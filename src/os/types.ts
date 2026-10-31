@@ -30,8 +30,14 @@ export interface WindowState {
   zIndex: number;
   minimized: boolean;
   maximized: boolean;
+  desktopId?: string;
   prevRect?: { x: number; y: number; width: number; height: number };
   payload?: unknown;
+}
+
+export interface VirtualDesktop {
+  id: string;
+  name: string;
 }
 
 export interface TaskbarApp {
@@ -41,20 +47,11 @@ export interface TaskbarApp {
 }
 
 export const TASKBAR_APPS: TaskbarApp[] = [
-  { appId: 'explorer', label: 'File Explorer', icon: 'FolderOpen' },
-  { appId: 'browser', label: 'Liquid Browser', icon: 'Globe' },
+  { appId: 'browser', label: 'Browser', icon: 'Globe' },
+  { appId: 'notepad', label: 'Editor', icon: 'FileText' },
   { appId: 'terminal', label: 'Terminal', icon: 'SquareTerminal' },
-  { appId: 'ai', label: 'Liquid Copilot AI', icon: 'Bot' },
-  { appId: 'weather', label: 'Cosmic Weather', icon: 'CloudSun' },
-  { appId: 'clock', label: 'Clock & Alarms', icon: 'Clock' },
-  { appId: 'notepad', label: 'Notepad', icon: 'FileText' },
-  { appId: 'calculator', label: 'Calculator Pro', icon: 'Calculator' },
-  { appId: 'taskmanager', label: 'Task Manager', icon: 'Cpu' },
-  { appId: 'game', label: '3D Arcadium Engine', icon: 'Gamepad2' },
-  { appId: 'appstore', label: 'App Store', icon: 'Store' },
-  { appId: 'sysmon', label: 'System Monitor', icon: 'Activity' },
-  { appId: 'calendar', label: 'Calendar & Tasks', icon: 'Calendar' },
-  { appId: 'synth', label: 'Monochrome Music', icon: 'Music' },
+  { appId: 'explorer', label: 'Files', icon: 'FolderOpen' },
+  { appId: 'calculator', label: 'Calculator', icon: 'Calculator' },
   { appId: 'settings', label: 'Settings', icon: 'Settings' },
 ];
 

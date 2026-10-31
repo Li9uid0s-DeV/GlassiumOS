@@ -3,15 +3,15 @@
 @tailwind utilities;
 
 :root {
-  --glass-border: rgba(255, 255, 255, 0.06);
-  --glass-border-dark: rgba(255, 255, 255, 0.02);
-  --glass-highlight: rgba(255, 255, 255, 0.08);
-  --theme-blur: 24px;
-  --theme-opacity: 0.04;
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-border-dark: rgba(255, 255, 255, 0.03);
+  --glass-highlight: rgba(255, 255, 255, 0.14);
+  --theme-blur: 20px;
+  --theme-opacity: 0.4;
   --theme-radius: 18px;
-  --glass-curvature: 42px;
-  --glass-specular: 0.65;
-  --glass-wobble: 0.6;
+  --glass-curvature: 36px;
+  --glass-specular: 0.75;
+  --glass-wobble: 0.65;
 }
 
 * {
@@ -27,469 +27,323 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   user-select: none;
 }
 
 /* ============================================================
-   TRUE 3D LIQUID GLASS — Curved Refractive Dome & Jelly Physics
+   GlassiumOS-V4.0 — 2.5D GLASSMORPHISM & LUSTROUS GRADIENTS
+   bg-slate-900/40 + backdrop-blur-md + inset specular shadow
    ============================================================ */
 
-/* ===== LIQUID GLASS WINDOW & CARDS ===== */
+/* ===== 2.5D GLASS WINDOWS & CARDS ===== */
 .liquid-glass-window,
 .liquid-glass-card {
-  position: relative;
   background: linear-gradient(
     145deg,
-    rgba(255, 255, 255, calc(var(--theme-opacity, 0.04) + 0.05)) 0%,
-    rgba(255, 255, 255, var(--theme-opacity, 0.04)) 45%,
-    rgba(255, 255, 255, calc(var(--theme-opacity, 0.04) + 0.02)) 100%
+    rgba(15, 23, 42, calc(var(--theme-opacity, 0.4) + 0.06)) 0%,
+    rgba(15, 23, 42, var(--theme-opacity, 0.4)) 55%,
+    rgba(30, 41, 59, calc(var(--theme-opacity, 0.4) + 0.04)) 100%
   );
-  backdrop-filter: blur(var(--theme-blur, 24px)) saturate(200%);
-  -webkit-backdrop-filter: blur(var(--theme-blur, 24px)) saturate(200%);
-  border: none;
+  backdrop-filter: blur(var(--theme-blur, 20px)) saturate(190%);
+  -webkit-backdrop-filter: blur(var(--theme-blur, 20px)) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--theme-radius, 18px);
   box-shadow:
-    0 26px 64px rgba(0, 0, 0, 0.65),
-    0 6px 20px rgba(0, 0, 0, 0.4),
-    inset 0 1.5px 2px 0 rgba(255, 255, 255, calc(0.28 * var(--glass-specular, 0.65))),
-    inset 0 -2px 4px 0 rgba(0, 0, 0, 0.38),
-    inset 0 0 calc(var(--glass-curvature, 42px) * 0.75) -14px rgba(255, 255, 255, calc(0.42 * var(--glass-specular, 0.65)));
+    0 24px 60px rgba(0, 0, 0, 0.55),
+    0 4px 16px rgba(0, 0, 0, 0.35),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 2px 0 rgba(0, 0, 0, 0.35),
+    inset 0 0 calc(var(--glass-curvature, 36px) * 0.65) -14px rgba(255, 255, 255, calc(0.28 * var(--glass-specular, 0.75)));
   isolation: isolate;
   transition:
-    box-shadow 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
-    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-/* Focused Window Sheen & Refractive Aura */
+/* Focused 2.5D Window Sheen */
 .liquid-glass-window.is-focused,
 .liquid-glass-card.is-focused {
+  border-color: rgba(255, 255, 255, 0.14);
   box-shadow:
-    0 32px 76px rgba(0, 0, 0, 0.75),
-    0 10px 28px rgba(0, 0, 0, 0.5),
-    0 0 42px rgba(56, 189, 248, 0.14),
-    inset 0 2px 3px 0 rgba(255, 255, 255, calc(0.38 * var(--glass-specular, 0.65))),
-    inset 0 -2px 4px 0 rgba(0, 0, 0, 0.45),
-    inset 0 0 calc(var(--glass-curvature, 42px) * 0.9) -12px rgba(255, 255, 255, calc(0.55 * var(--glass-specular, 0.65)));
+    0 30px 72px rgba(0, 0, 0, 0.68),
+    0 8px 24px rgba(0, 0, 0, 0.45),
+    0 0 36px rgba(139, 92, 246, 0.12),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 3px 0 rgba(0, 0, 0, 0.4),
+    inset 0 0 calc(var(--glass-curvature, 36px) * 0.8) -12px rgba(255, 255, 255, calc(0.38 * var(--glass-specular, 0.75)));
 }
 
-/* Drag fallback — ultra smooth 60fps GPU performance */
+/* Drag state */
 .liquid-glass-window.is-dragging {
   backdrop-filter: blur(16px) saturate(175%);
   -webkit-backdrop-filter: blur(16px) saturate(175%);
-  box-shadow: 0 36px 84px rgba(0, 0, 0, 0.82);
+  box-shadow: 0 36px 84px rgba(0, 0, 0, 0.78);
 }
 
-/* 3D Curved Lens Rim & Specular Dome Highlight */
+/* 2.5D Specular Top Sheen */
 .liquid-glass-window::before,
 .liquid-glass-card::before {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  box-shadow:
-    inset 0 0 calc(var(--glass-curvature, 42px) * 1.1) -28px rgba(255, 255, 255, calc(0.85 * var(--glass-specular, 0.65))),
-    inset 0 1px 0 0 rgba(255, 255, 255, calc(0.32 * var(--glass-specular, 0.65)));
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
   background: radial-gradient(
-    120% 70% at 50% 0%,
-    rgba(255, 255, 255, calc(0.12 * var(--glass-specular, 0.65))) 0%,
+    120% 65% at 50% 0%,
+    rgba(255, 255, 255, calc(0.1 * var(--glass-specular, 0.75))) 0%,
     rgba(255, 255, 255, 0) 60%
   );
   pointer-events: none;
   z-index: 1;
 }
 
-/* Inner viscous organic flow refraction */
+/* Subtle Optical Refraction */
 .liquid-glass-window::after,
 .liquid-glass-card::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  backdrop-filter: blur(3px);
+  backdrop-filter: blur(2px);
   filter: url(#glass-distortion);
   pointer-events: none;
   z-index: 1;
 }
 
-/* Window Control Buttons MUST be unblockable */
 .window-controls-container {
   position: relative;
   z-index: 99999 !important;
   pointer-events: auto !important;
 }
 
-/* ============================================================
-   3D JELLY / LIQUID GLASS SLIDERS & SWITCHES (プルプル3DガラスUI)
-   ============================================================ */
-
-/* 3D Jelly Interactive Bounce Utility */
-.glass-jelly {
-  position: relative;
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.14) 0%,
-    rgba(255, 255, 255, 0.04) 55%,
-    rgba(255, 255, 255, 0.09) 100%
-  );
-  backdrop-filter: blur(18px) saturate(190%);
-  -webkit-backdrop-filter: blur(18px) saturate(190%);
-  box-shadow:
-    0 10px 24px rgba(0, 0, 0, 0.35),
-    inset 0 1.5px 2px rgba(255, 255, 255, 0.38),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.32),
-    inset 0 0 18px -6px rgba(255, 255, 255, 0.28);
-  transition:
-    transform 0.42s cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
-    background 0.25s ease;
-}
-
-.glass-jelly:hover {
-  transform: translateY(-2px) scale(1.025, 1.035);
-  box-shadow:
-    0 14px 30px rgba(0, 0, 0, 0.44),
-    0 0 20px rgba(56, 189, 248, 0.18),
-    inset 0 2px 3px rgba(255, 255, 255, 0.52),
-    inset 0 -2px 5px rgba(0, 0, 0, 0.36),
-    inset 0 0 24px -4px rgba(255, 255, 255, 0.38);
-}
-
-.glass-jelly:active {
-  transform: translateY(1px) scale(0.96, 0.93);
-  transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
-}
-
-/* 3D Liquid Glass Range Slider */
-input[type='range'].glass-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 14px;
-  border-radius: 9999px;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.38) 0%,
-    rgba(255, 255, 255, 0.08) 100%
-  );
-  box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.55),
-    inset 0 -1px 1.5px rgba(255, 255, 255, 0.25),
-    0 1px 2px rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(12px);
-  outline: none;
-  cursor: pointer;
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
-}
-
-input[type='range'].glass-slider:hover {
-  transform: scaleY(1.12);
-  box-shadow:
-    inset 0 2px 6px rgba(0, 0, 0, 0.6),
-    inset 0 -1px 2px rgba(255, 255, 255, 0.35),
-    0 0 16px rgba(56, 189, 248, 0.2);
-}
-
-input[type='range'].glass-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 28px;
-  height: 22px;
-  border-radius: 9999px;
-  background: radial-gradient(
-    circle at 35% 28%,
-    rgba(255, 255, 255, 0.92) 0%,
-    rgba(255, 255, 255, 0.42) 36%,
-    rgba(125, 211, 252, 0.28) 72%,
-    rgba(255, 255, 255, 0.55) 100%
-  );
-  backdrop-filter: blur(10px) saturate(200%);
-  -webkit-backdrop-filter: blur(10px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  box-shadow:
-    0 6px 16px rgba(0, 0, 0, 0.5),
-    0 0 14px rgba(56, 189, 248, 0.35),
-    inset 0 2px 3px rgba(255, 255, 255, 0.9),
-    inset 0 -2px 4px rgba(14, 165, 233, 0.35);
-  cursor: grab;
-  transition:
-    transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 0.3s ease,
-    width 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-input[type='range'].glass-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.18, 1.12);
-  box-shadow:
-    0 8px 20px rgba(0, 0, 0, 0.55),
-    0 0 22px rgba(56, 189, 248, 0.55),
-    inset 0 2.5px 4px rgba(255, 255, 255, 0.98),
-    inset 0 -2px 5px rgba(56, 189, 248, 0.5);
-}
-
-input[type='range'].glass-slider::-webkit-slider-thumb:active {
-  cursor: grabbing;
-  transform: scale(1.28, 0.88);
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.6),
-    0 0 26px rgba(56, 189, 248, 0.7),
-    inset 0 3px 5px rgba(255, 255, 255, 1),
-    inset 0 -2px 5px rgba(56, 189, 248, 0.65);
-}
-
-input[type='range'].glass-slider::-moz-range-thumb {
-  width: 28px;
-  height: 22px;
-  border-radius: 9999px;
-  background: radial-gradient(
-    circle at 35% 28%,
-    rgba(255, 255, 255, 0.92) 0%,
-    rgba(255, 255, 255, 0.42) 36%,
-    rgba(125, 211, 252, 0.28) 72%,
-    rgba(255, 255, 255, 0.55) 100%
-  );
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  box-shadow:
-    0 6px 16px rgba(0, 0, 0, 0.5),
-    0 0 14px rgba(56, 189, 248, 0.35),
-    inset 0 2px 3px rgba(255, 255, 255, 0.9),
-    inset 0 -2px 4px rgba(14, 165, 233, 0.35);
-  cursor: grab;
-  transition: transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-/* 3D Liquid Glass Toggle Switch */
-.glass-switch {
-  position: relative;
-  width: 54px;
-  height: 30px;
-  border-radius: 9999px;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0.42) 0%,
-    rgba(255, 255, 255, 0.08) 100%
-  );
-  box-shadow:
-    inset 0 2px 5px rgba(0, 0, 0, 0.6),
-    inset 0 -1px 2px rgba(255, 255, 255, 0.22),
-    0 2px 8px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  cursor: pointer;
-  transition:
-    background 0.35s ease,
-    box-shadow 0.35s ease,
-    transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.glass-switch:hover {
-  transform: scale(1.05);
-}
-
-.glass-switch:active {
-  transform: scale(0.95, 0.9);
-}
-
-.glass-switch.is-on {
-  background: linear-gradient(
-    135deg,
-    rgba(56, 189, 248, 0.55) 0%,
-    rgba(99, 102, 241, 0.5) 100%
-  );
-  box-shadow:
-    inset 0 2px 4px rgba(255, 255, 255, 0.42),
-    inset 0 -2px 5px rgba(14, 165, 233, 0.45),
-    0 0 20px rgba(56, 189, 248, 0.35),
-    0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.glass-switch-thumb {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 24px;
-  height: 24px;
-  border-radius: 9999px;
-  background: radial-gradient(
-    circle at 35% 30%,
-    rgba(255, 255, 255, 0.96) 0%,
-    rgba(255, 255, 255, 0.58) 45%,
-    rgba(186, 230, 253, 0.42) 100%
-  );
-  box-shadow:
-    0 4px 10px rgba(0, 0, 0, 0.45),
-    inset 0 2px 3px rgba(255, 255, 255, 0.95),
-    inset 0 -2px 3px rgba(0, 0, 0, 0.2);
-  transition:
-    transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
-    width 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 0.3s ease;
-}
-
-.glass-switch:active .glass-switch-thumb {
-  width: 28px;
-}
-
-.glass-switch.is-on .glass-switch-thumb {
-  transform: translateX(24px);
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.5),
-    0 0 12px rgba(255, 255, 255, 0.65),
-    inset 0 2px 3px rgba(255, 255, 255, 1),
-    inset 0 -2px 4px rgba(56, 189, 248, 0.4);
-}
-
-.glass-switch.is-on:active .glass-switch-thumb {
-  transform: translateX(20px);
-}
-
-/* ===== LIQUID GLASS FULL-WIDTH TASKBAR ===== */
+/* ===== 2.5D TASKBAR ===== */
 .liquid-glass-taskbar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   width: 100vw;
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: url(#frosted-dock) blur(20px) saturate(180%);
-  -webkit-backdrop-filter: url(#frosted-dock) blur(20px) saturate(180%);
-  border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(20px) saturate(190%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow:
-    0 -8px 32px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 0 rgba(255, 255, 255, 0.14);
+    0 -10px 32px rgba(0, 0, 0, 0.55),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.2);
   isolation: isolate;
 }
 
-.liquid-glass-taskbar::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.04) 0%,
-    rgba(255, 255, 255, 0.01) 50%,
-    rgba(255, 255, 255, 0.04) 100%
-  );
-  pointer-events: none;
-  z-index: 1;
-  mix-blend-mode: overlay;
+/* ===== 2.5D JELLY / LUSTROUS GRADIENT SLIDERS & SWITCHES ===== */
+.glass-jelly {
+  position: relative;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(16px) saturate(185%);
+  -webkit-backdrop-filter: blur(16px) saturate(185%);
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.32),
+    inset 0 1px 1px rgba(255, 255, 255, 0.22),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.28);
+  transition:
+    transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.3s ease,
+    background 0.25s ease;
 }
 
-/* ===== BASE GLASS PANELS & START MENU ===== */
-.glass {
+.glass-jelly:hover {
+  transform: translateY(-1.5px) scale(1.02);
+  background: rgba(30, 41, 59, 0.52);
+  box-shadow:
+    0 12px 26px rgba(0, 0, 0, 0.42),
+    0 0 18px rgba(139, 92, 246, 0.2),
+    inset 0 1px 1.5px rgba(255, 255, 255, 0.32);
+}
+
+.glass-jelly:active {
+  transform: translateY(0.5px) scale(0.97);
+}
+
+/* 2.5D Lustrous Gradient Slider */
+input[type='range'].glass-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 12px;
+  border-radius: 9999px;
+  background: linear-gradient(
+    90deg,
+    rgba(217, 70, 239, 0.55) 0%,
+    rgba(139, 92, 246, 0.55) 50%,
+    rgba(6, 182, 212, 0.65) 100%
+  );
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.45),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(12px);
+  outline: none;
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+}
+
+input[type='range'].glass-slider:hover {
+  transform: scaleY(1.1);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.5),
+    0 0 14px rgba(139, 92, 246, 0.3);
+}
+
+input[type='range'].glass-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 20px;
+  border-radius: 9999px;
+  background: radial-gradient(
+    circle at 35% 30%,
+    #ffffff 0%,
+    #e0f2fe 45%,
+    #a5f3fc 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.45),
+    0 0 12px rgba(6, 182, 212, 0.45),
+    inset 0 1px 2px rgba(255, 255, 255, 0.95);
+  cursor: grab;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+}
+
+input[type='range'].glass-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.5),
+    0 0 18px rgba(217, 70, 239, 0.55),
+    inset 0 2px 3px rgba(255, 255, 255, 1);
+}
+
+input[type='range'].glass-slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.22, 0.9);
+}
+
+input[type='range'].glass-slider::-moz-range-thumb {
+  width: 24px;
+  height: 20px;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #e0f2fe 45%, #a5f3fc 100%);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.45),
+    0 0 12px rgba(6, 182, 212, 0.45),
+    inset 0 1px 2px rgba(255, 255, 255, 0.95);
+  cursor: grab;
+}
+
+/* 2.5D Liquid Glass Toggle Switch */
+.glass-switch {
   position: relative;
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: url(#frosted-menu) blur(24px) saturate(190%);
-  -webkit-backdrop-filter: url(#frosted-menu) blur(24px) saturate(190%);
-  border: none;
+  width: 52px;
+  height: 28px;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.55);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.55),
+    inset 0 1px 1px rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+  transition:
+    background 0.3s ease,
+    box-shadow 0.3s ease,
+    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.glass-switch.is-on {
+  background: linear-gradient(135deg, #d946ef 0%, #8b5cf6 50%, #06b6d4 100%);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.38),
+    0 0 18px rgba(139, 92, 246, 0.4);
+}
+
+.glass-switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #f1f5f9 100%);
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.4),
+    inset 0 1px 2px rgba(255, 255, 255, 0.95);
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.glass-switch.is-on .glass-switch-thumb {
+  transform: translateX(24px);
+}
+
+/* ===== BASE 2.5D GLASS PANELS ===== */
+.glass {
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 18px;
   box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.7),
-    0 4px 16px rgba(0, 0, 0, 0.4),
-    inset 0 1.5px 2px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -1px 2px 0 rgba(0, 0, 0, 0.4),
-    inset 0 0 calc(var(--glass-curvature, 42px) * 0.65) -14px rgba(255, 255, 255, 0.35);
+    0 24px 60px rgba(0, 0, 0, 0.65),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.22);
   isolation: isolate;
 }
 
 .glass-panel {
-  background: rgba(255, 255, 255, 0.035);
+  background: rgba(15, 23, 42, 0.4);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.14),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
 }
 
 .glass-panel-hover:hover {
-  background: rgba(255, 255, 255, 0.09);
+  background: rgba(30, 41, 59, 0.5);
   border-color: rgba(255, 255, 255, 0.18);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.35),
+    inset 0 1px 1px rgba(255, 255, 255, 0.25);
 }
 
-/* ============================================================
-   ALTERNATIVE DESIGN ENGINES
-   ============================================================ */
-
-/* 1. Frosted Blur Theme */
+/* Alternative Engines */
 .engine-frosted-blur .liquid-glass-window,
 .engine-frosted-blur .liquid-glass-taskbar,
 .engine-frosted-blur .glass {
   backdrop-filter: blur(28px) saturate(190%) !important;
   -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
-  background: rgba(18, 18, 28, 0.25);
-  border: none;
+  background: rgba(15, 23, 42, 0.45);
 }
 
-/* 2. Pure Liquid Refraction Theme */
 .engine-windows-mica .liquid-glass-window,
 .engine-windows-mica .liquid-glass-taskbar,
 .engine-windows-mica .glass {
   backdrop-filter: url(#liquid-glass-lens) blur(18px) saturate(200%) !important;
   -webkit-backdrop-filter: url(#liquid-glass-lens) blur(18px) saturate(200%) !important;
-  background: rgba(255, 255, 255, 0.02);
-  border: none;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  background: rgba(15, 23, 42, 0.38);
 }
 
-/* 3. Dark Cosmic Slate Theme */
 .engine-dark-slate .liquid-glass-window,
 .engine-dark-slate .liquid-glass-taskbar,
 .engine-dark-slate .glass {
   backdrop-filter: blur(20px) !important;
   -webkit-backdrop-filter: blur(20px) !important;
-  background: rgba(10, 12, 18, 0.45);
-  border: none;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+  background: rgba(9, 13, 22, 0.65);
 }
 
-/* 4. Cyberpunk Neon Grid Theme */
-.engine-cyberpunk-neon .liquid-glass-window {
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  background: rgba(10, 6, 24, 0.4);
-  border: 1px solid rgba(0, 255, 204, 0.4);
-  box-shadow: 0 0 24px rgba(0, 255, 204, 0.25), 0 16px 40px rgba(0, 0, 0, 0.6);
-}
-
-.engine-cyberpunk-neon .liquid-glass-taskbar {
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  background: rgba(8, 4, 20, 0.5);
-  border-top: 1px solid rgba(255, 0, 127, 0.4);
-  box-shadow: 0 0 20px rgba(255, 0, 127, 0.25);
-}
-
-/* ============================================================
-   NEON SPECULAR AURA GLOWS
-   ============================================================ */
-.liquid-glow {
-  box-shadow: 0 0 24px rgba(249, 115, 22, 0.45), 0 0 48px rgba(234, 88, 12, 0.2);
-}
-
-.glow-cyan {
-  box-shadow: 0 0 24px rgba(6, 182, 212, 0.45), 0 0 48px rgba(14, 165, 233, 0.2);
-}
-
-.glow-violet {
-  box-shadow: 0 0 24px rgba(168, 85, 247, 0.45), 0 0 48px rgba(147, 51, 234, 0.2);
-}
-
-/* ============================================================
-   MAC DOCK MAGNIFICATION & UBUNTU LAUNCHER
-   ============================================================ */
 .mac-dock-item {
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), margin 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .mac-dock-item:hover {
-  transform: translateY(-9px) scale(1.24);
+  transform: translateY(-8px) scale(1.2);
 }
 
-/* Active running app indicator dot */
 .app-active-pip {
   position: absolute;
   bottom: 2px;
@@ -498,33 +352,10 @@ input[type='range'].glass-slider::-moz-range-thumb {
   width: 4px;
   height: 4px;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+  background: #22d3ee;
+  box-shadow: 0 0 6px #22d3ee;
 }
 
-/* ============================================================
-   WINDOWS 8 METRO LIVE TILES
-   ============================================================ */
-.metro-tile {
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-}
-
-.metro-tile:hover {
-  transform: scale(1.03) translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.55);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35), 0 0 20px rgba(255, 255, 255, 0.2);
-}
-
-.metro-tile:active {
-  transform: scale(0.96);
-}
-
-/* Custom Scrollbar for all apps */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -540,5 +371,5 @@ input[type='range'].glass-slider::-moz-range-thumb {
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.35);
 }

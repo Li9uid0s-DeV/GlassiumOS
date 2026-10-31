@@ -6,10 +6,9 @@ interface Line {
   text: string;
 }
 
-const BANNER = `LiquidOS Terminal [Version 4.0.0-Release]
-(c) LiquidOS Foundation. All rights reserved.
-Kernel: Liquid-X Compositor (#glass-distortion)
-Type 'help' for a full list of system commands.`;
+const BANNER = `GlassiumOS-V4.0 Terminal
+(c) GlassiumOS Project. All rights reserved.
+Type 'help' for a list of available commands.`;
 
 const MOCK_WEATHER = [
   { city: 'New York', temp: '72°F', cond: 'Partly cloudy', wind: '8 mph SW' },
@@ -62,41 +61,36 @@ export function TerminalApp() {
     const [name, ...args] = cmd.split(/\s+/);
     switch (name.toLowerCase()) {
       case 'help':
-        print('LiquidOS v4.0.0 Command Suite:');
+        print('GlassiumOS-V4.0 Commands:');
         print('  help               Show this help index');
         print('  clear              Clear the terminal screen');
         print('  ls                 List directory contents');
         print('  cd <dir>           Change working directory');
         print('  pwd                Print working directory');
-        print('  cat <file>         Output contents of a virtual text file');
+        print('  cat <file>         Output contents of a file');
         print('  date               Show current system timestamp');
-        print('  whoami             Print current authenticated user');
-        print('  uname -a           Print kernel & architecture specifications');
-        print('  echo <text>        Print text to standard output');
+        print('  whoami             Print current user');
+        print('  uname -a           Print system version');
+        print('  echo <text>        Print text to output');
         print('  ps / top           List active window processes');
-        print('  kill <id>          Terminate a running window instance');
-        print('  shell <mode>       Switch OS shell (windows, mac, ubuntu, android, ios, metro)');
-        print('  open <app>         Launch application (calculator, taskmanager, game, etc.)');
-        print('  neofetch           Display system diagnostics & ASCII logo');
-        print('  sysinfo            Display hardware specs & memory usage');
-        print('  weather [city]     Realtime mock meteorological status');
-        print('  calc <expr>        Evaluate mathematical equation');
-        print('  theme <name>       Switch live wallpaper');
-        print('  history            View command history list');
-        print('  lock / sleep       Lock workstation screen');
+        print('  kill <id>          Close a running window');
+        print('  open <app>         Launch application (browser, notepad, calculator, settings, etc.)');
+        print('  neofetch           Display system summary');
+        print('  calc <expr>        Evaluate mathematical expression');
+        print('  lock               Lock screen');
         break;
       case 'clear':
         setLines([]);
         return;
       case 'uname':
-        print('LiquidOS 4.0.0-cosmic #1 SMP PREEMPT_DYNAMIC x86_64 GNU/Linux (Liquid-X Compositor)');
+        print('GlassiumOS-V4.0 WebOS x86_64 (2.5D Glass Compositor)');
         break;
       case 'ps':
       case 'top': {
         print('PID    PROCESS NAME             STATE       MEMORY');
         print('--------------------------------------------------');
-        print('1      liquid-init              Running     32 MB');
-        print('2      liquid-dwm (Compositor)  Running     96 MB');
+        print('1      glassium-core            Running     32 MB');
+        print('2      glassium-compositor      Running     64 MB');
         windows.forEach((w, idx) => {
           print(`${100 + idx}    ${w.title.padEnd(24, ' ')} ${w.minimized ? 'Suspended' : 'Running'}   48 MB`);
         });
@@ -212,22 +206,19 @@ export function TerminalApp() {
         break;
       }
       case 'neofetch':
-        print('       .---.        liquid@liquidos-v4');
-        print('      /     \\       ------------------');
-        print('     | () () |      OS: LiquidOS v4.0.0 Titanium Edition');
-        print('      \\  _  /       Host: WebGL 2.0 Browser Container');
-        print('       `---\'        Kernel: Liquid-X (#glass-distortion)');
-        print('    /|     |\\       Uptime: ' + Math.floor(performance.now() / 1000) + ' seconds');
-        print('   / |     | \\      Shell: LiquidBash 5.2.15');
-        print('  /  |_____|  \\     Display: ' + window.innerWidth + 'x' + window.innerHeight);
-        print(' `---`     `---`    WM: Liquid Glass Compositor (DWM)');
+        print('    .-------.       user@glassium-os');
+        print('   /   ___   \\      ----------------');
+        print('  |   /   \\   |     OS: GlassiumOS-V4.0');
+        print('  |  |  G  |  |     Runtime: Vite + TypeScript + Tailwind CSS');
+        print('  |   \\___/   |     UI: 2.5D Glassmorphism & Fluid Gradients');
+        print('   \\         /      Uptime: ' + Math.floor(performance.now() / 1000) + 's');
+        print('    `-------\'       Display: ' + window.innerWidth + 'x' + window.innerHeight);
         break;
       case 'sysinfo': {
-        print('=== LiquidOS v4.0.0 System Telemetry ===');
-        print(`Architecture: 64-bit Virtual Runtime (TypeScript 5.5 + Vite)`);
-        print(`CPU Cores:    ${navigator.hardwareConcurrency ?? '8'} logical processors`);
-        print(`Compositor:   True Liquid Glass (SVG #glass-distortion)`);
-        print(`Resolution:   ${window.innerWidth}x${window.innerHeight} @ 60Hz`);
+        print('=== GlassiumOS-V4.0 System Summary ===');
+        print(`Architecture: WebOS Container (TypeScript + Vite)`);
+        print(`CPU Threads:  ${navigator.hardwareConcurrency ?? '8'} logical cores`);
+        print(`Viewport:     ${window.innerWidth}x${window.innerHeight}`);
         print(`Uptime:       ${Math.floor(performance.now() / 1000)}s`);
         break;
       }
@@ -287,7 +278,7 @@ export function TerminalApp() {
     }
   };
 
-  const prompt = () => 'liquid@os:' + (cwd.length ? '/' + cwd.join('/') : '~') + '$';
+  const prompt = () => 'glassium@os:' + (cwd.length ? '/' + cwd.join('/') : '~') + '$';
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {

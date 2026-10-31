@@ -16,12 +16,13 @@ interface Message {
 }
 
 const TEMPLATES = [
+  { label: 'ブラックホールとは？', prompt: 'ブラックホールとは何か、わかりやすく教えて' },
+  { label: '量子コンピュータとは', prompt: '量子コンピュータについて教えて' },
+  { label: '美味しいカレーのレシピ', prompt: 'コクが出る美味しいカレーの作り方を教えて' },
+  { label: 'Reactコード作成', prompt: 'ReactとTypeScriptでカウンターコンポーネントを書いて' },
+  { label: '集中力を高める方法', prompt: '勉強や仕事の集中力を高めるコツを教えて' },
   { label: 'オーロラをエメラルドに', prompt: 'オーロラのカラーをエメラルド＆スカイに変更して' },
-  { label: 'ガラスの湾曲を強く', prompt: '3Dガラスの湾曲度とプルプル感を強めにして' },
-  { label: 'ゲームを起動', prompt: 'ゲームアプリを起動して' },
-  { label: 'macOSモードにする', prompt: 'レイアウトをmacOSに切り替えて' },
-  { label: 'スリープ画面にする', prompt: '画面をスリープにして' },
-  { label: 'TypeScriptの書き方', prompt: 'TypeScriptで配列の重複を消す簡潔なコードを教えて' },
+  { label: 'ウィンドウを左右に整列', prompt: 'ウィンドウを並べて整列して' },
 ];
 
 export function AIAssistantApp() {

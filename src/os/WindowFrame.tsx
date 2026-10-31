@@ -147,7 +147,11 @@ export function WindowFrame({ win, children }: Props) {
   }, [win.id, win.x, win.y, updateWindowRect, toggleMaximize, onPointerMove]);
 
   const startDrag = (e: React.PointerEvent) => {
-    if (win.maximized || shellMode === 'metro' || shellMode === 'windows8') return;
+    const targetEl = e.target as HTMLElement | null;
+    if (targetEl?.closest('button, .window-controls-container, .snap-layout-popover')) {
+      return;
+    }
+    if (shellMode === 'metro' || shellMode === 'windows8') return;
     // Check for double-tap on touch screens
     const now = Date.now();
     if (now - lastTapRef.current < 320) {
@@ -158,6 +162,8 @@ export function WindowFrame({ win, children }: Props) {
     lastTapRef.current = now;
 
     focusWindow(win.id);
+    if (win.maximized) return;
+
     setDragging(true);
     dragState.current = {
       mode: 'move',
@@ -244,11 +250,27 @@ export function WindowFrame({ win, children }: Props) {
   const isMobileViewport = typeof window !== 'undefined' && window.innerWidth < 640;
 
   // Windows freely overlap and drag; only maximize when explicitly maximized or in Windows 8 Metro mode
+  const topOffset = isMac || isUbuntu ? 28 : 0;
+  const leftOffset = isUbuntu ? 64 : 0;
   const style: React.CSSProperties = isMetro
-    ? { left: 0, top: 0, width: '100vw', height: '100vh', zIndex: win.zIndex, borderRadius: 0 }
+    ? { position: 'fixed', left: 0, top: 0, width: '100vw', height: '100vh', zIndex: win.zIndex, borderRadius: 0 }
     : win.maximized
-    ? { left: 0, top: 0, width: '100vw', height: `calc(100vh - ${TASKBAR_H}px)`, zIndex: win.zIndex, transform: undefined }
+    ? {
+        position: 'fixed',
+        left: leftOffset,
+        top: topOffset,
+        width: isUbuntu ? 'calc(100vw - 64px)' : '100vw',
+        height: isMac
+          ? 'calc(100vh - 96px)'
+          : isUbuntu
+          ? 'calc(100vh - 28px)'
+          : `calc(100vh - ${TASKBAR_H}px)`,
+        zIndex: win.zIndex,
+        borderRadius: 0,
+        transform: undefined,
+      }
     : {
+        position: 'absolute',
         left: win.x,
         top: win.y,
         width: typeof window !== 'undefined' ? Math.min(win.width, window.innerWidth - 16) : win.width,
@@ -302,15 +324,17 @@ export function WindowFrame({ win, children }: Props) {
       )}
 
       <motion.div
-        className={`absolute flex flex-col overflow-hidden select-none ${windowFrameClasses} ${dragging ? 'is-dragging shadow-2xl ring-2 ring-cyan-400/50' : ''}`}
+        className={`flex flex-col overflow-hidden select-none ${windowFrameClasses} ${isTopmost ? 'is-focused' : ''} ${dragging ? 'is-dragging shadow-2xl ring-2 ring-cyan-400/50' : ''}`}
         style={style}
         initial={{ opacity: 0, scale: isMetro ? 1 : 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: isMetro ? 1 : 0.96 }}
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-        onPointerDown={() => focusWindow(win.id)}
-        onMouseDown={() => focusWindow(win.id)}
-        onTouchStart={() => focusWindow(win.id)}
+        onPointerDownCapture={(e) => {
+          const targetEl = e.target as HTMLElement | null;
+          if (targetEl?.closest('.window-controls-container')) return;
+          if (!isTopmost) focusWindow(win.id);
+        }}
       >
         {/* ========================================================
             1. METRO / FULLSCREEN IMMERSIVE HEADER BAR
@@ -332,15 +356,20 @@ export function WindowFrame({ win, children }: Props) {
                 <span className="font-semibold">{win.title}</span>
                 <span className="text-[10px] text-white/40 font-mono">Windows 8 Fullscreen</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div
+                className="window-controls-container flex items-center gap-2"
+                onPointerDown={(e) => e.stopPropagation()}
+              >
                 <button
-                  onClick={() => minimizeWindow(win.id)}
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); minimizeWindow(win.id); }}
                   className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs text-white/90 transition"
                 >
                   <Icon name="Minus" size={14} />
                 </button>
                 <button
-                  onClick={() => closeWindow(win.id)}
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); closeWindow(win.id); }}
                   className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-xs text-white transition flex items-center gap-1.5"
                 >
                   <Icon name="X" size={14} />
@@ -358,18 +387,25 @@ export function WindowFrame({ win, children }: Props) {
           <div
             className={`flex items-center justify-between select-none shrink-0 cursor-default relative z-20 touch-none ${titleBarClasses}`}
             onPointerDown={startDrag}
-            onDoubleClick={() => toggleMaximize(win.id)}
+            onDoubleClick={(e) => {
+              const targetEl = e.target as HTMLElement | null;
+              if (targetEl?.closest('button, .window-controls-container')) return;
+              toggleMaximize(win.id);
+            }}
             style={{ touchAction: 'none' }}
           >
             {/* MAC OS: Authentic Traffic Light Beads with Group Hover and Balanced Title */}
             {isMac && (
               <div
-                className="flex items-center gap-2 pl-2 relative z-50 pointer-events-auto w-16 group"
+                className="window-controls-container flex items-center gap-2 pl-2 relative z-50 pointer-events-auto w-16 group"
                 onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
               >
                 {/* Close (Red / しょうきょ) */}
                 <button
-                  className="h-3 w-3 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:brightness-90 active:brightness-75 transition flex items-center justify-center text-[8px] text-[#4A0002] shadow-[inset_0_1px_rgba(255,255,255,0.4)]"
+                  type="button"
+                  className="h-3.5 w-3.5 rounded-full bg-[#FF5F56] border border-[#E0443E] hover:brightness-90 active:brightness-75 transition flex items-center justify-center text-[8px] text-[#4A0002] shadow-[inset_0_1px_rgba(255,255,255,0.4)] cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); closeWindow(win.id); }}
                   title="閉じる (Close)"
                 >
@@ -377,7 +413,9 @@ export function WindowFrame({ win, children }: Props) {
                 </button>
                 {/* Minimize (Yellow / さいしょうか) */}
                 <button
-                  className="h-3 w-3 rounded-full bg-[#FFBD2E] border border-[#DEA123] hover:brightness-90 active:brightness-75 transition flex items-center justify-center text-[8px] text-[#5A3B00] shadow-[inset_0_1px_rgba(255,255,255,0.4)]"
+                  type="button"
+                  className="h-3.5 w-3.5 rounded-full bg-[#FFBD2E] border border-[#DEA123] hover:brightness-90 active:brightness-75 transition flex items-center justify-center text-[8px] text-[#5A3B00] shadow-[inset_0_1px_rgba(255,255,255,0.4)] cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); minimizeWindow(win.id); }}
                   title="最小化 (Minimize)"
                 >
@@ -385,7 +423,9 @@ export function WindowFrame({ win, children }: Props) {
                 </button>
                 {/* Maximize (Green / さいだいか) */}
                 <button
-                  className="h-3 w-3 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:brightness-90 active:brightness-75 transition flex items-center justify-center text-[8px] text-[#0A4812] shadow-[inset_0_1px_rgba(255,255,255,0.4)]"
+                  type="button"
+                  className="h-3.5 w-3.5 rounded-full bg-[#27C93F] border border-[#1AAB29] hover:brightness-90 active:brightness-75 transition flex items-center justify-center text-[8px] text-[#0A4812] shadow-[inset_0_1px_rgba(255,255,255,0.4)] cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); toggleMaximize(win.id); }}
                   title="フルスクリーン / 最大化 (Maximize)"
                 >
@@ -396,7 +436,7 @@ export function WindowFrame({ win, children }: Props) {
 
             {/* Window Icon & Title */}
             <div className={`flex items-center gap-2 text-xs pointer-events-none truncate ${isMac ? 'mx-auto' : ''}`}>
-              <Icon name={win.icon} size={15} className={isXP ? 'text-amber-300' : isVista ? 'text-cyan-300' : 'text-cyan-400'} />
+              <Icon name={win.appId || win.icon} size={18} />
               <span className={`font-semibold truncate ${isXP ? 'text-white tracking-wide drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]' : 'text-white/90'}`}>
                 {win.title}
               </span>
@@ -404,136 +444,192 @@ export function WindowFrame({ win, children }: Props) {
 
             {/* WINDOWS XP: Iconic Blue / Red Luna Buttons */}
             {isXP ? (
-              <div className="flex items-center gap-1 relative z-50 pointer-events-auto">
+              <div
+                className="window-controls-container flex items-center gap-1 relative z-50 pointer-events-auto"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
                 <button
-                  className="w-5 h-5 rounded-sm bg-gradient-to-b from-[#2572ea] to-[#0038bb] hover:from-[#3c88fc] hover:to-[#0947db] border border-white/60 active:inset-0 text-white flex items-center justify-center text-[10px] font-bold shadow-sm"
+                  type="button"
+                  className="w-5 h-5 rounded-sm bg-gradient-to-b from-[#2572ea] to-[#0038bb] hover:from-[#3c88fc] hover:to-[#0947db] border border-white/60 active:inset-0 text-white flex items-center justify-center text-[10px] font-bold shadow-sm cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); minimizeWindow(win.id); }}
-                  title="Minimize"
+                  title="最小化 (Minimize)"
                 >
                   _
                 </button>
                 <button
-                  className="w-5 h-5 rounded-sm bg-gradient-to-b from-[#2572ea] to-[#0038bb] hover:from-[#3c88fc] hover:to-[#0947db] border border-white/60 active:inset-0 text-white flex items-center justify-center text-[9px] font-bold shadow-sm"
+                  type="button"
+                  className="w-5 h-5 rounded-sm bg-gradient-to-b from-[#2572ea] to-[#0038bb] hover:from-[#3c88fc] hover:to-[#0947db] border border-white/60 active:inset-0 text-white flex items-center justify-center text-[9px] font-bold shadow-sm cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); toggleMaximize(win.id); }}
-                  title="Maximize"
+                  title="最大化 (Maximize)"
                 >
                   □
                 </button>
                 <button
-                  className="w-5 h-5 rounded-sm bg-gradient-to-b from-[#e84c2f] to-[#be2000] hover:from-[#ff6b50] hover:to-[#d82803] border border-white/60 text-white flex items-center justify-center text-[11px] font-bold shadow-sm"
+                  type="button"
+                  className="w-5 h-5 rounded-sm bg-gradient-to-b from-[#e84c2f] to-[#be2000] hover:from-[#ff6b50] hover:to-[#d82803] border border-white/60 text-white flex items-center justify-center text-[11px] font-bold shadow-sm cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); closeWindow(win.id); }}
-                  title="Close"
+                  title="閉じる (Close)"
                 >
                   ×
                 </button>
               </div>
             ) : isVista ? (
               /* WINDOWS VISTA: Glowing Aero Glass Buttons */
-              <div className="flex items-center gap-1 relative z-50 pointer-events-auto">
+              <div
+                className="window-controls-container flex items-center gap-1 relative z-50 pointer-events-auto"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
                 <button
-                  className="h-6 w-7 rounded bg-white/10 hover:bg-white/20 border border-white/20 text-white flex items-center justify-center text-xs transition"
+                  type="button"
+                  className="h-6 w-7 rounded bg-white/10 hover:bg-white/20 border border-white/20 text-white flex items-center justify-center text-xs transition cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); minimizeWindow(win.id); }}
-                  title="Minimize"
+                  title="最小化 (Minimize)"
                 >
                   <Icon name="Minus" size={13} />
                 </button>
                 <button
-                  className="h-6 w-7 rounded bg-white/10 hover:bg-white/20 border border-white/20 text-white flex items-center justify-center text-xs transition"
+                  type="button"
+                  className="h-6 w-7 rounded bg-white/10 hover:bg-white/20 border border-white/20 text-white flex items-center justify-center text-xs transition cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); toggleMaximize(win.id); }}
-                  title="Maximize"
+                  title="最大化 (Maximize)"
                 >
                   <Icon name="Maximize" size={11} />
                 </button>
                 <button
-                  className="h-6 w-8 rounded bg-rose-600/80 hover:bg-rose-600 border border-rose-400 text-white flex items-center justify-center text-xs transition shadow-lg shadow-rose-500/30"
+                  type="button"
+                  className="h-6 w-8 rounded bg-rose-600/80 hover:bg-rose-600 border border-rose-400 text-white flex items-center justify-center text-xs transition shadow-lg shadow-rose-500/30 cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); closeWindow(win.id); }}
-                  title="Close"
+                  title="閉じる (Close)"
                 >
                   <Icon name="X" size={13} />
                 </button>
               </div>
             ) : isUbuntu ? (
               /* UBUNTU: Circular Industrial Controls */
-              <div className="flex items-center gap-1.5 pr-1 relative z-50 pointer-events-auto">
+              <div
+                className="window-controls-container flex items-center gap-1.5 pr-1 relative z-50 pointer-events-auto"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
                 <button
-                  className="h-5 w-5 rounded-full bg-white/10 hover:bg-white/25 text-white/80 flex items-center justify-center transition"
+                  type="button"
+                  className="h-5 w-5 rounded-full bg-white/10 hover:bg-white/25 text-white/80 flex items-center justify-center transition cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); minimizeWindow(win.id); }}
-                  title="Minimize"
+                  title="最小化 (Minimize)"
                 >
                   <Icon name="Minus" size={10} />
                 </button>
                 <button
-                  className="h-5 w-5 rounded-full bg-white/10 hover:bg-white/25 text-white/80 flex items-center justify-center transition"
+                  type="button"
+                  className="h-5 w-5 rounded-full bg-white/10 hover:bg-white/25 text-white/80 flex items-center justify-center transition cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); toggleMaximize(win.id); }}
-                  title="Maximize"
+                  title="最大化 (Maximize)"
                 >
                   <Icon name="Maximize" size={10} />
                 </button>
                 <button
-                  className="h-5 w-5 rounded-full bg-orange-600 hover:bg-orange-500 text-white flex items-center justify-center transition"
+                  type="button"
+                  className="h-5 w-5 rounded-full bg-orange-600 hover:bg-orange-500 text-white flex items-center justify-center transition cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); closeWindow(win.id); }}
-                  title="Close"
+                  title="閉じる (Close)"
                 >
                   <Icon name="X" size={10} />
                 </button>
               </div>
             ) : isDeX ? (
               /* SAMSUNG DEX: Clean DeX Controls */
-              <div className="flex items-center gap-1 relative z-50 pointer-events-auto">
+              <div
+                className="window-controls-container flex items-center gap-1 relative z-50 pointer-events-auto"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
                 <button
-                  className="p-1.5 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition"
+                  type="button"
+                  className="p-1.5 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); minimizeWindow(win.id); }}
-                  title="Minimize to DeX Taskbar"
+                  title="最小化 (Minimize)"
                 >
                   <Icon name="Minus" size={14} />
                 </button>
                 <button
-                  className="p-1.5 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition"
+                  type="button"
+                  className="p-1.5 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); toggleMaximize(win.id); }}
-                  title="Full Screen DeX"
+                  title="最大化 (Maximize)"
                 >
                   <Icon name="Maximize" size={13} />
                 </button>
                 <button
-                  className="p-1.5 rounded-lg text-white/70 hover:bg-rose-600 hover:text-white transition"
+                  type="button"
+                  className="p-1.5 rounded-lg text-white/70 hover:bg-rose-600 hover:text-white transition cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); closeWindow(win.id); }}
-                  title="Close Window"
+                  title="閉じる (Close)"
                 >
                   <Icon name="X" size={14} />
                 </button>
               </div>
             ) : isChromeOS ? (
               /* CHROMEOS: Minimalist Clean Controls */
-              <div className="flex items-center gap-1 relative z-50 pointer-events-auto">
+              <div
+                className="window-controls-container flex items-center gap-1 relative z-50 pointer-events-auto"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
                 <button
-                  className="h-7 w-7 rounded-full text-white/70 hover:bg-white/10 hover:text-white flex items-center justify-center transition"
+                  type="button"
+                  className="h-7 w-7 rounded-full text-white/70 hover:bg-white/10 hover:text-white flex items-center justify-center transition cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); minimizeWindow(win.id); }}
-                  title="Minimize"
+                  title="最小化 (Minimize)"
                 >
                   <Icon name="Minus" size={13} />
                 </button>
                 <button
-                  className="h-7 w-7 rounded-full text-white/70 hover:bg-white/10 hover:text-white flex items-center justify-center transition"
+                  type="button"
+                  className="h-7 w-7 rounded-full text-white/70 hover:bg-white/10 hover:text-white flex items-center justify-center transition cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); toggleMaximize(win.id); }}
-                  title="Maximize"
+                  title="最大化 (Maximize)"
                 >
                   <Icon name="Maximize" size={12} />
                 </button>
                 <button
-                  className="h-7 w-7 rounded-full text-white/70 hover:bg-rose-500/80 hover:text-white flex items-center justify-center transition"
+                  type="button"
+                  className="h-7 w-7 rounded-full text-white/70 hover:bg-rose-500/80 hover:text-white flex items-center justify-center transition cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); closeWindow(win.id); }}
-                  title="Close"
+                  title="閉じる (Close)"
                 >
                   <Icon name="X" size={13} />
                 </button>
               </div>
             ) : !isMac ? (
               /* WINDOWS 10 / WINDOWS 11 / STANDARD */
-              <div className="flex items-center relative z-50 pointer-events-auto">
+              <div
+                className="window-controls-container flex items-center relative z-50 pointer-events-auto"
+                onPointerDown={(e) => e.stopPropagation()}
+                onMouseDown={(e) => e.stopPropagation()}
+              >
                 <button
-                  className="win-control text-white/80 hover:bg-white/10 transition px-3.5 py-2"
+                  type="button"
+                  className="win-control text-white/80 hover:bg-white/15 active:bg-white/25 transition px-3.5 py-2 cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); minimizeWindow(win.id); }}
-                  title="Minimize"
+                  title="最小化 (Minimize)"
                 >
                   <Icon name="Minus" size={14} />
                 </button>
@@ -543,9 +639,11 @@ export function WindowFrame({ win, children }: Props) {
                   onMouseLeave={handleMaximizeHoverLeave}
                 >
                   <button
-                    className="win-control text-white/80 hover:bg-white/10 transition px-3.5 py-2"
+                    type="button"
+                    className="win-control text-white/80 hover:bg-white/15 active:bg-white/25 transition px-3.5 py-2 cursor-pointer"
+                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); toggleMaximize(win.id); }}
-                    title="Maximize"
+                    title={isMax ? '元に戻す (Restore)' : '最大化 (Maximize)'}
                   >
                     {isMax ? <Icon name="Maximize2" size={13} /> : <Icon name="Maximize" size={13} />}
                   </button>
@@ -556,6 +654,7 @@ export function WindowFrame({ win, children }: Props) {
                       className="snap-layout-popover right-0 top-9"
                       onMouseEnter={handleMaximizeHoverEnter}
                       onMouseLeave={handleMaximizeHoverLeave}
+                      onPointerDown={(e) => e.stopPropagation()}
                     >
                       {presets.map((preset) => (
                         <div key={preset.id} className="snap-layout-option" style={{ gridTemplateColumns: `repeat(${preset.zones.length}, 1fr)` }}>
@@ -564,8 +663,10 @@ export function WindowFrame({ win, children }: Props) {
                             return (
                               <button
                                 key={i}
+                                type="button"
                                 className="snap-zone-mini"
                                 style={{ width: Math.max(16, 60 / preset.zones.length), height: 36 * aspectH }}
+                                onPointerDown={(e) => e.stopPropagation()}
                                 onClick={(e) => { e.stopPropagation(); applySnapPreset(preset, i); }}
                                 title={`${preset.label} — zone ${i + 1}`}
                               />
@@ -577,9 +678,11 @@ export function WindowFrame({ win, children }: Props) {
                   )}
                 </div>
                 <button
-                  className="win-control close text-white/80 hover:bg-rose-600 hover:text-white transition px-4 py-2"
+                  type="button"
+                  className="win-control close text-white/80 hover:bg-rose-600 hover:text-white active:bg-rose-700 transition px-4 py-2 cursor-pointer"
+                  onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); closeWindow(win.id); }}
-                  title="Close"
+                  title="閉じる (Close)"
                 >
                   <Icon name="X" size={14} />
                 </button>
@@ -596,17 +699,6 @@ export function WindowFrame({ win, children }: Props) {
           style={{ contain: 'layout style paint' }}
         >
           {children}
-
-          {/* Inactive Window Overlay: brings window to front instantly on click or tap */}
-          {!isTopmost && (
-            <div
-              className="absolute inset-0 z-30 bg-transparent cursor-pointer"
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                focusWindow(win.id);
-              }}
-            />
-          )}
         </div>
 
         {/* ========================================================

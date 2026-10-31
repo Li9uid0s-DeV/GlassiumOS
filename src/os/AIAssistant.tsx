@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOS, AuroraColor, Wallpaper } from './OSContext';
 import { Icon } from './Icon';
@@ -14,10 +15,10 @@ interface ChatMessage {
 }
 
 const QUICK_PROMPTS = [
+  { label: 'ブラックホールとは？', query: 'ブラックホールとは何か、わかりやすく教えて' },
+  { label: '美味しいカレーの作り方', query: 'コクが出る美味しいカレーの作り方を教えて' },
+  { label: 'Reactの書き方', query: 'ReactとTypeScriptの基本的なコンポーネント例を教えて' },
   { label: 'オーロラをエメラルドに', query: 'オーロラのカラーをエメラルド＆スカイに変更して' },
-  { label: 'ガラスの湾曲を強く', query: '3Dガラスの湾曲度とプルプル感を強めにして' },
-  { label: 'ゲームを起動', query: 'ゲームを起動して' },
-  { label: 'スリープ画面', query: 'スリープにして' },
   { label: 'ウィンドウ整列', query: 'ウィンドウを並べて整列して' },
 ];
 
@@ -233,17 +234,19 @@ export function AIAssistant() {
         <Icon name="Sparkles" size={16} className="text-sky-300" />
       </button>
 
-      <AnimatePresence>
-        {expanded && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setExpanded(false)} />
-            <motion.div
-              initial={{ opacity: 0, x: 80 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 80 }}
-              transition={{ type: 'spring', stiffness: 360, damping: 28 }}
-              className="liquid-glass-card fixed top-3 right-3 bottom-14 z-50 w-84 sm:w-96 flex flex-col justify-between p-4 shadow-2xl"
-            >
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <AnimatePresence>
+            {expanded && (
+              <>
+                <div className="fixed inset-0 z-[5100]" onClick={() => setExpanded(false)} />
+                <motion.div
+                  initial={{ opacity: 0, x: 80 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 80 }}
+                  transition={{ type: 'spring', stiffness: 360, damping: 28 }}
+                  className="liquid-glass-card fixed top-3 right-3 bottom-14 z-[5200] w-84 sm:w-96 max-w-[calc(100vw-24px)] flex flex-col justify-between p-4 shadow-2xl"
+                >
               {/* Header */}
               <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
                 <div className="flex items-center gap-2.5">
@@ -351,10 +354,12 @@ export function AIAssistant() {
                   </button>
                 </div>
               </form>
-            </motion.div>
-          </>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>,
+          document.body
         )}
-      </AnimatePresence>
     </>
   );
 }

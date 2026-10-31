@@ -120,7 +120,9 @@ import {
   AppWindow,
   CheckCircle2,
   RotateCcw,
+  MousePointer,
 } from 'lucide-react';
+import { FluentAppIcon, resolveFluentIconType } from './FluentAppIcon';
 
 const map = {
   CloudSun,
@@ -148,6 +150,7 @@ const map = {
   AppWindow,
   CheckCircle2,
   RotateCcw,
+  MousePointer,
   FolderOpen,
   Globe,
   SquareTerminal,
@@ -253,12 +256,17 @@ export function Icon({
   className,
   size = 16,
   onClick,
+  fluent = true,
 }: {
   name: string;
   className?: string;
   size?: number;
   onClick?: () => void;
+  fluent?: boolean;
 }) {
+  if (fluent && resolveFluentIconType(name)) {
+    return <FluentAppIcon name={name} size={size} className={className} onClick={onClick} />;
+  }
   const C = (map as Record<string, typeof FolderOpen>)[name] ?? File;
   return <C className={className} size={size} onClick={onClick} />;
 }

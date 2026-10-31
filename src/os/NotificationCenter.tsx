@@ -28,7 +28,7 @@ export function NotificationCenter({ isOpen, onClose }: NotificationCenterProps)
         <>
           {/* Backdrop Click Dismiss */}
           <div
-            className="fixed inset-0 z-40 bg-black/10 backdrop-blur-[2px]"
+            className="fixed inset-0 z-[5250] bg-black/10 backdrop-blur-[2px]"
             onClick={onClose}
           />
 
@@ -37,7 +37,7 @@ export function NotificationCenter({ isOpen, onClose }: NotificationCenterProps)
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 380, scale: 0.98 }}
             transition={{ type: 'spring', damping: 26, stiffness: 280 }}
-            className="liquid-glass-card fixed right-3 top-3 bottom-14 z-[60] flex w-96 max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-2xl border-0 p-4 text-white shadow-2xl"
+            className="liquid-glass-card fixed right-3 top-3 bottom-14 z-[5300] flex w-96 max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-2xl border-0 p-4 text-white shadow-2xl"
           >
             {/* Header */}
             <div className="flex items-center justify-between border-b border-white/10 pb-3">

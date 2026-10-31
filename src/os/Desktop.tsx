@@ -150,10 +150,32 @@ export function Desktop() {
     dynamicIslandEvent,
     androidQuickSettings,
     toggleAndroidQuick,
+    closeWindow,
+    desktops,
+    activeDesktopId,
+    taskViewOpen,
+    setTaskViewOpen,
+    toggleTaskView,
+    switchDesktop,
+    createDesktop,
+    removeDesktop,
+    moveWindowToDesktop,
+    desktopIconPositions,
+    updateDesktopIconPosition,
+    resetDesktopIconPositions,
+    deskNotes,
+    addDeskNote,
+    updateDeskNote,
+    deleteDeskNote,
+    snapAllWindows5050,
   } = useOS();
 
   const [time, setTime] = useState(new Date());
   const [notifCenterOpen, setNotifCenterOpen] = useState(false);
+  const [draggingIcon, setDraggingIcon] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [draggingNote, setDraggingNote] = useState<{ id: string; x: number; y: number } | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -169,44 +191,149 @@ export function Desktop() {
   const useSpace = wallpaper === 'space' && !liteMode;
   const shaderOpacity = transparency / 100;
 
+  const activeDesktopWindows = windows.filter(
+    (w) => !w.desktopId || w.desktopId === activeDesktopId
+  );
+
   const handleAppClick = (appId: string) => {
     if (appId === 'recycle') {
       openApp('explorer', { payload: { folderPath: ['Recycle Bin'] } });
       return;
     }
-    const wins = windows.filter((w) => w.appId === appId);
+    const wins = activeDesktopWindows.filter((w) => w.appId === appId);
     if (wins.length === 0) {
       openApp(appId as AppId);
     } else {
       const top = wins.reduce((a, b) => (a.zIndex > b.zIndex ? a : b));
       if (top.minimized) restoreWindow(top.id);
       else {
-        const isTopmost = windows.reduce((a, b) => (a.zIndex > b.zIndex ? a : b)).id === top.id;
+        const visibleWins = activeDesktopWindows.filter((w) => !w.minimized);
+        const isTopmost =
+          visibleWins.length > 0 &&
+          visibleWins.reduce((a, b) => (a.zIndex > b.zIndex ? a : b)).id === top.id;
         if (isTopmost) minimizeWindow(top.id);
         else focusWindow(top.id);
       }
     }
   };
 
+  const handleIconPointerDown = (
+    e: React.PointerEvent<HTMLButtonElement>,
+    appId: string,
+    initialX: number,
+    initialY: number
+  ) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    e.stopPropagation();
+    setSelectedIconId(appId);
+    setContextMenu(null);
+
+    const startClientX = e.clientX;
+    const startClientY = e.clientY;
+    let moved = false;
+    let latestX = initialX;
+    let latestY = initialY;
+
+    const onMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - startClientX;
+      const dy = ev.clientY - startClientY;
+      if (!moved && Math.hypot(dx, dy) > 6) {
+        moved = true;
+      }
+      if (moved) {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        latestX = Math.max(8, Math.min(vw - 88, initialX + dx));
+        latestY = Math.max(8, Math.min(vh - 132, initialY + dy));
+        setDraggingIcon({ id: appId, x: latestX, y: latestY });
+      }
+    };
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      setDraggingIcon(null);
+      if (moved) {
+        updateDesktopIconPosition(appId, latestX, latestY);
+      } else {
+        handleAppClick(appId);
+      }
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+
+  const handleNotePointerDown = (
+    e: React.PointerEvent<HTMLDivElement>,
+    noteId: string,
+    initialX: number,
+    initialY: number
+  ) => {
+    if ((e.target as HTMLElement).closest('button, textarea')) return;
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let curX = initialX;
+    let curY = initialY;
+
+    const onMove = (ev: PointerEvent) => {
+      const dx = ev.clientX - startX;
+      const dy = ev.clientY - startY;
+      curX = Math.max(12, Math.min(window.innerWidth - 220, initialX + dx));
+      curY = Math.max(12, Math.min(window.innerHeight - 180, initialY + dy));
+      setDraggingNote({ id: noteId, x: curX, y: curY });
+    };
+
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+      setDraggingNote(null);
+      updateDeskNote(noteId, { x: curX, y: curY });
+    };
+
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+  };
+
   const DESKTOP_APPS_LIST = [
-    { id: 'recycle', label: 'Recycle Bin', icon: 'Trash2' },
-    { id: 'ai', label: 'Liquid Copilot AI', icon: 'Bot' },
-    { id: 'weather', label: 'Cosmic Weather', icon: 'CloudSun' },
-    { id: 'clock', label: 'Clock & Alarms', icon: 'Clock' },
-    { id: 'settings', label: 'Settings & OS', icon: 'Sparkles' },
-    { id: 'game', label: 'Cosmic Velocity', icon: 'Flame' },
-    { id: 'calculator', label: 'Calculator Pro', icon: 'Calculator' },
-    { id: 'taskmanager', label: 'Task Manager', icon: 'Cpu' },
-    { id: 'sysmon', label: 'System Monitor', icon: 'Activity' },
-    { id: 'explorer', label: 'File Explorer', icon: 'FolderOpen' },
-    { id: 'browser', label: 'Liquid Browser', icon: 'Globe' },
-    { id: 'terminal', label: 'Terminal', icon: 'SquareTerminal' },
-    { id: 'appstore', label: 'App Store', icon: 'Store' },
-    { id: 'synth', label: 'Monochrome Music', icon: 'Music' },
+    { id: 'browser', label: 'Browser', icon: 'browser' },
+    { id: 'notepad', label: 'Editor', icon: 'notepad' },
+    { id: 'terminal', label: 'Terminal', icon: 'terminal' },
+    { id: 'calculator', label: 'Calculator', icon: 'calculator' },
+    { id: 'explorer', label: 'Files', icon: 'explorer' },
+    { id: 'settings', label: 'Settings', icon: 'settings' },
+    { id: 'game', label: 'Games', icon: 'game' },
+    { id: 'synth', label: 'Music', icon: 'synth' },
+    { id: 'calendar', label: 'Calendar', icon: 'calendar' },
+    { id: 'weather', label: 'Weather', icon: 'weather' },
+    { id: 'clock', label: 'Clock', icon: 'clock' },
+    { id: 'ai', label: 'AI Assistant', icon: 'ai' },
+    { id: 'sysmon', label: 'Monitor', icon: 'sysmon' },
+    { id: 'taskmanager', label: 'Task Manager', icon: 'taskmanager' },
+    { id: 'appstore', label: 'App Store', icon: 'appstore' },
+    { id: 'recycle', label: 'Trash', icon: 'recycle' },
   ];
 
   return (
-    <div className={`relative h-full w-full overflow-hidden select-none engine-${designEngine} ${liteMode ? 'lite-mode' : ''}`}>
+    <div
+      className={`relative h-full w-full overflow-hidden select-none engine-${designEngine} ${liteMode ? 'lite-mode' : ''}`}
+      onPointerDown={() => {
+        setSelectedIconId(null);
+        setContextMenu(null);
+      }}
+      onContextMenu={(e) => {
+        if ((e.target as HTMLElement).closest('.liquid-glass-window')) return;
+        e.preventDefault();
+        const x = Math.min(e.clientX, window.innerWidth - 240);
+        const y = Math.min(e.clientY, window.innerHeight - 280);
+        setContextMenu({ x, y });
+      }}
+    >
       {/* Base wallpaper gradient */}
       <div
         className="absolute inset-0 animated-gradient"
@@ -241,16 +368,17 @@ export function Desktop() {
           {/* Mac Top Global Bar */}
           <div className="fixed top-0 inset-x-0 h-7 bg-black/40 backdrop-blur-xl border-b border-white/10 z-40 px-4 flex items-center justify-between text-xs text-white/90">
             <div className="flex items-center gap-4">
-              <Icon name="Apple" size={14} className="text-white cursor-pointer hover:opacity-80" onClick={() => openApp('settings')} />
-              <span className="font-bold tracking-tight">LiquidOS</span>
-              <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('explorer')}>Finder</span>
-              <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('settings')}>Preferences</span>
+              <div className="cursor-pointer hover:opacity-80" onClick={() => openApp('settings')}>
+                <AppLogo size={16} />
+              </div>
+              <span className="font-bold tracking-tight">GlassiumOS-V4.0</span>
+              <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('explorer')}>Files</span>
+              <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('settings')}>Settings</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => setShellMode('windows')}>View</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('terminal')}>Terminal</span>
             </div>
 
             <div className="flex items-center gap-3 font-medium text-[11px]">
-              <span className="text-white/60">v4.1.0-Beta</span>
               <Icon name="Wifi" size={13} />
               <Icon name="Battery" size={13} />
               <button
@@ -322,8 +450,8 @@ export function Desktop() {
           {/* Top Activity Bar */}
           <div className="fixed top-0 inset-x-0 h-7 bg-slate-950/80 backdrop-blur-md border-b border-white/10 z-40 px-3 flex items-center justify-between text-xs text-white">
             <div className="flex items-center gap-3">
-              <span className="font-semibold text-orange-400 cursor-pointer" onClick={() => openApp('terminal')}>Activities</span>
-              <span className="text-white/60">LiquidOS Ubuntu 24.04 LTS</span>
+              <span className="font-semibold text-cyan-300 cursor-pointer" onClick={() => openApp('terminal')}>Activities</span>
+              <span className="text-white/60">GlassiumOS-V4.0</span>
             </div>
             <div className="flex items-center gap-3">
               <span className="font-mono text-[11px]">{dateStr} {timeStr}</span>
@@ -826,29 +954,254 @@ export function Desktop() {
       )}
 
       {/* ========================================================
-          DESKTOP ICONS GRID (Windows, XP, Vista, 10, 11, DeX, ChromeOS, Zorin)
+          FREE-DRAGGABLE DESKTOP ICONS & DESK WORKSPACE CONTROLS
          ======================================================== */}
       {['windows', 'windows11', 'windows10', 'vista', 'xp', 'dex', 'chromeos', 'zorin'].includes(shellMode) && (
-        <div className="absolute top-4 left-4 z-10 flex flex-col flex-wrap gap-2 max-h-[calc(100vh-64px)] pointer-events-auto">
-          {DESKTOP_APPS_LIST.map((item) => (
+        <>
+          <div className="absolute inset-0 z-10 pointer-events-none">
+            {DESKTOP_APPS_LIST.map((item, idx) => {
+              const savedPos = desktopIconPositions[item.id] ?? {
+                x: 16 + Math.floor(idx / 6) * 92,
+                y: 16 + (idx % 6) * 94,
+              };
+              const isDraggingThis = draggingIcon?.id === item.id;
+              const x = isDraggingThis ? draggingIcon.x : savedPos.x;
+              const y = isDraggingThis ? draggingIcon.y : savedPos.y;
+              const isSelected = selectedIconId === item.id;
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onPointerDown={(e) => handleIconPointerDown(e, item.id, savedPos.x, savedPos.y)}
+                  style={{
+                    position: 'absolute',
+                    left: x,
+                    top: y,
+                    zIndex: isDraggingThis ? 50 : isSelected ? 20 : 10,
+                    touchAction: 'none',
+                  }}
+                  className={`pointer-events-auto flex flex-col items-center gap-1.5 w-[84px] py-2 px-1.5 rounded-2xl text-white/95 cursor-grab active:cursor-grabbing transition-shadow duration-150 group ${
+                    isDraggingThis
+                      ? 'bg-slate-900/65 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.35),0_16px_36px_rgba(0,0,0,0.55)] scale-105 ring-1 ring-cyan-400/50'
+                      : isSelected
+                      ? 'bg-slate-900/45 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.28)] ring-1 ring-white/25'
+                      : 'hover:bg-slate-900/40 hover:backdrop-blur-md hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.22),0_8px_20px_rgba(0,0,0,0.35)]'
+                  }`}
+                  title={`${item.label} (ドラッグで自由に移動 / クリックで起動)`}
+                >
+                  <div className="w-11 h-11 flex items-center justify-center group-hover:scale-110 group-hover:-translate-y-0.5 transition-transform duration-150 shrink-0 pointer-events-none">
+                    <Icon name={item.id} size={38} />
+                  </div>
+                  <span
+                    className={`text-[11px] font-medium text-center truncate max-w-full px-1 leading-tight select-none pointer-events-none drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)] ${
+                      shellMode === 'xp' ? 'text-white font-bold' : 'text-white/95 group-hover:text-white'
+                    }`}
+                  >
+                    {item.label}
+                  </span>
+                </button>
+              );
+            })}
+
+            {/* Desk Sticky Notes ("デスク付箋") */}
+            {deskNotes.map((note) => {
+              const isDraggingThis = draggingNote?.id === note.id;
+              const nx = isDraggingThis ? draggingNote.x : note.x;
+              const ny = isDraggingThis ? draggingNote.y : note.y;
+              const colorMap: Record<typeof note.color, string> = {
+                cyan: 'from-cyan-500/25 to-sky-900/40 border-cyan-400/30',
+                violet: 'from-violet-500/25 to-purple-900/40 border-violet-400/30',
+                amber: 'from-amber-500/25 to-orange-900/40 border-amber-400/30',
+                emerald: 'from-emerald-500/25 to-teal-900/40 border-emerald-400/30',
+                rose: 'from-rose-500/25 to-pink-900/40 border-rose-400/30',
+              };
+              return (
+                <div
+                  key={note.id}
+                  onPointerDown={(e) => handleNotePointerDown(e, note.id, note.x, note.y)}
+                  style={{
+                    position: 'absolute',
+                    left: nx,
+                    top: ny,
+                    zIndex: isDraggingThis ? 45 : 15,
+                    touchAction: 'none',
+                  }}
+                  className={`pointer-events-auto w-56 rounded-2xl bg-gradient-to-br ${colorMap[note.color]} backdrop-blur-xl border shadow-[inset_0_1px_1px_rgba(255,255,255,0.25),0_16px_40px_rgba(0,0,0,0.45)] p-3 flex flex-col gap-2`}
+                >
+                  <div className="flex items-center justify-between cursor-grab active:cursor-grabbing">
+                    <div className="flex items-center gap-1.5">
+                      {(['cyan', 'violet', 'amber', 'emerald', 'rose'] as const).map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => updateDeskNote(note.id, { color: c })}
+                          className={`w-3 h-3 rounded-full border border-white/40 transition ${
+                            c === 'cyan'
+                              ? 'bg-cyan-400'
+                              : c === 'violet'
+                              ? 'bg-violet-400'
+                              : c === 'amber'
+                              ? 'bg-amber-400'
+                              : c === 'emerald'
+                              ? 'bg-emerald-400'
+                              : 'bg-rose-400'
+                          } ${note.color === c ? 'scale-125 ring-1 ring-white' : 'opacity-60 hover:opacity-100'}`}
+                        />
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => deleteDeskNote(note.id)}
+                      className="text-white/50 hover:text-rose-300 transition p-0.5"
+                      title="付箋を削除"
+                    >
+                      <Icon name="X" size={13} />
+                    </button>
+                  </div>
+                  <textarea
+                    value={note.text}
+                    onChange={(e) => updateDeskNote(note.id, { text: e.target.value })}
+                    rows={4}
+                    className="w-full bg-transparent border-0 outline-none resize-none text-xs text-white/95 placeholder:text-white/40 leading-relaxed select-text"
+                    placeholder="メモを入力..."
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Top-Right Subtle 2.5D Desk Workspace Pill */}
+          <div className="fixed top-3 right-3 z-20 flex items-center gap-1.5 px-2.5 py-1.5 rounded-2xl bg-slate-900/45 backdrop-blur-xl border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_24px_rgba(0,0,0,0.4)] text-xs text-white/90 pointer-events-auto">
             <button
-              key={item.id}
-              onClick={() => handleAppClick(item.id as AppId)}
-              className="flex flex-col items-center gap-1 w-20 p-2 rounded-xl text-white/90 hover:bg-white/10 hover:shadow-lg active:scale-95 transition group"
-              title={item.label}
+              type="button"
+              onClick={toggleTaskView}
+              className="flex items-center gap-1.5 px-2 py-1 rounded-xl hover:bg-white/10 transition"
+              title="仮想デスクトップ / タスクビュー (Desk View)"
             >
-              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center group-hover:scale-110 group-hover:bg-white/15 transition shrink-0">
-                <Icon name={item.icon} size={18} className={shellMode === 'xp' ? 'text-amber-300' : shellMode === 'vista' ? 'text-sky-300' : 'text-cyan-300'} />
-              </div>
-              <span className={`text-[11px] font-medium text-center truncate max-w-full px-0.5 leading-tight select-none ${
-                shellMode === 'xp' ? 'text-white font-bold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]' : 'text-white/90'
-              }`}>
-                {item.label}
+              <Icon name="LayoutGrid" size={13} className="text-cyan-300" />
+              <span className="font-medium">
+                {desktops.find((d) => d.id === activeDesktopId)?.name || 'デスクトップ 1'}
+              </span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-white/10 text-white/70 font-mono">
+                {activeDesktopWindows.length}
               </span>
             </button>
-          ))}
-        </div>
+            <div className="h-3.5 w-px bg-white/15" />
+            <button
+              type="button"
+              onClick={addDeskNote}
+              className="p-1 rounded-xl hover:bg-white/10 text-white/75 hover:text-white transition"
+              title="デスク付箋を追加"
+            >
+              <Icon name="Plus" size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={() => resetDesktopIconPositions(false)}
+              className="p-1 rounded-xl hover:bg-white/10 text-white/75 hover:text-white transition"
+              title="デスクトップアイコンを自動整列"
+            >
+              <Icon name="RefreshCw" size={12} />
+            </button>
+          </div>
+        </>
       )}
+
+      {/* Desktop Right-Click Context Menu */}
+      <AnimatePresence>
+        {contextMenu && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ duration: 0.12 }}
+            style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 9999 }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="w-56 rounded-2xl bg-slate-900/80 backdrop-blur-2xl border border-white/15 shadow-[inset_0_1px_1px_rgba(255,255,255,0.25),0_20px_50px_rgba(0,0,0,0.65)] p-1.5 text-xs text-white/90"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                resetDesktopIconPositions(false);
+                setContextMenu(null);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-left transition"
+            >
+              <Icon name="LayoutGrid" size={14} className="text-cyan-300" />
+              <span>アイコンを自動整列</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                resetDesktopIconPositions(true);
+                setContextMenu(null);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-left transition"
+            >
+              <Icon name="Grid3x3" size={14} className="text-violet-300" />
+              <span>アイコンをグリッドに揃える</span>
+            </button>
+            <div className="my-1 border-t border-white/10" />
+            <button
+              type="button"
+              onClick={() => {
+                addDeskNote();
+                setContextMenu(null);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-left transition"
+            >
+              <Icon name="FileText" size={14} className="text-amber-300" />
+              <span>デスク付箋を追加</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                toggleTaskView();
+                setContextMenu(null);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-left transition"
+            >
+              <Icon name="Monitor" size={14} className="text-emerald-300" />
+              <span>仮想デスクトップ / タスクビュー</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                snapAllWindows5050();
+                setContextMenu(null);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-left transition"
+            >
+              <Icon name="Columns" size={14} className="text-sky-300" />
+              <span>ウィンドウを左右に並べる</span>
+            </button>
+            <div className="my-1 border-t border-white/10" />
+            <button
+              type="button"
+              onClick={() => {
+                openApp('ai');
+                setContextMenu(null);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-left transition"
+            >
+              <Icon name="Sparkles" size={14} className="text-fuchsia-300" />
+              <span>AIアシスタントを開く</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                openApp('settings');
+                setContextMenu(null);
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-left transition"
+            >
+              <Icon name="Settings" size={14} className="text-white/70" />
+              <span>ディスプレイとテーマ設定</span>
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ========================================================
           WINDOWS VISTA SIDEBAR WITH LIVE GADGETS (AERO GLASS)
@@ -941,24 +1294,209 @@ export function Desktop() {
           <div className="w-36 rounded-2xl bg-amber-500/10 border border-amber-400/30 p-2.5 text-xs text-amber-200/90 shadow-xl flex items-center gap-2">
             <Icon name="Sun" size={18} className="text-amber-400 shrink-0" />
             <div className="min-w-0">
-              <div className="text-[10px] font-bold text-white">Singularity</div>
-              <div className="text-[9px] text-amber-300/80">21°C · Sunny Aero</div>
+              <div className="text-[10px] font-bold text-white">Tokyo</div>
+              <div className="text-[9px] text-amber-300/80">21°C · Clear</div>
             </div>
           </div>
         </div>
       )}
 
       {/* ========================================================
-          ACTIVE FLOATING WINDOWS
+          ACTIVE FLOATING WINDOWS (Filtered by Current Virtual Desktop)
          ======================================================== */}
       <AnimatePresence>
-        {windows.map((win) => (
+        {activeDesktopWindows.map((win) => (
           <WindowFrame key={win.id} win={win}>
             <WindowErrorBoundary appTitle={win.title}>
               {renderApp(win.appId, win.payload)}
             </WindowErrorBoundary>
           </WindowFrame>
         ))}
+      </AnimatePresence>
+
+      {/* ========================================================
+          WINDOWS 11 TASK VIEW / VIRTUAL DESKTOPS OVERLAY ("デスク機能")
+         ======================================================== */}
+      <AnimatePresence>
+        {taskViewOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            onClick={() => setTaskViewOpen(false)}
+            className="fixed inset-0 bottom-12 z-[4900] bg-slate-950/70 backdrop-blur-2xl flex flex-col justify-between p-6 sm:p-10 select-none"
+          >
+            {/* Top Header */}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="flex items-center justify-between max-w-6xl w-full mx-auto"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-fuchsia-500/30 via-violet-500/25 to-cyan-500/30 border border-white/15 flex items-center justify-center text-cyan-300 shadow-lg">
+                  <Icon name="LayoutGrid" size={18} />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-white tracking-tight">
+                    タスクビュー ＆ 仮想デスクトップ
+                  </h2>
+                  <p className="text-xs text-white/50">
+                    {desktops.find((d) => d.id === activeDesktopId)?.name} — 実行中のウィンドウを管理・別のデスクへ移動できます
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTaskViewOpen(false)}
+                className="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-medium text-white flex items-center gap-1.5 transition"
+              >
+                <Icon name="X" size={14} />
+                <span>閉じる</span>
+              </button>
+            </div>
+
+            {/* Center: Open Windows Grid on Current Desktop */}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="my-auto max-w-6xl w-full mx-auto py-6 overflow-y-auto max-h-[56vh]"
+            >
+              {activeDesktopWindows.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center rounded-3xl bg-slate-900/45 border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.18)]">
+                  <Icon name="Monitor" size={36} className="text-white/30 mb-3" />
+                  <div className="text-sm font-semibold text-white/80">
+                    このデスクトップで開いているウィンドウはありません
+                  </div>
+                  <div className="text-xs text-white/45 mt-1">
+                    デスクトップアイコンまたは下のタスクバーからアプリを起動できます
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {activeDesktopWindows.map((win) => (
+                    <div
+                      key={win.id}
+                      onClick={() => {
+                        restoreWindow(win.id);
+                        setTaskViewOpen(false);
+                      }}
+                      className="group relative rounded-2xl bg-slate-900/65 hover:bg-slate-900/85 border border-white/15 hover:border-cyan-400/50 p-4 shadow-[inset_0_1px_1px_rgba(255,255,255,0.22),0_16px_40px_rgba(0,0,0,0.5)] cursor-pointer transition-all flex flex-col justify-between h-44"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <Icon name={win.appId || win.icon} size={22} />
+                          <span className="text-xs font-semibold text-white truncate">
+                            {win.title}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            closeWindow(win.id);
+                          }}
+                          className="h-6 w-6 rounded-lg bg-white/10 hover:bg-rose-600 text-white/70 hover:text-white flex items-center justify-center transition"
+                          title="ウィンドウを閉じる"
+                        >
+                          <Icon name="X" size={13} />
+                        </button>
+                      </div>
+
+                      <div className="my-auto flex items-center justify-center py-3 rounded-xl bg-black/30 border border-white/5">
+                        <Icon name={win.appId || win.icon} size={42} />
+                      </div>
+
+                      {/* Move Window to Another Desktop */}
+                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/10 text-[11px]">
+                        <span className="text-white/45">
+                          {win.minimized ? '最小化中' : win.maximized ? '最大化中' : '表示中'}
+                        </span>
+                        {desktops.length > 1 && (
+                          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            <span className="text-[10px] text-white/40 mr-1">移動:</span>
+                            {desktops
+                              .filter((d) => d.id !== activeDesktopId)
+                              .map((d) => (
+                                <button
+                                  key={d.id}
+                                  type="button"
+                                  onClick={() => moveWindowToDesktop(win.id, d.id)}
+                                  className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-cyan-500/30 text-cyan-200 text-[10px] transition"
+                                >
+                                  {d.name}
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Bottom: Virtual Desktops Bar ("新しいデスクトップ" / Switching) */}
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="max-w-6xl w-full mx-auto rounded-2xl bg-slate-900/75 backdrop-blur-2xl border border-white/15 p-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.22),0_20px_50px_rgba(0,0,0,0.6)] flex items-center gap-3 overflow-x-auto"
+            >
+              {desktops.map((desk) => {
+                const isCurrent = desk.id === activeDesktopId;
+                const count = windows.filter(
+                  (w) => (!w.desktopId && desk.id === 'desk-1') || w.desktopId === desk.id
+                ).length;
+                return (
+                  <div
+                    key={desk.id}
+                    onClick={() => switchDesktop(desk.id)}
+                    className={`relative shrink-0 w-44 h-24 rounded-xl p-3 flex flex-col justify-between cursor-pointer transition-all border ${
+                      isCurrent
+                        ? 'bg-gradient-to-br from-fuchsia-500/25 via-violet-500/20 to-cyan-500/25 border-cyan-400/60 shadow-[0_0_20px_rgba(6,182,212,0.25)]'
+                        : 'bg-white/5 hover:bg-white/10 border-white/10'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-white truncate">
+                        {desk.name}
+                      </span>
+                      {desktops.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removeDesktop(desk.id);
+                          }}
+                          className="h-5 w-5 rounded-md hover:bg-rose-500/80 text-white/50 hover:text-white flex items-center justify-center transition"
+                          title="このデスクトップを削除"
+                        >
+                          <Icon name="X" size={11} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-white/60">
+                      <span>{count} 個のウィンドウ</span>
+                      {isCurrent && (
+                        <span className="px-1.5 py-0.5 rounded bg-cyan-400/20 text-cyan-300 text-[10px] font-medium">
+                          現在
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={createDesktop}
+                className="shrink-0 w-44 h-24 rounded-xl border border-dashed border-white/25 hover:border-cyan-400/60 bg-white/[0.03] hover:bg-white/[0.08] flex flex-col items-center justify-center gap-1.5 text-white/75 hover:text-white transition"
+              >
+                <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center">
+                  <Icon name="Plus" size={16} className="text-cyan-300" />
+                </div>
+                <span className="text-xs font-medium">新しいデスクトップ</span>
+              </button>
+            </div>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Welcome Banner */}

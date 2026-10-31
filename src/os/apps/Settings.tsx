@@ -1,65 +1,44 @@
 import { useState, useRef } from 'react';
-import { motion } from 'framer-motion';
 import { useOS, Wallpaper, AuroraColor } from '../OSContext';
-import {
-  ShellMode,
-  DesignEngine,
-  LockScreenStyle,
-} from '../types';
+import { ShellMode, DesignEngine } from '../types';
 import { WALLPAPERS } from '../wallpapers';
 import { Icon } from '../Icon';
+import { AppLogo } from '../AppLogo';
 
-type Section = 'glass' | 'aurora' | 'personalization' | 'shells' | 'lockscreen' | 'system' | 'accounts';
+type SettingsSection = 'display' | 'sound' | 'theme';
 
-const PRESET_WALLPAPERS: Wallpaper[] = [
-  'live2d',
-  'aurora',
-  'ocean',
-  'sunset',
-  'forest',
-  'bloom',
-  'cosmic',
-  'space',
-  'shader',
+const WALLPAPER_CARDS: { id: Wallpaper; label: string; badge?: string }[] = [
+  { id: 'live2d', label: 'Aurora Silk (Live 2D)', badge: 'Default' },
+  { id: 'aurora', label: 'Northern Lights' },
+  { id: 'ocean', label: 'Deep Ocean' },
+  { id: 'cosmic', label: 'Amethyst Nebula' },
+  { id: 'sunset', label: 'Crimson Dusk' },
+  { id: 'forest', label: 'Emerald Canopy' },
+  { id: 'bloom', label: 'Prism Bloom' },
+  { id: 'shader', label: 'Liquid Silk Shader' },
+  { id: 'space', label: 'Deep Space Horizon' },
 ];
 
-const AURORA_THEMES: { id: AuroraColor; label: string; preview: string }[] = [
-  {
-    id: 'cyan-violet',
-    label: 'シアン & バイオレット',
-    preview: 'linear-gradient(135deg, #22d3ee 0%, #3b82f6 50%, #a855f7 100%)',
-  },
-  {
-    id: 'emerald-sky',
-    label: 'エメラルド & スカイ',
-    preview: 'linear-gradient(135deg, #34d399 0%, #14b8a6 50%, #38bdf8 100%)',
-  },
-  {
-    id: 'rose-gold',
-    label: 'ローズ & アンバー',
-    preview: 'linear-gradient(135deg, #fb7185 0%, #f59e0b 50%, #d946ef 100%)',
-  },
-  {
-    id: 'ocean-blue',
-    label: 'ディープオーシャン',
-    preview: 'linear-gradient(135deg, #38bdf8 0%, #2563eb 50%, #06b6d4 100%)',
-  },
-  {
-    id: 'sunset-magenta',
-    label: 'マゼンタ & サンセット',
-    preview: 'linear-gradient(135deg, #f472b6 0%, #9333ea 50%, #6366f1 100%)',
-  },
+const AURORA_PALETTES: { id: AuroraColor; label: string; preview: string }[] = [
+  { id: 'cyan-violet', label: 'Amethyst & Cyan', preview: 'linear-gradient(135deg, #d946ef, #8b5cf6, #06b6d4)' },
+  { id: 'emerald-sky', label: 'Emerald & Sky', preview: 'linear-gradient(135deg, #10b981, #0ea5e9, #6366f1)' },
+  { id: 'rose-gold', label: 'Rose & Amber', preview: 'linear-gradient(135deg, #f43f5e, #d946ef, #f59e0b)' },
+  { id: 'ocean-blue', label: 'Sapphire & Aqua', preview: 'linear-gradient(135deg, #2563eb, #06b6d4, #2dd4bf)' },
+  { id: 'sunset-magenta', label: 'Neon Magenta', preview: 'linear-gradient(135deg, #ec4899, #8b5cf6, #38bdf8)' },
 ];
 
 export function SettingsApp() {
   const {
-    openApp,
     wallpaper,
     setWallpaper,
+    customWallpapers,
+    addCustomWallpaper,
+    selectedCustomId,
+    setSelectedCustomId,
+    theme,
+    setTheme,
     shellMode,
     setShellMode,
-    taskbarStyle,
-    setTaskbarStyle,
     designEngine,
     setDesignEngine,
     blurAmount,
@@ -70,10 +49,6 @@ export function SettingsApp() {
     setTransparency,
     glassCurvature,
     setGlassCurvature,
-    glassSpecular,
-    setGlassSpecular,
-    glassWobble,
-    setGlassWobble,
     auroraColor,
     setAuroraColor,
     auroraSpeed,
@@ -82,674 +57,551 @@ export function SettingsApp() {
     setAuroraIntensity,
     auroraParticles,
     setAuroraParticles,
-    customWallpapers,
-    addCustomWallpaper,
-    selectedCustomId,
-    setSelectedCustomId,
-    user,
-    setUser,
-    lockScreenStyle,
-    setLockScreenStyle,
-    touchMode,
-    setTouchMode,
-    lockSystem,
+    volume,
+    setVolume,
+    brightness,
+    setBrightness,
     soundEnabled,
     setSoundEnabled,
+    playSound,
+    taskbarAlign,
+    setTaskbarAlign,
   } = useOS();
 
-  const [section, setSection] = useState<Section>('glass');
+  const [section, setSection] = useState<SettingsSection>('display');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadError, setUploadError] = useState('');
 
-  const [nameInput, setNameInput] = useState(user?.name ?? 'User');
-  const [avatarInput, setAvatarInput] = useState(user?.avatar ?? 'User');
-  const [passInput, setPassInput] = useState(user?.password ?? '');
-  const [savedMsg, setSavedMsg] = useState(false);
-
-  const sections: { id: Section; label: string; icon: string }[] = [
-    { id: 'glass', label: '3D ガラス造形', icon: 'Sparkles' },
-    { id: 'aurora', label: 'オーロラ背景', icon: 'Sun' },
-    { id: 'personalization', label: '壁紙・テーマ', icon: 'Palette' },
-    { id: 'shells', label: 'レイアウト', icon: 'Layout' },
-    { id: 'lockscreen', label: 'スリープ画面', icon: 'Moon' },
-    { id: 'system', label: 'システム操作', icon: 'SlidersHorizontal' },
-    { id: 'accounts', label: 'プロフィール', icon: 'User' },
-  ];
-
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleUploadWallpaper = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setUploadError('');
-    if (file.size > 8 * 1024 * 1024) {
-      setUploadError('8MB以内の画像を選択してください');
-      return;
-    }
     const reader = new FileReader();
     reader.onload = () => {
-      const dataUrl = reader.result as string;
-      addCustomWallpaper(file.name, dataUrl);
+      if (typeof reader.result === 'string') {
+        addCustomWallpaper(file.name.replace(/\.[^.]+$/, ''), reader.result);
+      }
     };
-    reader.onerror = () => setUploadError('画像の読み込みに失敗しました');
     reader.readAsDataURL(file);
-    e.target.value = '';
   };
 
-  const handleSaveAccount = (e: React.FormEvent) => {
-    e.preventDefault();
-    setUser({
-      name: nameInput.trim() || 'User',
-      avatar: avatarInput,
-      password: passInput.trim() || undefined,
-    });
-    setSavedMsg(true);
-    setTimeout(() => setSavedMsg(false), 2000);
-  };
+  const navItems: { id: SettingsSection; label: string; sub: string; icon: string }[] = [
+    { id: 'display', label: 'Display & Wallpaper', sub: '壁紙・オーロラ・輝度', icon: 'Monitor' },
+    { id: 'sound', label: 'Volume & Sound', sub: '音量・システム効果音', icon: 'Volume2' },
+    { id: 'theme', label: 'Theme', sub: '2.5Dガラス・外観モード', icon: 'Palette' },
+  ];
 
   return (
-    <div className="flex h-full w-full select-none overflow-hidden font-sans bg-black/25 backdrop-blur-2xl text-zinc-100">
-      {/* LEFT NAVIGATION SIDEBAR */}
-      <div className="w-52 shrink-0 flex flex-col p-3 bg-white/[0.02] border-r border-white/[0.06]">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-2xl glass-jelly mb-4">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-sky-400 to-indigo-500 flex items-center justify-center text-white font-semibold text-xs shrink-0 shadow-md">
-            {user?.name?.[0]?.toUpperCase() || 'U'}
+    <div className="flex h-full w-full min-w-0 min-h-0 bg-slate-900/40 backdrop-blur-md text-white select-none overflow-hidden">
+      {/* Left Navigation Sidebar */}
+      <aside className="w-60 shrink-0 border-r border-white/10 bg-slate-950/35 p-4 flex flex-col justify-between">
+        <div className="space-y-5">
+          {/* Brand Header */}
+          <div className="flex items-center gap-3 px-2 pt-1">
+            <AppLogo size={28} glow />
+            <div className="min-w-0">
+              <div className="text-sm font-bold tracking-tight text-white truncate">GlassiumOS-V4.0</div>
+              <div className="text-[11px] text-white/45">System Preferences</div>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-xs font-semibold text-white truncate">{user?.name || 'User'}</div>
-          </div>
-        </div>
 
-        <div className="flex-1 overflow-y-auto space-y-1">
-          {sections.map((s) => {
-            const active = section === s.id;
-            return (
-              <button
-                key={s.id}
-                onClick={() => setSection(s.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium transition-all text-left ${
-                  active
-                    ? 'glass-jelly text-white font-semibold'
-                    : 'text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-200'
-                }`}
-              >
-                <div className={`${active ? 'text-sky-300' : 'text-zinc-500'}`}>
-                  <Icon name={s.icon} size={15} />
-                </div>
-                <span>{s.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* RIGHT CONTENT AREA */}
-      <div className="flex-1 min-w-0 overflow-y-auto p-6 sm:p-8 space-y-6">
-        {/* =========================================================
-            SECTION 1: 3D ガラス造形 (Curvature, Wobble, Specular, Blur)
-           ========================================================= */}
-        {section === 'glass' && (
-          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-5 max-w-2xl">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-white tracking-tight">3D ガラス造形・質感</h2>
-              <button
-                onClick={() => {
-                  setGlassCurvature(42);
-                  setGlassSpecular(65);
-                  setGlassWobble(60);
-                  setBlurAmount(24);
-                  setTransparency(78);
-                  setCornerRadius(18);
-                }}
-                className="px-3 py-1.5 rounded-xl glass-jelly text-xs text-zinc-200 font-medium"
-              >
-                標準に戻す
-              </button>
-            </div>
-
-            {/* Interactive 3D Jelly Preview Card */}
-            <div
-              className="p-5 rounded-3xl glass-jelly flex items-center justify-between gap-4 overflow-hidden"
-              style={{
-                borderRadius: `${cornerRadius}px`,
-              }}
-            >
-              <div className="space-y-1">
-                <div className="text-xs font-semibold text-white">3D ガラス プレビュー</div>
-                <div className="text-[11px] text-zinc-300/80">
-                  ホバーやクリックでプルプルとした立体弾性とレンズ屈折を体感できます
-                </div>
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <div className="w-12 h-12 rounded-2xl glass-jelly flex items-center justify-center text-sky-300 cursor-pointer">
-                  <Icon name="Sparkles" size={20} />
-                </div>
-              </div>
-            </div>
-
-            {/* Fine-grained 3D Glass Controls */}
-            <div className="rounded-2xl glass-panel p-5 space-y-5">
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-zinc-200 font-medium">ガラスの湾曲度（レンズ屈折）</span>
-                  <span className="font-mono text-sky-300">{glassCurvature}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={glassCurvature}
-                  onChange={(e) => setGlassCurvature(Number(e.target.value))}
-                  className="glass-slider"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-zinc-200 font-medium">3D 立体エッジ光沢</span>
-                  <span className="font-mono text-sky-300">{glassSpecular}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={10}
-                  max={100}
-                  value={glassSpecular}
-                  onChange={(e) => setGlassSpecular(Number(e.target.value))}
-                  className="glass-slider"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-zinc-200 font-medium">プルプル弾性（揺らぎ感度）</span>
-                  <span className="font-mono text-sky-300">{glassWobble}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={glassWobble}
-                  onChange={(e) => setGlassWobble(Number(e.target.value))}
-                  className="glass-slider"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-zinc-200 font-medium">背景ぼかし（フロスト深度）</span>
-                  <span className="font-mono text-sky-300">{blurAmount}px</span>
-                </div>
-                <input
-                  type="range"
-                  min={4}
-                  max={48}
-                  value={blurAmount}
-                  onChange={(e) => setBlurAmount(Number(e.target.value))}
-                  className="glass-slider"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-zinc-200 font-medium">ガラス透過度</span>
-                  <span className="font-mono text-sky-300">{transparency}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={15}
-                  max={95}
-                  value={transparency}
-                  onChange={(e) => setTransparency(Number(e.target.value))}
-                  className="glass-slider"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-zinc-200 font-medium">角の丸み（ドーム曲率）</span>
-                  <span className="font-mono text-sky-300">{cornerRadius}px</span>
-                </div>
-                <input
-                  type="range"
-                  min={6}
-                  max={36}
-                  value={cornerRadius}
-                  onChange={(e) => setCornerRadius(Number(e.target.value))}
-                  className="glass-slider"
-                />
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* =========================================================
-            SECTION 2: オーロラ背景 (Aurora Customization)
-           ========================================================= */}
-        {section === 'aurora' && (
-          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-5 max-w-2xl">
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-white tracking-tight">オーロラ ライブ背景</h2>
-              {wallpaper !== 'live2d' && (
+          {/* 3 Realistic Control Categories */}
+          <nav className="space-y-1.5">
+            {navItems.map((item) => {
+              const active = section === item.id;
+              return (
                 <button
-                  onClick={() => {
-                    setWallpaper('live2d');
-                    setSelectedCustomId(null);
-                  }}
-                  className="px-3.5 py-1.5 rounded-xl glass-jelly text-xs text-sky-300 font-semibold"
+                  key={item.id}
+                  onClick={() => setSection(item.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-left transition-all duration-200 ${
+                    active
+                      ? 'bg-gradient-to-r from-fuchsia-500/25 via-violet-500/20 to-cyan-500/25 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.28),0_8px_20px_rgba(0,0,0,0.25)] border border-white/15'
+                      : 'text-white/65 hover:text-white hover:bg-white/[0.06]'
+                  }`}
                 >
-                  オーロラ背景を適用
+                  <div
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                      active
+                        ? 'bg-gradient-to-br from-fuchsia-500 via-violet-500 to-cyan-400 text-white shadow-md'
+                        : 'bg-white/10 text-white/75'
+                    }`}
+                  >
+                    <Icon name={item.icon} size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold truncate">{item.label}</div>
+                    <div className="text-[10px] text-white/45 truncate">{item.sub}</div>
+                  </div>
                 </button>
-              )}
+              );
+            })}
+          </nav>
+        </div>
+
+        <div className="rounded-xl bg-white/[0.04] border border-white/10 p-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)]">
+          <div className="text-[11px] font-medium text-white/80">GlassiumOS-V4.0</div>
+          <div className="text-[10px] text-white/45 mt-0.5">2.5D Fluid Glass Architecture</div>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-y-auto p-6 space-y-6">
+        {/* ============================================================
+            SECTION 1: DISPLAY & WALLPAPER
+           ============================================================ */}
+        {section === 'display' && (
+          <div className="space-y-6 max-w-2xl">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight text-white">Display & Wallpaper</h2>
+              <p className="text-xs text-white/50 mt-0.5">
+                画面の輝度、壁紙、およびライブオーロラの配色・動きを調整します。
+              </p>
             </div>
 
-            {/* Aurora Color Palette */}
-            <div className="rounded-2xl glass-panel p-5 space-y-3.5">
-              <div className="text-xs font-medium text-zinc-200">カラーパレット</div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {AURORA_THEMES.map((t) => {
-                  const active = auroraColor === t.id;
+            {/* Display Brightness Card */}
+            <div className="rounded-2xl bg-slate-900/40 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] border border-white/10 p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <Icon name="Sun" size={17} className="text-amber-300" />
+                  <span className="text-sm font-medium">Display Brightness</span>
+                </div>
+                <span className="text-xs font-mono text-cyan-300">{brightness}%</span>
+              </div>
+              <input
+                type="range"
+                min={25}
+                max={100}
+                value={brightness}
+                onChange={(e) => setBrightness(Number(e.target.value))}
+                className="glass-slider w-full"
+              />
+            </div>
+
+            {/* Wallpaper Selection Grid */}
+            <div className="rounded-2xl bg-slate-900/40 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] border border-white/10 p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium">Wallpaper</div>
+                  <div className="text-[11px] text-white/45">背景のガラス透過に映える壁紙を選択</div>
+                </div>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-medium flex items-center gap-1.5 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] transition"
+                >
+                  <Icon name="Upload" size={13} className="text-cyan-300" />
+                  <span>画像を追加</span>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleUploadWallpaper}
+                  className="hidden"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                {WALLPAPER_CARDS.map((w) => {
+                  const selected = wallpaper === w.id && !selectedCustomId;
                   return (
                     <button
-                      key={t.id}
+                      key={w.id}
                       onClick={() => {
-                        setAuroraColor(t.id);
-                        if (wallpaper !== 'live2d') {
-                          setWallpaper('live2d');
-                          setSelectedCustomId(null);
-                        }
+                        setSelectedCustomId(null);
+                        setWallpaper(w.id);
                       }}
-                      className={`p-3 rounded-2xl flex items-center gap-3 text-left transition ${
-                        active ? 'glass-jelly ring-1 ring-sky-400/60' : 'bg-white/[0.03] hover:bg-white/[0.06]'
+                      className={`group relative h-24 rounded-xl overflow-hidden border text-left p-2.5 flex flex-col justify-between transition-all ${
+                        selected
+                          ? 'border-cyan-400 ring-2 ring-cyan-400/40 scale-[1.01]'
+                          : 'border-white/15 hover:border-white/35'
                       }`}
+                      style={{ background: (WALLPAPERS[w.id] ?? WALLPAPERS.live2d).style }}
                     >
-                      <div
-                        className="w-9 h-9 rounded-xl shrink-0 shadow-inner border border-white/25"
-                        style={{ background: t.preview }}
-                      />
-                      <span className="text-xs font-medium text-white">{t.label}</span>
+                      <div className="flex justify-between items-start w-full">
+                        {w.badge ? (
+                          <span className="px-1.5 py-0.5 rounded-md bg-black/50 backdrop-blur-md text-[9px] font-semibold text-cyan-300 border border-white/15">
+                            {w.badge}
+                          </span>
+                        ) : (
+                          <span />
+                        )}
+                        {selected && (
+                          <span className="w-5 h-5 rounded-full bg-cyan-400 text-slate-950 flex items-center justify-center shadow">
+                            <Icon name="Check" size={12} />
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs font-medium text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] truncate">
+                        {w.label}
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {customWallpapers.map((cw) => {
+                  const selected = selectedCustomId === cw.id;
+                  return (
+                    <button
+                      key={cw.id}
+                      onClick={() => setSelectedCustomId(cw.id)}
+                      className={`relative h-24 rounded-xl overflow-hidden border text-left p-2.5 flex flex-col justify-end transition-all ${
+                        selected
+                          ? 'border-cyan-400 ring-2 ring-cyan-400/40'
+                          : 'border-white/15 hover:border-white/35'
+                      }`}
+                      style={{
+                        backgroundImage: `url(${cw.dataUrl})`,
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center',
+                      }}
+                    >
+                      <div className="text-xs font-medium text-white bg-black/50 backdrop-blur-sm px-2 py-0.5 rounded-md truncate">
+                        {cw.name}
+                      </div>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Aurora Sliders & Switch */}
-            <div className="rounded-2xl glass-panel p-5 space-y-5">
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-zinc-200 font-medium">オーロラの揺らぎ速度</span>
-                  <span className="font-mono text-sky-300">{auroraSpeed}%</span>
+            {/* Live Aurora Customization */}
+            {wallpaper === 'live2d' && !selectedCustomId && (
+              <div className="rounded-2xl bg-slate-900/40 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] border border-white/10 p-5 space-y-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium">Aurora Live Customization</div>
+                    <div className="text-[11px] text-white/45">2Dライブオーロラの色彩と流体速度</div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-white/70">光粒子エフェクト</span>
+                    <button
+                      type="button"
+                      data-checked={auroraParticles}
+                      onClick={() => setAuroraParticles(!auroraParticles)}
+                      className="glass-switch"
+                    >
+                      <span className="glass-switch-thumb" />
+                    </button>
+                  </div>
                 </div>
-                <input
-                  type="range"
-                  min={10}
-                  max={100}
-                  value={auroraSpeed}
-                  onChange={(e) => setAuroraSpeed(Number(e.target.value))}
-                  className="glass-slider"
-                />
-              </div>
 
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-zinc-200 font-medium">発光の強さ</span>
-                  <span className="font-mono text-sky-300">{auroraIntensity}%</span>
+                {/* Color Palette */}
+                <div className="grid grid-cols-5 gap-2">
+                  {AURORA_PALETTES.map((p) => {
+                    const active = auroraColor === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => setAuroraColor(p.id)}
+                        className={`p-2 rounded-xl border text-center transition ${
+                          active
+                            ? 'border-cyan-400 bg-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]'
+                            : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.07]'
+                        }`}
+                      >
+                        <div className="h-6 w-full rounded-lg mb-1.5 shadow-inner" style={{ background: p.preview }} />
+                        <div className="text-[10px] text-white/85 truncate">{p.label}</div>
+                      </button>
+                    );
+                  })}
                 </div>
-                <input
-                  type="range"
-                  min={20}
-                  max={100}
-                  value={auroraIntensity}
-                  onChange={(e) => setAuroraIntensity(Number(e.target.value))}
-                  className="glass-slider"
-                />
-              </div>
 
-              <div className="flex items-center justify-between pt-1">
-                <div>
-                  <div className="text-xs font-medium text-zinc-200">光の粒子エフェクト</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setAuroraParticles(!auroraParticles)}
-                  className={`glass-switch ${auroraParticles ? 'is-on' : ''}`}
-                  aria-label="光の粒子エフェクト"
-                >
-                  <div className="glass-switch-thumb" />
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* =========================================================
-            SECTION 3: 壁紙・テーマ
-           ========================================================= */}
-        {section === 'personalization' && (
-          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-5 max-w-2xl">
-            <h2 className="text-base font-semibold text-white tracking-tight">壁紙・テーマ</h2>
-
-            {/* Design Engine Selector */}
-            <div className="rounded-2xl glass-panel p-5 space-y-3">
-              <div className="text-xs font-medium text-zinc-200">ガラス レンダリング</div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                {[
-                  { id: 'liquid-glass', name: 'Liquid 3D' },
-                  { id: 'windows-mica', name: 'Pure Lens' },
-                  { id: 'frosted-blur', name: 'Frosted' },
-                  { id: 'dark-slate', name: 'Dark Glass' },
-                ].map((eng) => (
-                  <button
-                    key={eng.id}
-                    onClick={() => setDesignEngine(eng.id as DesignEngine)}
-                    className={`py-2.5 px-3 rounded-xl text-xs font-medium transition text-center ${
-                      designEngine === eng.id
-                        ? 'glass-jelly text-sky-300 font-semibold ring-1 ring-sky-400/50'
-                        : 'bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200'
-                    }`}
-                  >
-                    {eng.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Background Wallpapers */}
-            <div className="rounded-2xl glass-panel p-5 space-y-3.5">
-              <div className="flex items-center justify-between">
-                <div className="text-xs font-medium text-zinc-200">背景コレクション</div>
-                <div>
-                  <input ref={fileInputRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" />
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-3 py-1.5 glass-jelly rounded-xl text-xs text-zinc-200 flex items-center gap-1.5"
-                  >
-                    <Icon name="Plus" size={12} />
-                    <span>画像を追加</span>
-                  </button>
-                </div>
-              </div>
-
-              {uploadError && <p className="text-xs text-rose-400">{uploadError}</p>}
-
-              <div className="grid grid-cols-3 gap-2.5">
-                {PRESET_WALLPAPERS.map((w) => (
-                  <button
-                    key={w}
-                    onClick={() => {
-                      setWallpaper(w);
-                      setSelectedCustomId(null);
-                    }}
-                    className={`relative rounded-xl overflow-hidden h-16 transition border ${
-                      wallpaper === w && !selectedCustomId
-                        ? 'border-sky-400 ring-2 ring-sky-400/40 scale-[1.02]'
-                        : 'border-white/10 hover:border-white/30'
-                    }`}
-                    style={{ background: (WALLPAPERS[w] ?? WALLPAPERS.live2d).style }}
-                  >
-                    <div className="absolute inset-x-0 bottom-0 bg-black/55 backdrop-blur-sm px-2 py-1 text-[10px] text-zinc-100 truncate text-center">
-                      {(WALLPAPERS[w] ?? WALLPAPERS.live2d).label}
+                {/* Speed & Intensity Sliders */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                  <div>
+                    <div className="flex justify-between text-xs mb-1.5">
+                      <span className="text-white/75">Aurora Flow Speed</span>
+                      <span className="font-mono text-cyan-300">{auroraSpeed.toFixed(1)}x</span>
                     </div>
-                  </button>
-                ))}
+                    <input
+                      type="range"
+                      min={0.2}
+                      max={2.5}
+                      step={0.1}
+                      value={auroraSpeed}
+                      onChange={(e) => setAuroraSpeed(Number(e.target.value))}
+                      className="glass-slider w-full"
+                    />
+                  </div>
 
-                {customWallpapers.map((cw) => (
-                  <button
-                    key={cw.id}
-                    onClick={() => setSelectedCustomId(cw.id)}
-                    className={`relative rounded-xl overflow-hidden h-16 transition border bg-cover bg-center ${
-                      selectedCustomId === cw.id
-                        ? 'border-sky-400 ring-2 ring-sky-400/40 scale-[1.02]'
-                        : 'border-white/10 hover:border-white/30'
-                    }`}
-                    style={{ backgroundImage: `url(${cw.dataUrl})` }}
-                  >
-                    <div className="absolute inset-x-0 bottom-0 bg-black/55 backdrop-blur-sm px-2 py-1 text-[10px] text-zinc-100 truncate text-center">
-                      {cw.name}
+                  <div>
+                    <div className="flex justify-between text-xs mb-1.5">
+                      <span className="text-white/75">Lustre Intensity</span>
+                      <span className="font-mono text-fuchsia-300">{auroraIntensity}%</span>
                     </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* =========================================================
-            SECTION 4: レイアウト (SHELLS)
-           ========================================================= */}
-        {section === 'shells' && (
-          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-5 max-w-2xl">
-            <h2 className="text-base font-semibold text-white tracking-tight">デスクトップ レイアウト</h2>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-              {[
-                { id: 'windows11', name: 'Windows 11', icon: 'Monitor' },
-                { id: 'mac', name: 'macOS', icon: 'Apple' },
-                { id: 'windows10', name: 'Windows 10', icon: 'Grid3x3' },
-                { id: 'metro', name: 'タイル画面', icon: 'LayoutGrid' },
-                { id: 'vista', name: 'Aero Glass', icon: 'Sparkles' },
-                { id: 'xp', name: 'クラシック', icon: 'Flame' },
-                { id: 'dex', name: 'DeX モード', icon: 'Layers' },
-                { id: 'chromeos', name: 'ChromeOS', icon: 'Globe' },
-                { id: 'ubuntu', name: 'Ubuntu', icon: 'SlidersHorizontal' },
-              ].map((s) => {
-                const isSelected =
-                  shellMode === s.id ||
-                  (s.id === 'windows11' && shellMode === 'windows') ||
-                  (s.id === 'metro' && shellMode === 'windows8');
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => setShellMode(s.id as ShellMode)}
-                    className={`p-3.5 rounded-2xl text-left transition flex items-center gap-3 ${
-                      isSelected
-                        ? 'glass-jelly text-white ring-1 ring-sky-400/50'
-                        : 'bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200'
-                    }`}
-                  >
-                    <Icon name={s.icon} size={16} className={isSelected ? 'text-sky-300' : 'text-zinc-500'} />
-                    <span className="text-xs font-semibold">{s.name}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {['windows', 'windows11', 'windows10'].includes(shellMode) && (
-              <div className="p-4 rounded-2xl glass-panel flex items-center justify-between">
-                <div className="text-xs font-medium text-zinc-200">タスクバーの位置</div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setTaskbarStyle('modern')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition ${
-                      taskbarStyle === 'modern' ? 'glass-jelly text-sky-300 font-semibold' : 'bg-white/[0.04] text-zinc-400'
-                    }`}
-                  >
-                    中央
-                  </button>
-                  <button
-                    onClick={() => setTaskbarStyle('classic')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-medium transition ${
-                      taskbarStyle === 'classic' ? 'glass-jelly text-sky-300 font-semibold' : 'bg-white/[0.04] text-zinc-400'
-                    }`}
-                  >
-                    左端
-                  </button>
+                    <input
+                      type="range"
+                      min={25}
+                      max={100}
+                      value={auroraIntensity}
+                      onChange={(e) => setAuroraIntensity(Number(e.target.value))}
+                      className="glass-slider w-full"
+                    />
+                  </div>
                 </div>
               </div>
             )}
-          </motion.div>
+          </div>
         )}
 
-        {/* =========================================================
-            SECTION 5: スリープ画面
-           ========================================================= */}
-        {section === 'lockscreen' && (
-          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-5 max-w-2xl">
-            <h2 className="text-base font-semibold text-white tracking-tight">スリープ画面</h2>
+        {/* ============================================================
+            SECTION 2: VOLUME & SOUND
+           ============================================================ */}
+        {section === 'sound' && (
+          <div className="space-y-6 max-w-2xl">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight text-white">Volume & Sound</h2>
+              <p className="text-xs text-white/50 mt-0.5">
+                マスター音量とシステムUI効果音（Web Audioシンセサイザー）を制御します。
+              </p>
+            </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { id: 'hyperos3' as LockScreenStyle, name: '3D ガラスクロック' },
-                { id: 'miuix' as LockScreenStyle, name: '縦型スタッククロック' },
-                { id: 'windows-hello' as LockScreenStyle, name: 'センターガラス' },
-                { id: 'cosmic-liquid' as LockScreenStyle, name: 'ミニマルクロック' },
-              ].map((style) => {
-                const active = lockScreenStyle === style.id;
-                return (
+            {/* Master Volume Slider */}
+            <div className="rounded-2xl bg-slate-900/40 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] border border-white/10 p-5 space-y-5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-fuchsia-500/25 via-violet-500/25 to-cyan-500/25 border border-white/15 flex items-center justify-center shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]">
+                    <Icon
+                      name={soundEnabled && volume > 0 ? 'Volume2' : 'VolumeX'}
+                      size={20}
+                      className="text-cyan-300"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium">Master Volume</div>
+                    <div className="text-[11px] text-white/45">システム全体の出力レベル</div>
+                  </div>
+                </div>
+                <span className="text-sm font-mono font-semibold text-cyan-300">
+                  {soundEnabled ? `${volume}%` : 'Muted'}
+                </span>
+              </div>
+
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={soundEnabled ? volume : 0}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setVolume(v);
+                  if (v > 0 && !soundEnabled) setSoundEnabled(true);
+                }}
+                className="glass-slider w-full"
+              />
+
+              <div className="flex items-center justify-between pt-3 border-t border-white/10">
+                <div>
+                  <div className="text-xs font-medium text-white/90">System Sound Effects</div>
+                  <div className="text-[11px] text-white/45">ウィンドウ起動・通知・ロック時のフィードバック音</div>
+                </div>
+                <button
+                  type="button"
+                  data-checked={soundEnabled}
+                  onClick={() => setSoundEnabled(!soundEnabled)}
+                  className="glass-switch"
+                >
+                  <span className="glass-switch-thumb" />
+                </button>
+              </div>
+            </div>
+
+            {/* Sound Preview Card */}
+            <div className="rounded-2xl bg-slate-900/40 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] border border-white/10 p-5 space-y-3">
+              <div className="text-sm font-medium">Acoustic Feedback Test</div>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { type: 'open' as const, label: 'Window Open', icon: 'Maximize2' },
+                  { type: 'notify' as const, label: 'Notification Chime', icon: 'Bell' },
+                  { type: 'click' as const, label: 'Glass Tap', icon: 'MousePointer' },
+                ].map((s) => (
                   <button
-                    key={style.id}
-                    onClick={() => setLockScreenStyle(style.id)}
-                    className={`p-4 rounded-2xl text-left transition flex items-center justify-between ${
-                      active
-                        ? 'glass-jelly text-white ring-1 ring-sky-400/50'
-                        : 'bg-white/[0.03] text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200'
-                    }`}
+                    key={s.type}
+                    onClick={() => playSound(s.type)}
+                    className="flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-white/[0.06] hover:bg-gradient-to-r hover:from-fuchsia-500/20 hover:to-cyan-500/20 border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] text-xs font-medium transition active:scale-95"
                   >
-                    <span className="text-xs font-semibold">{style.name}</span>
-                    {active && <Icon name="Check" size={14} className="text-sky-300" />}
+                    <Icon name={s.icon} size={14} className="text-cyan-300" />
+                    <span>{s.label}</span>
                   </button>
-                );
-              })}
+                ))}
+              </div>
             </div>
-
-            <div className="p-4 rounded-2xl glass-panel flex items-center justify-between">
-              <div className="text-xs font-medium text-zinc-200">スリープモードを起動</div>
-              <button
-                onClick={lockSystem}
-                className="px-4 py-2 rounded-xl glass-jelly text-xs text-white font-semibold flex items-center gap-2"
-              >
-                <Icon name="Moon" size={14} className="text-sky-300" />
-                <span>スリープにする</span>
-              </button>
-            </div>
-          </motion.div>
+          </div>
         )}
 
-        {/* =========================================================
-            SECTION 6: システム操作 (Switches & Quick Launch)
-           ========================================================= */}
-        {section === 'system' && (
-          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-4 max-w-2xl">
-            <h2 className="text-base font-semibold text-white tracking-tight">システム操作</h2>
-
-            <div className="rounded-2xl glass-panel p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Icon name="Volume2" size={17} className="text-sky-300" />
-                <span className="text-xs font-medium text-zinc-200">システム効果音</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                className={`glass-switch ${soundEnabled ? 'is-on' : ''}`}
-                aria-label="システム効果音"
-              >
-                <div className="glass-switch-thumb" />
-              </button>
+        {/* ============================================================
+            SECTION 3: THEME (2.5D GLASS & APPEARANCE)
+           ============================================================ */}
+        {section === 'theme' && (
+          <div className="space-y-6 max-w-2xl">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight text-white">Theme & 2.5D Glass</h2>
+              <p className="text-xs text-white/50 mt-0.5">
+                カラーモード、すりガラスの透明度・ぼかし・湾曲屈折、およびタスクバー配置を設定します。
+              </p>
             </div>
 
-            <div className="rounded-2xl glass-panel p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Icon name="Hand" size={17} className="text-sky-300" />
-                <span className="text-xs font-medium text-zinc-200">タッチ操作の拡大</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setTouchMode(!touchMode)}
-                className={`glass-switch ${touchMode ? 'is-on' : ''}`}
-                aria-label="タッチ操作の拡大"
-              >
-                <div className="glass-switch-thumb" />
-              </button>
-            </div>
-
-            <div className="rounded-2xl glass-panel p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Icon name="Cpu" size={17} className="text-sky-300" />
-                <span className="text-xs font-medium text-zinc-200">タスク マネージャー</span>
-              </div>
-              <button
-                onClick={() => openApp('taskmanager')}
-                className="px-3.5 py-1.5 rounded-xl glass-jelly text-xs text-zinc-100"
-              >
-                開く
-              </button>
-            </div>
-
-            <div className="rounded-2xl glass-panel p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Icon name="Activity" size={17} className="text-emerald-300" />
-                <span className="text-xs font-medium text-zinc-200">システム モニター</span>
-              </div>
-              <button
-                onClick={() => openApp('sysmon')}
-                className="px-3.5 py-1.5 rounded-xl glass-jelly text-xs text-zinc-100"
-              >
-                開く
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* =========================================================
-            SECTION 7: プロフィール
-           ========================================================= */}
-        {section === 'accounts' && (
-          <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-4 max-w-md">
-            <h2 className="text-base font-semibold text-white tracking-tight">プロフィール</h2>
-
-            <form onSubmit={handleSaveAccount} className="rounded-2xl glass-panel p-5 space-y-4">
-              <div>
-                <label className="text-xs text-zinc-300 mb-1.5 block">表示名</label>
-                <input
-                  type="text"
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-400"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs text-zinc-300 mb-1.5 block">アイコン</label>
-                <div className="flex items-center gap-2">
-                  {['User', 'Sparkles', 'Shield', 'Bot', 'Terminal'].map((av) => (
+            {/* Color Mode & Taskbar Alignment */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="rounded-2xl bg-slate-900/40 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] border border-white/10 p-4 space-y-3">
+                <div className="text-xs font-semibold text-white/80">Appearance Mode</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['dark', 'light'] as const).map((m) => (
                     <button
-                      key={av}
-                      type="button"
-                      onClick={() => setAvatarInput(av)}
-                      className={`p-2.5 rounded-xl transition ${
-                        avatarInput === av
-                          ? 'glass-jelly text-sky-300 ring-1 ring-sky-400/50'
-                          : 'bg-white/[0.03] text-zinc-400 hover:text-white'
+                      key={m}
+                      onClick={() => setTheme(m)}
+                      className={`py-2 px-3 rounded-xl text-xs font-medium capitalize flex items-center justify-center gap-2 border transition ${
+                        theme === m
+                          ? 'bg-gradient-to-r from-fuchsia-500/30 to-cyan-500/30 border-cyan-400/50 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]'
+                          : 'bg-white/5 border-white/10 text-white/60 hover:text-white'
                       }`}
                     >
-                      <Icon name={av} size={16} />
+                      <Icon name={m === 'dark' ? 'Moon' : 'Sun'} size={14} />
+                      <span>{m}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div>
-                <label className="text-xs text-zinc-300 mb-1.5 block">ロック解除パスワード</label>
-                <input
-                  type="password"
-                  value={passInput}
-                  onChange={(e) => setPassInput(e.target.value)}
-                  placeholder="空欄でパスワードなし"
-                  className="w-full bg-white/[0.05] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-sky-400 placeholder-zinc-500"
-                />
+              <div className="rounded-2xl bg-slate-900/40 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] border border-white/10 p-4 space-y-3">
+                <div className="text-xs font-semibold text-white/80">Taskbar Icon Alignment</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['center', 'left'] as const).map((align) => (
+                    <button
+                      key={align}
+                      onClick={() => setTaskbarAlign(align)}
+                      className={`py-2 px-3 rounded-xl text-xs font-medium capitalize flex items-center justify-center gap-2 border transition ${
+                        taskbarAlign === align
+                          ? 'bg-gradient-to-r from-fuchsia-500/30 to-cyan-500/30 border-cyan-400/50 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]'
+                          : 'bg-white/5 border-white/10 text-white/60 hover:text-white'
+                      }`}
+                    >
+                      <Icon name="LayoutGrid" size={14} />
+                      <span>{align}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* 2.5D Glassmorphism Sliders */}
+            <div className="rounded-2xl bg-slate-900/40 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] border border-white/10 p-5 space-y-5">
+              <div className="text-sm font-medium">2.5D Glass Optical Controls</div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-white/75">Backdrop Blur</span>
+                    <span className="font-mono text-cyan-300">{blurAmount}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={8}
+                    max={48}
+                    value={blurAmount}
+                    onChange={(e) => setBlurAmount(Number(e.target.value))}
+                    className="glass-slider w-full"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-white/75">Glass Transparency</span>
+                    <span className="font-mono text-fuchsia-300">{transparency}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={35}
+                    max={92}
+                    value={transparency}
+                    onChange={(e) => setTransparency(Number(e.target.value))}
+                    className="glass-slider w-full"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-white/75">Lens Curvature (Refraction)</span>
+                    <span className="font-mono text-violet-300">{glassCurvature}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={80}
+                    value={glassCurvature}
+                    onChange={(e) => setGlassCurvature(Number(e.target.value))}
+                    className="glass-slider w-full"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-white/75">Window Corner Radius</span>
+                    <span className="font-mono text-cyan-300">{cornerRadius}px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={8}
+                    max={32}
+                    value={cornerRadius}
+                    onChange={(e) => setCornerRadius(Number(e.target.value))}
+                    className="glass-slider w-full"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Glass Surface Material & Desktop Shell Layout */}
+            <div className="rounded-2xl bg-slate-900/40 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] border border-white/10 p-5 space-y-4">
+              <div className="text-sm font-medium">Surface Finish & Desktop Layout</div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {(
+                  [
+                    { id: 'liquid-glass', label: '2.5D Liquid Glass' },
+                    { id: 'aero-crystal', label: 'Crystal Lens' },
+                    { id: 'frosted-mica', label: 'Frosted Slate' },
+                    { id: 'neon-cyber', label: 'Neon Amethyst' },
+                  ] as { id: DesignEngine; label: string }[]
+                ).map((eng) => (
+                  <button
+                    key={eng.id}
+                    onClick={() => setDesignEngine(eng.id)}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-medium border transition ${
+                      designEngine === eng.id
+                        ? 'bg-gradient-to-br from-fuchsia-500/25 via-violet-500/20 to-cyan-500/25 border-cyan-400/50 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]'
+                        : 'bg-white/[0.04] border-white/10 text-white/65 hover:text-white'
+                    }`}
+                  >
+                    {eng.label}
+                  </button>
+                ))}
               </div>
 
-              <div className="flex items-center justify-between pt-1">
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl glass-jelly text-xs text-white font-semibold"
-                >
-                  保存
-                </button>
-                {savedMsg && <span className="text-xs text-emerald-400">保存しました</span>}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-2">
+                {(
+                  [
+                    { id: 'windows', label: 'Glassium Default' },
+                    { id: 'mac', label: 'Dock Mode' },
+                    { id: 'ubuntu', label: 'Split Bar' },
+                    { id: 'windows10', label: 'Compact Bar' },
+                  ] as { id: ShellMode; label: string }[]
+                ).map((sh) => (
+                  <button
+                    key={sh.id}
+                    onClick={() => setShellMode(sh.id)}
+                    className={`py-2 px-3 rounded-xl text-xs font-medium border transition ${
+                      shellMode === sh.id
+                        ? 'bg-white/15 border-white/40 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]'
+                        : 'bg-white/[0.03] border-white/10 text-white/55 hover:text-white'
+                    }`}
+                  >
+                    {sh.label}
+                  </button>
+                ))}
               </div>
-            </form>
-          </motion.div>
+            </div>
+          </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
