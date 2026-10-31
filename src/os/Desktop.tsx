@@ -16,7 +16,6 @@ import { BrowserApp } from './apps/Browser';
 import { SettingsApp } from './apps/Settings';
 import { GameApp } from './apps/Game';
 import { AppStoreApp } from './apps/AppStore';
-import { SystemMonitorApp } from './apps/SystemMonitor';
 import { CalendarApp } from './apps/CalendarApp';
 import { WeatherApp } from './apps/Weather';
 import { ClockApp } from './apps/ClockApp';
@@ -25,7 +24,7 @@ import { Calculator } from './apps/Calculator';
 import { TaskManager } from './apps/TaskManager';
 import { SynthVisualizerApp } from './apps/SynthVisualizer';
 import { Icon } from './Icon';
-import { AppId, TASKBAR_APPS } from './types';
+import { AppId, TASKBAR_APPS, DESKTOP_ICON_SIZE_PRESETS, DesktopIconSize } from './types';
 import { AppLogo } from './AppLogo';
 
 function renderApp(appId: string, payload?: unknown) {
@@ -47,9 +46,8 @@ function renderApp(appId: string, payload?: unknown) {
     case 'calculator':
       return <Calculator />;
     case 'taskmanager':
-      return <TaskManager />;
     case 'sysmon':
-      return <SystemMonitorApp />;
+      return <TaskManager />;
     case 'calendar':
       return <CalendarApp />;
     case 'synth':
@@ -128,6 +126,8 @@ export function Desktop() {
     wallpaper,
     customWallpapers,
     selectedCustomId,
+    theme,
+    accentColor,
     liteMode,
     transparency,
     locked,
@@ -163,6 +163,11 @@ export function Desktop() {
     desktopIconPositions,
     updateDesktopIconPosition,
     resetDesktopIconPositions,
+    desktopIconSize,
+    setDesktopIconSize,
+    gridSnapEnabled,
+    setGridSnapEnabled,
+    isWallpaperBright,
     deskNotes,
     addDeskNote,
     updateDeskNote,
@@ -217,6 +222,9 @@ export function Desktop() {
     }
   };
 
+  const iconPreset = DESKTOP_ICON_SIZE_PRESETS[desktopIconSize];
+  const useDarkDesktopText = isWallpaperBright;
+
   const handleIconPointerDown = (
     e: React.PointerEvent<HTMLButtonElement>,
     appId: string,
@@ -243,8 +251,8 @@ export function Desktop() {
       if (moved) {
         const vw = window.innerWidth;
         const vh = window.innerHeight;
-        latestX = Math.max(8, Math.min(vw - 88, initialX + dx));
-        latestY = Math.max(8, Math.min(vh - 132, initialY + dy));
+        latestX = Math.max(8, Math.min(vw - iconPreset.boxW - 8, initialX + dx));
+        latestY = Math.max(8, Math.min(vh - iconPreset.boxH - 56, initialY + dy));
         setDraggingIcon({ id: appId, x: latestX, y: latestY });
       }
     };
@@ -313,7 +321,6 @@ export function Desktop() {
     { id: 'weather', label: 'Weather', icon: 'weather' },
     { id: 'clock', label: 'Clock', icon: 'clock' },
     { id: 'ai', label: 'AI Assistant', icon: 'ai' },
-    { id: 'sysmon', label: 'Monitor', icon: 'sysmon' },
     { id: 'taskmanager', label: 'Task Manager', icon: 'taskmanager' },
     { id: 'appstore', label: 'App Store', icon: 'appstore' },
     { id: 'recycle', label: 'Trash', icon: 'recycle' },
@@ -321,6 +328,8 @@ export function Desktop() {
 
   return (
     <div
+      data-theme={theme}
+      data-accent={accentColor}
       className={`relative h-full w-full overflow-hidden select-none engine-${designEngine} ${liteMode ? 'lite-mode' : ''}`}
       onPointerDown={() => {
         setSelectedIconId(null);
@@ -954,15 +963,66 @@ export function Desktop() {
       )}
 
       {/* ========================================================
-          FREE-DRAGGABLE DESKTOP ICONS & DESK WORKSPACE CONTROLS
+          GRID-SNAPPED DESKTOP ICONS & DESK WORKSPACE CONTROLS
          ======================================================== */}
       {['windows', 'windows11', 'windows10', 'vista', 'xp', 'dex', 'chromeos', 'zorin'].includes(shellMode) && (
         <>
           <div className="absolute inset-0 z-10 pointer-events-none">
+            {/* Visual Grid Overlay & Target Slot ("規定の場所") while dragging */}
+            {draggingIcon && gridSnapEnabled && (() => {
+              const padX = 16;
+              const padY = 16;
+              const maxCols = Math.max(1, Math.floor((window.innerWidth - padX * 2) / iconPreset.cellW));
+              const maxRows = Math.max(1, Math.floor((window.innerHeight - 68 - padY) / iconPreset.cellH));
+              const targetCol = Math.max(0, Math.min(maxCols - 1, Math.round((draggingIcon.x - padX) / iconPreset.cellW)));
+              const targetRow = Math.max(0, Math.min(maxRows - 1, Math.round((draggingIcon.y - padY) / iconPreset.cellH)));
+              const slotLeft = padX + targetCol * iconPreset.cellW;
+              const slotTop = padY + targetRow * iconPreset.cellH;
+
+              return (
+                <>
+                  {/* Subtle desktop grid lines while dragging so user sees defined slots */}
+                  <div
+                    className="absolute inset-0 pointer-events-none transition-opacity duration-150"
+                    style={{
+                      backgroundImage: useDarkDesktopText
+                        ? `linear-gradient(to right, rgba(15,23,42,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.08) 1px, transparent 1px)`
+                        : `linear-gradient(to right, rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px)`,
+                      backgroundSize: `${iconPreset.cellW}px ${iconPreset.cellH}px`,
+                      backgroundPosition: `${padX}px ${padY}px`,
+                    }}
+                  />
+                  {/* Highlighted Target Grid Slot ("規定の場所") */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: slotLeft,
+                      top: slotTop,
+                      width: iconPreset.boxW,
+                      height: iconPreset.boxH,
+                    }}
+                    className={`rounded-xl border-2 border-dashed transition-all duration-100 flex items-end justify-center pb-1 ${
+                      useDarkDesktopText
+                        ? 'border-slate-900/55 bg-slate-900/10'
+                        : 'border-cyan-400/75 bg-cyan-400/15'
+                    }`}
+                  >
+                    <span
+                      className={`text-[9px] font-mono px-1 rounded ${
+                        useDarkDesktopText ? 'text-slate-900/80 bg-white/75' : 'text-cyan-200 bg-slate-950/70'
+                      }`}
+                    >
+                      {targetCol + 1},{targetRow + 1}
+                    </span>
+                  </div>
+                </>
+              );
+            })()}
+
             {DESKTOP_APPS_LIST.map((item, idx) => {
               const savedPos = desktopIconPositions[item.id] ?? {
-                x: 16 + Math.floor(idx / 6) * 92,
-                y: 16 + (idx % 6) * 94,
+                x: 16 + Math.floor(idx / 6) * iconPreset.cellW,
+                y: 16 + (idx % 6) * iconPreset.cellH,
               };
               const isDraggingThis = draggingIcon?.id === item.id;
               const x = isDraggingThis ? draggingIcon.x : savedPos.x;
@@ -978,24 +1038,39 @@ export function Desktop() {
                     position: 'absolute',
                     left: x,
                     top: y,
+                    width: iconPreset.boxW,
+                    height: iconPreset.boxH,
                     zIndex: isDraggingThis ? 50 : isSelected ? 20 : 10,
                     touchAction: 'none',
                   }}
-                  className={`pointer-events-auto flex flex-col items-center gap-1.5 w-[84px] py-2 px-1.5 rounded-2xl text-white/95 cursor-grab active:cursor-grabbing transition-shadow duration-150 group ${
+                  className={`pointer-events-auto flex flex-col items-center justify-center gap-1.5 py-1.5 px-1 rounded-xl cursor-grab active:cursor-grabbing transition-[background-color,box-shadow,transform] duration-150 group ${
                     isDraggingThis
-                      ? 'bg-slate-900/65 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.35),0_16px_36px_rgba(0,0,0,0.55)] scale-105 ring-1 ring-cyan-400/50'
+                      ? useDarkDesktopText
+                        ? 'bg-white/85 backdrop-blur-md shadow-lg scale-105 ring-1 ring-slate-900/30'
+                        : 'bg-slate-900/75 backdrop-blur-md shadow-xl scale-105 ring-1 ring-cyan-400/55'
                       : isSelected
-                      ? 'bg-slate-900/45 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.28)] ring-1 ring-white/25'
-                      : 'hover:bg-slate-900/40 hover:backdrop-blur-md hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.22),0_8px_20px_rgba(0,0,0,0.35)]'
+                      ? useDarkDesktopText
+                        ? 'bg-slate-900/15 backdrop-blur-sm ring-1 ring-slate-900/35'
+                        : 'bg-white/15 backdrop-blur-sm ring-1 ring-white/35'
+                      : useDarkDesktopText
+                      ? 'hover:bg-slate-900/10'
+                      : 'hover:bg-white/10'
                   }`}
-                  title={`${item.label} (ドラッグで自由に移動 / クリックで起動)`}
+                  title={`${item.label} (ドラッグでグリッド移動 / クリックで起動)`}
                 >
-                  <div className="w-11 h-11 flex items-center justify-center group-hover:scale-110 group-hover:-translate-y-0.5 transition-transform duration-150 shrink-0 pointer-events-none">
-                    <Icon name={item.id} size={38} />
+                  <div
+                    style={{ width: iconPreset.iconPx + 6, height: iconPreset.iconPx + 6 }}
+                    className="flex items-center justify-center group-hover:scale-105 transition-transform duration-150 shrink-0 pointer-events-none"
+                  >
+                    <Icon name={item.id} size={iconPreset.iconPx} />
                   </div>
                   <span
-                    className={`text-[11px] font-medium text-center truncate max-w-full px-1 leading-tight select-none pointer-events-none drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)] ${
-                      shellMode === 'xp' ? 'text-white font-bold' : 'text-white/95 group-hover:text-white'
+                    className={`${iconPreset.fontClass} text-center truncate max-w-full px-1 leading-tight select-none pointer-events-none transition-colors duration-150 ${
+                      useDarkDesktopText
+                        ? 'text-slate-900 font-semibold drop-shadow-[0_1px_2px_rgba(255,255,255,0.95)]'
+                        : shellMode === 'xp'
+                        ? 'text-white font-bold drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]'
+                        : 'text-white/95 font-medium group-hover:text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.95)]'
                     }`}
                   >
                     {item.label}
@@ -1009,13 +1084,24 @@ export function Desktop() {
               const isDraggingThis = draggingNote?.id === note.id;
               const nx = isDraggingThis ? draggingNote.x : note.x;
               const ny = isDraggingThis ? draggingNote.y : note.y;
-              const colorMap: Record<typeof note.color, string> = {
-                cyan: 'from-cyan-500/25 to-sky-900/40 border-cyan-400/30',
-                violet: 'from-violet-500/25 to-purple-900/40 border-violet-400/30',
-                amber: 'from-amber-500/25 to-orange-900/40 border-amber-400/30',
-                emerald: 'from-emerald-500/25 to-teal-900/40 border-emerald-400/30',
-                rose: 'from-rose-500/25 to-pink-900/40 border-rose-400/30',
+              const colorMapDark: Record<typeof note.color, string> = {
+                cyan: 'bg-slate-900/80 border-cyan-400/40 text-white',
+                violet: 'bg-slate-900/80 border-violet-400/40 text-white',
+                amber: 'bg-slate-900/80 border-amber-400/40 text-white',
+                emerald: 'bg-slate-900/80 border-emerald-400/40 text-white',
+                rose: 'bg-slate-900/80 border-rose-400/40 text-white',
               };
+              const colorMapLight: Record<typeof note.color, string> = {
+                cyan: 'bg-cyan-50/95 border-cyan-400/60 text-slate-900',
+                violet: 'bg-violet-50/95 border-violet-400/60 text-slate-900',
+                amber: 'bg-amber-50/95 border-amber-400/60 text-slate-900',
+                emerald: 'bg-emerald-50/95 border-emerald-400/60 text-slate-900',
+                rose: 'bg-rose-50/95 border-rose-400/60 text-slate-900',
+              };
+              const noteStyle = (theme === 'light' || useDarkDesktopText)
+                ? colorMapLight[note.color]
+                : colorMapDark[note.color];
+
               return (
                 <div
                   key={note.id}
@@ -1027,7 +1113,7 @@ export function Desktop() {
                     zIndex: isDraggingThis ? 45 : 15,
                     touchAction: 'none',
                   }}
-                  className={`pointer-events-auto w-56 rounded-2xl bg-gradient-to-br ${colorMap[note.color]} backdrop-blur-xl border shadow-[inset_0_1px_1px_rgba(255,255,255,0.25),0_16px_40px_rgba(0,0,0,0.45)] p-3 flex flex-col gap-2`}
+                  className={`pointer-events-auto w-56 rounded-xl ${noteStyle} backdrop-blur-xl border shadow-lg p-3 flex flex-col gap-2`}
                 >
                   <div className="flex items-center justify-between cursor-grab active:cursor-grabbing">
                     <div className="flex items-center gap-1.5">
@@ -1036,7 +1122,7 @@ export function Desktop() {
                           key={c}
                           type="button"
                           onClick={() => updateDeskNote(note.id, { color: c })}
-                          className={`w-3 h-3 rounded-full border border-white/40 transition ${
+                          className={`w-3 h-3 rounded-full border border-black/20 transition ${
                             c === 'cyan'
                               ? 'bg-cyan-400'
                               : c === 'violet'
@@ -1046,14 +1132,14 @@ export function Desktop() {
                               : c === 'emerald'
                               ? 'bg-emerald-400'
                               : 'bg-rose-400'
-                          } ${note.color === c ? 'scale-125 ring-1 ring-white' : 'opacity-60 hover:opacity-100'}`}
+                          } ${note.color === c ? 'scale-125 ring-1 ring-current' : 'opacity-60 hover:opacity-100'}`}
                         />
                       ))}
                     </div>
                     <button
                       type="button"
                       onClick={() => deleteDeskNote(note.id)}
-                      className="text-white/50 hover:text-rose-300 transition p-0.5"
+                      className="opacity-60 hover:opacity-100 hover:text-rose-500 transition p-0.5"
                       title="付箋を削除"
                     >
                       <Icon name="X" size={13} />
@@ -1063,47 +1149,12 @@ export function Desktop() {
                     value={note.text}
                     onChange={(e) => updateDeskNote(note.id, { text: e.target.value })}
                     rows={4}
-                    className="w-full bg-transparent border-0 outline-none resize-none text-xs text-white/95 placeholder:text-white/40 leading-relaxed select-text"
+                    className="w-full bg-transparent border-0 outline-none resize-none text-xs text-current placeholder:opacity-45 leading-relaxed select-text"
                     placeholder="メモを入力..."
                   />
                 </div>
               );
             })}
-          </div>
-
-          {/* Top-Right Subtle 2.5D Desk Workspace Pill */}
-          <div className="fixed top-3 right-3 z-20 flex items-center gap-1.5 px-2.5 py-1.5 rounded-2xl bg-slate-900/45 backdrop-blur-xl border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_24px_rgba(0,0,0,0.4)] text-xs text-white/90 pointer-events-auto">
-            <button
-              type="button"
-              onClick={toggleTaskView}
-              className="flex items-center gap-1.5 px-2 py-1 rounded-xl hover:bg-white/10 transition"
-              title="仮想デスクトップ / タスクビュー (Desk View)"
-            >
-              <Icon name="LayoutGrid" size={13} className="text-cyan-300" />
-              <span className="font-medium">
-                {desktops.find((d) => d.id === activeDesktopId)?.name || 'デスクトップ 1'}
-              </span>
-              <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-white/10 text-white/70 font-mono">
-                {activeDesktopWindows.length}
-              </span>
-            </button>
-            <div className="h-3.5 w-px bg-white/15" />
-            <button
-              type="button"
-              onClick={addDeskNote}
-              className="p-1 rounded-xl hover:bg-white/10 text-white/75 hover:text-white transition"
-              title="デスク付箋を追加"
-            >
-              <Icon name="Plus" size={13} />
-            </button>
-            <button
-              type="button"
-              onClick={() => resetDesktopIconPositions(false)}
-              className="p-1 rounded-xl hover:bg-white/10 text-white/75 hover:text-white transition"
-              title="デスクトップアイコンを自動整列"
-            >
-              <Icon name="RefreshCw" size={12} />
-            </button>
           </div>
         </>
       )}
@@ -1118,18 +1169,71 @@ export function Desktop() {
             transition={{ duration: 0.12 }}
             style={{ position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 9999 }}
             onPointerDown={(e) => e.stopPropagation()}
-            className="w-56 rounded-2xl bg-slate-900/80 backdrop-blur-2xl border border-white/15 shadow-[inset_0_1px_1px_rgba(255,255,255,0.25),0_20px_50px_rgba(0,0,0,0.65)] p-1.5 text-xs text-white/90"
+            className={`w-60 rounded-xl backdrop-blur-2xl border shadow-2xl p-1.5 text-xs ${
+              theme === 'light'
+                ? 'bg-white/95 border-slate-200 text-slate-900'
+                : 'bg-slate-900/90 border-white/15 text-white/90'
+            }`}
           >
+            {/* Quick Icon Size Selector */}
+            <div className="px-2.5 py-1.5">
+              <div className="text-[10px] font-semibold uppercase tracking-wider opacity-55 mb-1.5">
+                アプリアイコンのサイズ
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {(['small', 'medium', 'large'] as DesktopIconSize[]).map((sz) => (
+                  <button
+                    key={sz}
+                    type="button"
+                    onClick={() => {
+                      setDesktopIconSize(sz);
+                    }}
+                    className={`py-1 rounded-md text-[11px] font-medium border transition ${
+                      desktopIconSize === sz
+                        ? 'os-accent-soft border font-semibold'
+                        : theme === 'light'
+                        ? 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                        : 'bg-white/5 border-white/10 text-white/75 hover:bg-white/10'
+                    }`}
+                  >
+                    {DESKTOP_ICON_SIZE_PRESETS[sz].labelJa}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className={`my-1 border-t ${theme === 'light' ? 'border-slate-200' : 'border-white/10'}`} />
+
+            <button
+              type="button"
+              onClick={() => {
+                setGridSnapEnabled(!gridSnapEnabled);
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition ${
+                theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-white/10'
+              }`}
+            >
+              <span className="flex items-center gap-2.5">
+                <Icon name="Grid3x3" size={14} className="os-accent-text" />
+                <span>グリッドに自動スナップ</span>
+              </span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${gridSnapEnabled ? 'os-accent-soft' : 'opacity-45'}`}>
+                {gridSnapEnabled ? 'ON' : 'OFF'}
+              </span>
+            </button>
+
             <button
               type="button"
               onClick={() => {
                 resetDesktopIconPositions(false);
                 setContextMenu(null);
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-left transition"
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition ${
+                theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-white/10'
+              }`}
             >
-              <Icon name="LayoutGrid" size={14} className="text-cyan-300" />
-              <span>アイコンを自動整列</span>
+              <Icon name="LayoutGrid" size={14} className="text-cyan-500" />
+              <span>アイコンを規定位置に整列</span>
             </button>
             <button
               type="button"
@@ -1137,21 +1241,25 @@ export function Desktop() {
                 resetDesktopIconPositions(true);
                 setContextMenu(null);
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-left transition"
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition ${
+                theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-white/10'
+              }`}
             >
-              <Icon name="Grid3x3" size={14} className="text-violet-300" />
-              <span>アイコンをグリッドに揃える</span>
+              <Icon name="Grid3x3" size={14} className="text-violet-500" />
+              <span>現在の位置をグリッドに揃える</span>
             </button>
-            <div className="my-1 border-t border-white/10" />
+            <div className={`my-1 border-t ${theme === 'light' ? 'border-slate-200' : 'border-white/10'}`} />
             <button
               type="button"
               onClick={() => {
                 addDeskNote();
                 setContextMenu(null);
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-left transition"
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition ${
+                theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-white/10'
+              }`}
             >
-              <Icon name="FileText" size={14} className="text-amber-300" />
+              <Icon name="FileText" size={14} className="text-amber-500" />
               <span>デスク付箋を追加</span>
             </button>
             <button
@@ -1160,9 +1268,11 @@ export function Desktop() {
                 toggleTaskView();
                 setContextMenu(null);
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-left transition"
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition ${
+                theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-white/10'
+              }`}
             >
-              <Icon name="Monitor" size={14} className="text-emerald-300" />
+              <Icon name="Monitor" size={14} className="text-emerald-500" />
               <span>仮想デスクトップ / タスクビュー</span>
             </button>
             <button
@@ -1171,33 +1281,26 @@ export function Desktop() {
                 snapAllWindows5050();
                 setContextMenu(null);
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-left transition"
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition ${
+                theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-white/10'
+              }`}
             >
-              <Icon name="Columns" size={14} className="text-sky-300" />
+              <Icon name="Columns" size={14} className="text-sky-500" />
               <span>ウィンドウを左右に並べる</span>
             </button>
-            <div className="my-1 border-t border-white/10" />
-            <button
-              type="button"
-              onClick={() => {
-                openApp('ai');
-                setContextMenu(null);
-              }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-left transition"
-            >
-              <Icon name="Sparkles" size={14} className="text-fuchsia-300" />
-              <span>AIアシスタントを開く</span>
-            </button>
+            <div className={`my-1 border-t ${theme === 'light' ? 'border-slate-200' : 'border-white/10'}`} />
             <button
               type="button"
               onClick={() => {
                 openApp('settings');
                 setContextMenu(null);
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-white/10 text-left transition"
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition ${
+                theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-white/10'
+              }`}
             >
-              <Icon name="Settings" size={14} className="text-white/70" />
-              <span>ディスプレイとテーマ設定</span>
+              <Icon name="Settings" size={14} className="opacity-70" />
+              <span>設定 (アイコンサイズ・外観)</span>
             </button>
           </motion.div>
         )}

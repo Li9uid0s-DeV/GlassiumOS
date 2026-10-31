@@ -56,6 +56,74 @@ export const TASKBAR_APPS: TaskbarApp[] = [
 ];
 
 export type TaskbarAlign = 'center' | 'left';
+export type DesktopIconSize = 'small' | 'medium' | 'large';
+
+export const DESKTOP_ICON_SIZE_PRESETS: Record<
+  DesktopIconSize,
+  {
+    id: DesktopIconSize;
+    label: string;
+    labelJa: string;
+    cellW: number;
+    cellH: number;
+    boxW: number;
+    boxH: number;
+    iconPx: number;
+    fontClass: string;
+  }
+> = {
+  small: {
+    id: 'small',
+    label: 'Small',
+    labelJa: '小 (コンパクト)',
+    cellW: 78,
+    cellH: 82,
+    boxW: 70,
+    boxH: 74,
+    iconPx: 28,
+    fontClass: 'text-[10px]',
+  },
+  medium: {
+    id: 'medium',
+    label: 'Medium',
+    labelJa: '中 (標準)',
+    cellW: 96,
+    cellH: 100,
+    boxW: 86,
+    boxH: 90,
+    iconPx: 38,
+    fontClass: 'text-[11px]',
+  },
+  large: {
+    id: 'large',
+    label: 'Large',
+    labelJa: '大 (ワイド)',
+    cellW: 118,
+    cellH: 122,
+    boxW: 108,
+    boxH: 112,
+    iconPx: 48,
+    fontClass: 'text-xs',
+  },
+};
+
+export type AccentColor = 'cyan' | 'blue' | 'violet' | 'emerald' | 'rose' | 'amber';
+
+export const ACCENT_COLOR_PRESETS: {
+  id: AccentColor;
+  label: string;
+  labelJa: string;
+  hex: string;
+  rgb: string;
+}[] = [
+  { id: 'cyan', label: 'Cyan', labelJa: 'シアン', hex: '#06b6d4', rgb: '6, 182, 212' },
+  { id: 'blue', label: 'Blue', labelJa: 'ブルー', hex: '#3b82f6', rgb: '59, 130, 246' },
+  { id: 'violet', label: 'Violet', labelJa: 'バイオレット', hex: '#8b5cf6', rgb: '139, 92, 246' },
+  { id: 'emerald', label: 'Emerald', labelJa: 'エメラルド', hex: '#10b981', rgb: '16, 185, 129' },
+  { id: 'rose', label: 'Rose', labelJa: 'ローズ', hex: '#f43f5e', rgb: '244, 63, 94' },
+  { id: 'amber', label: 'Amber', labelJa: 'アンバー', hex: '#f59e0b', rgb: '245, 158, 11' },
+];
+
 export type ShellMode =
   | 'windows'
   | 'windows11'
@@ -134,27 +202,15 @@ export interface StoreApp {
 
 export const STORE_CATALOG: StoreApp[] = [
   {
-    id: 'sysmon',
-    name: 'System Monitor Pro',
-    description: 'Real-time client-side CPU clock fluctuations, RAM pools, and rendering FPS counter.',
-    category: 'utilities',
-    icon: 'Activity',
-    author: 'Liquid Systems',
-    rating: 4.9,
-    size: '1.2 MB',
-    version: '3.0.0',
-    builtInAppId: 'sysmon',
-  },
-  {
     id: 'calendar',
-    name: 'Cosmic Calendar & Tasks',
-    description: 'Interactive agenda grid and system task scheduler with priority tags and local persistence.',
+    name: 'Calendar & Tasks',
+    description: 'Interactive agenda grid and task scheduler with local persistence.',
     category: 'utilities',
     icon: 'Calendar',
-    author: 'Liquid Labs',
+    author: 'Glassium Core',
     rating: 4.8,
     size: '1.8 MB',
-    version: '3.0.0',
+    version: '4.0.0',
     builtInAppId: 'calendar',
   },
   {

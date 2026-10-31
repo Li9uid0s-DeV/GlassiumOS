@@ -2,16 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-border-dark: rgba(255, 255, 255, 0.03);
-  --glass-highlight: rgba(255, 255, 255, 0.14);
+:root,
+[data-theme='dark'] {
+  --os-accent: #06b6d4;
+  --os-accent-rgb: 6, 182, 212;
+  --os-surface: rgba(15, 23, 42, 0.84);
+  --os-surface-solid: #0f172a;
+  --os-surface-elevated: rgba(30, 41, 59, 0.72);
+  --os-surface-panel: rgba(255, 255, 255, 0.04);
+  --os-surface-hover: rgba(255, 255, 255, 0.08);
+  --os-border: rgba(255, 255, 255, 0.1);
+  --os-border-strong: rgba(255, 255, 255, 0.18);
+  --os-text: #f8fafc;
+  --os-text-muted: rgba(248, 250, 252, 0.62);
+  --os-text-subtle: rgba(248, 250, 252, 0.42);
+  --os-titlebar: rgba(15, 23, 42, 0.65);
   --theme-blur: 20px;
-  --theme-opacity: 0.4;
-  --theme-radius: 18px;
-  --glass-curvature: 36px;
-  --glass-specular: 0.75;
-  --glass-wobble: 0.65;
+  --theme-opacity: 0.84;
+  --theme-radius: 12px;
+}
+
+[data-theme='light'] {
+  --os-surface: rgba(248, 250, 252, 0.9);
+  --os-surface-solid: #f8fafc;
+  --os-surface-elevated: rgba(255, 255, 255, 0.85);
+  --os-surface-panel: rgba(15, 23, 42, 0.04);
+  --os-surface-hover: rgba(15, 23, 42, 0.07);
+  --os-border: rgba(15, 23, 42, 0.11);
+  --os-border-strong: rgba(15, 23, 42, 0.2);
+  --os-text: #0f172a;
+  --os-text-muted: rgba(15, 23, 42, 0.66);
+  --os-text-subtle: rgba(15, 23, 42, 0.46);
+  --os-titlebar: rgba(241, 245, 249, 0.88);
 }
 
 * {
@@ -27,321 +49,300 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
-  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, sans-serif;
   user-select: none;
+  color: var(--os-text);
 }
 
 /* ============================================================
-   GlassiumOS-V4.0 — 2.5D GLASSMORPHISM & LUSTROUS GRADIENTS
-   bg-slate-900/40 + backdrop-blur-md + inset specular shadow
+   FLAT MODERN WINDOWS 11 SURFACES & THEME ADAPTATION
    ============================================================ */
 
-/* ===== 2.5D GLASS WINDOWS & CARDS ===== */
 .liquid-glass-window,
 .liquid-glass-card {
-  background: linear-gradient(
-    145deg,
-    rgba(15, 23, 42, calc(var(--theme-opacity, 0.4) + 0.06)) 0%,
-    rgba(15, 23, 42, var(--theme-opacity, 0.4)) 55%,
-    rgba(30, 41, 59, calc(var(--theme-opacity, 0.4) + 0.04)) 100%
-  );
-  backdrop-filter: blur(var(--theme-blur, 20px)) saturate(190%);
-  -webkit-backdrop-filter: blur(var(--theme-blur, 20px)) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--theme-radius, 18px);
-  box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.55),
-    0 4px 16px rgba(0, 0, 0, 0.35),
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -1px 2px 0 rgba(0, 0, 0, 0.35),
-    inset 0 0 calc(var(--glass-curvature, 36px) * 0.65) -14px rgba(255, 255, 255, calc(0.28 * var(--glass-specular, 0.75)));
+  background: var(--os-surface);
+  backdrop-filter: blur(var(--theme-blur, 20px)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--theme-blur, 20px)) saturate(150%);
+  border: 1px solid var(--os-border);
+  border-radius: var(--theme-radius, 12px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35), 0 2px 10px rgba(0, 0, 0, 0.18);
+  color: var(--os-text);
   isolation: isolate;
   transition:
-    box-shadow 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
-    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    background-color 0.22s ease,
+    border-color 0.22s ease,
+    box-shadow 0.22s ease,
+    color 0.22s ease;
 }
 
-/* Focused 2.5D Window Sheen */
+[data-theme='light'] .liquid-glass-window,
+[data-theme='light'] .liquid-glass-card {
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16), 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
 .liquid-glass-window.is-focused,
 .liquid-glass-card.is-focused {
-  border-color: rgba(255, 255, 255, 0.14);
+  border-color: rgba(var(--os-accent-rgb), 0.45);
   box-shadow:
-    0 30px 72px rgba(0, 0, 0, 0.68),
-    0 8px 24px rgba(0, 0, 0, 0.45),
-    0 0 36px rgba(139, 92, 246, 0.12),
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.28),
-    inset 0 -1px 3px 0 rgba(0, 0, 0, 0.4),
-    inset 0 0 calc(var(--glass-curvature, 36px) * 0.8) -12px rgba(255, 255, 255, calc(0.38 * var(--glass-specular, 0.75)));
+    0 24px 60px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(var(--os-accent-rgb), 0.18);
 }
 
-/* Drag state */
+[data-theme='light'] .liquid-glass-window.is-focused,
+[data-theme='light'] .liquid-glass-card.is-focused {
+  border-color: rgba(var(--os-accent-rgb), 0.55);
+  box-shadow:
+    0 22px 52px rgba(15, 23, 42, 0.22),
+    0 0 0 1px rgba(var(--os-accent-rgb), 0.22);
+}
+
 .liquid-glass-window.is-dragging {
-  backdrop-filter: blur(16px) saturate(175%);
-  -webkit-backdrop-filter: blur(16px) saturate(175%);
-  box-shadow: 0 36px 84px rgba(0, 0, 0, 0.78);
+  box-shadow: 0 28px 68px rgba(0, 0, 0, 0.5);
 }
 
-/* 2.5D Specular Top Sheen */
-.liquid-glass-window::before,
-.liquid-glass-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
-  background: radial-gradient(
-    120% 65% at 50% 0%,
-    rgba(255, 255, 255, calc(0.1 * var(--glass-specular, 0.75))) 0%,
-    rgba(255, 255, 255, 0) 60%
-  );
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* Subtle Optical Refraction */
-.liquid-glass-window::after,
-.liquid-glass-card::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  backdrop-filter: blur(2px);
-  filter: url(#glass-distortion);
-  pointer-events: none;
-  z-index: 1;
-}
-
+/* ===== AUTHENTIC WINDOWS 10/11 CAPTION BUTTONS ===== */
 .window-controls-container {
   position: relative;
   z-index: 99999 !important;
   pointer-events: auto !important;
+  display: flex;
+  align-items: stretch;
+  height: 100%;
 }
 
-/* ===== 2.5D TASKBAR ===== */
+.win-caption-btn {
+  width: 46px;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--os-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  transition: background-color 0.12s ease, color 0.12s ease;
+  cursor: default;
+}
+
+.win-caption-btn:hover {
+  background-color: var(--os-surface-hover);
+  color: var(--os-text);
+}
+
+.win-caption-btn:active {
+  background-color: rgba(128, 128, 128, 0.22);
+}
+
+.win-caption-close {
+  width: 46px;
+  height: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--os-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  transition: background-color 0.12s ease, color 0.12s ease;
+  cursor: default;
+}
+
+.win-caption-close:hover {
+  background-color: #e81123 !important;
+  color: #ffffff !important;
+}
+
+.win-caption-close:active {
+  background-color: #f1707a !important;
+  color: #ffffff !important;
+}
+
+/* ===== FLAT TASKBAR ===== */
 .liquid-glass-taskbar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   width: 100vw;
-  background: rgba(15, 23, 42, 0.42);
-  backdrop-filter: blur(20px) saturate(190%);
-  -webkit-backdrop-filter: blur(20px) saturate(190%);
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow:
-    0 -10px 32px rgba(0, 0, 0, 0.55),
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.2);
+  background: var(--os-surface);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border-top: 1px solid var(--os-border);
+  color: var(--os-text);
   isolation: isolate;
+  transition: background-color 0.22s ease, border-color 0.22s ease, color 0.22s ease;
 }
 
-/* ===== 2.5D JELLY / LUSTROUS GRADIENT SLIDERS & SWITCHES ===== */
+/* ===== FLAT CONTROLS: SLIDERS & SWITCHES ===== */
 .glass-jelly {
   position: relative;
-  background: rgba(15, 23, 42, 0.42);
-  backdrop-filter: blur(16px) saturate(185%);
-  -webkit-backdrop-filter: blur(16px) saturate(185%);
-  box-shadow:
-    0 8px 20px rgba(0, 0, 0, 0.32),
-    inset 0 1px 1px rgba(255, 255, 255, 0.22),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.28);
+  background: var(--os-surface-panel);
+  border: 1px solid var(--os-border);
   transition:
-    transform 0.38s cubic-bezier(0.34, 1.56, 0.64, 1),
-    box-shadow 0.3s ease,
-    background 0.25s ease;
+    transform 0.18s ease,
+    background-color 0.18s ease,
+    border-color 0.18s ease;
 }
 
 .glass-jelly:hover {
-  transform: translateY(-1.5px) scale(1.02);
-  background: rgba(30, 41, 59, 0.52);
-  box-shadow:
-    0 12px 26px rgba(0, 0, 0, 0.42),
-    0 0 18px rgba(139, 92, 246, 0.2),
-    inset 0 1px 1.5px rgba(255, 255, 255, 0.32);
+  background: var(--os-surface-hover);
+  border-color: var(--os-border-strong);
 }
 
 .glass-jelly:active {
-  transform: translateY(0.5px) scale(0.97);
+  transform: scale(0.98);
 }
 
-/* 2.5D Lustrous Gradient Slider */
+/* Flat Accent Slider */
 input[type='range'].glass-slider {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 12px;
+  height: 6px;
   border-radius: 9999px;
-  background: linear-gradient(
-    90deg,
-    rgba(217, 70, 239, 0.55) 0%,
-    rgba(139, 92, 246, 0.55) 50%,
-    rgba(6, 182, 212, 0.65) 100%
-  );
-  box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, 0.45),
-    inset 0 1px 1px rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(12px);
+  background: rgba(var(--os-accent-rgb), 0.32);
   outline: none;
   cursor: pointer;
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+  transition: background-color 0.2s ease;
 }
 
 input[type='range'].glass-slider:hover {
-  transform: scaleY(1.1);
-  box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, 0.5),
-    0 0 14px rgba(139, 92, 246, 0.3);
+  background: rgba(var(--os-accent-rgb), 0.48);
 }
 
 input[type='range'].glass-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 24px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   border-radius: 9999px;
-  background: radial-gradient(
-    circle at 35% 30%,
-    #ffffff 0%,
-    #e0f2fe 45%,
-    #a5f3fc 100%
-  );
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.45),
-    0 0 12px rgba(6, 182, 212, 0.45),
-    inset 0 1px 2px rgba(255, 255, 255, 0.95);
-  cursor: grab;
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+  background: var(--os-accent);
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease;
 }
 
 input[type='range'].glass-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-  box-shadow:
-    0 6px 16px rgba(0, 0, 0, 0.5),
-    0 0 18px rgba(217, 70, 239, 0.55),
-    inset 0 2px 3px rgba(255, 255, 255, 1);
+  transform: scale(1.12);
 }
 
 input[type='range'].glass-slider::-webkit-slider-thumb:active {
-  cursor: grabbing;
-  transform: scale(1.22, 0.9);
+  transform: scale(0.95);
 }
 
 input[type='range'].glass-slider::-moz-range-thumb {
-  width: 24px;
-  height: 20px;
+  width: 16px;
+  height: 16px;
   border-radius: 9999px;
-  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #e0f2fe 45%, #a5f3fc 100%);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow:
-    0 4px 12px rgba(0, 0, 0, 0.45),
-    0 0 12px rgba(6, 182, 212, 0.45),
-    inset 0 1px 2px rgba(255, 255, 255, 0.95);
-  cursor: grab;
+  background: var(--os-accent);
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
 }
 
-/* 2.5D Liquid Glass Toggle Switch */
+/* Flat Accent Toggle Switch */
 .glass-switch {
   position: relative;
-  width: 52px;
-  height: 28px;
+  width: 44px;
+  height: 22px;
   border-radius: 9999px;
-  background: rgba(15, 23, 42, 0.55);
-  box-shadow:
-    inset 0 1px 2px rgba(0, 0, 0, 0.55),
-    inset 0 1px 1px rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(12px);
+  background: rgba(148, 163, 184, 0.3);
+  border: 1px solid var(--os-border-strong);
   cursor: pointer;
-  transition:
-    background 0.3s ease,
-    box-shadow 0.3s ease,
-    transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .glass-switch.is-on {
-  background: linear-gradient(135deg, #d946ef 0%, #8b5cf6 50%, #06b6d4 100%);
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.38),
-    0 0 18px rgba(139, 92, 246, 0.4);
+  background: var(--os-accent);
+  border-color: var(--os-accent);
 }
 
 .glass-switch-thumb {
   position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 22px;
-  height: 22px;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
   border-radius: 9999px;
-  background: radial-gradient(circle at 35% 30%, #ffffff 0%, #f1f5f9 100%);
-  box-shadow:
-    0 3px 8px rgba(0, 0, 0, 0.4),
-    inset 0 1px 2px rgba(255, 255, 255, 0.95);
-  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .glass-switch.is-on .glass-switch-thumb {
-  transform: translateX(24px);
+  transform: translateX(22px);
 }
 
-/* ===== BASE 2.5D GLASS PANELS ===== */
+/* ===== FLAT PANELS ===== */
 .glass {
-  background: rgba(15, 23, 42, 0.55);
-  backdrop-filter: blur(24px) saturate(190%);
-  -webkit-backdrop-filter: blur(24px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 18px;
-  box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.65),
-    inset 0 1px 1px 0 rgba(255, 255, 255, 0.22);
+  background: var(--os-surface);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid var(--os-border);
+  border-radius: 12px;
+  color: var(--os-text);
   isolation: isolate;
 }
 
 .glass-panel {
-  background: rgba(15, 23, 42, 0.4);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  background: var(--os-surface-panel);
+  border: 1px solid var(--os-border);
 }
 
 .glass-panel-hover:hover {
-  background: rgba(30, 41, 59, 0.5);
-  border-color: rgba(255, 255, 255, 0.18);
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.35),
-    inset 0 1px 1px rgba(255, 255, 255, 0.25);
+  background: var(--os-surface-hover);
+  border-color: var(--os-border-strong);
+}
+
+/* Accent Utility Classes */
+.os-accent-bg {
+  background-color: var(--os-accent);
+  color: #ffffff;
+}
+
+.os-accent-soft {
+  background-color: rgba(var(--os-accent-rgb), 0.14);
+  color: var(--os-accent);
+  border-color: rgba(var(--os-accent-rgb), 0.35);
+}
+
+.os-accent-text {
+  color: var(--os-accent);
+}
+
+.os-accent-border {
+  border-color: var(--os-accent);
 }
 
 /* Alternative Engines */
 .engine-frosted-blur .liquid-glass-window,
 .engine-frosted-blur .liquid-glass-taskbar,
 .engine-frosted-blur .glass {
-  backdrop-filter: blur(28px) saturate(190%) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
-  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(28px) saturate(160%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(160%) !important;
 }
 
 .engine-windows-mica .liquid-glass-window,
 .engine-windows-mica .liquid-glass-taskbar,
 .engine-windows-mica .glass {
-  backdrop-filter: url(#liquid-glass-lens) blur(18px) saturate(200%) !important;
-  -webkit-backdrop-filter: url(#liquid-glass-lens) blur(18px) saturate(200%) !important;
-  background: rgba(15, 23, 42, 0.38);
+  backdrop-filter: blur(20px) saturate(140%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
 }
 
 .engine-dark-slate .liquid-glass-window,
 .engine-dark-slate .liquid-glass-taskbar,
 .engine-dark-slate .glass {
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  background: rgba(9, 13, 22, 0.65);
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
 }
 
 .mac-dock-item {
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .mac-dock-item:hover {
-  transform: translateY(-8px) scale(1.2);
+  transform: translateY(-6px) scale(1.14);
 }
 
 .app-active-pip {
@@ -349,11 +350,10 @@ input[type='range'].glass-slider::-moz-range-thumb {
   bottom: 2px;
   left: 50%;
   transform: translateX(-50%);
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 3px;
   border-radius: 9999px;
-  background: #22d3ee;
-  box-shadow: 0 0 6px #22d3ee;
+  background: var(--os-accent);
 }
 
 ::-webkit-scrollbar {
@@ -366,10 +366,86 @@ input[type='range'].glass-slider::-moz-range-thumb {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(148, 163, 184, 0.3);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(148, 163, 184, 0.5);
 }
+
+/* ============================================================
+   AUTOMATIC DARK/BLACK TEXT ON WHITE OR BRIGHT BACKGROUNDS
+   ============================================================ */
+
+[data-theme='light'] .liquid-glass-window,
+[data-theme='light'] .liquid-glass-card,
+[data-theme='light'] .liquid-glass-taskbar {
+  color: #0f172a;
+}
+
+/* Convert hardcoded white text utilities inside windows/taskbar to dark slate in Light Mode */
+[data-theme='light'] .liquid-glass-window .text-white,
+[data-theme='light'] .liquid-glass-window .text-white\/95,
+[data-theme='light'] .liquid-glass-window .text-white\/90,
+[data-theme='light'] .liquid-glass-window .text-white\/85,
+[data-theme='light'] .liquid-glass-window .text-white\/80,
+[data-theme='light'] .liquid-glass-taskbar .text-white,
+[data-theme='light'] .liquid-glass-taskbar .text-white\/95,
+[data-theme='light'] .liquid-glass-taskbar .text-white\/90 {
+  color: #0f172a !important;
+}
+
+[data-theme='light'] .liquid-glass-window .text-white\/75,
+[data-theme='light'] .liquid-glass-window .text-white\/70,
+[data-theme='light'] .liquid-glass-window .text-white\/65,
+[data-theme='light'] .liquid-glass-window .text-white\/60,
+[data-theme='light'] .liquid-glass-taskbar .text-white\/70,
+[data-theme='light'] .liquid-glass-taskbar .text-white\/60 {
+  color: rgba(15, 23, 42, 0.72) !important;
+}
+
+[data-theme='light'] .liquid-glass-window .text-white\/55,
+[data-theme='light'] .liquid-glass-window .text-white\/50,
+[data-theme='light'] .liquid-glass-window .text-white\/45,
+[data-theme='light'] .liquid-glass-window .text-white\/40,
+[data-theme='light'] .liquid-glass-window .text-white\/35,
+[data-theme='light'] .liquid-glass-window .text-white\/30 {
+  color: rgba(15, 23, 42, 0.54) !important;
+}
+
+/* Keep white text on accent buttons and explicit colored badges */
+[data-theme='light'] .liquid-glass-window .os-accent-bg,
+[data-theme='light'] .liquid-glass-window .os-accent-bg .text-white {
+  color: #ffffff !important;
+}
+
+/* Adapt dark app container backgrounds inside windows when Light Mode is active */
+[data-theme='light'] .liquid-glass-window .bg-zinc-950,
+[data-theme='light'] .liquid-glass-window .bg-zinc-950\/90,
+[data-theme='light'] .liquid-glass-window .bg-slate-950,
+[data-theme='light'] .liquid-glass-window .bg-slate-950\/60,
+[data-theme='light'] .liquid-glass-window .bg-slate-950\/70,
+[data-theme='light'] .liquid-glass-window .bg-slate-950\/80 {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+[data-theme='light'] .liquid-glass-window .bg-zinc-900,
+[data-theme='light'] .liquid-glass-window .bg-zinc-900\/80,
+[data-theme='light'] .liquid-glass-window .bg-slate-900,
+[data-theme='light'] .liquid-glass-window .bg-slate-900\/55,
+[data-theme='light'] .liquid-glass-window .bg-slate-900\/60,
+[data-theme='light'] .liquid-glass-window .bg-slate-900\/70,
+[data-theme='light'] .liquid-glass-window .bg-slate-900\/80 {
+  background-color: #ffffff !important;
+  color: #0f172a !important;
+}
+
+[data-theme='light'] .liquid-glass-window .border-white\/5,
+[data-theme='light'] .liquid-glass-window .border-white\/10,
+[data-theme='light'] .liquid-glass-window .border-white\/15,
+[data-theme='light'] .liquid-glass-window .border-white\/20 {
+  border-color: rgba(15, 23, 42, 0.12) !important;
+}
+

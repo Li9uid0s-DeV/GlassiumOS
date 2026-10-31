@@ -24,8 +24,7 @@ const SEARCHABLE_APPS: { appId: AppId; label: string; keywords: string; icon: st
   { appId: 'weather', label: 'Weather', keywords: 'forecast temperature 天気', icon: 'CloudSun' },
   { appId: 'clock', label: 'Clock', keywords: 'time alarm timer 時計', icon: 'Clock' },
   { appId: 'ai', label: 'AI Assistant', keywords: 'gemini chat copilot アシスタント', icon: 'Sparkles' },
-  { appId: 'sysmon', label: 'System Monitor', keywords: 'cpu memory activity モニター', icon: 'Activity' },
-  { appId: 'taskmanager', label: 'Task Manager', keywords: 'processes windows タスク', icon: 'Cpu' },
+  { appId: 'taskmanager', label: 'Task Manager', keywords: 'processes windows cpu memory タスク', icon: 'Cpu' },
   { appId: 'appstore', label: 'App Store', keywords: 'install store ストア', icon: 'Store' },
 ];
 
@@ -47,15 +46,15 @@ export function Taskbar(_props?: TaskbarProps) {
     shellMode,
     volume,
     setVolume,
-    brightness,
-    setBrightness,
     soundEnabled,
     setSoundEnabled,
     activeDesktopId,
     taskViewOpen,
     setTaskViewOpen,
     toggleTaskView,
+    theme,
   } = useOS();
+  const isLight = theme === 'light';
 
   const currentDesktopWindows = windows.filter(
     (w) => !w.desktopId || w.desktopId === activeDesktopId
@@ -403,42 +402,52 @@ export function Taskbar(_props?: TaskbarProps) {
       )}
 
       {/* ==============================================================
-          5. GLASSIUMOS-V4.0 2.5D GLASSMORPHISM TASKBAR (DEFAULT)
+          5. GLASSIUMOS-V4.0 FLAT TASKBAR (DEFAULT)
          ============================================================== */}
       {!isXP && !isVista && !isWin10 && !isDeX && !isChromeOS && !isZorin && (
         <div
-          className="fixed bottom-0 inset-x-0 h-12 w-screen z-[5000] bg-slate-900/40 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] border-t border-white/10 flex items-center justify-between px-3 select-none"
+          className={`fixed bottom-0 inset-x-0 h-12 w-screen z-[5000] backdrop-blur-2xl border-t flex items-center justify-between px-3 select-none transition-colors duration-200 ${
+            isLight
+              ? 'bg-slate-100/88 border-slate-900/12 text-slate-900'
+              : 'bg-slate-900/80 border-white/10 text-white'
+          }`}
           style={{ position: 'fixed', bottom: 0, left: 0, right: 0, width: '100vw', borderRadius: 0 }}
         >
-          {/* Left: The Fluid "G" Start Button + Borderless 2.5D Glass App Search Bar */}
+          {/* Left: Start Button + Flat App Search Bar + Task View */}
           <div className="flex items-center gap-2 min-w-0" ref={searchContainerRef}>
             <button
               ref={startBtnRef}
               type="button"
               onClick={handleStartClick}
-              className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all duration-200 shrink-0 ${
+              className={`h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-150 shrink-0 ${
                 startOpen
-                  ? 'bg-gradient-to-br from-fuchsia-500/30 via-violet-500/25 to-cyan-500/30 shadow-[inset_0_1px_1px_rgba(255,255,255,0.35),0_0_16px_rgba(139,92,246,0.4)] scale-95'
-                  : 'bg-white/[0.06] hover:bg-white/[0.12] shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] active:scale-95'
+                  ? 'os-accent-soft border scale-95'
+                  : isLight
+                  ? 'bg-slate-900/5 hover:bg-slate-900/10 active:scale-95'
+                  : 'bg-white/[0.06] hover:bg-white/[0.12] active:scale-95'
               }`}
               title="GlassiumOS-V4.0 Start"
             >
               <AppLogo size={20} glow={startOpen} />
             </button>
 
-            {/* Borderless Flat 2.5D Glass Search Bar */}
+            {/* Flat Search Bar */}
             <div className="relative">
               <div
-                className={`flex items-center gap-2 h-8 px-3 rounded-xl transition-all duration-200 ${
+                className={`flex items-center gap-2 h-8 px-3 rounded-lg border transition-all duration-200 ${
                   searchFocused
-                    ? 'w-44 sm:w-56 bg-slate-900/60 backdrop-blur-xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.28),0_4px_20px_rgba(0,0,0,0.4)]'
-                    : 'w-32 sm:w-44 bg-white/[0.06] hover:bg-white/[0.10] shadow-[inset_0_1px_1px_rgba(255,255,255,0.16)]'
+                    ? isLight
+                      ? 'w-44 sm:w-56 bg-white border-slate-300 shadow-sm'
+                      : 'w-44 sm:w-56 bg-slate-950/80 border-white/20 shadow-sm'
+                    : isLight
+                    ? 'w-32 sm:w-44 bg-slate-900/5 hover:bg-slate-900/8 border-slate-900/10'
+                    : 'w-32 sm:w-44 bg-white/[0.06] hover:bg-white/[0.10] border-white/10'
                 }`}
               >
                 <Icon
                   name="Search"
                   size={13}
-                  className={searchFocused ? 'text-cyan-300 shrink-0' : 'text-white/50 shrink-0'}
+                  className={searchFocused ? 'os-accent-text shrink-0' : 'opacity-50 shrink-0'}
                 />
                 <input
                   type="text"
@@ -463,13 +472,15 @@ export function Taskbar(_props?: TaskbarProps) {
                     }
                   }}
                   placeholder="検索"
-                  className="w-full bg-transparent border-0 outline-none text-xs text-white/95 placeholder:text-white/45"
+                  className={`w-full bg-transparent border-0 outline-none text-xs ${
+                    isLight ? 'text-slate-900 placeholder:text-slate-400' : 'text-white/95 placeholder:text-white/45'
+                  }`}
                 />
                 {searchQuery && (
                   <button
                     type="button"
                     onClick={() => setSearchQuery('')}
-                    className="text-white/40 hover:text-white/80 transition"
+                    className="opacity-45 hover:opacity-90 transition"
                   >
                     <Icon name="X" size={12} />
                   </button>
@@ -477,19 +488,21 @@ export function Taskbar(_props?: TaskbarProps) {
               </div>
             </div>
 
-            {/* Windows 11 Task View / Virtual Desktops ("デスク機能") Button */}
+            {/* Windows 11 Task View / Virtual Desktops Button */}
             <button
               type="button"
               onClick={toggleTaskView}
-              className={`h-9 w-9 rounded-xl flex items-center justify-center transition-all duration-200 shrink-0 ${
+              className={`h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-150 shrink-0 ${
                 taskViewOpen
-                  ? 'bg-gradient-to-br from-cyan-500/35 to-violet-500/30 text-cyan-300 shadow-[inset_0_1px_1px_rgba(255,255,255,0.35),0_0_14px_rgba(6,182,212,0.4)]'
-                  : 'bg-white/[0.06] hover:bg-white/[0.12] text-white/80 hover:text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.16)] active:scale-95'
+                  ? 'os-accent-soft border'
+                  : isLight
+                  ? 'bg-slate-900/5 hover:bg-slate-900/10 text-slate-700 hover:text-slate-900 active:scale-95'
+                  : 'bg-white/[0.06] hover:bg-white/[0.12] text-white/80 hover:text-white active:scale-95'
               }`}
               title="タスクビュー ＆ 仮想デスクトップ (Desk View)"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <rect x="2.5" y="4.5" width="13" height="11" rx="2.5" stroke="currentColor" strokeWidth="1.8" fill="currentColor" fillOpacity="0.15" />
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                <rect x="2.5" y="4.5" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.8" fill="currentColor" fillOpacity="0.15" />
                 <path d="M8.5 19.5H19C20.3807 19.5 21.5 18.3807 21.5 17V8.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
               </svg>
             </button>
@@ -497,7 +510,7 @@ export function Taskbar(_props?: TaskbarProps) {
 
           {/* Center: Curated Essential Taskbar Icons */}
           <div
-            className={`flex items-center gap-1.5 ${
+            className={`flex items-center gap-1 ${
               taskbarAlign === 'left' ? 'justify-start pl-3' : 'justify-center'
             } flex-1 max-w-xl px-2`}
           >
@@ -509,22 +522,26 @@ export function Taskbar(_props?: TaskbarProps) {
                 <button
                   key={app.appId}
                   onClick={() => handleAppClick(app.appId)}
-                  className={`relative h-9 w-9 rounded-xl flex items-center justify-center transition-all duration-200 shrink-0 group ${
+                  className={`relative h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-150 shrink-0 group ${
                     anyVisible
-                      ? 'bg-gradient-to-b from-white/18 to-white/8 shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_4px_12px_rgba(0,0,0,0.25)]'
-                      : 'hover:bg-white/10 hover:shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] active:scale-95'
+                      ? isLight
+                        ? 'bg-slate-900/10'
+                        : 'bg-white/15'
+                      : isLight
+                      ? 'hover:bg-slate-900/6 active:scale-95'
+                      : 'hover:bg-white/10 active:scale-95'
                   }`}
                   title={app.label}
                 >
                   <Icon
                     name={app.appId}
-                    size={23}
-                    className="transition-transform duration-150 group-hover:scale-110 group-hover:-translate-y-0.5"
+                    size={22}
+                    className="transition-transform duration-150 group-hover:scale-105"
                   />
                   {active && (
                     <span
-                      className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 rounded-full bg-gradient-to-r from-fuchsia-400 via-violet-400 to-cyan-400 transition-all ${
-                        anyVisible ? 'w-4 shadow-[0_0_6px_rgba(6,182,212,0.8)]' : 'w-1.5 opacity-70'
+                      className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 rounded-full os-accent-bg transition-all ${
+                        anyVisible ? 'w-4' : 'w-1.5 opacity-70'
                       }`}
                     />
                   )}
@@ -546,16 +563,20 @@ export function Taskbar(_props?: TaskbarProps) {
                   <button
                     key={win.id}
                     onClick={() => handleAppClick(win.appId as AppId)}
-                    className={`relative h-9 w-9 rounded-xl flex items-center justify-center transition-all duration-200 shrink-0 group ${
+                    className={`relative h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-150 shrink-0 group ${
                       anyVisible
-                        ? 'bg-gradient-to-b from-white/18 to-white/8 shadow-[inset_0_1px_1px_rgba(255,255,255,0.3)]'
+                        ? isLight
+                          ? 'bg-slate-900/10'
+                          : 'bg-white/15'
+                        : isLight
+                        ? 'hover:bg-slate-900/6 active:scale-95'
                         : 'hover:bg-white/10 active:scale-95'
                     }`}
                     title={win.title}
                   >
-                    <Icon name={win.appId} size={23} className="transition-transform duration-150 group-hover:scale-110" />
+                    <Icon name={win.appId} size={22} className="transition-transform duration-150 group-hover:scale-105" />
                     <span
-                      className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 rounded-full bg-gradient-to-r from-fuchsia-400 to-cyan-400 transition-all ${
+                      className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 rounded-full os-accent-bg transition-all ${
                         anyVisible ? 'w-4' : 'w-1.5 opacity-70'
                       }`}
                     />
@@ -564,7 +585,9 @@ export function Taskbar(_props?: TaskbarProps) {
               })}
 
             {/* Installed apps */}
-            {installedApps.length > 0 && <div className="h-4 w-px bg-white/10 mx-0.5 shrink-0" />}
+            {installedApps.length > 0 && (
+              <div className={`h-4 w-px mx-0.5 shrink-0 ${isLight ? 'bg-slate-900/15' : 'bg-white/10'}`} />
+            )}
             {installedApps
               .filter(
                 (app, idx, arr) =>
@@ -580,18 +603,22 @@ export function Taskbar(_props?: TaskbarProps) {
                   <button
                     key={`${app.id || app.appId}-${idx}`}
                     onClick={() => handleInstalledAppClick(app.id || app.appId)}
-                    className={`relative h-9 w-9 rounded-xl flex items-center justify-center transition-all duration-200 shrink-0 group ${
+                    className={`relative h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-150 shrink-0 group ${
                       anyVisible
-                        ? 'bg-white/15 shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]'
+                        ? isLight
+                          ? 'bg-slate-900/10'
+                          : 'bg-white/15'
+                        : isLight
+                        ? 'hover:bg-slate-900/6 active:scale-95'
                         : 'hover:bg-white/10 active:scale-95'
                     }`}
                     title={app.name}
                   >
-                    <Icon name={app.icon} size={22} className="transition-transform duration-150 group-hover:scale-110" />
+                    <Icon name={app.icon} size={22} className="transition-transform duration-150 group-hover:scale-105" />
                     {active && (
                       <span
-                        className={`absolute bottom-1 left-1/2 -translate-x-1/2 h-0.5 rounded-full bg-cyan-400 transition-all ${
-                          anyVisible ? 'w-3.5' : 'w-1.5 opacity-60'
+                        className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 rounded-full os-accent-bg transition-all ${
+                          anyVisible ? 'w-4' : 'w-1.5 opacity-60'
                         }`}
                       />
                     )}
@@ -600,44 +627,52 @@ export function Taskbar(_props?: TaskbarProps) {
               })}
           </div>
 
-          {/* Right: Clean 2.5D System Tray */}
+          {/* Right: Flat System Tray */}
           <div className="flex items-center gap-1.5 min-w-0 justify-end">
             <AIAssistant />
-            <div className="h-4 w-px bg-white/10 mx-0.5 shrink-0" />
+            <div className={`h-4 w-px mx-0.5 shrink-0 ${isLight ? 'bg-slate-900/15' : 'bg-white/10'}`} />
             <button
               onClick={() => setTrayOpen((v) => !v)}
-              className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-white/[0.05] hover:bg-white/[0.12] shadow-[inset_0_1px_1px_rgba(255,255,255,0.16)] transition"
+              className={`flex items-center gap-2 px-2.5 py-1 rounded-lg transition ${
+                isLight
+                  ? 'bg-slate-900/5 hover:bg-slate-900/10 text-slate-900'
+                  : 'bg-white/[0.05] hover:bg-white/[0.12] text-white'
+              }`}
               title="System Controls"
             >
-              <div className="flex items-center gap-1.5 text-white/80">
-                <Icon name="Wifi" size={13} className={quickSettings.wifi ? 'text-cyan-300' : 'text-white/40'} />
+              <div className="flex items-center gap-1.5">
+                <Icon name="Wifi" size={13} className={quickSettings.wifi ? 'os-accent-text' : 'opacity-40'} />
                 <Icon
                   name={soundEnabled && volume > 0 ? 'Volume2' : 'VolumeX'}
                   size={13}
-                  className={soundEnabled && volume > 0 ? 'text-fuchsia-300' : 'text-white/40'}
+                  className={soundEnabled && volume > 0 ? 'os-accent-text' : 'opacity-40'}
                 />
               </div>
               <div className="text-right leading-tight hidden sm:block">
-                <div className="text-[11px] font-medium text-white/95 tabular-nums font-mono">{timeStr}</div>
-                <div className="text-[9px] text-white/50">{dateStr}</div>
+                <div className="text-[11px] font-medium tabular-nums font-mono">{timeStr}</div>
+                <div className="text-[9px] opacity-55">{dateStr}</div>
               </div>
             </button>
           </div>
         </div>
       )}
 
-      {/* Instant App Search Dropdown (Rendered outside backdrop-blur taskbar to preserve fixed coordinates) */}
+      {/* Instant App Search Dropdown */}
       <AnimatePresence>
         {searchFocused && (
           <motion.div
             ref={searchDropdownRef}
-            initial={{ opacity: 0, y: 10, scale: 0.97 }}
+            initial={{ opacity: 0, y: 8, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.97 }}
-            transition={{ duration: 0.16 }}
-            className="fixed bottom-14 left-3 z-[5200] w-64 rounded-2xl bg-slate-900/85 backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.25),0_20px_50px_rgba(0,0,0,0.65)] border border-white/15 p-2 overflow-hidden"
+            exit={{ opacity: 0, y: 8, scale: 0.98 }}
+            transition={{ duration: 0.14 }}
+            className={`fixed bottom-14 left-3 z-[5200] w-64 rounded-xl backdrop-blur-2xl border p-2 overflow-hidden shadow-2xl ${
+              isLight
+                ? 'bg-white/95 border-slate-900/12 text-slate-900'
+                : 'bg-slate-900/90 border-white/15 text-white'
+            }`}
           >
-            <div className="px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider text-white/40">
+            <div className="px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider opacity-45">
               Applications
             </div>
             <div className="space-y-0.5">
@@ -651,18 +686,20 @@ export function Taskbar(_props?: TaskbarProps) {
                       setSearchQuery('');
                       setSearchFocused(false);
                     }}
-                    className="w-full flex items-center gap-3 px-2.5 py-2 rounded-xl hover:bg-gradient-to-r hover:from-fuchsia-500/20 hover:via-violet-500/15 hover:to-cyan-500/20 text-left transition group"
+                    className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-left transition group ${
+                      isLight ? 'hover:bg-slate-900/5' : 'hover:bg-white/10'
+                    }`}
                   >
-                    <div className="w-7 h-7 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                      <Icon name={item.appId} size={24} />
+                    <div className="w-7 h-7 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                      <Icon name={item.appId} size={22} />
                     </div>
-                    <span className="text-xs font-medium text-white/90 group-hover:text-white truncate">
+                    <span className="text-xs font-medium truncate">
                       {item.label}
                     </span>
                   </button>
                 ))
               ) : (
-                <div className="px-3 py-4 text-center text-xs text-white/40">
+                <div className="px-3 py-4 text-center text-xs opacity-45">
                   該当するアプリがありません
                 </div>
               )}
@@ -671,26 +708,30 @@ export function Taskbar(_props?: TaskbarProps) {
         )}
       </AnimatePresence>
 
-      {/* 2.5D Glass Quick Settings Flyout */}
+      {/* Flat Quick Settings Flyout (Brightness removed as requested) */}
       <AnimatePresence>
         {trayOpen && (
           <>
             <div className="fixed inset-0 z-[5100]" onClick={() => setTrayOpen(false)} />
             <motion.div
-              initial={{ opacity: 0, y: 16, scale: 0.97 }}
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 16, scale: 0.97 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-              className="fixed bottom-14 right-3 z-[5200] w-72 max-w-[calc(100vw-24px)] rounded-2xl p-4 bg-slate-900/80 backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.25),0_24px_60px_rgba(0,0,0,0.65)] border border-white/15 text-white"
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+              className={`fixed bottom-14 right-3 z-[5200] w-72 max-w-[calc(100vw-24px)] rounded-xl p-4 backdrop-blur-2xl border shadow-2xl ${
+                isLight
+                  ? 'bg-white/95 border-slate-900/12 text-slate-900'
+                  : 'bg-slate-900/90 border-white/15 text-white'
+              }`}
             >
               <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold tracking-wide text-white/90">Quick Controls</span>
+                <span className="text-xs font-semibold tracking-wide">Quick Controls</span>
                 <button
                   onClick={() => {
                     setTrayOpen(false);
                     openApp('settings');
                   }}
-                  className="text-[11px] text-cyan-300 hover:text-cyan-200 flex items-center gap-1 transition"
+                  className="text-[11px] os-accent-text hover:underline flex items-center gap-1 transition"
                 >
                   <Icon name="Settings" size={12} />
                   <span>Settings</span>
@@ -701,15 +742,17 @@ export function Taskbar(_props?: TaskbarProps) {
                 {[
                   { key: 'wifi' as const, label: 'Wi-Fi', icon: 'Wifi' },
                   { key: 'bluetooth' as const, label: 'Bluetooth', icon: 'Bluetooth' },
-                  { key: 'darkMode' as const, label: 'Dark Theme', icon: 'Moon' },
+                  { key: 'darkMode' as const, label: 'Dark Mode', icon: 'Moon' },
                 ].map((q) => (
                   <button
                     key={q.key}
                     onClick={() => toggleQuick(q.key)}
-                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl transition ${
+                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-lg border transition ${
                       quickSettings[q.key]
-                        ? 'bg-gradient-to-br from-fuchsia-500/30 via-violet-500/25 to-cyan-500/30 border border-cyan-400/40 text-white shadow-[inset_0_1px_1px_rgba(255,255,255,0.25)]'
-                        : 'bg-white/5 border border-white/10 text-white/60 hover:bg-white/10'
+                        ? 'os-accent-bg border-transparent'
+                        : isLight
+                        ? 'bg-slate-900/5 border-slate-900/10 text-slate-700 hover:bg-slate-900/10'
+                        : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
                     }`}
                   >
                     <Icon name={q.icon} size={15} />
@@ -718,55 +761,39 @@ export function Taskbar(_props?: TaskbarProps) {
                 ))}
               </div>
 
-              <div className="space-y-3 bg-white/[0.04] border border-white/10 rounded-xl p-3 shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)]">
-                <div>
-                  <div className="flex items-center justify-between text-xs text-white/80 mb-1.5">
-                    <span className="flex items-center gap-1.5">
-                      <Icon name="Sun" size={13} className="text-amber-300" />
-                      Brightness
-                    </span>
-                    <span className="font-mono text-[11px] text-white/60">{brightness}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={20}
-                    max={100}
-                    value={brightness}
-                    onChange={(e) => setBrightness(Number(e.target.value))}
-                    className="glass-slider w-full"
-                  />
+              <div
+                className={`rounded-lg p-3 border ${
+                  isLight ? 'bg-slate-900/[0.03] border-slate-900/10' : 'bg-white/[0.04] border-white/10'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <button
+                    onClick={() => setSoundEnabled(!soundEnabled)}
+                    className="flex items-center gap-1.5 hover:opacity-80 transition"
+                  >
+                    <Icon
+                      name={soundEnabled && volume > 0 ? 'Volume2' : 'VolumeX'}
+                      size={13}
+                      className="os-accent-text"
+                    />
+                    <span>Master Volume</span>
+                  </button>
+                  <span className="font-mono text-[11px] opacity-65">
+                    {soundEnabled ? `${volume}%` : 'Muted'}
+                  </span>
                 </div>
-
-                <div>
-                  <div className="flex items-center justify-between text-xs text-white/80 mb-1.5">
-                    <button
-                      onClick={() => setSoundEnabled(!soundEnabled)}
-                      className="flex items-center gap-1.5 hover:text-white transition"
-                    >
-                      <Icon
-                        name={soundEnabled && volume > 0 ? 'Volume2' : 'VolumeX'}
-                        size={13}
-                        className="text-cyan-300"
-                      />
-                      <span>Volume</span>
-                    </button>
-                    <span className="font-mono text-[11px] text-white/60">
-                      {soundEnabled ? `${volume}%` : 'Muted'}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={soundEnabled ? volume : 0}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setVolume(val);
-                      if (val > 0 && !soundEnabled) setSoundEnabled(true);
-                    }}
-                    className="glass-slider w-full"
-                  />
-                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={soundEnabled ? volume : 0}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setVolume(val);
+                    if (val > 0 && !soundEnabled) setSoundEnabled(true);
+                  }}
+                  className="glass-slider w-full"
+                />
               </div>
             </motion.div>
           </>

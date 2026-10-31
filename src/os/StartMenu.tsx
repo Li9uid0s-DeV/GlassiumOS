@@ -43,7 +43,6 @@ const PINNED: PinnedEntry[] = [
   { uid: 'pin-weather', appId: 'weather', label: 'Weather', icon: 'weather' },
   { uid: 'pin-clock', appId: 'clock', label: 'Clock', icon: 'clock' },
   { uid: 'pin-ai', appId: 'ai', label: 'AI Assistant', icon: 'ai' },
-  { uid: 'pin-sysmon', appId: 'sysmon', label: 'Monitor', icon: 'sysmon' },
   { uid: 'pin-taskmanager', appId: 'taskmanager', label: 'Task Manager', icon: 'taskmanager' },
   { uid: 'pin-appstore', appId: 'appstore', label: 'App Store', icon: 'appstore' },
 ];
@@ -144,7 +143,9 @@ export function StartMenu({ open, onClose }: Props) {
     lockSystem,
     shellMode,
     taskbarAlign,
+    theme,
   } = useOS();
+  const isLight = theme === 'light';
 
   const [query, setQuery] = useState('');
   const [allProgramsView, setAllProgramsView] = useState(false);
@@ -387,10 +388,6 @@ export function StartMenu({ open, onClose }: Props) {
                       <Icon name="settings" size={16} />
                       <span>Control Panel</span>
                     </button>
-                    <button onClick={() => { openApp('sysmon'); onClose(); }} className="w-full flex items-center gap-2 p-1 rounded hover:bg-[#2f71cd] hover:text-white transition text-left">
-                      <Icon name="sysmon" size={16} />
-                      <span>System Monitor</span>
-                    </button>
                     <button onClick={() => { openApp('taskmanager'); onClose(); }} className="w-full flex items-center gap-2 p-1 rounded hover:bg-[#2f71cd] hover:text-white transition text-left">
                       <Icon name="taskmanager" size={16} />
                       <span>Task Manager</span>
@@ -587,7 +584,7 @@ export function StartMenu({ open, onClose }: Props) {
           )}
 
           {/* ==============================================================
-              5. AUTHENTIC WINDOWS 11 START MENU (GlassiumOS-V4.0 2.5D Glass)
+              5. AUTHENTIC WINDOWS 11 START MENU (Flat GlassiumOS-V4.0)
              ============================================================== */}
           {!isXP && !isVista && !isWin10 && !isDeX && !isChromeOS && !isZorin && (
             <div
@@ -598,17 +595,27 @@ export function StartMenu({ open, onClose }: Props) {
               }`}
             >
               <motion.div
-                initial={{ opacity: 0, y: 18, scale: 0.97 }}
+                initial={{ opacity: 0, y: 16, scale: 0.98 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 18, scale: 0.97 }}
-                transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+                exit={{ opacity: 0, y: 16, scale: 0.98 }}
+                transition={{ type: 'spring', stiffness: 440, damping: 34 }}
                 onClick={(e) => e.stopPropagation()}
-                className="pointer-events-auto w-full max-w-[600px] max-h-[calc(100vh-72px)] rounded-2xl overflow-hidden flex flex-col bg-slate-900/78 backdrop-blur-2xl shadow-[inset_0_1px_1px_rgba(255,255,255,0.24),0_28px_72px_rgba(0,0,0,0.8)] border border-white/15 select-none text-white"
+                className={`pointer-events-auto w-full max-w-[600px] max-h-[calc(100vh-72px)] rounded-xl overflow-hidden flex flex-col backdrop-blur-2xl border select-none transition-colors duration-200 ${
+                  isLight
+                    ? 'bg-slate-50/92 border-slate-900/12 text-slate-900 shadow-[0_24px_60px_rgba(15,23,42,0.22)]'
+                    : 'bg-slate-900/88 border-white/12 text-white shadow-[0_24px_60px_rgba(0,0,0,0.75)]'
+                }`}
               >
-                {/* Top Section: Authentic Windows 11 Search Box */}
+                {/* Top Section: Flat Windows 11 Search Box */}
                 <div className="px-6 sm:px-7 pt-5 pb-3 shrink-0">
-                  <div className="flex items-center gap-3 h-10 bg-slate-950/70 border border-white/15 border-b-2 border-b-cyan-400/80 rounded-full px-4 shadow-inner focus-within:bg-slate-950/90 transition">
-                    <Icon name="Search" size={15} className="text-cyan-300 shrink-0" fluent={false} />
+                  <div
+                    className={`flex items-center gap-3 h-9 border border-b-2 os-accent-border rounded-lg px-3.5 transition ${
+                      isLight
+                        ? 'bg-white border-slate-300 text-slate-900'
+                        : 'bg-slate-950/70 border-white/12 text-white'
+                    }`}
+                  >
+                    <Icon name="Search" size={14} className="os-accent-text shrink-0" fluent={false} />
                     <input
                       autoFocus
                       type="text"
@@ -623,13 +630,15 @@ export function StartMenu({ open, onClose }: Props) {
                         }
                       }}
                       placeholder="アプリ、設定、ドキュメントを検索"
-                      className="flex-1 bg-transparent text-xs sm:text-sm text-white/95 outline-none placeholder:text-white/40"
+                      className={`flex-1 bg-transparent text-xs sm:text-sm outline-none ${
+                        isLight ? 'text-slate-900 placeholder:text-slate-400' : 'text-white/95 placeholder:text-white/40'
+                      }`}
                     />
                     {query && (
                       <button
                         type="button"
                         onClick={() => setQuery('')}
-                        className="text-white/40 hover:text-white/80 transition"
+                        className="opacity-50 hover:opacity-100 transition"
                       >
                         <Icon name="X" size={14} fluent={false} />
                       </button>
@@ -637,176 +646,221 @@ export function StartMenu({ open, onClose }: Props) {
                   </div>
                 </div>
 
-                {/* Main Content Area (Responsive Scrollable Region) */}
+                {/* Main Content Area (Animated Sub-views) */}
                 <div className="px-6 sm:px-7 py-2 flex-1 min-h-0 overflow-y-auto">
-                  {/* Mode A: Search Results */}
-                  {query.trim() ? (
-                    <div className="space-y-3 py-1">
-                      <div className="text-xs font-semibold text-white/70 px-1">
-                        検索結果 ({searchResults.length})
-                      </div>
-                      {searchResults.length > 0 ? (
-                        <div className="space-y-1">
-                          {searchResults.map((result) => (
+                  <AnimatePresence mode="wait">
+                    {query.trim() ? (
+                      <motion.div
+                        key="search-view"
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ duration: 0.14 }}
+                        className="space-y-2 py-1"
+                      >
+                        <div className="text-xs font-semibold opacity-65 px-1">
+                          検索結果 ({searchResults.length})
+                        </div>
+                        {searchResults.length > 0 ? (
+                          <div className="space-y-1">
+                            {searchResults.map((result) => (
+                              <button
+                                key={result.uid}
+                                type="button"
+                                onClick={() => launchSearchResult(result)}
+                                className={`w-full flex items-center gap-3.5 p-2 rounded-lg transition text-left group ${
+                                  isLight ? 'hover:bg-slate-900/5' : 'hover:bg-white/10'
+                                }`}
+                              >
+                                <div className="h-9 w-9 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+                                  <Icon name={result.icon} size={28} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs sm:text-sm font-medium truncate">
+                                    {result.label}
+                                  </div>
+                                  <div className="text-[10px] opacity-50">
+                                    {result.type === 'app'
+                                      ? 'システム アプリケーション'
+                                      : `ファイル · ${result.filePath?.join('/') || '/'}`}
+                                  </div>
+                                </div>
+                                <Icon
+                                  name="ChevronRight"
+                                  size={14}
+                                  className="opacity-35 group-hover:opacity-80 transition"
+                                  fluent={false}
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="py-12 text-center text-xs opacity-45">
+                            一致するアプリやドキュメントが見つかりませんでした
+                          </div>
+                        )}
+                      </motion.div>
+                    ) : allProgramsView ? (
+                      <motion.div
+                        key="all-apps-view"
+                        initial={{ opacity: 0, x: 14 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -14 }}
+                        transition={{ duration: 0.16 }}
+                        className="space-y-2 py-1"
+                      >
+                        <div className="flex items-center justify-between mb-3 px-1">
+                          <span className="text-xs font-semibold">すべてのアプリ ({sortedAllApps.length})</span>
+                          <button
+                            type="button"
+                            onClick={() => setAllProgramsView(false)}
+                            className={`px-2.5 py-1 rounded-md border text-[11px] flex items-center gap-1 transition ${
+                              isLight
+                                ? 'bg-slate-900/5 hover:bg-slate-900/10 border-slate-900/10 text-slate-800'
+                                : 'bg-white/[0.06] hover:bg-white/[0.12] border-white/10 text-white/90'
+                            }`}
+                          >
+                            <Icon name="ChevronLeft" size={12} fluent={false} />
+                            <span>戻る</span>
+                          </button>
+                        </div>
+
+                        <div className="space-y-0.5 max-h-[340px] overflow-y-auto pr-1">
+                          {sortedAllApps.map((app) => (
                             <button
-                              key={result.uid}
+                              key={app.uid}
                               type="button"
-                              onClick={() => launchSearchResult(result)}
-                              className="w-full flex items-center gap-3.5 p-2.5 rounded-xl hover:bg-white/10 transition text-left group"
+                              onClick={() => launch(app)}
+                              className={`w-full flex items-center gap-3.5 px-2.5 py-2 rounded-lg transition text-left group ${
+                                isLight ? 'hover:bg-slate-900/5' : 'hover:bg-white/10'
+                              }`}
                             >
-                              <div className="h-9 w-9 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
-                                <Icon name={result.icon} size={30} />
+                              <div className="w-8 h-8 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+                                <Icon name={app.icon} size={26} />
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs sm:text-sm font-medium text-white/95 truncate">
-                                  {result.label}
-                                </div>
-                                <div className="text-[10px] text-white/45">
-                                  {result.type === 'app'
-                                    ? 'システム アプリケーション'
-                                    : `ファイル · ${result.filePath?.join('/') || '/'}`}
-                                </div>
-                              </div>
-                              <Icon
-                                name="ChevronRight"
-                                size={14}
-                                className="text-white/30 group-hover:text-white/70 transition"
-                                fluent={false}
-                              />
+                              <span className="text-xs font-medium truncate">
+                                {app.label}
+                              </span>
                             </button>
                           ))}
                         </div>
-                      ) : (
-                        <div className="py-12 text-center text-xs text-white/40">
-                          一致するアプリやドキュメントが見つかりませんでした
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="pinned-view"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 10 }}
+                        transition={{ duration: 0.16 }}
+                      >
+                        {/* 1. Pinned Section Header */}
+                        <div className="flex items-center justify-between mb-2 px-2">
+                          <span className="text-xs font-semibold">ピン留め済み</span>
+                          <button
+                            type="button"
+                            onClick={() => setAllProgramsView(true)}
+                            className={`px-2.5 py-1 rounded-md border text-[11px] flex items-center gap-1 transition ${
+                              isLight
+                                ? 'bg-slate-900/5 hover:bg-slate-900/10 border-slate-900/10 text-slate-800'
+                                : 'bg-white/[0.06] hover:bg-white/[0.12] border-white/10 text-white/90'
+                            }`}
+                          >
+                            <span>すべてのアプリ</span>
+                            <Icon name="ChevronRight" size={12} fluent={false} />
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  ) : allProgramsView ? (
-                    /* Mode B: Windows 11 "All apps" (すべてのアプリ) Alphabetical List */
-                    <div className="space-y-2 py-1">
-                      <div className="flex items-center justify-between mb-3 px-1">
-                        <span className="text-xs font-semibold text-white/95">すべてのアプリ</span>
-                        <button
-                          type="button"
-                          onClick={() => setAllProgramsView(false)}
-                          className="px-2.5 py-1 rounded-md bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-[11px] text-white/90 flex items-center gap-1 transition"
-                        >
-                          <Icon name="ChevronLeft" size={12} fluent={false} />
-                          <span>戻る</span>
-                        </button>
-                      </div>
 
-                      <div className="space-y-0.5 max-h-[340px] overflow-y-auto pr-1">
-                        {sortedAllApps.map((app) => (
+                        {/* Pinned 6-Column Grid */}
+                        <div className="grid grid-cols-5 sm:grid-cols-6 gap-x-1 gap-y-1.5 mb-4">
+                          {allPinned.slice(0, 18).map((app) => (
+                            <button
+                              key={app.uid}
+                              type="button"
+                              onClick={() => launch(app)}
+                              className={`flex flex-col items-center gap-1.5 py-2 px-1 rounded-lg active:scale-95 transition group ${
+                                isLight ? 'hover:bg-slate-900/5' : 'hover:bg-white/[0.08]'
+                              }`}
+                            >
+                              <div className="h-10 w-10 flex items-center justify-center group-hover:scale-105 transition-transform">
+                                <Icon name={app.icon} size={32} />
+                              </div>
+                              <span className="text-[11px] text-center leading-tight truncate max-w-full font-medium opacity-90">
+                                {app.label}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* 2. Recommended (おすすめ) Section Header */}
+                        <div className="flex items-center justify-between mb-2 px-2">
+                          <span className="text-xs font-semibold">おすすめ</span>
                           <button
-                            key={app.uid}
                             type="button"
-                            onClick={() => launch(app)}
-                            className="w-full flex items-center gap-3.5 px-2.5 py-2 rounded-xl hover:bg-white/10 transition text-left group"
+                            onClick={() => setAllProgramsView(true)}
+                            className={`px-2.5 py-1 rounded-md border text-[11px] flex items-center gap-1 transition ${
+                              isLight
+                                ? 'bg-slate-900/5 hover:bg-slate-900/10 border-slate-900/10 text-slate-800'
+                                : 'bg-white/[0.06] hover:bg-white/[0.12] border-white/10 text-white/90'
+                            }`}
                           >
-                            <div className="w-8 h-8 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
-                              <Icon name={app.icon} size={26} />
-                            </div>
-                            <span className="text-xs font-medium text-white/90 group-hover:text-white truncate">
-                              {app.label}
-                            </span>
+                            <span>さらに表示</span>
+                            <Icon name="ChevronRight" size={12} fluent={false} />
                           </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    /* Mode C: Authentic Windows 11 Default View (Pinned 6-col Grid + Recommended 2-col Grid) */
-                    <>
-                      {/* 1. Pinned Section Header */}
-                      <div className="flex items-center justify-between mb-2 px-2">
-                        <span className="text-xs font-semibold text-white/95">ピン留め済み</span>
-                        <button
-                          type="button"
-                          onClick={() => setAllProgramsView(true)}
-                          className="px-2.5 py-1 rounded-md bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-[11px] text-white/90 flex items-center gap-1 transition shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)]"
-                        >
-                          <span>すべてのアプリ</span>
-                          <Icon name="ChevronRight" size={12} fluent={false} />
-                        </button>
-                      </div>
+                        </div>
 
-                      {/* Pinned 6-Column Grid */}
-                      <div className="grid grid-cols-5 sm:grid-cols-6 gap-x-1 gap-y-1.5 mb-4">
-                        {allPinned.slice(0, 18).map((app) => (
-                          <button
-                            key={app.uid}
-                            type="button"
-                            onClick={() => launch(app)}
-                            className="flex flex-col items-center gap-1.5 py-2 px-1 rounded-xl hover:bg-white/[0.08] active:scale-95 transition group"
-                          >
-                            <div className="h-10 w-10 flex items-center justify-center group-hover:scale-110 group-hover:-translate-y-0.5 transition-transform">
-                              <Icon name={app.icon} size={34} />
-                            </div>
-                            <span className="text-[11px] text-white/90 text-center leading-tight truncate max-w-full font-medium">
-                              {app.label}
-                            </span>
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* 2. Recommended (おすすめ) Section Header */}
-                      <div className="flex items-center justify-between mb-2 px-2">
-                        <span className="text-xs font-semibold text-white/95">おすすめ</span>
-                        <button
-                          type="button"
-                          onClick={() => setAllProgramsView(true)}
-                          className="px-2.5 py-1 rounded-md bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-[11px] text-white/90 flex items-center gap-1 transition shadow-[inset_0_1px_1px_rgba(255,255,255,0.12)]"
-                        >
-                          <span>さらに表示</span>
-                          <Icon name="ChevronRight" size={12} fluent={false} />
-                        </button>
-                      </div>
-
-                      {/* Recommended 2-Column x 3-Row Grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 pb-2">
-                        {RECOMMENDED_ITEMS.map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => {
-                              if (item.payload) {
-                                openApp(item.appId, { payload: item.payload });
-                              } else {
-                                openApp(item.appId);
-                              }
-                              onClose();
-                            }}
-                            className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/[0.08] active:scale-98 transition text-left group"
-                          >
-                            <div className="w-8 h-8 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
-                              <Icon name={item.icon} size={28} />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="text-xs font-medium text-white/95 truncate">{item.title}</div>
-                              <div className="text-[10px] text-white/45 truncate">{item.subtitle}</div>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
+                        {/* Recommended 2-Column x 3-Row Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 pb-2">
+                          {RECOMMENDED_ITEMS.map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => {
+                                if (item.payload) {
+                                  openApp(item.appId, { payload: item.payload });
+                                } else {
+                                  openApp(item.appId);
+                                }
+                                onClose();
+                              }}
+                              className={`flex items-center gap-3 p-2 rounded-lg active:scale-98 transition text-left group ${
+                                isLight ? 'hover:bg-slate-900/5' : 'hover:bg-white/[0.08]'
+                              }`}
+                            >
+                              <div className="w-8 h-8 flex items-center justify-center shrink-0 group-hover:scale-105 transition">
+                                <Icon name={item.icon} size={26} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="text-xs font-medium truncate">{item.title}</div>
+                                <div className="text-[10px] opacity-50 truncate">{item.subtitle}</div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 {/* Bottom Footer Bar: User Profile (Left) + Power Menu (Right) */}
-                <div className="relative h-14 px-6 sm:px-8 bg-slate-950/65 border-t border-white/10 flex items-center justify-between shrink-0">
+                <div
+                  className={`relative h-13 py-2.5 px-6 sm:px-8 border-t flex items-center justify-between shrink-0 ${
+                    isLight ? 'bg-slate-100/90 border-slate-900/10' : 'bg-slate-950/65 border-white/10'
+                  }`}
+                >
                   <button
                     type="button"
                     onClick={() => {
                       openApp('settings');
                       onClose();
                     }}
-                    className="flex items-center gap-2.5 px-2.5 py-1.5 -ml-2.5 rounded-xl hover:bg-white/10 transition"
+                    className={`flex items-center gap-2.5 px-2.5 py-1.5 -ml-2.5 rounded-lg transition ${
+                      isLight ? 'hover:bg-slate-900/5' : 'hover:bg-white/10'
+                    }`}
                   >
-                    <div className="h-7 w-7 rounded-full bg-gradient-to-br from-fuchsia-500 via-violet-500 to-cyan-400 flex items-center justify-center text-white text-xs font-bold shadow-md">
+                    <div className="h-7 w-7 rounded-full os-accent-bg flex items-center justify-center text-white text-xs font-bold">
                       {userInitial}
                     </div>
-                    <span className="text-xs text-white/90 font-medium truncate max-w-[180px]">
+                    <span className="text-xs font-medium truncate max-w-[180px]">
                       {userName}
                     </span>
                   </button>
@@ -815,9 +869,13 @@ export function StartMenu({ open, onClose }: Props) {
                     <button
                       type="button"
                       onClick={() => setPowerMenuOpen((v) => !v)}
-                      className={`p-2 rounded-xl transition ${
+                      className={`p-2 rounded-lg transition ${
                         powerMenuOpen
-                          ? 'bg-white/15 text-white'
+                          ? isLight
+                            ? 'bg-slate-900/10 text-slate-900'
+                            : 'bg-white/15 text-white'
+                          : isLight
+                          ? 'text-slate-600 hover:bg-slate-900/5 hover:text-slate-900'
                           : 'text-white/75 hover:bg-white/10 hover:text-white'
                       }`}
                       title="電源オプション"
@@ -832,7 +890,11 @@ export function StartMenu({ open, onClose }: Props) {
                           animate={{ opacity: 1, y: 0, scale: 1 }}
                           exit={{ opacity: 0, y: 8, scale: 0.96 }}
                           transition={{ duration: 0.14 }}
-                          className="absolute bottom-11 right-0 w-44 rounded-xl bg-slate-900/95 backdrop-blur-2xl border border-white/15 shadow-2xl p-1.5 z-50"
+                          className={`absolute bottom-11 right-0 w-44 rounded-lg backdrop-blur-2xl border shadow-2xl p-1.5 z-50 ${
+                            isLight
+                              ? 'bg-white/95 border-slate-900/12 text-slate-900'
+                              : 'bg-slate-900/95 border-white/15 text-white'
+                          }`}
                         >
                           <button
                             type="button"
@@ -841,9 +903,11 @@ export function StartMenu({ open, onClose }: Props) {
                               onClose();
                               lockSystem();
                             }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 text-xs text-white/90 transition text-left"
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs transition text-left ${
+                              isLight ? 'hover:bg-slate-900/5' : 'hover:bg-white/10'
+                            }`}
                           >
-                            <Icon name="Moon" size={14} className="text-cyan-300" fluent={false} />
+                            <Icon name="Moon" size={14} className="os-accent-text" fluent={false} />
                             <span>スリープ / ロック</span>
                           </button>
                           <button
@@ -853,9 +917,11 @@ export function StartMenu({ open, onClose }: Props) {
                               onClose();
                               lockSystem();
                             }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/10 text-xs text-white/90 transition text-left"
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs transition text-left ${
+                              isLight ? 'hover:bg-slate-900/5' : 'hover:bg-white/10'
+                            }`}
                           >
-                            <Icon name="RotateCcw" size={14} className="text-amber-300" fluent={false} />
+                            <Icon name="RotateCcw" size={14} className="text-amber-500" fluent={false} />
                             <span>再起動</span>
                           </button>
                           <button
@@ -865,9 +931,9 @@ export function StartMenu({ open, onClose }: Props) {
                               onClose();
                               lockSystem();
                             }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-rose-500/20 text-xs text-rose-300 transition text-left"
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-rose-500/15 text-xs text-rose-500 transition text-left"
                           >
-                            <Icon name="Power" size={14} className="text-rose-400" fluent={false} />
+                            <Icon name="Power" size={14} className="text-rose-500" fluent={false} />
                             <span>シャットダウン</span>
                           </button>
                         </motion.div>

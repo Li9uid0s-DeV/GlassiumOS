@@ -68,8 +68,9 @@ function getSnapPresets(vw: number, vh: number): SnapPreset[] {
 
 export function WindowFrame({ win, children }: Props) {
   const {
-    focusWindow, closeWindow, minimizeWindow, toggleMaximize, updateWindowRect, shellMode, touchMode, windows,
+    focusWindow, closeWindow, minimizeWindow, toggleMaximize, updateWindowRect, shellMode, touchMode, windows, theme,
   } = useOS();
+  const isLight = theme === 'light';
   const [dragging, setDragging] = useState(false);
   const [snapZone, setSnapZone] = useState<SnapZone | null>(null);
   const [showSnapLayout, setShowSnapLayout] = useState(false);
@@ -282,8 +283,10 @@ export function WindowFrame({ win, children }: Props) {
   const presets = getSnapPresets(typeof window !== 'undefined' ? window.innerWidth : 1200, typeof window !== 'undefined' ? window.innerHeight : 800);
 
   // Shell-specific Window Frame Classes & Styles
-  let windowFrameClasses = 'liquid-glass-window rounded-2xl border border-white/[0.08]';
-  let titleBarClasses = 'h-10 px-3 bg-white/[0.03] border-b border-white/[0.06] text-white';
+  let windowFrameClasses = 'liquid-glass-window';
+  let titleBarClasses = isLight
+    ? 'h-9 pl-3 pr-0 bg-slate-100/80 border-b border-slate-900/10 text-slate-900'
+    : 'h-9 pl-3 pr-0 bg-slate-900/70 border-b border-white/10 text-white';
 
   if (isXP) {
     windowFrameClasses = 'bg-[#ece9d8] text-black shadow-2xl rounded-t-lg border border-[#0055ea] overflow-hidden';
@@ -292,44 +295,56 @@ export function WindowFrame({ win, children }: Props) {
     windowFrameClasses = 'bg-slate-950/80 backdrop-blur-2xl rounded-xl shadow-2xl border border-white/10 ring-1 ring-white/10';
     titleBarClasses = 'h-9 px-3 bg-gradient-to-b from-sky-400/20 via-slate-900/60 to-black/80 border-b border-white/[0.06] text-white';
   } else if (isWin10) {
-    windowFrameClasses = 'bg-zinc-950 rounded-none shadow-2xl border border-zinc-800';
-    titleBarClasses = 'h-8 px-3 bg-zinc-900 border-b border-zinc-800 text-white/90 text-xs';
+    windowFrameClasses = isLight
+      ? 'bg-white rounded-none shadow-2xl border border-slate-300 text-slate-900'
+      : 'bg-zinc-950 rounded-none shadow-2xl border border-zinc-800 text-white';
+    titleBarClasses = isLight
+      ? 'h-8 pl-3 pr-0 bg-slate-100 border-b border-slate-200 text-slate-900 text-xs'
+      : 'h-8 pl-3 pr-0 bg-zinc-900 border-b border-zinc-800 text-white/90 text-xs';
   } else if (isDeX) {
-    windowFrameClasses = 'bg-zinc-900/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/[0.08]';
-    titleBarClasses = 'h-10 px-3.5 bg-black/40 border-b border-white/[0.06] text-white';
+    windowFrameClasses = 'liquid-glass-window rounded-xl';
+    titleBarClasses = isLight
+      ? 'h-9 pl-3.5 pr-2 bg-slate-100/80 border-b border-slate-900/10 text-slate-900'
+      : 'h-9 pl-3.5 pr-2 bg-black/40 border-b border-white/[0.06] text-white';
   } else if (isChromeOS) {
-    windowFrameClasses = 'bg-zinc-900/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/[0.08]';
-    titleBarClasses = 'h-9 px-3 bg-white/[0.04] border-b border-white/[0.06] text-white/90';
+    windowFrameClasses = 'liquid-glass-window rounded-xl';
+    titleBarClasses = isLight
+      ? 'h-9 px-3 bg-slate-100/80 border-b border-slate-900/10 text-slate-900'
+      : 'h-9 px-3 bg-white/[0.04] border-b border-white/[0.06] text-white/90';
   } else if (isZorin) {
-    windowFrameClasses = 'bg-slate-900/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/[0.08]';
-    titleBarClasses = 'h-10 px-3.5 bg-black/40 border-b border-white/[0.06] text-white';
+    windowFrameClasses = 'liquid-glass-window rounded-xl';
+    titleBarClasses = isLight
+      ? 'h-9 pl-3.5 pr-0 bg-slate-100/80 border-b border-slate-900/10 text-slate-900'
+      : 'h-9 pl-3.5 pr-0 bg-black/40 border-b border-white/[0.06] text-white';
   } else if (isMac) {
-    windowFrameClasses = 'bg-zinc-900/95 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/[0.08] ring-1 ring-black/40';
-    titleBarClasses = 'h-9 px-3 bg-white/[0.02] border-b border-black/30 text-white/90 text-xs';
+    windowFrameClasses = 'liquid-glass-window rounded-xl';
+    titleBarClasses = isLight
+      ? 'h-9 px-3 bg-slate-100/80 border-b border-slate-900/10 text-slate-900 text-xs'
+      : 'h-9 px-3 bg-white/[0.02] border-b border-black/30 text-white/90 text-xs';
   }
 
   const isTopmost = windows.filter((w) => !w.minimized).reduce((max, w) => (w.zIndex > max ? w.zIndex : max), 0) === win.zIndex;
 
   if (touchMode) {
-    titleBarClasses = titleBarClasses.replace(/h-\d+/, 'h-12') + ' touch-manipulation py-1';
+    titleBarClasses = titleBarClasses.replace(/h-\d+/, 'h-11') + ' touch-manipulation';
   }
 
   return (
     <>
       {snapZone && (
         <div
-          className="snap-preview fixed z-50 pointer-events-none transition-all duration-150 border-2 border-cyan-400 bg-cyan-400/15 rounded-xl shadow-2xl"
+          className="snap-preview fixed z-50 pointer-events-none transition-all duration-150 border-2 os-accent-border bg-cyan-400/15 rounded-xl shadow-2xl"
           style={{ left: snapZone.preview.x, top: snapZone.preview.y, width: snapZone.preview.width, height: snapZone.preview.height }}
         />
       )}
 
       <motion.div
-        className={`flex flex-col overflow-hidden select-none ${windowFrameClasses} ${isTopmost ? 'is-focused' : ''} ${dragging ? 'is-dragging shadow-2xl ring-2 ring-cyan-400/50' : ''}`}
+        className={`flex flex-col overflow-hidden select-none ${windowFrameClasses} ${isTopmost ? 'is-focused' : ''} ${dragging ? 'is-dragging shadow-2xl' : ''}`}
         style={style}
-        initial={{ opacity: 0, scale: isMetro ? 1 : 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: isMetro ? 1 : 0.96 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+        initial={{ opacity: 0, scale: isMetro ? 1 : 0.96, y: isMetro ? 0 : 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: isMetro ? 1 : 0.96, y: isMetro ? 0 : 8 }}
+        transition={{ type: 'spring', stiffness: 420, damping: 32 }}
         onPointerDownCapture={(e) => {
           const targetEl = e.target as HTMLElement | null;
           if (targetEl?.closest('.window-controls-container')) return;
@@ -436,8 +451,8 @@ export function WindowFrame({ win, children }: Props) {
 
             {/* Window Icon & Title */}
             <div className={`flex items-center gap-2 text-xs pointer-events-none truncate ${isMac ? 'mx-auto' : ''}`}>
-              <Icon name={win.appId || win.icon} size={18} />
-              <span className={`font-semibold truncate ${isXP ? 'text-white tracking-wide drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]' : 'text-white/90'}`}>
+              <Icon name={win.appId || win.icon} size={17} />
+              <span className={`font-medium truncate ${isXP ? 'text-white tracking-wide drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]' : isLight ? 'text-slate-900' : 'text-white/90'}`}>
                 {win.title}
               </span>
             </div>
@@ -618,34 +633,45 @@ export function WindowFrame({ win, children }: Props) {
                 </button>
               </div>
             ) : !isMac ? (
-              /* WINDOWS 10 / WINDOWS 11 / STANDARD */
+              /* AUTHENTIC WINDOWS 10 / 11 CAPTION BUTTONS (46px x full height, #e81123 red Close hover) */
               <div
-                className="window-controls-container flex items-center relative z-50 pointer-events-auto"
+                className="window-controls-container flex items-stretch h-full relative z-50 pointer-events-auto"
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
               >
                 <button
                   type="button"
-                  className="win-control text-white/80 hover:bg-white/15 active:bg-white/25 transition px-3.5 py-2 cursor-pointer"
+                  className="win-caption-btn"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); minimizeWindow(win.id); }}
                   title="最小化 (Minimize)"
                 >
-                  <Icon name="Minus" size={14} />
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                    <path d="M0 5H10" stroke="currentColor" strokeWidth="1" />
+                  </svg>
                 </button>
                 <div
-                  className="relative"
+                  className="relative h-full flex items-stretch"
                   onMouseEnter={handleMaximizeHoverEnter}
                   onMouseLeave={handleMaximizeHoverLeave}
                 >
                   <button
                     type="button"
-                    className="win-control text-white/80 hover:bg-white/15 active:bg-white/25 transition px-3.5 py-2 cursor-pointer"
+                    className="win-caption-btn"
                     onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => { e.stopPropagation(); toggleMaximize(win.id); }}
                     title={isMax ? '元に戻す (Restore)' : '最大化 (Maximize)'}
                   >
-                    {isMax ? <Icon name="Maximize2" size={13} /> : <Icon name="Maximize" size={13} />}
+                    {isMax ? (
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                        <path d="M2.5 2.5V0.5H9.5V7.5H7.5" stroke="currentColor" strokeWidth="1" />
+                        <rect x="0.5" y="2.5" width="7" height="7" stroke="currentColor" strokeWidth="1" />
+                      </svg>
+                    ) : (
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                        <rect x="0.5" y="0.5" width="9" height="9" stroke="currentColor" strokeWidth="1" />
+                      </svg>
+                    )}
                   </button>
 
                   {/* Windows 11 Snap Layout Popover */}
@@ -679,12 +705,14 @@ export function WindowFrame({ win, children }: Props) {
                 </div>
                 <button
                   type="button"
-                  className="win-control close text-white/80 hover:bg-rose-600 hover:text-white active:bg-rose-700 transition px-4 py-2 cursor-pointer"
+                  className="win-caption-close"
                   onPointerDown={(e) => e.stopPropagation()}
                   onClick={(e) => { e.stopPropagation(); closeWindow(win.id); }}
                   title="閉じる (Close)"
                 >
-                  <Icon name="X" size={14} />
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                    <path d="M0.5 0.5L9.5 9.5M9.5 0.5L0.5 9.5" stroke="currentColor" strokeWidth="1.15" />
+                  </svg>
                 </button>
               </div>
             ) : isMac ? (
@@ -695,7 +723,9 @@ export function WindowFrame({ win, children }: Props) {
 
         {/* Content View */}
         <div
-          className="flex-1 min-h-0 min-w-0 w-full h-full overflow-hidden relative select-none z-10 pointer-events-auto bg-zinc-950/60"
+          className={`flex-1 min-h-0 min-w-0 w-full h-full overflow-hidden relative select-none z-10 pointer-events-auto transition-colors duration-200 ${
+            isLight ? 'bg-slate-50/90 text-slate-900' : 'bg-zinc-950/75 text-white'
+          }`}
           style={{ contain: 'layout style paint' }}
         >
           {children}

@@ -11,6 +11,10 @@ import {
   AppId,
   WindowState,
   TaskbarAlign,
+  DesktopIconSize,
+  DESKTOP_ICON_SIZE_PRESETS,
+  AccentColor,
+  ACCENT_COLOR_PRESETS,
   ShellMode,
   WindowsTaskbarStyle,
   DesignEngine,
@@ -27,6 +31,7 @@ import {
   VirtualDesktop,
 } from './types';
 import { VirtualFolder, getInitialFileSystem, VirtualNode } from './fileSystem';
+import { WALLPAPERS } from './wallpapers';
 
 export interface DeskStickyNote {
   id: string;
@@ -92,6 +97,8 @@ export interface OSContextValue {
   setSelectedCustomId: (id: string | null) => void;
   theme: Theme;
   setTheme: (t: Theme) => void;
+  accentColor: AccentColor;
+  setAccentColor: (c: AccentColor) => void;
 
   // Customization & Shell Engines
   shellMode: ShellMode;
@@ -233,10 +240,15 @@ export interface OSContextValue {
   removeDesktop: (id: string) => void;
   moveWindowToDesktop: (winId: string, desktopId: string) => void;
 
-  // Free-Draggable Desktop Icon Positions
+  // Grid-Snapped Desktop Icon Positions & Sizing
   desktopIconPositions: Record<string, { x: number; y: number }>;
   updateDesktopIconPosition: (id: string, x: number, y: number) => void;
   resetDesktopIconPositions: (snapToGrid?: boolean) => void;
+  desktopIconSize: DesktopIconSize;
+  setDesktopIconSize: (size: DesktopIconSize) => void;
+  gridSnapEnabled: boolean;
+  setGridSnapEnabled: (v: boolean) => void;
+  isWallpaperBright: boolean;
 
   // Desk Sticky Notes ("デスク付箋")
   deskNotes: DeskStickyNote[];
@@ -294,22 +306,24 @@ export const DEFAULT_DESKTOP_ICON_ORDER = [
   'weather',
   'clock',
   'ai',
-  'sysmon',
   'taskmanager',
   'appstore',
   'recycle',
 ];
 
-export function computeDefaultIconPositions(): Record<string, { x: number; y: number }> {
+export function computeDefaultIconPositions(
+  iconSize: DesktopIconSize = 'medium'
+): Record<string, { x: number; y: number }> {
+  const preset = DESKTOP_ICON_SIZE_PRESETS[iconSize] ?? DESKTOP_ICON_SIZE_PRESETS.medium;
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-  const maxRows = Math.max(4, Math.floor((vh - 88) / 94));
+  const maxRows = Math.max(3, Math.floor((vh - 76) / preset.cellH));
   const map: Record<string, { x: number; y: number }> = {};
   DEFAULT_DESKTOP_ICON_ORDER.forEach((id, idx) => {
     const col = Math.floor(idx / maxRows);
     const row = idx % maxRows;
     map[id] = {
-      x: 16 + col * 92,
-      y: 16 + row * 94,
+      x: 16 + col * preset.cellW,
+      y: 16 + row * preset.cellH,
     };
   });
   return map;
@@ -343,11 +357,40 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const [activeDesktopId, setActiveDesktopId] = useState<string>('desk-1');
   const [taskViewOpen, setTaskViewOpen] = useState<boolean>(false);
 
-  // Free-Draggable Desktop Icon Positions
+  const [desktopIconSize, setDesktopIconSizeState] = useState<DesktopIconSize>(
+    (persistedSettings.desktopIconSize as DesktopIconSize) ?? 'medium'
+  );
+  const [gridSnapEnabled, setGridSnapEnabled] = useState<boolean>(
+    persistedSettings.gridSnapEnabled ?? true
+  );
+
+  // Grid-Snapped Desktop Icon Positions
   const [desktopIconPositions, setDesktopIconPositions] = useState<Record<string, { x: number; y: number }>>(() => {
-    const defaults = computeDefaultIconPositions();
+    const initialSize = (persistedSettings.desktopIconSize as DesktopIconSize) ?? 'medium';
+    const preset = DESKTOP_ICON_SIZE_PRESETS[initialSize] ?? DESKTOP_ICON_SIZE_PRESETS.medium;
+    const defaults = computeDefaultIconPositions(initialSize);
     const saved = loadPersisted<Record<string, { x: number; y: number }>>(LS_ICON_POS_KEY, {});
-    return { ...defaults, ...saved };
+    const merged = { ...defaults, ...saved };
+    // Ensure all initial positions are aligned to grid slots
+    const snapped: Record<string, { x: number; y: number }> = {};
+    const occupied = new Set<string>();
+    Object.entries(merged).forEach(([key, pos]) => {
+      let col = Math.max(0, Math.round((pos.x - 16) / preset.cellW));
+      let row = Math.max(0, Math.round((pos.y - 16) / preset.cellH));
+      while (occupied.has(`${col},${row}`)) {
+        row += 1;
+        if (row > 6) {
+          row = 0;
+          col += 1;
+        }
+      }
+      occupied.add(`${col},${row}`);
+      snapped[key] = {
+        x: 16 + col * preset.cellW,
+        y: 16 + row * preset.cellH,
+      };
+    });
+    return snapped;
   });
 
   // Desk Sticky Notes ("デスク付箋")
@@ -363,7 +406,9 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const [wallpaper, setWallpaper] = useState<Wallpaper>(persistedSettings.wallpaper ?? 'live2d');
   const [customWallpapers, setCustomWallpapers] = useState<CustomWallpaper[]>(persistedSettings.customWallpapers ?? []);
   const [selectedCustomId, setSelectedCustomId] = useState<string | null>(persistedSettings.selectedCustomId ?? null);
-  const [theme, setTheme] = useState<Theme>(persistedSettings.theme ?? 'dark');
+  const [theme, setThemeState] = useState<Theme>(persistedSettings.theme ?? 'dark');
+  const [accentColor, setAccentColor] = useState<AccentColor>(persistedSettings.accentColor ?? 'cyan');
+  const [customWallpaperBright, setCustomWallpaperBright] = useState<boolean>(false);
 
   // Shell & Design Engines — Default to desktop 'windows' shell so all icons & taskbar are immediately accessible
   const [shellMode, setShellMode] = useState<ShellMode>(() => {
@@ -412,26 +457,15 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const [taskbarAlign, setTaskbarAlign] = useState<TaskbarAlign>(persistedSettings.taskbarAlign ?? 'center');
   const [startOpen, setStartOpen] = useState(false);
 
-  const [installedApps, setInstalledApps] = useState<InstalledApp[]>(() =>
-    loadPersisted<InstalledApp[]>(LS_APPS_KEY, [
-      {
-        id: 'sysmon',
-        appId: 'sysmon',
-        name: 'System Monitor Pro',
-        icon: 'Activity',
-        description: 'Real-time CPU and FPS counter',
-        author: 'Liquid Systems',
-        category: 'utilities',
-        installedAt: Date.now(),
-        builtInAppId: 'sysmon',
-      },
+  const [installedApps, setInstalledApps] = useState<InstalledApp[]>(() => {
+    const loaded = loadPersisted<InstalledApp[]>(LS_APPS_KEY, [
       {
         id: 'calendar',
         appId: 'calendar',
-        name: 'Cosmic Calendar',
+        name: 'Calendar & Tasks',
         icon: 'Calendar',
         description: 'Interactive agenda grid',
-        author: 'Liquid Labs',
+        author: 'Glassium Core',
         category: 'utilities',
         installedAt: Date.now(),
         builtInAppId: 'calendar',
@@ -441,14 +475,15 @@ export function OSProvider({ children }: { children: ReactNode }) {
         appId: 'synth',
         name: 'Monochrome Music',
         icon: 'Music',
-        description: 'Hi-Fi music streaming and synced lyrics via Scramjet & Ultraviolet proxy',
+        description: 'Hi-Fi music streaming and synced lyrics',
         author: 'Monochrome Audio',
         category: 'utilities',
         installedAt: Date.now(),
         builtInAppId: 'synth',
       },
-    ])
-  );
+    ]);
+    return loaded.filter((a) => a.id !== 'sysmon' && a.appId !== 'sysmon');
+  });
 
   const [installedThemeIds, setInstalledThemeIds] = useState<string[]>(() =>
     loadPersisted<string[]>(LS_THEMES_KEY, ['win11-mica', 'vista-aero', 'xp-luna'])
@@ -557,15 +592,67 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const [launchpadOpen, setLaunchpadOpen] = useState(false);
   const toggleLaunchpad = useCallback(() => setLaunchpadOpen((v) => !v), []);
 
-  // Sync CSS variables with custom slider values
+  const setTheme = useCallback((t: Theme) => {
+    setThemeState(t);
+    setQuickSettings((q) => ({ ...q, darkMode: t === 'dark' }));
+  }, []);
+
+  // Automatically sample custom wallpaper luminance to detect bright/white backgrounds
   useEffect(() => {
+    const customWp = customWallpapers.find((c) => c.id === selectedCustomId);
+    if (!customWp) {
+      setCustomWallpaperBright(false);
+      return;
+    }
+    let cancelled = false;
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      if (cancelled) return;
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 16;
+        canvas.height = 16;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        ctx.drawImage(img, 0, 0, 16, 16);
+        const data = ctx.getImageData(0, 0, 16, 16).data;
+        let totalLum = 0;
+        const count = data.length / 4;
+        for (let i = 0; i < data.length; i += 4) {
+          totalLum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        }
+        const avgLum = totalLum / count;
+        setCustomWallpaperBright(avgLum > 145);
+      } catch {
+        setCustomWallpaperBright(false);
+      }
+    };
+    img.src = customWp.dataUrl;
+    return () => {
+      cancelled = true;
+    };
+  }, [customWallpapers, selectedCustomId]);
+
+  const isWallpaperBright = selectedCustomId
+    ? customWallpaperBright
+    : Boolean(WALLPAPERS[wallpaper]?.isBright);
+
+  // Sync CSS variables & data attributes with custom slider, theme, wallpaper tone, and accent color values
+  useEffect(() => {
+    const preset = ACCENT_COLOR_PRESETS.find((p) => p.id === accentColor) ?? ACCENT_COLOR_PRESETS[0];
+    document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-accent', accentColor);
+    document.documentElement.setAttribute('data-wallpaper-tone', isWallpaperBright ? 'bright' : 'dark');
+    document.documentElement.style.setProperty('--os-accent', preset.hex);
+    document.documentElement.style.setProperty('--os-accent-rgb', preset.rgb);
     document.documentElement.style.setProperty('--theme-blur', `${blurAmount}px`);
     document.documentElement.style.setProperty('--theme-opacity', `${(100 - transparency) / 100}`);
     document.documentElement.style.setProperty('--theme-radius', `${cornerRadius}px`);
     document.documentElement.style.setProperty('--glass-curvature', `${glassCurvature}px`);
     document.documentElement.style.setProperty('--glass-specular', `${glassSpecular / 100}`);
     document.documentElement.style.setProperty('--glass-wobble', `${glassWobble / 100}`);
-  }, [blurAmount, transparency, cornerRadius, glassCurvature, glassSpecular, glassWobble]);
+  }, [theme, accentColor, isWallpaperBright, blurAmount, transparency, cornerRadius, glassCurvature, glassSpecular, glassWobble]);
 
   // Persist Settings
   useEffect(() => {
@@ -577,6 +664,9 @@ export function OSProvider({ children }: { children: ReactNode }) {
           customWallpapers,
           selectedCustomId,
           theme,
+          accentColor,
+          desktopIconSize,
+          gridSnapEnabled,
           shellMode,
           taskbarStyle,
           designEngine,
@@ -611,6 +701,9 @@ export function OSProvider({ children }: { children: ReactNode }) {
     customWallpapers,
     selectedCustomId,
     theme,
+    accentColor,
+    desktopIconSize,
+    gridSnapEnabled,
     shellMode,
     taskbarStyle,
     designEngine,
@@ -758,38 +851,155 @@ export function OSProvider({ children }: { children: ReactNode }) {
     }
   }, [deskNotes]);
 
-  const updateDesktopIconPosition = useCallback((id: string, x: number, y: number) => {
-    const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
-    const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-    const clampedX = Math.max(8, Math.min(vw - 88, Math.round(x)));
-    const clampedY = Math.max(8, Math.min(vh - 132, Math.round(y)));
-    setDesktopIconPositions((prev) => ({
-      ...prev,
-      [id]: { x: clampedX, y: clampedY },
-    }));
-  }, []);
-
-  const resetDesktopIconPositions = useCallback((snapToGrid?: boolean) => {
-    playSound('click');
-    if (snapToGrid) {
-      setDesktopIconPositions((prev) => {
-        const next: Record<string, { x: number; y: number }> = {};
+  const setDesktopIconSize = useCallback(
+    (newSize: DesktopIconSize) => {
+      playSound('click');
+      setDesktopIconSizeState((oldSize) => {
+        const oldPreset = DESKTOP_ICON_SIZE_PRESETS[oldSize] ?? DESKTOP_ICON_SIZE_PRESETS.medium;
+        const newPreset = DESKTOP_ICON_SIZE_PRESETS[newSize] ?? DESKTOP_ICON_SIZE_PRESETS.medium;
         const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
         const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-        Object.entries(prev).forEach(([key, pos]) => {
-          const col = Math.max(0, Math.round((pos.x - 16) / 92));
-          const row = Math.max(0, Math.round((pos.y - 16) / 94));
-          next[key] = {
-            x: Math.min(vw - 88, 16 + col * 92),
-            y: Math.min(vh - 132, 16 + row * 94),
-          };
+        const maxCols = Math.max(2, Math.floor((vw - 24) / newPreset.cellW));
+        const maxRows = Math.max(3, Math.floor((vh - 76) / newPreset.cellH));
+
+        setDesktopIconPositions((prev) => {
+          const next: Record<string, { x: number; y: number }> = {};
+          const occupied = new Set<string>();
+          Object.entries(prev).forEach(([key, pos]) => {
+            let col = Math.max(0, Math.min(maxCols - 1, Math.round((pos.x - 16) / oldPreset.cellW)));
+            let row = Math.max(0, Math.min(maxRows - 1, Math.round((pos.y - 16) / oldPreset.cellH)));
+            while (occupied.has(`${col},${row}`)) {
+              row += 1;
+              if (row >= maxRows) {
+                row = 0;
+                col += 1;
+              }
+            }
+            occupied.add(`${col},${row}`);
+            next[key] = {
+              x: 16 + col * newPreset.cellW,
+              y: 16 + row * newPreset.cellH,
+            };
+          });
+          return next;
         });
+        return newSize;
+      });
+    },
+    [playSound]
+  );
+
+  const updateDesktopIconPosition = useCallback(
+    (id: string, x: number, y: number) => {
+      const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+      const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+      const preset = DESKTOP_ICON_SIZE_PRESETS[desktopIconSize] ?? DESKTOP_ICON_SIZE_PRESETS.medium;
+
+      if (!gridSnapEnabled) {
+        const clampedX = Math.max(8, Math.min(vw - preset.boxW - 8, Math.round(x)));
+        const clampedY = Math.max(8, Math.min(vh - preset.boxH - 56, Math.round(y)));
+        setDesktopIconPositions((prev) => ({
+          ...prev,
+          [id]: { x: clampedX, y: clampedY },
+        }));
+        return;
+      }
+
+      const maxCols = Math.max(2, Math.floor((vw - 24) / preset.cellW));
+      const maxRows = Math.max(3, Math.floor((vh - 76) / preset.cellH));
+      const targetCol = Math.max(0, Math.min(maxCols - 1, Math.round((x - 16) / preset.cellW)));
+      const targetRow = Math.max(0, Math.min(maxRows - 1, Math.round((y - 16) / preset.cellH)));
+      const snappedX = 16 + targetCol * preset.cellW;
+      const snappedY = 16 + targetRow * preset.cellH;
+
+      setDesktopIconPositions((prev) => {
+        const prevPos = prev[id];
+        const next = { ...prev };
+
+        // Check if another icon already occupies this grid slot
+        const collidingEntry = Object.entries(prev).find(([otherId, pos]) => {
+          if (otherId === id) return false;
+          const cCol = Math.round((pos.x - 16) / preset.cellW);
+          const cRow = Math.round((pos.y - 16) / preset.cellH);
+          return cCol === targetCol && cRow === targetRow;
+        });
+
+        next[id] = { x: snappedX, y: snappedY };
+
+        if (collidingEntry) {
+          const [otherId] = collidingEntry;
+          if (prevPos) {
+            // Swap with previous slot of dragged icon
+            const prevCol = Math.max(0, Math.min(maxCols - 1, Math.round((prevPos.x - 16) / preset.cellW)));
+            const prevRow = Math.max(0, Math.min(maxRows - 1, Math.round((prevPos.y - 16) / preset.cellH)));
+            next[otherId] = {
+              x: 16 + prevCol * preset.cellW,
+              y: 16 + prevRow * preset.cellH,
+            };
+          } else {
+            // Find first open slot
+            const occupied = new Set(
+              Object.entries(next)
+                .filter(([k]) => k !== otherId)
+                .map(([, p]) => `${Math.round((p.x - 16) / preset.cellW)},${Math.round((p.y - 16) / preset.cellH)}`)
+            );
+            let fCol = 0;
+            let fRow = 0;
+            while (occupied.has(`${fCol},${fRow}`)) {
+              fRow += 1;
+              if (fRow >= maxRows) {
+                fRow = 0;
+                fCol += 1;
+              }
+            }
+            next[otherId] = {
+              x: 16 + fCol * preset.cellW,
+              y: 16 + fRow * preset.cellH,
+            };
+          }
+        }
         return next;
       });
-    } else {
-      setDesktopIconPositions(computeDefaultIconPositions());
-    }
-  }, [playSound]);
+    },
+    [desktopIconSize, gridSnapEnabled]
+  );
+
+  const resetDesktopIconPositions = useCallback(
+    (snapToGrid?: boolean) => {
+      playSound('click');
+      const preset = DESKTOP_ICON_SIZE_PRESETS[desktopIconSize] ?? DESKTOP_ICON_SIZE_PRESETS.medium;
+      if (snapToGrid) {
+        setDesktopIconPositions((prev) => {
+          const next: Record<string, { x: number; y: number }> = {};
+          const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
+          const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+          const maxCols = Math.max(2, Math.floor((vw - 24) / preset.cellW));
+          const maxRows = Math.max(3, Math.floor((vh - 76) / preset.cellH));
+          const occupied = new Set<string>();
+          Object.entries(prev).forEach(([key, pos]) => {
+            let col = Math.max(0, Math.min(maxCols - 1, Math.round((pos.x - 16) / preset.cellW)));
+            let row = Math.max(0, Math.min(maxRows - 1, Math.round((pos.y - 16) / preset.cellH)));
+            while (occupied.has(`${col},${row}`)) {
+              row += 1;
+              if (row >= maxRows) {
+                row = 0;
+                col += 1;
+              }
+            }
+            occupied.add(`${col},${row}`);
+            next[key] = {
+              x: 16 + col * preset.cellW,
+              y: 16 + row * preset.cellH,
+            };
+          });
+          return next;
+        });
+      } else {
+        setDesktopIconPositions(computeDefaultIconPositions(desktopIconSize));
+      }
+    },
+    [playSound, desktopIconSize]
+  );
 
   const toggleTaskView = useCallback(() => {
     playSound('click');
@@ -869,7 +1079,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const openApp = useCallback(
-    (appId: AppId, opts?: OpenOptions) => {
+    (rawAppId: AppId, opts?: OpenOptions) => {
+      const appId: AppId = rawAppId === 'sysmon' ? 'taskmanager' : rawAppId;
       playSound('open');
       setTaskViewOpen(false);
       setWindows((ws) => {
@@ -1190,7 +1401,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const toggleQuick = useCallback((key: 'wifi' | 'bluetooth' | 'darkMode') => {
     setQuickSettings((q) => {
       const next = { ...q, [key]: !q[key] };
-      if (key === 'darkMode') setTheme(next.darkMode ? 'dark' : 'light');
+      if (key === 'darkMode') setThemeState(next.darkMode ? 'dark' : 'light');
       return next;
     });
   }, []);
@@ -1412,6 +1623,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
     setSelectedCustomId,
     theme,
     setTheme,
+    accentColor,
+    setAccentColor,
     shellMode,
     setShellMode,
     taskbarStyle,
@@ -1515,6 +1728,11 @@ export function OSProvider({ children }: { children: ReactNode }) {
     desktopIconPositions,
     updateDesktopIconPosition,
     resetDesktopIconPositions,
+    desktopIconSize,
+    setDesktopIconSize,
+    gridSnapEnabled,
+    setGridSnapEnabled,
+    isWallpaperBright,
     deskNotes,
     addDeskNote,
     updateDeskNote,
