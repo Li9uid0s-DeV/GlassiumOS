@@ -409,10 +409,10 @@ export function WindowFrame({ win, children }: Props) {
             }}
             style={{ touchAction: 'none' }}
           >
-            {/* MAC OS: Authentic Traffic Light Beads with Group Hover and Balanced Title */}
+            {/* MAC OS: Authentic Traffic Light Beads with Absolute Positioning */}
             {isMac && (
               <div
-                className="window-controls-container flex items-center gap-2 pl-2 relative z-50 pointer-events-auto w-16 group"
+                className="window-controls-container absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-2 z-50 pointer-events-auto group"
                 onPointerDown={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
               >

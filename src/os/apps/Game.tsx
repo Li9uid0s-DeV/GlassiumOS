@@ -2,7 +2,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { Icon } from '../Icon';
 
-export type GameMode = 'velocity' | 'maze' | '2048' | 'snake' | 'breaker';
+export type GameMode = 'velocity' | 'maze' | '2048' | 'snake' | 'breaker' | 'gameboy';
 
 interface GameAppProps {
   payload?: { gameId?: string };
@@ -14,6 +14,7 @@ function mapPayloadToMode(gameId?: string): GameMode {
   if (gameId.includes('snake')) return 'snake';
   if (gameId.includes('maze')) return 'maze';
   if (gameId.includes('breaker') || gameId.includes('brick')) return 'breaker';
+  if (gameId.includes('gameboy' ) || gameId.includes('gb') || gameId.includes('rom')) return 'gameboy';
   return 'velocity';
 }
 
@@ -28,6 +29,8 @@ export function GameApp({ payload }: GameAppProps) {
   const [speedGauge, setSpeedGauge] = useState(120);
   const [gameOver, setGameOver] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [gbRom, setGbRom] = useState<'tetris' | 'space' | 'mario' | 'custom'>('tetris');
+  const [customRomName, setCustomRomName] = useState<string>('');
 
   // Sync high score on mode switch
   useEffect(() => {
@@ -126,6 +129,92 @@ export function GameApp({ payload }: GameAppProps) {
 
   const setControl = (key: 'left' | 'right' | 'up' | 'down' | 'boost', state: boolean) => {
     controlsRef.current[key] = state;
+  };
+
+  // =============================================================
+  // Game Boy ROM Emulator Engine
+  // =============================================================
+  const initGameBoy = (container: HTMLDivElement, rom: string) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 160;
+    canvas.height = 144;
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
+    canvas.style.imageRendering = 'pixelated';
+    container.appendChild(canvas);
+    const ctx = canvas.getContext('2d')!;
+
+    let px = 80;
+    const py = 120;
+    let scoreVal = 0;
+    let ticks = 0;
+    const bullets: { x: number; y: number }[] = [];
+    const enemies: { x: number; y: number; active: boolean }[] = [];
+    for (let i = 0; i < 5; i++) {
+      enemies.push({ x: 20 + i * 28, y: 30 + (i % 2) * 15, active: true });
+    }
+
+    const keys: Record<string, boolean> = {};
+    const onDown = (e: KeyboardEvent) => { keys[e.code] = true; };
+    const onUp = (e: KeyboardEvent) => { keys[e.code] = false; };
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup', onUp);
+
+    const loop = () => {
+      gameLoopRef.current = requestAnimationFrame(loop);
+      ticks++;
+
+      if (keys['ArrowLeft'] || keys['KeyA'] || controlsRef.current.left) px = Math.max(10, px - 2);
+      if (keys['ArrowRight'] || keys['KeyD'] || controlsRef.current.right) px = Math.min(150, px + 2);
+      if ((keys['Space'] || keys['KeyJ'] || controlsRef.current.boost) && ticks % 15 === 0) {
+        bullets.push({ x: px, y: py - 6 });
+        playSound('boost');
+      }
+
+      ctx.fillStyle = '#9bbc0f';
+      ctx.fillRect(0, 0, 160, 144);
+
+      ctx.fillStyle = '#0f380f';
+      ctx.font = '8px monospace';
+      ctx.fillText(`ROM:${rom.toUpperCase()} SC:${scoreVal}`, 6, 12);
+
+      ctx.fillStyle = '#0f380f';
+      ctx.fillRect(px - 6, py - 4, 12, 6);
+      ctx.fillRect(px - 2, py - 8, 4, 4);
+
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        bullets[i].y -= 3;
+        ctx.fillRect(bullets[i].x - 1, bullets[i].y, 2, 4);
+        if (bullets[i].y < 0) bullets.splice(i, 1);
+      }
+
+      enemies.forEach((en) => {
+        if (!en.active) return;
+        en.x += Math.sin(ticks / 20) * 0.6;
+        ctx.fillRect(en.x - 6, en.y - 4, 12, 8);
+
+        for (let i = bullets.length - 1; i >= 0; i--) {
+          const b = bullets[i];
+          if (Math.abs(b.x - en.x) < 8 && Math.abs(b.y - en.y) < 6) {
+            en.active = false;
+            bullets.splice(i, 1);
+            scoreVal += 100;
+            updateScore(scoreVal);
+            playSound('score');
+            setTimeout(() => { en.active = true; }, 3000);
+          }
+        }
+      });
+    };
+
+    gameLoopRef.current = requestAnimationFrame(loop);
+
+    return () => {
+      cancelAnimationFrame(gameLoopRef.current);
+      window.removeEventListener('keydown', onDown);
+      window.removeEventListener('keyup', onUp);
+      if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+    };
   };
 
   // =============================================================
@@ -947,12 +1036,14 @@ export function GameApp({ payload }: GameAppProps) {
       cleanup = initBreaker(container);
     } else if (mode === '2048') {
       setGrid2048(createInitial2048Grid());
+    } else if (mode === 'gameboy') {
+      cleanup = initGameBoy(container, gbRom === 'custom' ? customRomName || 'Custom ROM' : gbRom);
     }
 
     return () => {
       if (cleanup) cleanup();
     };
-  }, [mode, gameOver]);
+  }, [mode, gameOver, gbRom, customRomName]);
 
   const GAME_TABS: { id: GameMode; label: string; icon: string }[] = [
     { id: 'velocity', label: 'Velocity 3D', icon: 'Flame' },
@@ -960,6 +1051,7 @@ export function GameApp({ payload }: GameAppProps) {
     { id: '2048', label: '2048 Glass', icon: 'LayoutGrid' },
     { id: 'snake', label: 'Neon Snake', icon: 'Zap' },
     { id: 'breaker', label: 'Glass Breaker', icon: 'Sparkles' },
+    { id: 'gameboy', label: 'Game Boy ROM', icon: 'Gamepad2' },
   ];
 
   return (
@@ -1066,8 +1158,48 @@ export function GameApp({ payload }: GameAppProps) {
           </div>
         )}
 
+        {mode === 'gameboy' && (
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-center bg-slate-950/90 p-6 backdrop-blur-2xl">
+            <div className="bg-[#8b9bb4] p-6 rounded-[36px] shadow-2xl border-4 border-[#6c7d93] flex flex-col items-center max-w-sm w-full">
+              <div className="text-[10px] font-mono tracking-widest text-[#2d3748] mb-1 font-bold">NINTENDO GAME BOY · DMG-01</div>
+              <div className="bg-[#9bbc0f] p-3 rounded-2xl border-4 border-[#306230] shadow-inner w-full h-48 relative overflow-hidden flex items-center justify-center">
+                <div ref={containerRef} className="w-full h-full relative" />
+              </div>
+              <div className="w-full flex items-center justify-between mt-6 px-4">
+                <div className="relative w-20 h-20">
+                  <button onPointerDown={() => setControl('left', true)} onPointerUp={() => setControl('left', false)} className="absolute left-0 top-6 w-6 h-8 bg-[#2d3748] rounded-l text-[10px] text-white flex items-center justify-center">◀</button>
+                  <button onPointerDown={() => setControl('right', true)} onPointerUp={() => setControl('right', false)} className="absolute right-0 top-6 w-6 h-8 bg-[#2d3748] rounded-r text-[10px] text-white flex items-center justify-center">▶</button>
+                  <button onPointerDown={() => setControl('up', true)} onPointerUp={() => setControl('up', false)} className="absolute left-6 top-0 w-8 h-6 bg-[#2d3748] rounded-t text-[10px] text-white flex items-center justify-center">▲</button>
+                  <button onPointerDown={() => setControl('down', true)} onPointerUp={() => setControl('down', false)} className="absolute left-6 bottom-0 w-8 h-6 bg-[#2d3748] rounded-b text-[10px] text-white flex items-center justify-center">▼</button>
+                </div>
+                <div className="flex items-center gap-3">
+                  <button onPointerDown={() => setControl('boost', true)} onPointerUp={() => setControl('boost', false)} className="w-10 h-10 rounded-full bg-[#8b0000] text-white font-bold text-xs shadow-md active:scale-95 flex items-center justify-center">B</button>
+                  <button onPointerDown={() => setControl('boost', true)} onPointerUp={() => setControl('boost', false)} className="w-10 h-10 rounded-full bg-[#8b0000] text-white font-bold text-xs shadow-md active:scale-95 flex items-center justify-center">A</button>
+                </div>
+              </div>
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-2 w-full pt-3 border-t border-[#6c7d93]">
+                {(['tetris', 'space', 'mario'] as const).map((r) => (
+                  <button key={r} onClick={() => setGbRom(r)} className={`px-2.5 py-1 rounded text-xs uppercase font-bold transition ${gbRom === r ? 'bg-[#306230] text-white' : 'bg-[#2d3748] text-white/80'}`}>
+                    {r}
+                  </button>
+                ))}
+                <label className="px-2.5 py-1 rounded bg-[#2d3748] text-white text-xs font-bold cursor-pointer hover:bg-[#3d4b60]">
+                  <span>📁 ROM Drop</span>
+                  <input type="file" accept=".gb,.rom" className="hidden" onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) {
+                      setCustomRomName(f.name);
+                      setGbRom('custom');
+                    }
+                  }} />
+                </label>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Touch Controls for Velocity / Maze / Snake / Breaker */}
-        {mode !== '2048' && (
+        {mode !== '2048' && mode !== 'gameboy' && (
           <div className="absolute inset-x-4 bottom-4 z-20 flex items-end justify-between pointer-events-none">
             <div className="flex items-center gap-2.5 pointer-events-auto">
               <button

@@ -61,6 +61,7 @@ export function Taskbar(_props?: TaskbarProps) {
   );
 
   const [trayOpen, setTrayOpen] = useState(false);
+  const [calendarFlyoutOpen, setCalendarFlyoutOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [now, setNow] = useState(new Date());
@@ -341,7 +342,7 @@ export function Taskbar(_props?: TaskbarProps) {
               <Icon name="Wifi" size={13} />
               <Icon name="Volume2" size={13} />
             </div>
-            <div className="px-2 hover:bg-white/10 h-full flex flex-col justify-center text-right leading-tight cursor-pointer" onClick={() => openApp('calendar')}>
+            <div className="px-2 hover:bg-white/10 h-full flex flex-col justify-center text-right leading-tight cursor-pointer" onClick={() => setCalendarFlyoutOpen(!calendarFlyoutOpen)}>
               <div className="text-[11px] font-mono">{timeStr}</div>
               <div className="text-[9px] text-white/60">{dateStr}</div>
             </div>
@@ -794,6 +795,65 @@ export function Taskbar(_props?: TaskbarProps) {
                   }}
                   className="glass-slider w-full"
                 />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Standalone Calendar Flyout Popup */}
+      <AnimatePresence>
+        {calendarFlyoutOpen && (
+          <>
+            <div className="fixed inset-0 z-[5200]" onClick={() => setCalendarFlyoutOpen(false)} />
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 16, scale: 0.95 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="fixed right-3 bottom-14 z-[5300] w-80 p-4 rounded-3xl bg-slate-900/90 backdrop-blur-2xl shadow-[0_24px_64px_rgba(0,0,0,0.6)] text-white select-none flex flex-col gap-3"
+            >
+              <div className="flex items-center justify-between pb-2">
+                <div className="text-sm font-bold flex items-center gap-2">
+                  <Icon name="Calendar" size={16} className="text-cyan-400" />
+                  <span>{now.toLocaleDateString('ja-JP', { month: 'long', year: 'numeric' })}</span>
+                </div>
+                <button
+                  onClick={() => setCalendarFlyoutOpen(false)}
+                  className="p-1 rounded-full hover:bg-white/10 text-white/60 hover:text-white"
+                >
+                  <Icon name="X" size={14} />
+                </button>
+              </div>
+
+              {/* Mini Month Grid */}
+              <div className="grid grid-cols-7 gap-1 text-center text-xs">
+                {['日', '月', '火', '水', '木', '金', '土'].map((d, i) => (
+                  <div key={d} className={`font-semibold py-1 ${i === 0 ? 'text-rose-400' : i === 6 ? 'text-sky-400' : 'text-white/65'}`}>
+                    {d}
+                  </div>
+                ))}
+                {Array.from({ length: 31 }, (_, i) => {
+                  const day = i + 1;
+                  const isToday = day === now.getDate();
+                  return (
+                    <div
+                      key={day}
+                      className={`h-7 rounded-xl flex items-center justify-center text-xs font-medium transition ${
+                        isToday
+                          ? 'bg-cyan-500 text-black font-bold shadow-md'
+                          : 'hover:bg-white/10 text-white/90'
+                      }`}
+                    >
+                      {day}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-white/70">
+                <span className="font-mono">{timeStr}</span>
+                <span className="text-cyan-300 font-medium">予定 2件</span>
               </div>
             </motion.div>
           </>

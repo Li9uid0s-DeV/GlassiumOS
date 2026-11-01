@@ -275,7 +275,7 @@ export function SettingsApp() {
   ];
 
   const sectionClass =
-    'space-y-3 pb-5 border-b border-slate-200/70 dark:border-white/10 last:border-b-0 last:pb-0';
+    'space-y-3 pb-8 mb-8 last:mb-0 last:pb-0';
   const sectionTitleClass = 'text-xs font-bold tracking-tight text-slate-800 dark:text-slate-100';
   const sectionDescClass = 'text-[11px] opacity-60';
 
@@ -284,12 +284,12 @@ export function SettingsApp() {
   }`;
 
   const subButtonClass = (active: boolean) =>
-    `rounded-lg border px-3 py-2 text-xs font-medium transition-all duration-150 ${
+    `rounded-lg px-3 py-2 text-xs font-medium transition-all duration-150 ${
       active
-        ? 'os-accent-soft border font-semibold'
+        ? 'os-accent-soft font-semibold shadow-sm'
         : isLight
-        ? 'bg-slate-100/80 border-slate-200 text-slate-700 hover:bg-slate-200/70'
-        : 'bg-white/[0.04] border-white/10 text-white/75 hover:bg-white/[0.08]'
+        ? 'bg-slate-100/90 text-slate-700 hover:bg-slate-200/70'
+        : 'bg-white/[0.04] text-white/75 hover:bg-white/[0.08]'
     }`;
 
   return (
@@ -300,8 +300,8 @@ export function SettingsApp() {
     >
       {/* Left Navigation Sidebar */}
       <div
-        className={`w-full sm:w-56 border-b sm:border-b-0 sm:border-r p-3 flex sm:flex-col justify-between gap-2 shrink-0 transition-colors duration-200 ${
-          isLight ? 'bg-slate-100/90 border-slate-200' : 'bg-slate-900/60 border-white/10'
+        className={`w-full sm:w-56 p-3 flex sm:flex-col justify-between gap-2 shrink-0 transition-colors duration-200 ${
+          isLight ? 'bg-slate-100/80' : 'bg-slate-900/40'
         }`}
       >
         <div className="w-full">
@@ -363,10 +363,10 @@ export function SettingsApp() {
         {/* Bottom Profile Summary */}
         <div
           onClick={() => setActiveTab('account')}
-          className={`hidden sm:flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer transition ${
+          className={`hidden sm:flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer transition ${
             isLight
-              ? 'bg-white border-slate-200 hover:border-slate-300'
-              : 'bg-white/[0.03] border-white/10 hover:bg-white/[0.06]'
+              ? 'bg-white hover:bg-slate-200/60 shadow-sm'
+              : 'bg-white/[0.03] hover:bg-white/[0.06]'
           }`}
         >
           <div className="w-7 h-7 rounded-full os-accent-bg flex items-center justify-center text-white text-xs font-bold shrink-0">
@@ -724,12 +724,12 @@ export function SettingsApp() {
                           playSound('click');
                           setAccentColor(preset.id);
                         }}
-                        className={`flex items-center gap-2 p-2 rounded-lg border text-left transition-all ${
+                        className={`flex items-center gap-2 p-2 rounded-lg text-left transition-all ${
                           selected
-                            ? 'os-accent-soft border font-semibold'
+                            ? 'os-accent-soft font-semibold shadow-sm'
                             : isLight
-                            ? 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                            : 'bg-white/[0.03] border-white/10 hover:bg-white/[0.07]'
+                            ? 'bg-slate-100/70 hover:bg-slate-200/80'
+                            : 'bg-white/[0.03] hover:bg-white/[0.07]'
                         }`}
                       >
                         <span
@@ -924,7 +924,7 @@ export function SettingsApp() {
                 </div>
               </div>
 
-              {/* Surface Material & Desktop Shell */}
+               {/* Surface Material & Desktop Shell */}
               <div className={sectionClass}>
                 <div className={sectionTitleClass + ' mb-2.5'}>Surface Material (ウィンドウ質感)</div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
@@ -936,12 +936,12 @@ export function SettingsApp() {
                         playSound('click');
                         setDesignEngine(eng.id);
                       }}
-                      className={`p-2.5 rounded-lg border text-left transition ${
+                      className={`p-2.5 rounded-lg text-left transition ${
                         designEngine === eng.id
-                          ? 'os-accent-soft border font-semibold'
+                          ? 'os-accent-soft font-semibold shadow-sm'
                           : isLight
-                          ? 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                          : 'bg-white/[0.03] border-white/10 hover:bg-white/[0.07]'
+                          ? 'bg-slate-100/70 hover:bg-slate-200/80'
+                          : 'bg-white/[0.03] hover:bg-white/[0.07]'
                       }`}
                     >
                       <div className="text-xs font-medium">{eng.label}</div>
@@ -960,12 +960,12 @@ export function SettingsApp() {
                         playSound('click');
                         setShellMode(mode.id);
                       }}
-                      className={`p-2.5 rounded-lg border text-left transition ${
+                      className={`p-2.5 rounded-lg text-left transition ${
                         shellMode === mode.id
-                          ? 'os-accent-soft border font-semibold'
+                          ? 'os-accent-soft font-semibold shadow-sm'
                           : isLight
-                          ? 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                          : 'bg-white/[0.03] border-white/10 hover:bg-white/[0.07]'
+                          ? 'bg-slate-100/70 hover:bg-slate-200/80'
+                          : 'bg-white/[0.03] hover:bg-white/[0.07]'
                       }`}
                     >
                       <div className="text-xs font-medium">{mode.label}</div>
