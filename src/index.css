@@ -667,4 +667,63 @@ input[type='range'].glass-slider::-moz-range-thumb {
     inset 0 1px 0 rgba(253, 224, 71, 0.4);
 }
 
+/* ============================================================
+   PER-SHELL-MODE APP & WINDOW LAYOUT ADAPTATION
+   ============================================================ */
+
+/* GlassiumOS 5 (Sharp Minimal Hairline Architecture) */
+[data-shell-mode='windows'] .liquid-glass-window {
+  border-radius: 0px !important;
+}
+[data-shell-mode='windows'] .window-body-shell-windows button:not(.rounded-full),
+[data-shell-mode='windows'] .window-body-shell-windows input:not([type='range']) {
+  border-radius: 0px !important;
+}
+
+/* Windows 11 (Fluent Rounded Mica Architecture) */
+[data-shell-mode='windows11'] .liquid-glass-window {
+  border-radius: 12px !important;
+}
+[data-shell-mode='windows11'] .window-body-shell-windows11 button:not(.rounded-full),
+[data-shell-mode='windows11'] .window-body-shell-windows11 input:not([type='range']) {
+  border-radius: 6px !important;
+}
+
+/* Windows 10 (Crisp Rectangular Fluent Metro) */
+[data-shell-mode='windows10'] .liquid-glass-window {
+  border-radius: 0px !important;
+}
+[data-shell-mode='windows10'] .window-body-shell-windows10 button:not(.rounded-full),
+[data-shell-mode='windows10'] .window-body-shell-windows10 input:not([type='range']) {
+  border-radius: 0px !important;
+}
+
+/* macOS (Aqua Rounded Controls & Translucent Sidebar) */
+[data-shell-mode='mac'] .liquid-glass-window {
+  border-radius: 12px !important;
+}
+[data-shell-mode='mac'] .window-body-shell-mac button:not(.rounded-full),
+[data-shell-mode='mac'] .window-body-shell-mac input:not([type='range']) {
+  border-radius: 8px !important;
+}
+
+/* Ubuntu Desktop (Yaru Warm Header & Rounded Pill Controls) */
+[data-shell-mode='ubuntu'] .liquid-glass-window {
+  border-radius: 10px 10px 6px 6px !important;
+}
+[data-shell-mode='ubuntu'] .window-body-shell-ubuntu button:not(.rounded-full),
+[data-shell-mode='ubuntu'] .window-body-shell-ubuntu input:not([type='range']) {
+  border-radius: 6px !important;
+}
+
+/* DeX / ChromeOS (Soft Pill Geometry) */
+[data-shell-mode='dex'] .liquid-glass-window,
+[data-shell-mode='chromeos'] .liquid-glass-window {
+  border-radius: 16px !important;
+}
+[data-shell-mode='chromeos'] .window-body-shell-chromeos button {
+  border-radius: 9999px !important;
+}
+
+
 

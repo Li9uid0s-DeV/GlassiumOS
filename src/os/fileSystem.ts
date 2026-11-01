@@ -35,8 +35,8 @@ const initial: VirtualFolder = {
       name: 'Documents',
       kind: 'folder',
       children: [
-        txt('doc-welcome', 'Welcome.txt', 'Welcome to LiquidOS v4.0.0!\n\nThis is a high-density Web OS engineered with dynamic Liquid Glass optical refraction (#glass-distortion) and multi-shell architecture.\n\nEnjoy the cosmic performance and zero-latency simulation!'),
-        txt('doc-notes', 'SystemNotes.txt', 'v4.0.0 Architecture Highlights:\n- True Liquid Glass Refraction (#glass-distortion)\n- 5 Multi-OS Shell Environments (Windows 11, macOS, Ubuntu, Android, iOS)\n- Windows 8 Metro Live Touch Matrix\n- Cosmic Velocity 3D Arcadium Engine\n- Calculator Pro & System Task Manager\n- Offline-First LocalStorage Daemon'),
+        txt('doc-welcome', 'Welcome.txt', 'Welcome to GlassiumOS 5!\n\nThis web operating system includes multi-shell desktop modes, Surface Material Engine, integrated AI assistant, and 10 live wallpapers.'),
+        txt('doc-notes', 'SystemNotes.txt', 'GlassiumOS 5 Highlights:\n- Surface Material Engine (Liquid, Frosted, Clear, Solid)\n- 8 Desktop Shell Environments (GlassiumOS 5, Windows 11, Windows 10, Windows 8.1, macOS, Ubuntu, DeX, ChromeOS)\n- 10 2D Live Wallpapers & Custom Wallpaper Uploads\n- Integrated AI Assistant & Omnibar'),
       ],
     },
     {

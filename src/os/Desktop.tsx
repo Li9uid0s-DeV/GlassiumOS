@@ -418,7 +418,7 @@ export function Desktop() {
               <div className="cursor-pointer hover:opacity-80" onClick={() => openApp('settings')}>
                 <AppLogo size={16} />
               </div>
-              <span className="font-bold tracking-tight">GlassiumOS-V4.0</span>
+              <span className="font-bold tracking-tight">GlassiumOS 5</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('explorer')}>Files</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('settings')}>Settings</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => setShellMode('windows')}>View</span>
@@ -498,7 +498,7 @@ export function Desktop() {
           <div className="fixed top-0 inset-x-0 h-7 bg-slate-950/80 backdrop-blur-md border-b border-white/10 z-40 px-3 flex items-center justify-between text-xs text-white">
             <div className="flex items-center gap-3">
               <span className="font-semibold text-cyan-300 cursor-pointer" onClick={() => openApp('terminal')}>Activities</span>
-              <span className="text-white/60">GlassiumOS-V4.0</span>
+              <span className="text-white/60">GlassiumOS 5</span>
             </div>
             <div className="flex items-center gap-3">
               <span className="font-mono text-[11px]">{dateStr} {timeStr}</span>
@@ -590,7 +590,7 @@ export function Desktop() {
           >
             <div className="flex items-center gap-2 text-white/70 text-xs">
               <Icon name="Search" size={15} className="text-sky-400" />
-              <span>Search LiquidOS or type URL...</span>
+              <span>Search GlassiumOS 5 or type URL...</span>
             </div>
             <Icon name="Mic" size={15} className="text-white/60" />
           </div>
@@ -681,7 +681,7 @@ export function Desktop() {
             >
               <span className={`h-2 w-2 rounded-full ${dynamicIslandEvent ? 'bg-cyan-400 animate-ping' : 'bg-emerald-400 animate-pulse'}`} />
               <span className="text-[11px] font-medium font-sans">
-                {dynamicIslandEvent ? `${dynamicIslandEvent.title}${dynamicIslandEvent.subtitle ? ` · ${dynamicIslandEvent.subtitle}` : ''}` : 'LiquidOS v4.0.0 Active'}
+                {dynamicIslandEvent ? `${dynamicIslandEvent.title}${dynamicIslandEvent.subtitle ? ` · ${dynamicIslandEvent.subtitle}` : ''}` : 'GlassiumOS 5 Active'}
               </span>
             </div>
             <div className="flex items-center gap-1.5">
@@ -791,8 +791,8 @@ export function Desktop() {
                       <span className="text-[10px] font-mono bg-black/20 px-1.5 py-0.5 uppercase tracking-wider">Gemini 3.8</span>
                     </div>
                     <div>
-                      <div className="text-base font-bold leading-tight">Liquid Copilot AI Studio</div>
-                      <div className="text-[11px] text-white/80">Autonomous OS Assistant</div>
+                      <div className="text-base font-bold leading-tight">GlassiumOS 5 AI Assistant</div>
+                      <div className="text-[11px] text-white/80">Integrated OS Assistant</div>
                     </div>
                   </div>
 
@@ -993,7 +993,7 @@ export function Desktop() {
           <div className="flex items-center justify-between text-xs text-white/40 font-mono shrink-0 pt-3 max-w-7xl w-full mx-auto border-t border-white/5">
             <div className="flex items-center gap-2">
               <AppLogo size={16} />
-              <span>LiquidOS-4.1.0-Beta Metro Live</span>
+              <span>GlassiumOS 5 Metro Live</span>
             </div>
             <div>Swipe horizontally or tap to launch tiles</div>
           </div>
@@ -1700,8 +1700,8 @@ export function Desktop() {
                 <div className="flex items-center gap-3">
                   <AppLogo size={26} />
                   <div>
-                    <h2 className="text-lg font-bold tracking-tight">GlassiumOS 5.0 更新内容</h2>
-                    <p className="text-xs text-white/50 font-mono">Version 5.0 Release Notes</p>
+                    <h2 className="text-lg font-bold tracking-tight">GlassiumOS 5 更新内容</h2>
+                    <p className="text-xs text-white/50 font-mono">GlassiumOS 5 Release Notes</p>
                   </div>
                 </div>
                 <button
@@ -1741,7 +1741,7 @@ export function Desktop() {
 
               {/* Modal Footer */}
               <div className="pt-3 border-t border-white/10 flex items-center justify-between">
-                <span className="text-[11px] text-white/40 font-mono">GlassiumOS 5.0</span>
+                <span className="text-[11px] text-white/40 font-mono">GlassiumOS 5</span>
                 <button
                   onClick={() => {
                     localStorage.setItem('glassium_v5.0_whats_new_dismissed', 'true');

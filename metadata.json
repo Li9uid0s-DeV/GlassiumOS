@@ -1,6 +1,6 @@
 {
-  "name": "GlassiumOS 4.7",
-  "description": "An advanced web operating system featuring GlassiumOS 4.7 (Windows 11 inspired UI), Glassium Studio AI workspace, RetroCade emulator, Service Worker proxy browser, Quick Look, and Gemini AI integration.",
+  "name": "GlassiumOS 5",
+  "description": "GlassiumOS 5 — Web operating system featuring multi-shell desktop environments, Surface Material Engine, 2D/3D live wallpapers, and integrated AI assistant.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -1200,14 +1200,29 @@ export function StudyReferenceHubApp({ initialTab = 'dictionary' }: { initialTab
     (['dictionary', 'periodic', 'flashcards'].includes(initialTab) ? initialTab : 'dictionary') as 'dictionary'
   );
   const [q, setQ] = useState('');
+  const [aiResult, setAiResult] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const entries = [
     { term: 'API (Application Programming Interface)', desc: 'ソフトウェア間で機能やデータを共有するためのインターフェース仕様。' },
     { term: 'HTTP 405 (Method Not Allowed)', desc: '対象URLで許可されていないHTTPメソッドが送信された際の応答コード。' },
     { term: 'TypeScript', desc: 'JavaScriptに静的型付けを加えたプログラミング言語。' },
     { term: 'WebGL', desc: 'ブラウザ上でGPUを用いて2D/3Dグラフィックスを描画する標準仕様。' },
-    { term: 'Zero Bug Architecture', desc: 'フォールバック設計と厳密な型検証により実行時エラーを排除する設計原則。' },
+    { term: 'GlassiumOS 5', desc: 'マルチシェル対応・Surface Material Engine搭載のデスクトップWeb OS環境。' },
   ];
+
+  const handleAiLookup = async () => {
+    if (!q.trim() || aiLoading) return;
+    setAiLoading(true);
+    try {
+      const res = await requestAIChat(`「${q.trim()}」の意味と概要を簡潔に解説してください。`);
+      setAiResult(res.reply);
+    } catch {
+      setAiResult('解説を取得できませんでした。');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const elements = [
     { num: 1, sym: 'H', name: '水素 (Hydrogen)', mass: '1.008', cat: '非金属' },
@@ -1251,7 +1266,28 @@ export function StudyReferenceHubApp({ initialTab = 'dictionary' }: { initialTab
 
       {tab === 'dictionary' && (
         <div className="flex flex-col gap-4">
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="用語を検索..." className="bg-transparent border-b border-white/20 py-2 text-xs outline-none focus:border-cyan-400" />
+          <div className="flex items-center gap-3">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAiLookup(); }}
+              placeholder="用語を検索または入力してAI解説..."
+              className="flex-1 bg-transparent border-b border-white/20 py-2 text-xs outline-none focus:border-cyan-400"
+            />
+            <button
+              onClick={handleAiLookup}
+              disabled={!q.trim() || aiLoading}
+              className="px-3.5 py-1.5 bg-cyan-500 text-black text-xs font-semibold disabled:opacity-40"
+            >
+              {aiLoading ? '検索中...' : 'AIで用語解説'}
+            </button>
+          </div>
+          {aiResult && (
+            <div className="py-3 border-b border-cyan-500/30 text-xs text-white/90 whitespace-pre-wrap leading-relaxed">
+              <div className="text-[11px] font-bold text-cyan-400 mb-1">AI 解説結果</div>
+              {aiResult}
+            </div>
+          )}
           <div className="divide-y divide-white/[0.08]">
             {entries.filter((e) => e.term.toLowerCase().includes(q.toLowerCase()) || e.desc.includes(q)).map((item) => (
               <div key={item.term} className="py-3.5 space-y-1">
@@ -1343,8 +1379,8 @@ export function SysInfoView() {
   const { shellMode, designEngine, theme, language } = useOS();
 
   const specs = [
-    { label: 'OS バージョン', value: 'GlassiumOS 5.0' },
-    { label: '現在のシェルモード', value: shellMode === 'windows' ? 'GlassiumOS 5 Standard' : shellMode },
+    { label: 'OS バージョン', value: 'GlassiumOS 5' },
+    { label: '現在のシェルモード', value: shellMode === 'windows' ? 'GlassiumOS 5' : shellMode },
     { label: 'サーフェスマテリアル', value: designEngine },
     { label: 'テーマ / 表示言語', value: `${theme} / ${language.toUpperCase()}` },
     { label: 'CPU 論理コア数', value: `${navigator.hardwareConcurrency || 8}` },

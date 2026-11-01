@@ -89,7 +89,7 @@ const RECOMMENDED_ITEMS: {
     appId: 'notepad',
     payload: {
       fileName: 'GlassiumOS_Notes.md',
-      content: '# GlassiumOS-V4.0\n\n2.5D Glassmorphism & Lustrous Gradient Desktop Environment.\n',
+      content: '# GlassiumOS 5\n\nMinimal Refractive Glass & Integrated AI Desktop Environment.\n',
     },
   },
   {
@@ -518,7 +518,12 @@ export function StartMenu({ open, onClose }: Props) {
               className="fixed bottom-10 left-0 z-[5200] w-[min(620px,calc(100vw-16px))] h-[min(500px,calc(100vh-56px))] rounded-none shadow-2xl border border-zinc-700 bg-zinc-950/95 backdrop-blur-2xl flex font-sans select-none text-white"
             >
               <div className="w-12 bg-black/60 border-r border-zinc-800 flex flex-col justify-between items-center py-3 shrink-0">
-                <button className="p-2 text-white/60 hover:text-white" title="Expand">
+                <button
+                  type="button"
+                  onClick={() => setAllProgramsView((v) => !v)}
+                  className="p-2 text-white/60 hover:text-white"
+                  title="All Apps"
+                >
                   <Icon name="LayoutGrid" size={16} fluent={false} />
                 </button>
                 <div className="flex flex-col items-center gap-3">
@@ -751,7 +756,7 @@ export function StartMenu({ open, onClose }: Props) {
                       {userInitial}
                     </div>
                     <span className="font-medium">{userName}</span>
-                    <span className="text-[10px] font-mono opacity-45">GlassiumOS 5.0</span>
+                    <span className="text-[10px] font-mono opacity-45">GlassiumOS 5</span>
                   </button>
 
                   <div className="flex items-center gap-4">

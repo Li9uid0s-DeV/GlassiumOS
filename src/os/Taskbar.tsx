@@ -88,7 +88,11 @@ export function Taskbar(_props?: TaskbarProps) {
     theme,
     setTheme,
     setWallpaper,
+    setAuroraColor,
+    setShellMode,
     setAccentColor,
+    lockSystem,
+    snapAllWindows5050,
   } = useOS();
   const isLight = theme === 'light';
 
@@ -122,11 +126,27 @@ export function Taskbar(_props?: TaskbarProps) {
     try {
       const res = await requestAIChat({ message: q });
       setAiOmniReply(res.reply);
-      if (res.osAction) {
-        if (res.osAction.type === 'theme') setTheme(res.osAction.value as 'dark' | 'light');
-        if (res.osAction.type === 'wallpaper') setWallpaper(res.osAction.value as Wallpaper);
-        if (res.osAction.type === 'accent') setAccentColor(res.osAction.value as AccentColorId);
-        if (res.osAction.type === 'openApp') openApp(res.osAction.value as AppId);
+      const act = res.action || res.osAction;
+      if (act) {
+        const targetVal = String(act.target ?? act.value ?? '');
+        if (act.type === 'theme' || act.type === 'set_theme' || act.type === 'setTheme') {
+          setTheme(targetVal === 'light' ? 'light' : 'dark');
+        } else if (act.type === 'wallpaper' || act.type === 'set_wallpaper') {
+          setWallpaper(targetVal as Wallpaper);
+        } else if (act.type === 'set_aurora') {
+          setWallpaper('live2d');
+          setAuroraColor(targetVal as Parameters<typeof setAuroraColor>[0]);
+        } else if (act.type === 'set_shell' || act.type === 'setShellMode') {
+          setShellMode(targetVal as Parameters<typeof setShellMode>[0]);
+        } else if (act.type === 'accent') {
+          setAccentColor(targetVal as AccentColorId);
+        } else if (act.type === 'openApp' || act.type === 'open_app') {
+          openApp(targetVal as AppId);
+        } else if (act.type === 'lock_system') {
+          lockSystem();
+        } else if (act.type === 'snap_windows') {
+          snapAllWindows5050();
+        }
       }
       setAiOmniInput('');
     } catch {
@@ -569,8 +589,8 @@ export function Taskbar(_props?: TaskbarProps) {
                 title="GlassiumOS 5 スタート"
               >
                 {startOpen && <span className="absolute top-0 left-0 right-0 h-0.5 bg-[var(--os-accent)]" />}
-                <AppLogo size={20} glow={startOpen} />
-                <span className="text-xs font-bold tracking-tight hidden md:inline">OS 5</span>
+                <AppLogo size={20} />
+                <span className="text-xs font-bold tracking-tight hidden md:inline">GlassiumOS 5</span>
               </button>
 
               <div className={`h-4 w-px ${isLight ? 'bg-slate-300' : 'bg-white/10'}`} />
@@ -781,7 +801,7 @@ export function Taskbar(_props?: TaskbarProps) {
               }`}
               title="Windows 11 Start"
             >
-              <AppLogo size={20} glow={startOpen} />
+              <AppLogo size={20} />
             </button>
 
             {/* Flat Search Bar */}

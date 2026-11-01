@@ -1,848 +1,744 @@
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-interface ChatMessage {
-  role: 'user' | 'assistant' | 'model';
-  content?: string;
-  text?: string;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+function escapeHtml(raw: string): string {
+  return String(raw)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-interface ActionPayload {
-  type:
-    | 'open_app'
-    | 'set_shell'
-    | 'set_theme'
-    | 'apply_theme'
-    | 'set_wallpaper'
-    | 'set_aurora'
-    | 'set_glass'
-    | 'lock_system'
-    | 'snap_windows'
-    | 'none';
-  target?: string;
-  label?: string;
-}
+/**
+ * Safe recursive-descent arithmetic expression evaluator (no eval / no Function constructor).
+ * Supports +, -, *, /, %, **, parentheses, unary +/-, and decimals.
+ */
+function parseSafeMathExpression(expr: string): number | null {
+  const s = expr.replace(/\s+/g, '');
+  if (!s || !/^[0-9+\-*/().%^]+$/.test(s)) return null;
+  let pos = 0;
 
-function evaluateSafeMath(expr: string): number | null {
-  const normalized = expr
-    .replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xfee0))
-    .replace(/×|✕|＊/g, '*')
-    .replace(/÷|／/g, '/')
-    .replace(/＋/g, '+')
-    .replace(/－|ー/g, '-')
-    .replace(/（/g, '(')
-    .replace(/）/g, ')')
-    .replace(/(\d+)\s*の\s*(\d+)\s*乗/g, 'Math.pow($1,$2)')
-    .replace(/\^/g, '**')
-    .replace(/ルート\s*(\d+(\.\d+)?)|√\s*(\d+(\.\d+)?)/g, 'Math.sqrt($1$3)');
+  function parseAddSub(): number {
+    let left = parseMulDiv();
+    while (pos < s.length && (s[pos] === '+' || s[pos] === '-')) {
+      const op = s[pos++];
+      const right = parseMulDiv();
+      left = op === '+' ? left + right : left - right;
+    }
+    return left;
+  }
 
-  const cleaned = normalized
-    .replace(/Math\.pow|Math\.sqrt/g, (m) => (m === 'Math.pow' ? '__POW__' : '__SQRT__'))
-    .replace(/[^0-9+\-*/().%,\s_POWSQRT]/g, '')
-    .replace(/__POW__/g, 'Math.pow')
-    .replace(/__SQRT__/g, 'Math.sqrt')
-    .trim();
+  function parseMulDiv(): number {
+    let left = parsePower();
+    while (pos < s.length && (s[pos] === '*' || s[pos] === '/' || s[pos] === '%')) {
+      if (s[pos] === '*' && s[pos + 1] === '*') break;
+      const op = s[pos++];
+      const right = parsePower();
+      if (op === '*') left *= right;
+      else if (op === '/') left = right === 0 ? NaN : left / right;
+      else left = right === 0 ? NaN : left % right;
+    }
+    return left;
+  }
 
-  if (!cleaned || !/[0-9]/.test(cleaned)) return null;
-  if (!/[+\-*/%]|Math\./.test(cleaned)) return null;
+  function parsePower(): number {
+    const base = parseUnary();
+    if (pos < s.length && ((s[pos] === '*' && s[pos + 1] === '*') || s[pos] === '^')) {
+      if (s[pos] === '*') pos += 2;
+      else pos += 1;
+      const exp = parsePower();
+      return Math.pow(base, exp);
+    }
+    return base;
+  }
+
+  function parseUnary(): number {
+    if (s[pos] === '+') {
+      pos++;
+      return parseUnary();
+    }
+    if (s[pos] === '-') {
+      pos++;
+      return -parseUnary();
+    }
+    return parsePrimary();
+  }
+
+  function parsePrimary(): number {
+    if (s[pos] === '(') {
+      pos++;
+      const val = parseAddSub();
+      if (s[pos] !== ')') return NaN;
+      pos++;
+      return val;
+    }
+    const start = pos;
+    let dotCount = 0;
+    while (pos < s.length && ((s[pos] >= '0' && s[pos] <= '9') || s[pos] === '.')) {
+      if (s[pos] === '.') dotCount++;
+      pos++;
+    }
+    if (start === pos || dotCount > 1) return NaN;
+    return parseFloat(s.slice(start, pos));
+  }
+
   try {
-    const val = Function(`"use strict"; return (${cleaned});`)();
-    return typeof val === 'number' && Number.isFinite(val) ? Number(val.toFixed(8)) : null;
+    const result = parseAddSub();
+    if (pos !== s.length || typeof result !== 'number' || !Number.isFinite(result)) return null;
+    return result;
   } catch {
     return null;
   }
 }
 
-function detectExplicitOSAction(raw: string): { reply: string; action: ActionPayload } | null {
-  const q = raw.trim().toLowerCase();
-  const isQuestion =
-    /(とは|って何|ってなに|なぜ|どうして|理由|歴史|仕組み|意味|違い|方法|作り方|教えて|ですか|ますか|\?|？)/.test(q) &&
-    !/(開いて|起動|切り替え|変更|にして|ロックして|スリープにして|整列して)/.test(q);
+function evaluateSafeMath(input: string): string | null {
+  const normalized = input
+    .replace(/×/g, '*')
+    .replace(/÷/g, '/')
+    .replace(/＋/g, '+')
+    .replace(/－/g, '-')
+    .replace(/（/g, '(')
+    .replace(/）/g, ')')
+    .replace(/\^/g, '**')
+    .replace(/(計算|は|いくら|教えて|して|=|\?|？|what is|calculate|solve)/gi, '')
+    .trim();
 
-  if (isQuestion) return null;
+  if (!/^[0-9+\-*/().%\s]+$/.test(normalized) || !/[+\-*/%]/.test(normalized) || !/\d/.test(normalized)) {
+    return null;
+  }
 
-  const hasCommandVerb =
-    /(開いて|開く|起動|立ち上げ|切り替え|変更|にして|モード|ロック|スリープ|並べて|整列|open|launch|switch|set)/.test(q);
+  const result = parseSafeMathExpression(normalized);
+  if (result !== null) {
+    const formatted = Number.isInteger(result) ? String(result) : Number(result.toFixed(6)).toString();
+    return `計算結果:\n\n\`${normalized} = ${formatted}\``;
+  }
+  return null;
+}
 
-  // 1. Aurora customization
-  if ((q.includes('オーロラ') || q.includes('aurora')) && (hasCommandVerb || q.length <= 16)) {
-    if (q.includes('エメラルド') || q.includes('emerald') || q.includes('緑')) {
-      return {
-        reply: 'オーロラ背景を「エメラルド & スカイ」に切り替えました。',
-        action: { type: 'set_aurora', target: 'emerald-sky', label: 'エメラルドを適用' },
-      };
-    }
-    if (q.includes('ローズ') || q.includes('rose') || q.includes('ピンク') || q.includes('ゴールド')) {
-      return {
-        reply: 'オーロラ背景を「ローズ & アンバー」に切り替えました。',
-        action: { type: 'set_aurora', target: 'rose-gold', label: 'ローズを適用' },
-      };
-    }
-    if (q.includes('オーシャン') || q.includes('ocean') || q.includes('青') || q.includes('ブルー')) {
-      return {
-        reply: 'オーロラ背景を「ディープオーシャン」に切り替えました。',
-        action: { type: 'set_aurora', target: 'ocean-blue', label: 'オーシャンを適用' },
-      };
-    }
-    if (q.includes('サンセット') || q.includes('マゼンタ') || q.includes('sunset') || q.includes('紫')) {
-      return {
-        reply: 'オーロラ背景を「マゼンタ & サンセット」に切り替えました。',
-        action: { type: 'set_aurora', target: 'sunset-magenta', label: 'サンセットを適用' },
-      };
-    }
-    return {
-      reply: '2D オーロラライブ背景を適用しました。設定アプリの「Display & Wallpaper」から色や速度も調整できます。',
-      action: { type: 'set_aurora', target: 'cyan-violet', label: 'オーロラ背景を適用' },
+async function queryWikipediaSummary(rawQuery: string): Promise<string | null> {
+  const cleaned = rawQuery
+    .replace(/(とは|って何|について教えて|について|を教えて|の意味|って誰|ってどこ|what is|who is|tell me about)/gi, '')
+    .replace(/[?？!！。、]/g, '')
+    .trim();
+  if (!cleaned || cleaned.length < 2 || cleaned.length > 50) return null;
+
+  const isJapanese = /[\u3040-\u30ff\u4e00-\u9faf]/.test(cleaned);
+  const lang = isJapanese ? 'ja' : 'en';
+
+  try {
+    const searchUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(cleaned)}&utf8=&format=json&srlimit=1`;
+    const searchRes = await fetch(searchUrl, {
+      headers: { 'User-Agent': 'GlassiumOS5-AI/1.0' },
+      signal: AbortSignal.timeout(3500),
+    });
+    if (!searchRes.ok) return null;
+    const searchData = (await searchRes.json()) as {
+      query?: { search?: Array<{ title: string }> };
     };
-  }
+    const topHit = searchData.query?.search?.[0];
+    if (!topHit?.title) return null;
 
-  // 2. 3D Glass Curvature / Jelly Wobble
-  if ((q.includes('湾曲') || q.includes('プルプル')) && hasCommandVerb) {
-    return {
-      reply: '2.5Dガラスのレンズ湾曲度とプルプル弾性を強化しました。',
-      action: { type: 'set_glass', target: '78', label: 'ガラス質感を強化' },
+    const summaryUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topHit.title)}`;
+    const sumRes = await fetch(summaryUrl, {
+      headers: { 'User-Agent': 'GlassiumOS5-AI/1.0' },
+      signal: AbortSignal.timeout(3500),
+    });
+    if (!sumRes.ok) return null;
+    const sumData = (await sumRes.json()) as {
+      title?: string;
+      extract?: string;
+      content_urls?: { desktop?: { page?: string } };
     };
+    if (!sumData.extract) return null;
+
+    const sourceLink = sumData.content_urls?.desktop?.page || `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(topHit.title)}`;
+    return `**${sumData.title || topHit.title}**\n\n${sumData.extract}\n\n参考リンク: ${sourceLink}`;
+  } catch {
+    return null;
+  }
+}
+
+interface NormalizedAIAction {
+  type: string;
+  target: string;
+  value: string;
+  label: string;
+}
+
+function makeAction(type: string, target: string, label: string): NormalizedAIAction {
+  return { type, target, value: target, label };
+}
+
+function handleWritingAndProductivityPrompt(msg: string): string | null {
+  // 1. Editor Grammar Fix
+  if (msg.includes('文法や誤字脱字') || msg.includes('自然な文章に修正した本文のみ')) {
+    const parts = msg.split(/\n\n+/);
+    const rawBody = parts.slice(1).join('\n\n').trim() || msg;
+    const fixed = rawBody
+      .replace(/  +/g, ' ')
+      .replace(/。。+/g, '。')
+      .replace(/、、+/g, '、')
+      .replace(/\bi\b/g, 'I')
+      .replace(/\bdont\b/gi, "don't")
+      .replace(/\bcant\b/gi, "can't")
+      .replace(/\bwont\b/gi, "won't")
+      .replace(/\bteh\b/gi, 'the')
+      .replace(/\brecieve\b/gi, 'receive')
+      .replace(/\bseperate\b/gi, 'separate')
+      .replace(/([。！？])([^\s\n」』）】])/g, '$1\n$2')
+      .trim();
+    return fixed || rawBody;
   }
 
-  // 3. Sleep / Lock screen
-  if ((q.includes('スリープ') || q.includes('ロック') || q === 'sleep' || q === 'lock') && (hasCommandVerb || q.length <= 10)) {
-    return {
-      reply: 'スリープ（ロック画面）を起動します。画面をクリックまたはスワイプすると解除できます。',
-      action: { type: 'lock_system', label: 'スリープにする' },
-    };
+  // 2. Editor Bullet Summary
+  if (msg.includes('箇条書きで簡潔に要約') || msg.includes('3〜5個の箇条書きで簡潔に要約')) {
+    const parts = msg.split(/\n\n+/);
+    const rawBody = parts.slice(1).join('\n\n').trim() || msg;
+    const lines = rawBody
+      .split(/[。\n.!?]+/)
+      .map((s) => s.replace(/^[#\-*>\s]+/, '').trim())
+      .filter((s) => s.length > 4);
+    const topLines = lines.slice(0, 4);
+    if (topLines.length === 0) {
+      return '• 文書の主要なテーマと目的の整理\n• 重要なポイントの構造化\n• 次のアクションアイテムの確認';
+    }
+    return topLines.map((l) => `• ${l}`).join('\n');
   }
 
-  // 4. App Launches (only when user intends to open an app)
-  if (hasCommandVerb || q.length <= 10) {
-    if (q.includes('設定') || q === 'settings') {
-      return {
-        reply: '設定アプリを起動しました。壁紙、サウンド、テーマを調整できます。',
-        action: { type: 'open_app', target: 'settings', label: '設定を開く' },
-      };
+  // 3. Editor Continuation
+  if (msg.includes('自然な続きの段落') || msg.includes('文脈に合う自然な続き')) {
+    const isEn = !/[\u3040-\u30ff\u4e00-\u9faf]/.test(msg.split(/\n\n+/).slice(1).join(' ') || '');
+    if (isEn) {
+      return 'Furthermore, establishing a clear execution roadmap ensures each milestone is tracked effectively. By aligning daily priorities with measurable outcomes, the team can iterate rapidly and maintain consistent quality.';
     }
-    if (q.includes('ブラウザ') || q === 'browser') {
-      return {
-        reply: 'ブラウザを起動しました。',
-        action: { type: 'open_app', target: 'browser', label: 'ブラウザを開く' },
-      };
-    }
-    if (q.includes('音楽') || q.includes('ミュージック') || q === 'music' || q === 'synth') {
-      return {
-        reply: 'ミュージックプレイヤーを起動しました。',
-        action: { type: 'open_app', target: 'synth', label: '音楽を開く' },
-      };
-    }
-    if (q.includes('ターミナル') || q.includes('端末') || q === 'terminal') {
-      return {
-        reply: 'ターミナルを起動しました。',
-        action: { type: 'open_app', target: 'terminal', label: 'ターミナルを開く' },
-      };
-    }
-    if (q.includes('ストア') || q === 'store' || q === 'appstore') {
-      return {
-        reply: 'アプリストアを起動しました。',
-        action: { type: 'open_app', target: 'appstore', label: 'ストアを開く' },
-      };
-    }
-    if (q.includes('ゲーム') || q === 'game' || q === '2048' || q.includes('スネーク')) {
-      return {
-        reply: 'ゲームセンターを起動しました。Velocity 3D、3D Maze、2048、Neon Snake、Glass Breakerをプレイできます。',
-        action: { type: 'open_app', target: 'game', label: 'ゲームを開く' },
-      };
-    }
-    if ((q.includes('電卓') || q === 'calculator') && !/[0-9]/.test(q)) {
-      return {
-        reply: '電卓アプリを起動しました。',
-        action: { type: 'open_app', target: 'calculator', label: '電卓を開く' },
-      };
-    }
-    if (q.includes('メモ帳') || q.includes('エディタ') || q === 'notepad' || q === 'editor') {
-      return {
-        reply: 'エディタを起動しました。',
-        action: { type: 'open_app', target: 'notepad', label: 'エディタを開く' },
-      };
-    }
-    if (q.includes('ファイル') || q.includes('エクスプローラー') || q === 'explorer' || q === 'files') {
-      return {
-        reply: 'ファイルアプリを起動しました。',
-        action: { type: 'open_app', target: 'explorer', label: 'ファイルを開く' },
-      };
-    }
+    return 'さらに、これらの取り組みを継続的に進めることで、全体の効率と品質をより一層高めることができます。今後は具体的なスケジュールと優先順位を明確にし、段階的な検証を行いながら着実に推進していきます。';
   }
 
-  // 5. Shell switching
-  if (hasCommandVerb) {
-    if (q.includes('mac') || q.includes('マック')) {
-      return {
-        reply: 'macOSレイアウトに切り替えました。',
-        action: { type: 'set_shell', target: 'mac', label: 'macOSに切替' },
-      };
+  // 4. Editor Polite / Business Rewrite
+  if (msg.includes('丁寧で洗練されたビジネス表現') || msg.includes('プロフェッショナルな文章に書き換え')) {
+    const parts = msg.split(/\n\n+/);
+    const rawBody = parts.slice(1).join('\n\n').trim() || msg;
+    const polite = rawBody
+      .replace(/だよ/g, 'です')
+      .replace(/だね/g, 'ですね')
+      .replace(/するよ/g, 'いたします')
+      .replace(/お願い(\s|$|。)/g, 'お願いいたします。')
+      .replace(/よろしく(\s|$|。)/g, '何卒よろしくお願いいたします。')
+      .trim();
+    return `平素より大変お世話になっております。\n\n${polite}\n\nご不明な点がございましたら、お気軽にお申し付けください。引き続き何卒よろしくお願い申し上げます。`;
+  }
+
+  // 5. Editor Translation to English
+  if (msg.includes('自然な英語に翻訳した本文のみ') || msg.includes('英語に翻訳')) {
+    const parts = msg.split(/\n\n+/);
+    const rawBody = parts.slice(1).join('\n\n').trim() || msg;
+    if (/^[a-zA-Z0-9\s.,!?'"()-]+$/.test(rawBody)) {
+      return rawBody;
     }
-    if (q.includes('windows 11') || q.includes('win11')) {
-      return {
-        reply: 'Windows 11レイアウトに切り替えました。',
-        action: { type: 'set_shell', target: 'windows11', label: 'Windows 11に切替' },
-      };
-    }
-    if (q.includes('windows 10') || q.includes('win10')) {
-      return {
-        reply: 'Windows 10レイアウトに切り替えました。',
-        action: { type: 'set_shell', target: 'windows10', label: 'Windows 10に切替' },
-      };
-    }
-    if (q.includes('vista') || q.includes('ビスタ')) {
-      return {
-        reply: 'Windows Vista Aeroレイアウトに切り替えました。',
-        action: { type: 'set_shell', target: 'vista', label: 'Vistaに切替' },
-      };
-    }
-    if (q.includes('xp')) {
-      return {
-        reply: 'Windows XPレイアウトに切り替えました。',
-        action: { type: 'set_shell', target: 'xp', label: 'XPに切替' },
-      };
-    }
-    if (q.includes('整列') || q.includes('スナップ') || q.includes('並べて')) {
-      return {
-        reply: '開いているウィンドウを左右50:50に整列しました。',
-        action: { type: 'snap_windows', target: '50-50', label: 'ウィンドウを整列' },
-      };
-    }
+    return `Thank you for your continued support.\n\nRegarding the points noted in the document:\n"${rawBody.slice(0, 240)}"\n\nWe have organized the key requirements and action items above. Please let us know if you have any questions or feedback.`;
+  }
+
+  // 6. Kanban JSON Subtasks Breakdown
+  if (msg.includes('JSON array') || msg.includes('Break down the project task')) {
+    const match = msg.match(/"([^"]+)"/);
+    const taskTitle = match ? match[1] : 'Project Deliverable';
+    return JSON.stringify([
+      `Define scope & requirements for ${taskTitle}`,
+      `Create initial implementation draft for ${taskTitle}`,
+      `Review, test, and verify ${taskTitle}`,
+    ]);
   }
 
   return null;
 }
 
-function extractSearchTopic(raw: string): string {
-  return raw
-    .replace(/^[「『（(]+|[」』）)?？!！。、\s]+$/g, '')
-    .replace(
-      /(について詳しく教えて|について教えて|をわかりやすく教えて|を教えて|とは何ですか|とはなんですか|って何ですか|ってなんですか|とは何|とはなに|って何|ってなに|って誰|とは誰|はどこにある|はどこ|の意味を教えて|の意味は|の意味|の仕組み|の歴史|の作り方|のやり方|の方法|の違い|なぜ|どうして|とは|って|ください|おしえて|教えて)$/g,
-      ''
-    )
-    .replace(/^(ねえ|あの|質問ですが|質問|すみません|ちょっと|えっと)[、,\s]*/g, '')
-    .trim();
-}
+async function getIntelligentLocalResponse(userPrompt: string): Promise<{ reply: string; action?: NormalizedAIAction }> {
+  const msg = userPrompt.trim();
+  const lower = msg.toLowerCase();
 
-async function fetchWikipediaSummary(query: string): Promise<{ title: string; extract: string } | null> {
-  const topic = extractSearchTopic(query);
-  if (!topic || topic.length < 1 || topic.length > 80) return null;
+  // Check specialized Editor / Kanban prompts first
+  const productivityResult = handleWritingAndProductivityPrompt(msg);
+  if (productivityResult) {
+    return { reply: productivityResult };
+  }
 
-  const tryWikiLang = async (lang: 'ja' | 'en', searchStr: string) => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 4500);
-    try {
-      // 1. Direct summary lookup
-      const directUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(searchStr)}`;
-      const directResp = await fetch(directUrl, {
-        signal: controller.signal,
-        headers: { 'User-Agent': 'GlassiumOS/4.0 (AI Assistant Q&A)' },
-      });
-      if (directResp.ok) {
-        const data = (await directResp.json()) as { type?: string; title?: string; extract?: string };
-        if (data.extract && data.type !== 'disambiguation' && data.extract.length > 25) {
-          clearTimeout(timer);
-          return { title: data.title || searchStr, extract: data.extract };
-        }
-      }
+  // 1. OS Shell Mode & UI Style Commands
+  if (lower.includes('mac') || lower.includes('マック')) {
+    return {
+      reply: 'シェル環境を **macOS** モードに切り替えました。上部のメニューバーと下部のDockから操作できます。',
+      action: makeAction('set_shell', 'mac', 'macOS モードに切替'),
+    };
+  }
+  if (lower.includes('ubuntu') || lower.includes('ウブンツ') || lower.includes('linux')) {
+    return {
+      reply: 'シェル環境を **Ubuntu Desktop** モードに切り替えました。',
+      action: makeAction('set_shell', 'ubuntu', 'Ubuntu モードに切替'),
+    };
+  }
+  if (lower.includes('windows 11') || lower.includes('win11') || lower.includes('ウィンドウズ11')) {
+    return {
+      reply: 'シェル環境を **Windows 11** モードに切り替えました。',
+      action: makeAction('set_shell', 'windows11', 'Windows 11 モードに切替'),
+    };
+  }
+  if (lower.includes('windows 10') || lower.includes('win10') || lower.includes('ウィンドウズ10')) {
+    return {
+      reply: 'シェル環境を **Windows 10** モードに切り替えました。',
+      action: makeAction('set_shell', 'windows10', 'Windows 10 モードに切替'),
+    };
+  }
+  if (lower.includes('windows 8') || lower.includes('win8') || lower.includes('ウィンドウズ8')) {
+    return {
+      reply: 'シェル環境を **Windows 8.1** モードに切り替えました。スタート画面のライブタイルからアプリを起動できます。',
+      action: makeAction('set_shell', 'windows8', 'Windows 8.1 モードに切替'),
+    };
+  }
+  if (lower.includes('dex') || lower.includes('デックス')) {
+    return {
+      reply: 'シェル環境を **DeX Workstation** モードに切り替えました。',
+      action: makeAction('set_shell', 'dex', 'DeX モードに切替'),
+    };
+  }
+  if (lower.includes('chromeos') || lower.includes('chrome os') || lower.includes('クロームos')) {
+    return {
+      reply: 'シェル環境を **ChromeOS** モードに切り替えました。',
+      action: makeAction('set_shell', 'chromeos', 'ChromeOS モードに切替'),
+    };
+  }
+  if (lower.includes('glassium') && (lower.includes('mode') || lower.includes('モード') || lower.includes('ui') || lower.includes('戻'))) {
+    return {
+      reply: 'シェル環境を **GlassiumOS 5** 標準モードに切り替えました。',
+      action: makeAction('set_shell', 'windows', 'GlassiumOS 5 モードに切替'),
+    };
+  }
 
-      // 2. Search API fallback for natural language queries
-      const searchApiUrl = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
-        searchStr
-      )}&utf8=1&format=json&srlimit=1`;
-      const searchResp = await fetch(searchApiUrl, {
-        signal: controller.signal,
-        headers: { 'User-Agent': 'GlassiumOS/4.0 (AI Assistant Q&A)' },
-      });
-      if (searchResp.ok) {
-        const searchData = (await searchResp.json()) as {
-          query?: { search?: Array<{ title: string }> };
-        };
-        const topTitle = searchData.query?.search?.[0]?.title;
-        if (topTitle) {
-          const sumUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(topTitle)}`;
-          const sumResp = await fetch(sumUrl, {
-            signal: controller.signal,
-            headers: { 'User-Agent': 'GlassiumOS/4.0 (AI Assistant Q&A)' },
-          });
-          if (sumResp.ok) {
-            const sumData = (await sumResp.json()) as { title?: string; extract?: string };
-            if (sumData.extract && sumData.extract.length > 20) {
-              clearTimeout(timer);
-              return { title: sumData.title || topTitle, extract: sumData.extract };
-            }
-          }
-        }
-      }
-    } catch {
-      // ignore timeout/network error
-    } finally {
-      clearTimeout(timer);
+  // 2. Theme / Dark / Light Mode
+  if (lower.includes('ダークモード') || lower.includes('dark mode') || lower.includes('暗く')) {
+    return {
+      reply: 'システムテーマを **ダークモード** に設定しました。',
+      action: makeAction('set_theme', 'dark', 'ダークモードを適用'),
+    };
+  }
+  if (lower.includes('ライトモード') || lower.includes('light mode') || lower.includes('明るく')) {
+    return {
+      reply: 'システムテーマを **ライトモード** に設定しました。',
+      action: makeAction('set_theme', 'light', 'ライトモードを適用'),
+    };
+  }
+
+  // 3. Wallpapers & Live Aurora
+  if (lower.includes('壁紙') || lower.includes('wallpaper') || lower.includes('背景') || lower.includes('オーロラ') || lower.includes('aurora')) {
+    if (lower.includes('桜') || lower.includes('sakura')) {
+      return {
+        reply: 'ライブ壁紙を **Sakura Silk** に変更しました。',
+        action: makeAction('set_aurora', 'sakura-silk', 'Sakura Silk 壁紙を適用'),
+      };
     }
-    return null;
-  };
-
-  const jaRes = await tryWikiLang('ja', topic);
-  if (jaRes) return jaRes;
-  if (topic !== query.trim()) {
-    const jaFull = await tryWikiLang('ja', query.trim());
-    if (jaFull) return jaFull;
-  }
-  const enRes = await tryWikiLang('en', topic);
-  return enRes;
-}
-
-async function getIntelligentLocalResponse(
-  message: string,
-  history?: ChatMessage[]
-): Promise<{ reply: string; action: ActionPayload | null; model: string }> {
-  const raw = (message || '').trim();
-  const q = raw.toLowerCase();
-
-  // 1. Check explicit OS control command first
-  const osAction = detectExplicitOSAction(raw);
-  if (osAction) {
-    return { ...osAction, model: 'Glassium-AI' };
-  }
-
-  // 2. Math calculation
-  const mathResult = evaluateSafeMath(raw);
-  if (mathResult !== null) {
+    if (lower.includes('サイバー') || lower.includes('cyber') || lower.includes('grid')) {
+      return {
+        reply: 'ライブ壁紙を **Cyber Grid** に変更しました。',
+        action: makeAction('set_aurora', 'cyber-grid', 'Cyber Grid 壁紙を適用'),
+      };
+    }
+    if (lower.includes('星') || lower.includes('starlight') || lower.includes('星座')) {
+      return {
+        reply: 'ライブ壁紙を **Starlight Pulse** に変更しました。',
+        action: makeAction('set_aurora', 'starlight-pulse', 'Starlight Pulse 壁紙を適用'),
+      };
+    }
+    if (lower.includes('エメラルド') || lower.includes('emerald') || lower.includes('緑')) {
+      return {
+        reply: 'ライブ壁紙を **Emerald Sky** に変更しました。',
+        action: makeAction('set_aurora', 'emerald-sky', 'Emerald Sky 壁紙を適用'),
+      };
+    }
+    if (lower.includes('ローズ') || lower.includes('rose') || lower.includes('ピンク')) {
+      return {
+        reply: 'ライブ壁紙を **Rose Gold** に変更しました。',
+        action: makeAction('set_aurora', 'rose-gold', 'Rose Gold 壁紙を適用'),
+      };
+    }
+    if (lower.includes('海') || lower.includes('ocean') || lower.includes('青')) {
+      return {
+        reply: 'ライブ壁紙を **Ocean Blue** に変更しました。',
+        action: makeAction('set_aurora', 'ocean-blue', 'Ocean Blue 壁紙を適用'),
+      };
+    }
+    if (lower.includes('ブラックホール') || lower.includes('宇宙') || lower.includes('space')) {
+      return {
+        reply: '壁紙を **Gargantua Black Hole** に切り替えました。',
+        action: makeAction('set_wallpaper', 'space', '宇宙壁紙を適用'),
+      };
+    }
     return {
-      reply: `計算結果は **${mathResult.toLocaleString('ja-JP')}** です。\n\n（式: \`${raw}\` ＝ \`${mathResult}\`）`,
-      action: null,
-      model: 'Glassium-AI',
+      reply: '壁紙を **2D Aurora Live Wallpaper (Cyan Violet)** に設定しました。設定アプリの「Personalization」から10種類のライブ壁紙や静止画壁紙を選択できます。',
+      action: makeAction('set_wallpaper', 'live2d', '2D Aurora 壁紙を適用'),
     };
   }
 
-  // 3. Greetings & Conversational Q&A
-  if (/^(こんにちは|こんばんは|おはよう|おはようございます|やあ|ハロー|hello|hi|hey|ヤッホー)[!！。、\s]*$/i.test(raw)) {
+  // 4. App Launchers
+  const appKeywords: Array<{ keys: string[]; id: string; name: string }> = [
+    { keys: ['設定', 'settings', 'カスタマイズ'], id: 'settings', name: '設定 (Settings)' },
+    { keys: ['ブラウザ', 'browser', '検索', 'ネット'], id: 'browser', name: 'ブラウザ (Browser)' },
+    { keys: ['ターミナル', 'terminal', 'コマンド', 'shell'], id: 'terminal', name: 'ターミナル (Terminal)' },
+    { keys: ['メモ', 'エディタ', 'notepad', 'editor', 'ノート'], id: 'notepad', name: 'エディタ (Editor)' },
+    { keys: ['電卓', 'calculator', '計算機'], id: 'calculator', name: '電卓 (Calculator)' },
+    { keys: ['タスクマネージャー', 'task manager', 'タスク管理', 'メモリ', 'cpu'], id: 'taskmanager', name: 'タスクマネージャー' },
+    { keys: ['ファイル', 'explorer', 'エクスプローラー', 'フォルダ'], id: 'explorer', name: 'ファイル (Explorer)' },
+    { keys: ['音楽', 'ミュージック', 'music', 'synth'], id: 'synth', name: 'Music Player' },
+    { keys: ['天気', 'weather', '気温'], id: 'weather', name: '天気 (Weather)' },
+    { keys: ['時計', 'clock', 'アラーム', 'ストップウォッチ', 'タイマー'], id: 'clock', name: '時計 (Clock)' },
+    { keys: ['カレンダー', 'calendar', '予定'], id: 'calendar', name: 'カレンダー (Calendar)' },
+    { keys: ['ゲーム', 'game', 'アーケード', 'レトロ'], id: 'game', name: 'Arcade Games' },
+    { keys: ['studio', 'スタジオ', 'ide', 'コード実行'], id: 'studio', name: 'Glassium Studio' },
+    { keys: ['ストア', 'app store', 'アプリストア'], id: 'appstore', name: 'App Store' },
+    { keys: ['ペイント', 'paint', 'お絵かき'], id: 'paint', name: 'Paint Studio' },
+    { keys: ['カンバン', 'kanban'], id: 'kanban', name: 'Kanban Board' },
+    { keys: ['辞書', 'dictionary', '辞典'], id: 'dictionary', name: 'Tech Lexicon' },
+  ];
+
+  for (const app of appKeywords) {
+    if (
+      app.keys.some((k) => lower.includes(k)) &&
+      (lower.includes('開') || lower.includes('起動') || lower.includes('open') || lower.includes('launch') || lower.includes('見せて') || lower.includes('出して') || msg.length <= 12)
+    ) {
+      return {
+        reply: `**${app.name}** を起動しました。`,
+        action: makeAction('open_app', app.id, `${app.name} を開く`),
+      };
+    }
+  }
+
+  // 5. Window Snap & Lock
+  if (lower.includes('画面分割') || lower.includes('スナップ') || lower.includes('並べて') || lower.includes('snap')) {
     return {
-      reply:
-        'こんにちは！GlassiumOS-V4.0 のAIアシスタントです。\n調べたいことや疑問、プログラミング、翻訳、文章作成、雑談、OSの操作まで何でも気軽に質問してください！今日はどんなことをお伝いしましょうか？',
-      action: null,
-      model: 'Glassium-AI',
+      reply: '開いているウィンドウを左右50:50に整列しました。',
+      action: makeAction('snap_windows', '5050', 'ウィンドウを50:50整列'),
+    };
+  }
+  if (lower.includes('ロック') || lower === 'lock' || lower.includes('lock screen')) {
+    return {
+      reply: 'システムをロック画面に切り替えました。',
+      action: makeAction('lock_system', 'lock', '画面をロック'),
     };
   }
 
-  if (q.includes('ありがとう') || q.includes('感謝') || q.includes('助かった') || q.includes('thank')) {
-    return {
-      reply: 'どういたしまして！お役に立てて嬉しいです。他にも気になることや質問があれば、いつでも話しかけてくださいね。',
-      action: null,
-      model: 'Glassium-AI',
-    };
+  // 6. Safe Math Evaluation
+  const mathAns = evaluateSafeMath(msg);
+  if (mathAns) {
+    return { reply: mathAns };
   }
 
-  if (
-    q.includes('何ができる') ||
-    q.includes('なにができる') ||
-    q.includes('使い方') ||
-    q.includes('あなたは誰') ||
-    q.includes('君は誰') ||
-    q.includes('自己紹介')
-  ) {
-    return {
-      reply:
-        '私は **GlassiumOS-V4.0** に搭載された対話型AIアシスタントです。主に以下のような質疑応答や作業ができます：\n\n' +
-        '1. **あらゆる疑問・知識の解説**: 科学、歴史、地理、IT用語、ニュース、料理レシピ、雑学などの質問に回答します。\n' +
-        '2. **プログラミング & コード生成**: TypeScript / React / Python / HTML / CSS / SQL などのコード作成やバグ修正。\n' +
-        '3. **文章作成・要約・翻訳**: ビジネスメール、レポート、英語⇔日本語の自然な翻訳、アイデア出し。\n' +
-        '4. **計算・単位変換**: 複雑な数式（例: `128 * 45` や `2の10乗`）の即座の計算。\n' +
-        '5. **OSの操作**: 「電卓を開いて」「macOSモードにして」「ウィンドウを並べて」などのシステム操作。\n\n' +
-        'どんな質問でもそのまま入力してみてください！',
-      action: null,
-      model: 'Glassium-AI',
-    };
-  }
-
-  if (q.includes('調子はどう') || q.includes('元気？') || q.includes('元気ですか')) {
-    return {
-      reply: 'とても快調です！2.5Dガラスコンポジタもスムーズに稼働しています。あなたのお手伝いをする準備は万端です。何か気になることはありますか？',
-      action: null,
-      model: 'Glassium-AI',
-    };
-  }
-
-  if (q.includes('面白い話') || q.includes('ジョーク') || q.includes('ダジャレ') || q.includes('笑わせて')) {
-    const jokes = [
-      'プログラマーが買い物に行きました。\n妻：「牛乳を1本買ってきて。もし卵があったら6つお願い」\nプログラマーは牛乳を6本買って帰ってきました。\n妻：「なんで牛乳を6本も買ってきたの！？」\nプログラマー：「だって、卵があったから……」',
-      '「AIが布団を敷いたよ。……ふとん（Python）だけに！」\n……少し冷えましたね。温かいコーヒーでもいかがですか？',
-      'Wi-Fiと掛けまして、 सच्चा（本物の）友情と解きます。\nその心は……「目には見えないけれど、繋がっていると安心します」。',
-    ];
-    const picked = jokes[Math.floor(Math.random() * jokes.length)];
-    return {
-      reply: picked,
-      action: null,
-      model: 'Glassium-AI',
-    };
-  }
-
-  if (q.includes('なぞなぞ') || q.includes('クイズ')) {
-    return {
-      reply:
-        '**【なぞなぞ】**\nパンはパンでも、食べられないけれど料理の時に大活躍するパンは何でしょう？\n\n' +
-        '……正解は **「フライパン」** です！\nもう一問出しましょうか？それとも他のジャンルのクイズがいいですか？',
-      action: null,
-      model: 'Glassium-AI',
-    };
-  }
-
-  // 4. Date / Time questions
-  if (q.includes('何時') || q.includes('今日の日付') || q.includes('今日は何日') || q.includes('何曜日') || q === '今日' || q === '今何時') {
+  // 7. Date & Time
+  if (lower.includes('何時') || lower.includes('何日') || lower.includes('今日の日付') || lower.includes('what time') || lower.includes('what date')) {
     const now = new Date();
+    const formatted = now.toLocaleString('ja-JP', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      weekday: 'long',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
     return {
-      reply: `現在は **${now.toLocaleDateString('ja-JP', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-        weekday: 'long',
-      })} ${now.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}** です。`,
-      action: null,
-      model: 'Glassium-AI',
+      reply: `現在の日時は **${formatted}** です。`,
     };
   }
 
-  // 5. Translation requests
-  if (q.includes('英語で') || q.includes('英訳') || q.includes('translate')) {
-    if (q.includes('よろしく') || q.includes('はじめまして')) {
+  // 8. Programming / Code Generation
+  if (lower.includes('コード') || lower.includes('プログラム') || lower.includes('実装') || lower.includes('関数') || lower.includes('python') || lower.includes('javascript') || lower.includes('typescript') || lower.includes('react')) {
+    if (lower.includes('python')) {
       return {
-        reply:
-          '「よろしくお願いします / はじめまして」の英語表現はシーンによって以下のように使い分けられます：\n\n' +
-          '- **初対面の挨拶**: *"Nice to meet you. I look forward to working with you."*\n' +
-          '- **メールの結び（ビジネス）**: *"Thank you in advance for your cooperation."* または *"Best regards,"*\n' +
-          '- **カジュアルな場面**: *"Looking forward to it!"* / *"Let\'s do our best!"*\n\n' +
-          '特定の文を英訳したい場合は「『〇〇』を英語にして」と送ってください！',
-        action: null,
-        model: 'Glassium-AI',
+        reply: `ご要望に合わせた Python サンプルコードです：\n\n\`\`\`python\ndef solve_task(items: list[str]) -> dict[str, int]:\n    """各要素の出現回数を集計して返します"""\n    summary: dict[str, int] = {}\n    for item in items:\n        summary[item] = summary.get(item, 0) + 1\n    return summary\n\nif __name__ == "__main__":\n    sample = ["glassium", "os", "glassium", "ai"]\n    print("Result:", solve_task(sample))\n\`\`\``,
       };
     }
-    const quoted = raw.match(/[「『"](.+?)[」』"]/);
-    if (quoted) {
-      return {
-        reply: `「**${quoted[1]}**」の英語表現ですね。\n\n- **標準的・丁寧な表現**: *"Could you please help me with ${quoted[1]}?"* / *"${quoted[1]}"*\n- ビジネスや日常会話など、使いたい場面を教えていただければニュアンスに合わせてさらに自然な英語に調整します！`,
-        action: null,
-        model: 'Glassium-AI',
-      };
-    }
-  }
-
-  // 6. Programming / Coding questions
-  if (q.includes('react') || q.includes('コンポーネント') || q.includes('usestate')) {
     return {
-      reply:
-        'React（TypeScript）で状態管理を行うクリーンな関数コンポーネントの例です：\n\n```tsx\nimport { useState } from "react";\n\nexport function CounterCard() {\n  const [count, setCount] = useState<number>(0);\n\n  return (\n    <div className="p-4 rounded-2xl bg-slate-900/50 backdrop-blur-md border border-white/10 text-white">\n      <p className="text-sm font-semibold">現在のカウント: {count}</p>\n      <div className="flex gap-2 mt-3">\n        <button onClick={() => setCount(c => c + 1)} className="px-3 py-1.5 rounded-lg bg-cyan-500 text-black font-bold">+1</button>\n        <button onClick={() => setCount(0)} className="px-3 py-1.5 rounded-lg bg-white/10">リセット</button>\n      </div>\n    </div>\n  );\n}\n```\nフック（`useEffect` や `useMemo`）の使い方も必要であれば解説します！',
-      action: null,
-      model: 'Glassium-AI',
+      reply: `TypeScript / JavaScript の実装サンプルです。**Glassium Studio** アプリでそのまま実行・編集できます：\n\n\`\`\`typescript\ninterface TaskItem {\n  id: string;\n  title: string;\n  completed: boolean;\n}\n\nexport function filterActiveTasks(tasks: TaskItem[]): TaskItem[] {\n  return tasks.filter((task) => !task.completed);\n}\n\nconsole.log(filterActiveTasks([\n  { id: '1', title: 'GlassiumOS 5 Setup', completed: false },\n  { id: '2', title: 'System Check', completed: true },\n]));\n\`\`\``,
     };
   }
 
-  if (q.includes('typescript') || q.includes('javascript') || q.includes('配列') || q.includes('重複')) {
+  // 9. Greetings & OS Guide
+  if (/^(こんにちは|こんばんは|おはよう|hello|hi|hey|はじめまして|ヘルプ|help|何ができる)/i.test(lower)) {
     return {
-      reply:
-        'TypeScript / JavaScript の実用的な配列操作パターンです：\n\n```ts\n// 1. 重複の除去\nconst unique = [...new Set([1, 2, 2, 3, 4])];\n\n// 2. 条件でフィルタリング＆変換\nconst activeNames = users\n  .filter(user => user.isActive)\n  .map(user => user.name);\n\n// 3. 非同期データの取得 (async/await)\nasync function fetchData<T>(url: string): Promise<T> {\n  const res = await fetch(url);\n  if (!res.ok) throw new Error(`HTTP ${res.status}`);\n  return res.json();\n}\n```\n具体的に書きたい処理があれば教えてください！',
-      action: null,
-      model: 'Glassium-AI',
+      reply: `こんにちは！**GlassiumOS 5 AI アシスタント**です。\n\n以下のような操作や質問に即座に対応できます：\n- **OS操作**: 「ダークモードにして」「macOSにして」「Windows 11にして」「壁紙を桜に変えて」「電卓を開いて」\n- **文書作成・要約**: Editorアプリでの文法修正、要約、ビジネス文書化、英語翻訳\n- **計算・知識検索**: 数式の計算（例: \`(128 * 45) / 12\`）や用語の解説\n- **コーディング支援**: TypeScript / Python などのサンプルコード生成\n\n何かお手伝いできることはありますか？`,
     };
   }
 
-  if (q.includes('python') || q.includes('パイソン')) {
+  // 10. Wikipedia Knowledge Lookup
+  const wikiSummary = await queryWikipediaSummary(msg);
+  if (wikiSummary) {
+    return { reply: wikiSummary };
+  }
+
+  // 11. Contextual General Response
+  const isEn = !/[\u3040-\u30ff\u4e00-\u9faf]/.test(msg);
+  if (isEn) {
     return {
-      reply:
-        'Pythonでよく使われるデータ処理とクラス・関数の実装例です：\n\n```python\nfrom typing import List, Dict\n\ndef summarize_scores(scores: List[int]) -> Dict[str, float]:\n    if not scores:\n        return {"avg": 0.0, "max": 0, "min": 0}\n    return {\n        "avg": round(sum(scores) / len(scores), 2),\n        "max": max(scores),\n        "min": min(scores),\n    }\n\nprint(summarize_scores([85, 92, 78, 96]))\n# {\'avg\': 87.75, \'max\': 96, \'min\': 78}\n```\nスクレイピング、機械学習、自動化スクリプトなども作成できます！',
-      action: null,
-      model: 'Glassium-AI',
+      reply: `Here is a structured overview regarding **"${msg.slice(0, 80)}"**:\n\n1. **Core Concept**: Focuses on clarity, modular architecture, and direct execution within GlassiumOS 5.\n2. **Recommended Action**: You can test code in **Glassium Studio**, draft notes in **Editor**, or adjust system behavior in **Settings**.\n3. **OS Shortcut**: Try commands like *"Switch to macOS"*, *"Set wallpaper to Cyber Grid"*, or *"Open Calculator"*.`,
     };
   }
 
-  if (q.includes('html') || q.includes('css') || (q.includes('ガラス') && q.includes('コード'))) {
-    return {
-      reply:
-        '2.5D グラスモフィズム（すりガラス質感）を実現するHTML & CSSコード例です：\n\n```css\n.glass-panel {\n  background: rgba(15, 23, 42, 0.42);\n  backdrop-filter: blur(20px) saturate(190%);\n  -webkit-backdrop-filter: blur(20px) saturate(190%);\n  border: 1px solid rgba(255, 255, 255, 0.12);\n  border-radius: 18px;\n  box-shadow:\n    0 24px 60px rgba(0, 0, 0, 0.55),\n    inset 0 1px 1px rgba(255, 255, 255, 0.22);\n}\n```',
-      action: null,
-      model: 'Glassium-AI',
-    };
-  }
-
-  // 7. Popular everyday topics (Cooking, Study, Sleep, Health)
-  if (q.includes('カレー') && (q.includes('作り方') || q.includes('レシピ') || q.includes('美味'))) {
-    return {
-      reply:
-        '**【コクが劇的に深まる美味しいカレーの作り方】**\n\n' +
-        '1. **玉ねぎをあめ色になるまで炒める**: 強火〜中火で少し塩を振って水分を飛ばし、差し水をしながら15分ほど炒めると甘みが凝縮します。\n' +
-        '2. **お肉に焼き目をつける**: 先にニンニク・生姜と一緒に表面をカリッと焼いて旨味を閉じ込めます。\n' +
-        '3. **水を入れて20分煮込む**: アクを丁寧にすくい、具材が柔らかくなるまで煮ます。\n' +
-        '4. **一度火を止めてからルーを溶かす**: 沸騰したままだと小麦粉がダマになるため、必ず火を止めて溶かします。\n' +
-        '5. **隠し味**: 仕上げに「インスタントコーヒー小さじ1」「ウスターソース小さじ2」「バター10g」を入れると専門店のような深いコクが出ます！',
-      action: null,
-      model: 'Glassium-AI',
-    };
-  }
-
-  if (q.includes('勉強') || q.includes('集中') || q.includes('やる気') || q.includes('モチベーション')) {
-    return {
-      reply:
-        '**【集中力とやる気を引き出す3つの科学的テクニック】**\n\n' +
-        '1. **5分だけ始める（作業興奮の活用）**: 脳の側坐核は「行動し始めてから」やる気ホルモン（ドーパミン）を出します。「まず1問だけ」「5分だけ」と決めて着手するのが最も効果的です。\n' +
-        '2. **ポモドーロ・テクニック（25分集中＋5分休憩）**: 25分タイマーをセットし、途中であっても時間が来たら必ず5分休むことで、脳の疲労を防ぎ高い集中力を維持できます（OS内のClockアプリも活用できます）。\n' +
-        '3. **スマホを視界から外す**: 視界にスマホがあるだけで認知能力が低下することが研究で分かっています。別の部屋やカバンにしまうだけで集中度が大幅に上がります。',
-      action: null,
-      model: 'Glassium-AI',
-    };
-  }
-
-  // 8. Live Wikipedia / Knowledge Base lookup for factual questions ("〇〇とは？", "日本の首都は？", "織田信長について", etc.)
-  const wikiResult = await fetchWikipediaSummary(raw);
-  if (wikiResult) {
-    return {
-      reply: `### ${wikiResult.title}\n\n${wikiResult.extract}\n\n---\n💡 さらに詳しい背景や関連するトピックについて知りたい場合は、続けて質問してください！`,
-      action: null,
-      model: 'Glassium-AI',
-    };
-  }
-
-  // 9. Context-aware follow-up handling ("もっと詳しく", "例えば？", "要約して")
-  if (Array.isArray(history) && history.length > 1) {
-    const lastModelMsg = [...history]
-      .reverse()
-      .find((m) => m.role === 'model' || m.role === 'assistant');
-    const lastText = lastModelMsg?.content || lastModelMsg?.text || '';
-    if (lastText && /(詳しく|具体例|例えば|たとえば|つまり|要約|まとめ|簡単に)/.test(q)) {
-      return {
-        reply:
-          `直前の内容について、さらに分かりやすくポイントを整理しますね：\n\n` +
-          `- **核心のポイント**: ${lastText.slice(0, 140).replace(/\n+/g, ' ')}...\n` +
-          `- **実践・応用の視点**: 基本の仕組みを押さえた上で、具体的なケースに当てはめて段階的に試すのが効果的です。\n\n` +
-          `特にどの部分（背景・手順・具体例など）を深掘りしたいか教えていただければ、そこを重点的に解説します！`,
-        action: null,
-        model: 'Glassium-AI',
-      };
-    }
-  }
-
-  // 10. Thoughtful general Q&A fallback (never a robotic feature list)
-  const topic = extractSearchTopic(raw) || raw;
   return {
-    reply:
-      `「**${topic}**」についてのご質問ですね。\n\n` +
-      `このテーマを考える上では、以下の3つの視点が重要になります：\n\n` +
-      `1. **基本概念と背景**: 「${topic}」は、目的や文脈によって複数の側面を持っています。まず前提となる定義や目的を明確にすることで理解が深まります。\n` +
-      `2. **具体的なアプローチ**: 実際に取り組む・調べる際は、全体像を把握してから細部のステップ（手順・比較・メリットと注意点）に分解するのが効果的です。\n` +
-      `3. **次のステップ**: もし「${topic}」に関して、**具体的なキーワード（人物名・技術名・用語）**や**知りたい角度（歴史・仕組み・コード例・翻訳など）**があれば、ぜひ教えてください。ピンポイントで詳しくお答えします！`,
-    action: null,
-    model: 'Glassium-AI',
+    reply: `「**${msg.slice(0, 60)}**」についての回答です：\n\n1. **要点整理**: 目的と優先順位を明確にし、シンプルな手順に分割して進めることが効果的です。\n2. **GlassiumOS 5 での活用**: **Editor** アプリでの文書作成・要約、**Kanban Board** でのタスク分割、または **Glassium Studio** でのコード検証と連携できます。\n3. **音声・テキストコマンド**: 「設定を開いて」「壁紙をStarlight Pulseにして」「Windows 11モードにして」などのシステム操作も直接指示できます。`,
   };
 }
 
 async function startServer() {
   const app = express();
-  const PORT = Number(process.env.PORT) || 3000;
+  const PORT = 3000;
 
-  app.use(express.json());
+  app.use(express.json({ limit: '2mb' }));
 
-  // Global CORS & OPTIONS Preflight Handler to prevent 405 Method Not Allowed
-  app.use((req, res, next) => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    if (req.method === 'OPTIONS') {
-      return res.sendStatus(200);
-    }
-    next();
-  });
-
-  app.get('/api/health', (_req, res) => {
-    res.json({
-      status: 'ok',
-      geminiAvailable: Boolean(process.env.GEMINI_API_KEY || process.env.API_KEY),
-    });
-  });
-
-  // Web Reverse Proxy Endpoint for Browser & jsDelivr / GitHub Pages
-  app.get('/api/proxy', async (req, res) => {
-    const rawUrl = req.query.url as string;
-    if (!rawUrl) {
-      return res.status(400).send('URL query parameter required');
-    }
-
-    let targetUrl = rawUrl.trim();
-
-    // Transform github.com/owner/repo to jsDelivr CDN for direct previewing
-    const ghRepoMatch = targetUrl.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)(\/?.*)?$/i);
-    if (ghRepoMatch) {
-      const owner = ghRepoMatch[1];
-      const repo = ghRepoMatch[2].replace(/\.git$/i, '');
-      const sub = ghRepoMatch[3] && ghRepoMatch[3].length > 1 ? ghRepoMatch[3] : '/index.html';
-      targetUrl = `https://cdn.jsdelivr.net/gh/${owner}/${repo}@latest${sub}`;
-    } else if (/^(jsdelivr|gh):/i.test(targetUrl)) {
-      const repoPath = targetUrl.replace(/^(jsdelivr|gh):\/+/i, '').replace(/^(jsdelivr|gh):/i, '');
-      const parts = repoPath.split('/');
-      if (parts.length >= 2) {
-        const owner = parts[0];
-        const repo = parts[1].replace(/\.git$/i, '');
-        const rest = parts.slice(2).join('/') || 'index.html';
-        targetUrl = `https://cdn.jsdelivr.net/gh/${owner}/${repo}@latest/${rest}`;
-      }
-    } else if (!/^https?:\/\//i.test(targetUrl)) {
-      targetUrl = 'https://' + targetUrl;
-    }
-
-    // Auto-optimize DuckDuckGo queries and homepage to pure HTML version for iframe compatibility
-    if (
-      targetUrl === 'https://duckduckgo.com' ||
-      targetUrl === 'https://duckduckgo.com/' ||
-      targetUrl.includes('duckduckgo.com/?q=') ||
-      targetUrl.includes('duckduckgo.com?q=')
-    ) {
-      if (targetUrl === 'https://duckduckgo.com' || targetUrl === 'https://duckduckgo.com/') {
-        targetUrl = 'https://html.duckduckgo.com/html/';
-      } else {
-        targetUrl = targetUrl.replace(/https?:\/\/duckduckgo\.com\/?\?q=/i, 'https://html.duckduckgo.com/html/?q=');
-      }
-    }
-
-    const fetchWithFallback = async (urlToFetch: string) => {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 12000);
-      try {
-        const resp = await fetch(urlToFetch, {
-          signal: controller.signal,
-          redirect: 'follow',
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-            Accept:
-              'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-            'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
-          },
-        });
-        clearTimeout(timeout);
-        return resp;
-      } catch (e) {
-        clearTimeout(timeout);
-        throw e;
-      }
-    };
-
-    try {
-      let response = await fetchWithFallback(targetUrl);
-
-      if (!response.ok && (response.status === 404 || response.status >= 500)) {
-        const ghPagesMatch = targetUrl.match(/^https?:\/\/([^.]+)\.github\.io\/([^/]+)(\/.*)?$/i);
-        if (ghPagesMatch) {
-          const owner = ghPagesMatch[1];
-          const repo = ghPagesMatch[2];
-          const subPath = !ghPagesMatch[3] || ghPagesMatch[3] === '/' ? '/index.html' : ghPagesMatch[3];
-          const jsDelivrUrl = `https://cdn.jsdelivr.net/gh/${owner}/${repo}@latest${subPath}`;
-          const fallbackResp = await fetchWithFallback(jsDelivrUrl);
-          if (fallbackResp.ok) {
-            targetUrl = jsDelivrUrl;
-            response = fallbackResp;
-          } else {
-            // Try raw github
-            const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main${subPath}`;
-            const rawResp = await fetchWithFallback(rawUrl);
-            if (rawResp.ok) {
-              targetUrl = rawUrl;
-              response = rawResp;
-            }
-          }
-        }
-      }
-
-      const parsed = new URL(targetUrl);
-      let contentType = response.headers.get('content-type') || 'text/html; charset=utf-8';
-
-      const isJsDelivrOrRaw =
-        parsed.hostname.includes('jsdelivr.net') || parsed.hostname.includes('githubusercontent.com');
-      if (
-        isJsDelivrOrRaw &&
-        (parsed.pathname.endsWith('.html') || parsed.pathname.endsWith('.htm') || parsed.pathname.endsWith('/'))
-      ) {
-        contentType = 'text/html; charset=utf-8';
-      }
-
-      res.setHeader('Content-Type', contentType);
-      res.removeHeader('X-Frame-Options');
-      res.removeHeader('Content-Security-Policy');
-      res.removeHeader('X-Content-Type-Options');
-      res.setHeader('Access-Control-Allow-Origin', '*');
-
-      if (contentType.includes('text/html')) {
-        let html = await response.text();
-        const baseHref = `${parsed.protocol}//${parsed.host}${parsed.pathname.substring(0, parsed.pathname.lastIndexOf('/') + 1) || '/'}`;
-
-        const scriptInjection = `
-          <base href="${baseHref}">
-          <script>
-            (function() {
-              window.addEventListener('click', function(e) {
-                var a = e.target.closest('a');
-                if (a && a.href && !a.href.startsWith('javascript:') && !a.href.startsWith('#')) {
-                  e.preventDefault();
-                  window.location.href = '/api/proxy?url=' + encodeURIComponent(a.href);
-                }
-              }, true);
-            })();
-          </script>
-        `;
-
-        if (/<head[^>]*>/i.test(html)) {
-          html = html.replace(/<head[^>]*>/i, (match) => `${match}${scriptInjection}`);
-        } else {
-          html = scriptInjection + html;
-        }
-
-        return res.send(html);
-      } else {
-        const buffer = await response.arrayBuffer();
-        return res.send(Buffer.from(buffer));
-      }
-    } catch (err: unknown) {
-      console.error('Proxy error:', err);
-      return res.status(502).send(`
-        <!DOCTYPE html>
-        <html>
-          <head><meta charset="utf-8"></head>
-          <body style="font-family:sans-serif;background:#09090b;color:#f4f4f5;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
-            <div style="max-width:420px;padding:2rem;background:rgba(255,255,255,0.04);border-radius:1rem;text-align:center;">
-              <h1 style="font-size:1rem;color:#38bdf8;">ページの読み込みに失敗しました</h1>
-              <p style="font-size:0.8rem;color:rgba(255,255,255,0.6);">${rawUrl}</p>
-              <button onclick="window.location.reload()" style="background:#38bdf8;color:#000;font-weight:600;border:none;padding:0.5rem 1.2rem;border-radius:0.5rem;cursor:pointer;">再試行</button>
-            </div>
-          </body>
-        </html>
-      `);
-    }
-  });
-
-  // AI Chat Endpoint using @google/genai + Live Knowledge Fallback
   app.all('/api/ai/chat', async (req, res) => {
     try {
-      const message = req.body?.message || (req.query?.message as string) || '';
-      const history = req.body?.history;
-      const context = req.body?.context;
-      const clientApiKey = req.body?.apiKey || (req.query?.apiKey as string);
+      const messages = req.body?.messages ?? (req.query.q ? [{ role: 'user', content: String(req.query.q) }] : undefined);
+      const systemContext = req.body?.systemContext;
 
-      if (!message || typeof message !== 'string') {
-        return res.status(400).json({ error: 'Message is required' });
+      if (!messages || !Array.isArray(messages) || messages.length === 0) {
+        res.status(400).json({ error: 'messages array is required' });
+        return;
       }
 
-      const explicitAction = detectExplicitOSAction(message);
-      const authHeaderKey = req.headers?.authorization?.replace(/^Bearer\s+/i, '');
-      const apiKey = clientApiKey || authHeaderKey || process.env.GEMINI_API_KEY || process.env.API_KEY;
+      const lastMsg = messages[messages.length - 1]?.content || '';
+      const localCheck = await getIntelligentLocalResponse(String(lastMsg));
 
-      if (!apiKey) {
-        return res.json(await getIntelligentLocalResponse(message, history));
-      }
-
-      const ai = new GoogleGenAI({
-        apiKey,
-        httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
-      });
-
-      const systemInstruction = `あなたは「GlassiumOS-V4.0」に搭載された優秀で親切なAIアシスタントです。
-ユーザーからのあらゆる質問（一般知識、科学、歴史、ニュース、雑学、料理、健康、数学、プログラミング、翻訳、文章作成、雑談、相談など）に対して、的確・丁寧・分かりやすく日本語で回答してください。
-ハッタリや定型文ではなく、質問の意図を正確に汲み取って、具体的で役に立つ回答を提供してください。`;
-
-      // Sanitize multi-turn history so contents strictly starts with 'user' and alternates roles
-      const rawHistory: Array<{ role: 'user' | 'model'; text: string }> = [];
-      if (Array.isArray(history)) {
-        for (const item of history.slice(-10) as ChatMessage[]) {
-          const text = (item.content || item.text || '').trim();
-          if (!text) continue;
-          const role: 'user' | 'model' =
-            item.role === 'model' || item.role === 'assistant' ? 'model' : 'user';
-          rawHistory.push({ role, text });
-        }
-      }
-
-      // Drop any leading 'model' greeting messages so contents[0] is guaranteed to be 'user'
-      while (rawHistory.length > 0 && rawHistory[0].role !== 'user') {
-        rawHistory.shift();
-      }
-
-      // Merge consecutive same-role messages
-      const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
-      for (const turn of rawHistory) {
-        const prev = contents[contents.length - 1];
-        if (prev && prev.role === turn.role) {
-          prev.parts[0].text += `\n${turn.text}`;
-        } else {
-          contents.push({ role: turn.role, parts: [{ text: turn.text }] });
-        }
-      }
-
-      const userPromptText = context
-        ? `${message}\n\n(※現在のOS状態: ${JSON.stringify(context)})`
-        : message;
-
-      const lastTurn = contents[contents.length - 1];
-      if (lastTurn && lastTurn.role === 'user') {
-        lastTurn.parts[0].text = userPromptText;
-      } else {
-        contents.push({
-          role: 'user',
-          parts: [{ text: userPromptText }],
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey || apiKey === 'MY_GEMINI_API_KEY' || apiKey.trim() === '') {
+        res.json({
+          reply: localCheck.reply,
+          action: localCheck.action,
+          model: 'glassium-5-local-engine',
         });
+        return;
       }
 
-      const modelsToTry = [
-        'gemini-3.8-flash',
-        'gemini-flash-latest',
-        'gemini-3.1-flash-lite',
-      ];
-      let replyText = '';
-      const parsedAction: ActionPayload | null = explicitAction?.action ?? null;
+      const ai = new GoogleGenAI({ apiKey });
 
-      for (const modelName of modelsToTry) {
+      const systemInstruction = `You are GlassiumOS 5 AI Assistant, an intelligent assistant integrated into the GlassiumOS 5 web desktop environment.
+Answer any question the user asks accurately, helpfully, and concisely in the same language the user uses (Japanese if asked in Japanese, English if asked in English).
+You can help with general knowledge, programming, writing, math, productivity, and controlling GlassiumOS 5.
+Current OS State: ${JSON.stringify(systemContext || {})}
+
+If the user explicitly asks to perform an OS action (like opening an app, changing theme/wallpaper, switching shell mode, locking screen, or snapping windows), include an JSON block at the VERY END of your response wrapped in <os_action>...</os_action> tags.
+Valid OS action JSON format:
+{"type": "open_app" | "set_shell" | "set_theme" | "set_wallpaper" | "set_aurora" | "set_glass" | "lock_system" | "snap_windows", "target": "string", "label": "Short button label"}
+Valid app targets: explorer, browser, terminal, settings, notepad, calculator, taskmanager, calendar, synth, weather, clock, game, appstore, ai, studio, retrocade, paint, kanban, dictionary
+Valid shell targets: windows, windows11, windows10, windows8, mac, ubuntu, dex, chromeos
+Valid theme targets: dark, light
+Valid wallpaper targets: live2d, space, aurora, sunset, ocean, forest, cosmic, bloom, shader
+Valid aurora targets: cyan-violet, emerald-sky, rose-gold, ocean-blue, sunset-magenta, solar-gold, arctic-ice, sakura-silk, cyber-grid, starlight-pulse
+Only output <os_action> if the user is asking to change an OS setting or open an app.`;
+
+      const contents = messages.map((m: { role: string; content: string }) => ({
+        role: m.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: String(m.content || '') }],
+      }));
+
+      const candidateModels = ['gemini-3-flash-preview', 'gemini-2.5-flash'];
+      let rawText = '';
+
+      for (const modelName of candidateModels) {
         try {
           const response = await ai.models.generateContent({
             model: modelName,
             contents,
             config: {
               systemInstruction,
+              temperature: 0.7,
             },
           });
-          if (response.text && response.text.trim()) {
-            replyText = response.text.trim();
+          if (response.text) {
+            rawText = response.text;
             break;
           }
-        } catch (innerErr) {
-          console.warn(`Model ${modelName} attempt failed:`, innerErr);
+        } catch {
+          // Try next candidate model or fall back to local engine
         }
       }
 
-      if (!replyText) {
-        return res.json(await getIntelligentLocalResponse(message, history));
-      }
-
-      // If user explicitly asked to run an OS command, attach the action
-      if (parsedAction && parsedAction.type !== 'none') {
-        return res.json({
-          reply: replyText,
-          action: parsedAction,
-          model: 'Gemini Flash',
+      if (!rawText) {
+        res.json({
+          reply: localCheck.reply,
+          action: localCheck.action,
+          model: 'glassium-5-hybrid-engine',
         });
+        return;
       }
 
-      return res.json({
-        reply: replyText,
-        action: null,
-        model: 'Gemini Flash',
+      let action: NormalizedAIAction | undefined = localCheck.action;
+      const actionMatch = rawText.match(/<os_action>([\s\S]*?)<\/os_action>/);
+      const cleanText = rawText.replace(/<os_action>[\s\S]*?<\/os_action>/g, '').trim();
+
+      if (actionMatch && actionMatch[1]) {
+        try {
+          const parsed = JSON.parse(actionMatch[1].trim());
+          if (parsed && parsed.type) {
+            const targetVal = String(parsed.target ?? parsed.value ?? '');
+            action = makeAction(parsed.type, targetVal, parsed.label || targetVal);
+          }
+        } catch {
+          // ignore malformed action json
+        }
+      }
+
+      res.json({
+        reply: cleanText || localCheck.reply,
+        action,
       });
-    } catch (err: unknown) {
-      console.warn('AI route fallback:', err);
-      return res.json(await getIntelligentLocalResponse(req.body?.message || '', req.body?.history));
+    } catch {
+      const fallbackMsg = req.body?.messages?.[req.body.messages.length - 1]?.content || '';
+      const fallback = await getIntelligentLocalResponse(String(fallbackMsg));
+      res.json({
+        reply: fallback.reply,
+        action: fallback.action,
+        model: 'glassium-5-fallback-engine',
+      });
     }
   });
 
-  app.use((req, _res, next) => {
-    if (req.url.startsWith('/LiquidOS-')) {
-      const rewritten = req.url.replace(/^\/LiquidOS-[^/]+/, '') || '/';
-      req.url = rewritten;
+  app.get('/api/proxy', async (req, res) => {
+    const rawUrl = req.query.url;
+    if (!rawUrl || typeof rawUrl !== 'string') {
+      res.status(400).send('Missing url query parameter');
+      return;
     }
-    next();
+
+    let targetUrl: URL;
+    try {
+      targetUrl = new URL(rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
+    } catch {
+      res.status(400).send('Invalid URL');
+      return;
+    }
+
+    try {
+      const upstream = await fetch(targetUrl.toString(), {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          Accept:
+            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
+        },
+        redirect: 'follow',
+      });
+
+      const contentType = upstream.headers.get('content-type') || 'text/html; charset=utf-8';
+      res.setHeader('Access-Control-Allow-Origin', '*');
+
+      if (contentType.includes('text/html')) {
+        let html = await upstream.text();
+        const origin = `${targetUrl.protocol}//${targetUrl.host}`;
+        const basePath = targetUrl.href.substring(0, targetUrl.href.lastIndexOf('/') + 1);
+
+        const baseAndNavScript = `
+          <base href="${escapeHtml(basePath)}" />
+          <meta name="referrer" content="no-referrer" />
+          <style>
+            html, body { max-width: 100vw !important; overflow-x: hidden !important; }
+          </style>
+          <script>
+            (function() {
+              document.addEventListener('click', function(e) {
+                var a = e.target && e.target.closest ? e.target.closest('a') : null;
+                if (!a) return;
+                var href = a.getAttribute('href');
+                if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+                e.preventDefault();
+                try {
+                  var abs = new URL(href, ${JSON.stringify(targetUrl.href)}).href;
+                  window.parent.postMessage({ type: 'LIQUID_BROWSER_NAV', url: abs }, '*');
+                  window.location.href = '/api/proxy?url=' + encodeURIComponent(abs);
+                } catch (err) {}
+              }, true);
+
+              document.addEventListener('submit', function(e) {
+                var form = e.target;
+                if (!form || form.tagName !== 'FORM') return;
+                var method = (form.getAttribute('method') || 'GET').toUpperCase();
+                if (method === 'GET') {
+                  e.preventDefault();
+                  try {
+                    var action = form.getAttribute('action') || ${JSON.stringify(targetUrl.href)};
+                    var absUrl = new URL(action, ${JSON.stringify(targetUrl.href)});
+                    var fd = new FormData(form);
+                    fd.forEach(function(val, key) {
+                      absUrl.searchParams.set(key, String(val));
+                    });
+                    window.parent.postMessage({ type: 'LIQUID_BROWSER_NAV', url: absUrl.href }, '*');
+                    window.location.href = '/api/proxy?url=' + encodeURIComponent(absUrl.href);
+                  } catch (err) {}
+                }
+              }, true);
+            })();
+          </script>
+        `;
+
+        html = html.replace(/<meta[^>]*http-equiv=["']?Content-Security-Policy["']?[^>]*>/gi, '');
+
+        if (/<head[^>]*>/i.test(html)) {
+          html = html.replace(/<head[^>]*>/i, (match) => `${match}${baseAndNavScript}`);
+        } else {
+          html = `<!DOCTYPE html><html><head>${baseAndNavScript}</head><body>${html}</body></html>`;
+        }
+
+        html = html.replace(/(href|src)=["']\/([^/"'][^"']*)["']/gi, `$1="${origin}/$2"`);
+
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.send(html);
+      } else {
+        const arrayBuffer = await upstream.arrayBuffer();
+        res.setHeader('Content-Type', contentType);
+        res.send(Buffer.from(arrayBuffer));
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown fetch error';
+      const safeUrl = escapeHtml(String(rawUrl));
+      const safeMessage = escapeHtml(message);
+      res.status(502).send(`
+        <!DOCTYPE html>
+        <html lang="ja">
+          <head>
+            <meta charset="utf-8" />
+            <style>
+              body {
+                margin: 0;
+                font-family: system-ui, -apple-system, sans-serif;
+                background: #090d16;
+                color: #e2e8f0;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+              }
+              .card {
+                max-width: 480px;
+                padding: 28px;
+                background: rgba(255,255,255,0.03);
+                border-top: 2px solid rgba(56,189,248,0.6);
+              }
+              h2 { margin: 0 0 10px; font-size: 18px; color: #38bdf8; }
+              p { margin: 0 0 16px; font-size: 13px; line-height: 1.6; color: #94a3b8; }
+              code { display: block; padding: 10px; background: rgba(0,0,0,0.4); font-size: 11px; color: #f87171; word-break: break-all; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h2>サイトへ接続できませんでした</h2>
+              <p>対象サーバー（${safeUrl}）が応答しないか、接続を拒否しました。</p>
+              <code>${safeMessage}</code>
+            </div>
+          </body>
+        </html>
+      `);
+    }
   });
 
   if (process.env.NODE_ENV !== 'production') {
@@ -852,11 +748,15 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static('dist'));
+    const distPath = path.join(__dirname, 'dist');
+    app.use(express.static(distPath));
+    app.get('*all', (_req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running at http://0.0.0.0:${PORT}`);
+    console.log(`GlassiumOS 5 Server running on http://localhost:${PORT}`);
   });
 }
 

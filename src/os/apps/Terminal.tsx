@@ -6,7 +6,7 @@ interface Line {
   text: string;
 }
 
-const BANNER = `GlassiumOS-V4.0 Terminal
+const BANNER = `GlassiumOS 5 Terminal
 (c) GlassiumOS Project. All rights reserved.
 Type 'help' for a list of available commands.`;
 
@@ -18,18 +18,55 @@ const MOCK_WEATHER = [
 ];
 
 function tryEval(expr: string): string | null {
-  try {
-    const sanitized = expr.replace(/[^-()\d/*+.%\s]/g, '');
-    if (!sanitized.trim()) return null;
-    if (sanitized.includes('//')) return null;
-    const result = Function(`"use strict"; return (${sanitized})`)();
-    if (typeof result === 'number' && isFinite(result)) {
-      return String(Math.round(result * 1e10) / 1e10);
+  const s = expr.replace(/\s+/g, '');
+  if (!s || !/^[0-9+\-*/().%]+$/.test(s)) return null;
+  let pos = 0;
+
+  function parseExpression(): number {
+    let val = parseTerm();
+    while (pos < s.length && (s[pos] === '+' || s[pos] === '-')) {
+      const op = s[pos++];
+      const right = parseTerm();
+      val = op === '+' ? val + right : val - right;
     }
-    return null;
-  } catch {
-    return null;
+    return val;
   }
+
+  function parseTerm(): number {
+    let val = parseFactor();
+    while (pos < s.length && (s[pos] === '*' || s[pos] === '/' || s[pos] === '%')) {
+      const op = s[pos++];
+      const right = parseFactor();
+      if ((op === '/' || op === '%') && right === 0) return NaN;
+      val = op === '*' ? val * right : op === '/' ? val / right : val % right;
+    }
+    return val;
+  }
+
+  function parseFactor(): number {
+    if (s[pos] === '+') {
+      pos++;
+      return parseFactor();
+    }
+    if (s[pos] === '-') {
+      pos++;
+      return -parseFactor();
+    }
+    if (s[pos] === '(') {
+      pos++;
+      const val = parseExpression();
+      if (s[pos] === ')') pos++;
+      return val;
+    }
+    const start = pos;
+    while (pos < s.length && ((s[pos] >= '0' && s[pos] <= '9') || s[pos] === '.')) pos++;
+    if (start === pos) return NaN;
+    return parseFloat(s.slice(start, pos));
+  }
+
+  const res = parseExpression();
+  if (pos !== s.length || !Number.isFinite(res)) return null;
+  return String(Math.round(res * 1e10) / 1e10);
 }
 
 export function TerminalApp() {
@@ -61,7 +98,7 @@ export function TerminalApp() {
     const [name, ...args] = cmd.split(/\s+/);
     switch (name.toLowerCase()) {
       case 'help':
-        print('GlassiumOS-V4.0 Commands:');
+        print('GlassiumOS 5 Commands:');
         print('  help               Show this help index');
         print('  clear              Clear the terminal screen');
         print('  ls                 List directory contents');
@@ -83,7 +120,7 @@ export function TerminalApp() {
         setLines([]);
         return;
       case 'uname':
-        print('GlassiumOS-V4.0 WebOS x86_64 (2.5D Glass Compositor)');
+        print('GlassiumOS 5 WebOS x86_64 (Liquid Glass Compositor)');
         break;
       case 'ps':
       case 'top': {
@@ -110,7 +147,7 @@ export function TerminalApp() {
       }
       case 'shell': {
         const targetShell = args[0]?.toLowerCase();
-        const validShells = ['windows', 'mac', 'ubuntu', 'android', 'ios', 'metro'];
+        const validShells = ['windows', 'windows11', 'windows10', 'windows8', 'mac', 'ubuntu', 'dex', 'chromeos'];
         if (targetShell && validShells.includes(targetShell)) {
           setShellMode(targetShell as never);
           print(`[SYSTEM] Switched active shell mode to: ${targetShell.toUpperCase()}`);
@@ -138,8 +175,8 @@ export function TerminalApp() {
       }
       case 'sudo':
         if (args.join(' ').includes('apt update') || args.join(' ').includes('apt upgrade')) {
-          print('Hit:1 https://packages.liquidos.org/release v4.0.0 InRelease');
-          print('Get:2 https://security.liquidos.org/updates core-security [1,048 kB]');
+          print('Hit:1 https://packages.glassium.os/release v5 InRelease');
+          print('Get:2 https://security.glassium.os/updates core-security [1,048 kB]');
           print('Fetched 1,048 kB in 0.12s (8,733 kB/s)');
           print('All system packages are up to date (0 upgradable).');
         } else {
@@ -183,15 +220,14 @@ export function TerminalApp() {
         print(new Date().toString());
         break;
       case 'whoami':
-        print('liquid-administrator (uid=1000 gid=1000)');
+        print('glassium-administrator (uid=1000 gid=1000)');
         break;
       case 'echo':
         print(args.join(' '));
         break;
       case 'about':
-        print('LiquidOS v4.0.0 — High-density Web Operating System.');
-        print('Refined with SVG Displacement Refraction (#glass-distortion).');
-        print('Multi-OS Shell Architecture (Windows, macOS, Ubuntu, Android, iOS, Metro).');
+        print('GlassiumOS 5 — Web Operating System.');
+        print('Surface Material Engine & Multi-Shell Architecture.');
         break;
       case 'open': {
         const valid = ['explorer', 'browser', 'settings', 'notepad', 'terminal', 'game', 'appstore', 'calculator', 'taskmanager', 'sysmon', 'calendar', 'synth', 'music', 'monochrome'];
@@ -208,14 +244,14 @@ export function TerminalApp() {
       case 'neofetch':
         print('    .-------.       user@glassium-os');
         print('   /   ___   \\      ----------------');
-        print('  |   /   \\   |     OS: GlassiumOS-V4.0');
+        print('  |   /   \\   |     OS: GlassiumOS 5');
         print('  |  |  G  |  |     Runtime: Vite + TypeScript + Tailwind CSS');
-        print('  |   \\___/   |     UI: 2.5D Glassmorphism & Fluid Gradients');
+        print('  |   \\___/   |     UI: Surface Material Engine & Multi-Shell');
         print('   \\         /      Uptime: ' + Math.floor(performance.now() / 1000) + 's');
         print('    `-------\'       Display: ' + window.innerWidth + 'x' + window.innerHeight);
         break;
       case 'sysinfo': {
-        print('=== GlassiumOS-V4.0 System Summary ===');
+        print('=== GlassiumOS 5 System Summary ===');
         print(`Architecture: WebOS Container (TypeScript + Vite)`);
         print(`CPU Threads:  ${navigator.hardwareConcurrency ?? '8'} logical cores`);
         print(`Viewport:     ${window.innerWidth}x${window.innerHeight}`);

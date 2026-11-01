@@ -59,7 +59,17 @@ export type Wallpaper =
   | 'shader';
 
 export type Theme = 'dark' | 'light';
-export type AuroraColor = 'cyan-violet' | 'emerald-sky' | 'rose-gold' | 'ocean-blue' | 'sunset-magenta';
+export type AuroraColor =
+  | 'cyan-violet'
+  | 'emerald-sky'
+  | 'rose-gold'
+  | 'ocean-blue'
+  | 'sunset-magenta'
+  | 'solar-gold'
+  | 'arctic-ice'
+  | 'sakura-silk'
+  | 'cyber-grid'
+  | 'starlight-pulse';
 
 export interface CustomWallpaper {
   id: string;
@@ -333,7 +343,7 @@ const APP_DEFAULTS: Record<AppId, { title: string; icon: string; width: number; 
 };
 
 const INITIAL_TASKS: CalendarTask[] = [
-  { id: 'task-1', title: 'Review GlassiumOS V4.0 UI Guidelines', date: '2026-08-27', time: '14:00', category: 'system', completed: true, priority: 'high' },
+  { id: 'task-1', title: 'Review GlassiumOS 5 UI Guidelines', date: '2026-08-27', time: '14:00', category: 'system', completed: true, priority: 'high' },
   { id: 'task-2', title: 'Update 2.5D Glass Refraction Presets', date: '2026-08-27', time: '16:30', category: 'work', completed: false, priority: 'medium' },
   { id: 'task-3', title: 'Prepare Release Documentation', date: '2026-08-28', time: '11:00', category: 'personal', completed: false, priority: 'low' },
 ];
@@ -487,15 +497,12 @@ export function OSProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore
     }
-    // Automatically adapt shell layout per UI Style
     if (style === 'macos') {
       setShellMode('mac');
     } else if (style === 'one-ui') {
       setShellMode('dex');
     } else if (style === 'material3') {
       setShellMode('chromeos');
-    } else {
-      setShellMode('windows');
     }
   }, []);
 
@@ -671,8 +678,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => [
     {
       id: 'notif-welcome',
-      title: 'GlassiumOS-V4.0',
-      message: 'GlassiumOS-V4.0 desktop environment is ready.',
+      title: 'GlassiumOS 5',
+      message: 'GlassiumOS 5 desktop environment is ready.',
       time: 'Just now',
       app: 'System',
       icon: 'Shield',
@@ -774,6 +781,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.setAttribute('data-accent', accentColor);
     document.documentElement.setAttribute('data-ui-style', uiStyle);
+    document.documentElement.setAttribute('data-shell-mode', shellMode);
     document.documentElement.setAttribute('data-design-engine', designEngine);
     document.documentElement.setAttribute('data-wallpaper-tone', isWallpaperBright ? 'bright' : 'dark');
     document.documentElement.lang = language;
@@ -785,7 +793,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     document.documentElement.style.setProperty('--glass-curvature', `${glassCurvature}px`);
     document.documentElement.style.setProperty('--glass-specular', `${glassSpecular / 100}`);
     document.documentElement.style.setProperty('--glass-wobble', `${glassWobble / 100}`);
-  }, [theme, accentColor, language, uiStyle, designEngine, isWallpaperBright, blurAmount, transparency, cornerRadius, glassCurvature, glassSpecular, glassWobble]);
+  }, [theme, accentColor, language, uiStyle, shellMode, designEngine, isWallpaperBright, blurAmount, transparency, cornerRadius, glassCurvature, glassSpecular, glassWobble]);
 
   // Persist Settings
   useEffect(() => {

@@ -17,6 +17,11 @@ const SLEEP_AURORA_COLORS: Record<AuroraColor, [string, string, string]> = {
   'rose-gold': ['rgba(251, 113, 133, 0.38)', 'rgba(245, 158, 11, 0.3)', 'rgba(217, 70, 239, 0.25)'],
   'ocean-blue': ['rgba(56, 189, 248, 0.38)', 'rgba(37, 99, 235, 0.34)', 'rgba(6, 182, 212, 0.28)'],
   'sunset-magenta': ['rgba(244, 114, 182, 0.38)', 'rgba(147, 51, 234, 0.34)', 'rgba(99, 102, 241, 0.28)'],
+  'solar-gold': ['rgba(251, 191, 36, 0.38)', 'rgba(249, 115, 22, 0.34)', 'rgba(234, 88, 12, 0.28)'],
+  'arctic-ice': ['rgba(125, 211, 252, 0.38)', 'rgba(56, 189, 248, 0.34)', 'rgba(186, 230, 253, 0.28)'],
+  'sakura-silk': ['rgba(244, 114, 182, 0.38)', 'rgba(251, 113, 133, 0.34)', 'rgba(192, 132, 252, 0.28)'],
+  'cyber-grid': ['rgba(6, 182, 212, 0.38)', 'rgba(217, 70, 239, 0.34)', 'rgba(59, 130, 246, 0.28)'],
+  'starlight-pulse': ['rgba(129, 140, 248, 0.38)', 'rgba(56, 189, 248, 0.34)', 'rgba(192, 132, 252, 0.28)'],
 };
 
 const CLOCK_OPTIONS: { id: SleepClockStyle; label: string; icon: string }[] = [
