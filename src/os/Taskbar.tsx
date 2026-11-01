@@ -36,6 +36,7 @@ export function Taskbar(_props?: TaskbarProps) {
     focusWindow,
     minimizeWindow,
     restoreWindow,
+    closeWindow,
     quickSettings,
     toggleQuick,
     taskbarAlign,
@@ -66,10 +67,17 @@ export function Taskbar(_props?: TaskbarProps) {
   const [searchFocused, setSearchFocused] = useState(false);
   const [now, setNow] = useState(new Date());
   const [hoveredApp, setHoveredApp] = useState<string | null>(null);
+  const [hoverPos, setHoverPos] = useState<{ x: number } | null>(null);
   const startBtnRef = useRef<HTMLButtonElement>(null);
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const searchDropdownRef = useRef<HTMLDivElement>(null);
   const [startPos, setStartPos] = useState<{ x: number; width: number } | null>(null);
+
+  const handleMouseEnterIcon = (e: React.MouseEvent<HTMLDivElement>, appId: string) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setHoverPos({ x: rect.left + rect.width / 2 });
+    setHoveredApp(appId);
+  };
 
   const updateStartPos = useCallback(() => {
     if (startBtnRef.current) {
@@ -524,8 +532,8 @@ export function Taskbar(_props?: TaskbarProps) {
                 <div
                   key={app.appId}
                   className="relative group shrink-0"
-                  onMouseEnter={() => setHoveredApp(app.appId)}
-                  onMouseLeave={() => setHoveredApp(null)}
+                  onMouseEnter={(e) => handleMouseEnterIcon(e, app.appId)}
+                  onMouseLeave={() => { setHoveredApp(null); setHoverPos(null); }}
                 >
                   <button
                     onClick={() => handleAppClick(app.appId)}
@@ -554,27 +562,73 @@ export function Taskbar(_props?: TaskbarProps) {
                     )}
                   </button>
 
-                  {/* Taskbar Live Window Hover Preview Card */}
+                  {/* Windows 11 Interactive Taskbar Window Hover Preview Card */}
                   <AnimatePresence>
-                    {hoveredApp === app.appId && wins.length > 0 && (
+                    {hoveredApp === app.appId && hoverPos && wins.length > 0 && (
                       <motion.div
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 6, scale: 0.95 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute bottom-12 left-1/2 -translate-x-1/2 z-50 w-48 p-2.5 rounded-2xl bg-zinc-900/90 backdrop-blur-2xl border border-white/20 shadow-2xl flex flex-col gap-2 pointer-events-none"
+                        exit={{ opacity: 0, y: 6, scale: 0.96 }}
+                        transition={{ duration: 0.12 }}
+                        style={{ left: hoverPos.x, transform: 'translateX(-50%)' }}
+                        onMouseEnter={() => setHoveredApp(app.appId)}
+                        onMouseLeave={() => { setHoveredApp(null); setHoverPos(null); }}
+                        className="fixed bottom-14 z-[5500] flex items-center gap-2 p-2 rounded-xl bg-slate-900/95 backdrop-blur-2xl border border-white/15 shadow-2xl pointer-events-auto text-white font-sans max-w-[90vw] overflow-x-auto"
                       >
-                        <div className="flex items-center justify-between text-[11px] font-semibold text-white/90 px-1 border-b border-white/10 pb-1">
-                          <span className="truncate">{wins[0].title}</span>
-                          <span className="text-[9px] text-cyan-400 font-mono">Live</span>
-                        </div>
-                        <div className="h-28 w-full bg-black/60 rounded-xl border border-white/10 overflow-hidden flex items-center justify-center relative">
-                          <div className="text-center p-2">
-                            <Icon name={app.appId} size={28} className="mx-auto text-cyan-300/80 mb-1" />
-                            <div className="text-[10px] text-white/60 truncate">{wins[0].title}</div>
+                        {wins.map((win) => (
+                          <div
+                            key={win.id}
+                            className="w-48 flex flex-col gap-1.5 p-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.07] border border-white/10 hover:border-cyan-400/40 transition group shrink-0"
+                          >
+                            <div className="flex items-center justify-between gap-1 px-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <Icon name={app.appId} size={13} className="text-cyan-400 shrink-0" />
+                                <span className="text-[11px] font-medium text-white/90 truncate">{win.title}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  closeWindow(win.id);
+                                  if (wins.length <= 1) {
+                                    setHoveredApp(null);
+                                    setHoverPos(null);
+                                  }
+                                }}
+                                className="w-5 h-5 rounded flex items-center justify-center text-white/50 hover:text-white hover:bg-rose-600 transition shrink-0"
+                                title="閉じる"
+                              >
+                                <Icon name="X" size={12} />
+                              </button>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (win.minimized) restoreWindow(win.id);
+                                else focusWindow(win.id);
+                                setHoveredApp(null);
+                                setHoverPos(null);
+                              }}
+                              className="h-28 w-full bg-black/60 rounded border border-white/10 group-hover:border-cyan-400/30 overflow-hidden relative flex flex-col justify-between p-2 text-left transition cursor-pointer"
+                            >
+                              <div className="w-full h-4 bg-white/10 rounded-sm flex items-center px-1.5 gap-1 shrink-0">
+                                <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                                <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                                <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                                <span className="text-[9px] text-white/50 truncate ml-1 font-mono">{win.title}</span>
+                              </div>
+
+                              <div className="flex-1 my-1 flex items-center justify-center">
+                                <Icon name={app.appId} size={28} className="text-white/30 group-hover:scale-110 group-hover:text-cyan-400/70 transition-all" />
+                              </div>
+
+                              <div className="text-[9px] text-white/40 font-mono truncate text-center">
+                                {win.minimized ? '最小化中 (クリックで再開)' : 'クリックでアクティブ化'}
+                              </div>
+                            </button>
                           </div>
-                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-cyan-500/20 to-transparent h-6" />
-                        </div>
+                        ))}
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -597,8 +651,8 @@ export function Taskbar(_props?: TaskbarProps) {
                   <div
                     key={win.id}
                     className="relative group shrink-0"
-                    onMouseEnter={() => setHoveredApp(win.appId)}
-                    onMouseLeave={() => setHoveredApp(null)}
+                    onMouseEnter={(e) => handleMouseEnterIcon(e, win.appId)}
+                    onMouseLeave={() => { setHoveredApp(null); setHoverPos(null); }}
                   >
                     <button
                       onClick={() => handleAppClick(win.appId as AppId)}
@@ -621,27 +675,73 @@ export function Taskbar(_props?: TaskbarProps) {
                       />
                     </button>
 
-                    {/* Live Preview Card */}
+                    {/* Windows 11 Live Preview Card */}
                     <AnimatePresence>
-                      {hoveredApp === win.appId && wins.length > 0 && (
+                      {hoveredApp === win.appId && hoverPos && wins.length > 0 && (
                         <motion.div
-                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          initial={{ opacity: 0, y: 8, scale: 0.96 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 6, scale: 0.95 }}
-                          transition={{ duration: 0.15 }}
-                          className="absolute bottom-12 left-1/2 -translate-x-1/2 z-50 w-52 p-2.5 rounded-2xl bg-zinc-900/90 backdrop-blur-2xl border border-white/20 shadow-2xl flex flex-col gap-2 pointer-events-none"
+                          exit={{ opacity: 0, y: 6, scale: 0.96 }}
+                          transition={{ duration: 0.12 }}
+                          style={{ left: hoverPos.x, transform: 'translateX(-50%)' }}
+                          onMouseEnter={() => setHoveredApp(win.appId)}
+                          onMouseLeave={() => { setHoveredApp(null); setHoverPos(null); }}
+                          className="fixed bottom-14 z-[5500] flex items-center gap-2 p-2 rounded-xl bg-slate-900/95 backdrop-blur-2xl border border-white/15 shadow-2xl pointer-events-auto text-white font-sans max-w-[90vw] overflow-x-auto"
                         >
-                          <div className="flex items-center justify-between text-[11px] font-semibold text-white/90 px-1 border-b border-white/10 pb-1">
-                            <span className="truncate">{win.title}</span>
-                            <span className="text-[9px] text-cyan-400 font-mono">Live</span>
-                          </div>
-                          <div className="h-28 w-full bg-black/60 rounded-xl border border-white/10 overflow-hidden flex items-center justify-center relative">
-                            <div className="text-center p-2">
-                              <Icon name={win.appId} size={28} className="mx-auto text-cyan-300/80 mb-1" />
-                              <div className="text-[10px] text-white/60 truncate">{win.title}</div>
+                          {wins.map((w) => (
+                            <div
+                              key={w.id}
+                              className="w-48 flex flex-col gap-1.5 p-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.07] border border-white/10 hover:border-cyan-400/40 transition group shrink-0"
+                            >
+                              <div className="flex items-center justify-between gap-1 px-1">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <Icon name={w.appId} size={13} className="text-cyan-400 shrink-0" />
+                                  <span className="text-[11px] font-medium text-white/90 truncate">{w.title}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    closeWindow(w.id);
+                                    if (wins.length <= 1) {
+                                      setHoveredApp(null);
+                                      setHoverPos(null);
+                                    }
+                                  }}
+                                  className="w-5 h-5 rounded flex items-center justify-center text-white/50 hover:text-white hover:bg-rose-600 transition shrink-0"
+                                  title="閉じる"
+                                >
+                                  <Icon name="X" size={12} />
+                                </button>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (w.minimized) restoreWindow(w.id);
+                                  else focusWindow(w.id);
+                                  setHoveredApp(null);
+                                  setHoverPos(null);
+                                }}
+                                className="h-28 w-full bg-black/60 rounded border border-white/10 group-hover:border-cyan-400/30 overflow-hidden relative flex flex-col justify-between p-2 text-left transition cursor-pointer"
+                              >
+                                <div className="w-full h-4 bg-white/10 rounded-sm flex items-center px-1.5 gap-1 shrink-0">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                                  <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                                  <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                                  <span className="text-[9px] text-white/50 truncate ml-1 font-mono">{w.title}</span>
+                                </div>
+
+                                <div className="flex-1 my-1 flex items-center justify-center">
+                                  <Icon name={w.appId} size={28} className="text-white/30 group-hover:scale-110 group-hover:text-cyan-400/70 transition-all" />
+                                </div>
+
+                                <div className="text-[9px] text-white/40 font-mono truncate text-center">
+                                  {w.minimized ? '最小化中 (クリックで再開)' : 'クリックでアクティブ化'}
+                                </div>
+                              </button>
                             </div>
-                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-cyan-500/20 to-transparent h-6" />
-                          </div>
+                          ))}
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -668,8 +768,8 @@ export function Taskbar(_props?: TaskbarProps) {
                   <div
                     key={`${app.id || app.appId}-${idx}`}
                     className="relative group shrink-0"
-                    onMouseEnter={() => setHoveredApp(app.id || app.appId)}
-                    onMouseLeave={() => setHoveredApp(null)}
+                    onMouseEnter={(e) => handleMouseEnterIcon(e, app.id || app.appId)}
+                    onMouseLeave={() => { setHoveredApp(null); setHoverPos(null); }}
                   >
                     <button
                       onClick={() => handleInstalledAppClick(app.id || app.appId)}
@@ -696,25 +796,71 @@ export function Taskbar(_props?: TaskbarProps) {
 
                     {/* Live Preview Card for Installed Apps */}
                     <AnimatePresence>
-                      {hoveredApp === (app.id || app.appId) && wins.length > 0 && (
+                      {hoveredApp === (app.id || app.appId) && hoverPos && wins.length > 0 && (
                         <motion.div
-                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          initial={{ opacity: 0, y: 8, scale: 0.96 }}
                           animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 6, scale: 0.95 }}
-                          transition={{ duration: 0.15 }}
-                          className="absolute bottom-12 left-1/2 -translate-x-1/2 z-50 w-52 p-2.5 rounded-2xl bg-zinc-900/90 backdrop-blur-2xl border border-white/20 shadow-2xl flex flex-col gap-2 pointer-events-none"
+                          exit={{ opacity: 0, y: 6, scale: 0.96 }}
+                          transition={{ duration: 0.12 }}
+                          style={{ left: hoverPos.x, transform: 'translateX(-50%)' }}
+                          onMouseEnter={() => setHoveredApp(app.id || app.appId)}
+                          onMouseLeave={() => { setHoveredApp(null); setHoverPos(null); }}
+                          className="fixed bottom-14 z-[5500] flex items-center gap-2 p-2 rounded-xl bg-slate-900/95 backdrop-blur-2xl border border-white/15 shadow-2xl pointer-events-auto text-white font-sans max-w-[90vw] overflow-x-auto"
                         >
-                          <div className="flex items-center justify-between text-[11px] font-semibold text-white/90 px-1 border-b border-white/10 pb-1">
-                            <span className="truncate">{wins[0].title}</span>
-                            <span className="text-[9px] text-cyan-400 font-mono">Live</span>
-                          </div>
-                          <div className="h-28 w-full bg-black/60 rounded-xl border border-white/10 overflow-hidden flex items-center justify-center relative">
-                            <div className="text-center p-2">
-                              <Icon name={app.icon} size={28} className="mx-auto text-cyan-300/80 mb-1" />
-                              <div className="text-[10px] text-white/60 truncate">{wins[0].title}</div>
+                          {wins.map((w) => (
+                            <div
+                              key={w.id}
+                              className="w-48 flex flex-col gap-1.5 p-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.07] border border-white/10 hover:border-cyan-400/40 transition group shrink-0"
+                            >
+                              <div className="flex items-center justify-between gap-1 px-1">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <Icon name={app.icon} size={13} className="text-cyan-400 shrink-0" />
+                                  <span className="text-[11px] font-medium text-white/90 truncate">{w.title}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    closeWindow(w.id);
+                                    if (wins.length <= 1) {
+                                      setHoveredApp(null);
+                                      setHoverPos(null);
+                                    }
+                                  }}
+                                  className="w-5 h-5 rounded flex items-center justify-center text-white/50 hover:text-white hover:bg-rose-600 transition shrink-0"
+                                  title="閉じる"
+                                >
+                                  <Icon name="X" size={12} />
+                                </button>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (w.minimized) restoreWindow(w.id);
+                                  else focusWindow(w.id);
+                                  setHoveredApp(null);
+                                  setHoverPos(null);
+                                }}
+                                className="h-28 w-full bg-black/60 rounded border border-white/10 group-hover:border-cyan-400/30 overflow-hidden relative flex flex-col justify-between p-2 text-left transition cursor-pointer"
+                              >
+                                <div className="w-full h-4 bg-white/10 rounded-sm flex items-center px-1.5 gap-1 shrink-0">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                                  <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                                  <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
+                                  <span className="text-[9px] text-white/50 truncate ml-1 font-mono">{w.title}</span>
+                                </div>
+
+                                <div className="flex-1 my-1 flex items-center justify-center">
+                                  <Icon name={app.icon} size={28} className="text-white/30 group-hover:scale-110 group-hover:text-cyan-400/70 transition-all" />
+                                </div>
+
+                                <div className="text-[9px] text-white/40 font-mono truncate text-center">
+                                  {w.minimized ? '最小化中 (クリックで再開)' : 'クリックでアクティブ化'}
+                                </div>
+                              </button>
                             </div>
-                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-cyan-500/20 to-transparent h-6" />
-                          </div>
+                          ))}
                         </motion.div>
                       )}
                     </AnimatePresence>

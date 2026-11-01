@@ -132,23 +132,20 @@ export function RetroCadeApp() {
   };
 
   return (
-    <div className="h-full w-full flex flex-col bg-black/40 backdrop-blur-2xl text-white select-none">
+    <div className="h-full w-full flex flex-col bg-slate-950 text-white select-none">
       {/* Top Header */}
-      <div className="h-13 px-5 bg-white/[0.02] border-b border-white/[0.06] flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl glass-jelly flex items-center justify-center text-rose-400">
-            <Icon name="Gamepad2" size={16} />
-          </div>
-          <div>
-            <div className="text-sm font-semibold">RetroCade エミュレータ</div>
-            <div className="text-[10px] text-white/50">Wasm & Canvas レトロゲームセンター</div>
-          </div>
+      <div className="h-12 px-4 border-b border-white/10 flex items-center justify-between shrink-0 bg-slate-900/50">
+        <div className="flex items-center gap-2.5">
+          <Icon name="Gamepad2" size={16} className="text-rose-400" />
+          <span className="text-xs font-semibold tracking-wide">RetroCade エミュレータ</span>
+          <span className="text-[11px] text-white/40">·</span>
+          <span className="text-[11px] text-white/50">Wasm & Canvas プレイヤー</span>
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-xs text-white/90 flex items-center gap-1.5 cursor-pointer transition">
+          <label className="text-xs text-white/80 hover:text-white flex items-center gap-1.5 cursor-pointer transition">
             <Icon name="Upload" size={13} />
-            <span>ROM読込 (.nes / .gb)</span>
+            <span>ROMファイル読込 (.nes / .gb)</span>
             <input type="file" accept=".nes,.gb,.bin,.rom" onChange={handleFileUpload} className="hidden" />
           </label>
         </div>
@@ -156,42 +153,43 @@ export function RetroCadeApp() {
 
       <div className="flex-1 min-h-0 flex">
         {/* Game Sidebar */}
-        <div className="w-72 border-r border-white/10 p-4 flex flex-col gap-3 overflow-y-auto bg-black/20">
-          <div className="text-xs font-semibold text-white/60 mb-1">内蔵ゲームライブラリ</div>
+        <div className="w-64 border-r border-white/10 p-4 flex flex-col gap-3 overflow-y-auto bg-slate-900/20">
+          <div className="text-xs font-medium text-white/50 mb-1">ライブラリ</div>
           {BUILTIN_GAMES.map((game) => (
             <button
               key={game.id}
               onClick={() => { setCurrentGame(game); setIsPlaying(true); playSound('click'); }}
-              className={`p-3 rounded-xl border text-left transition flex flex-col gap-1 ${currentGame.id === game.id && isPlaying ? 'bg-cyan-500/20 border-cyan-400/50 text-white' : 'bg-white/[0.02] border-white/10 text-white/80 hover:bg-white/[0.06]'}`}
+              className={`p-3 text-left transition border-b border-white/5 flex flex-col gap-1 ${currentGame.id === game.id && isPlaying ? 'text-cyan-400 font-medium' : 'text-white/80 hover:text-white'}`}
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold">{game.title}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-white/10 text-cyan-300">{game.system}</span>
+                <span className="text-[10px] text-white/40">{game.system}</span>
               </div>
-              <span className="text-[10px] text-white/50">{game.description}</span>
+              <span className="text-[11px] text-white/50 font-normal">{game.description}</span>
             </button>
           ))}
 
           {customRomName && (
-            <div className="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-left flex flex-col gap-1 mt-2">
-              <div className="text-xs font-semibold text-cyan-300">カスタムROM</div>
-              <span className="text-[10px] text-white/80 truncate">{customRomName}</span>
+            <div className="p-3 border-t border-white/10 text-left flex flex-col gap-1 mt-2">
+              <span className="text-xs font-medium text-cyan-400">カスタムROM</span>
+              <span className="text-[11px] text-white/70 truncate">{customRomName}</span>
             </div>
           )}
         </div>
 
         {/* Main Emulator View */}
-        <div className="flex-1 flex flex-col items-center justify-center p-6 bg-gradient-to-b from-zinc-950 to-black relative">
-          <div className="absolute top-4 left-6 flex items-center gap-4 text-xs font-mono">
-            <div className="bg-white/5 border border-white/10 px-3 py-1 rounded-lg">
-              スコア: <span className="text-cyan-400 font-bold">{score}</span>
+        <div className="flex-1 flex flex-col items-center justify-center p-6 bg-black relative">
+          <div className="absolute top-4 left-6 flex items-center gap-4 text-xs font-mono text-white/70">
+            <div>
+              スコア: <span className="text-white font-semibold">{score}</span>
             </div>
-            <div className="bg-white/5 border border-white/10 px-3 py-1 rounded-lg">
-              ハイスコア: <span className="text-amber-400 font-bold">{highScore}</span>
+            <span className="text-white/20">|</span>
+            <div>
+              ハイスコア: <span className="text-white font-semibold">{highScore}</span>
             </div>
           </div>
 
-          <div className="relative rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl bg-black">
+          <div className="relative border border-white/15 bg-black">
             <canvas
               ref={canvasRef}
               width={480}
@@ -199,11 +197,11 @@ export function RetroCadeApp() {
               className="block"
             />
             {!isPlaying && (
-              <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
-                <div className="text-base font-bold">{currentGame.title}</div>
+              <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center gap-3">
+                <div className="text-sm font-semibold">{currentGame.title}</div>
                 <button
                   onClick={() => setIsPlaying(true)}
-                  className="px-6 py-2.5 rounded-xl bg-cyan-500 text-black font-bold text-xs hover:scale-105 transition"
+                  className="px-5 py-2 bg-white text-black font-semibold text-xs rounded hover:bg-slate-200 transition"
                 >
                   ゲームスタート
                 </button>
@@ -212,7 +210,7 @@ export function RetroCadeApp() {
           </div>
 
           <div className="mt-4 text-[11px] text-white/40 font-mono">
-            操作方法: [A] [D] または [←] [→] キーでパドル操作
+            操作: [A] [D] または [←] [→] キーでパドル操作
           </div>
         </div>
       </div>

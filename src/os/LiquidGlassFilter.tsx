@@ -40,7 +40,7 @@ export function LiquidGlassFilter() {
       currentScale += (targetScale - currentScale) * 0.12;
 
       if (dispRef.current) {
-        dispRef.current.scale.baseVal = currentScale;
+        dispRef.current.scale.baseVal = 0;
       }
       if (lightRef.current) {
         lightRef.current.setAttribute('x', String(mouseX));
@@ -81,7 +81,7 @@ export function LiquidGlassFilter() {
             ref={dispRef}
             in="SourceGraphic"
             in2="noise"
-            scale="8"
+            scale="0"
             xChannelSelector="R"
             yChannelSelector="G"
             result="displaced"
@@ -102,7 +102,7 @@ export function LiquidGlassFilter() {
         {/* Subtle Glass Surface Micro-refraction */}
         <filter id="liquid-glass-subtle" x="-10%" y="-10%" width="120%" height="120%" colorInterpolationFilters="sRGB">
           <feTurbulence type="fractalNoise" baseFrequency="0.02" numOctaves="1" result="noise" />
-          <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" xChannelSelector="R" yChannelSelector="G" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale="0" xChannelSelector="R" yChannelSelector="G" />
         </filter>
       </defs>
     </svg>

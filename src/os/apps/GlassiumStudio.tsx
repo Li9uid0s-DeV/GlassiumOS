@@ -112,30 +112,28 @@ export function GlassiumStudioApp() {
   };
 
   return (
-    <div className="h-full w-full flex flex-col bg-black/35 backdrop-blur-2xl text-white select-none">
+    <div className="h-full w-full flex flex-col bg-slate-950 text-white select-none">
       {/* Top Header */}
-      <div className="h-13 px-5 bg-white/[0.02] border-b border-white/[0.06] flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl glass-jelly flex items-center justify-center text-cyan-300">
-            <Icon name="Code2" size={16} />
-          </div>
-          <div>
-            <div className="text-sm font-semibold">Glassium Studio</div>
-            <div className="text-[10px] text-white/50">AI 共同開発ワークスペース</div>
-          </div>
+      <div className="h-12 px-4 border-b border-white/10 flex items-center justify-between shrink-0 bg-slate-900/50">
+        <div className="flex items-center gap-2.5">
+          <Icon name="Code2" size={16} className="text-cyan-400" />
+          <span className="text-xs font-semibold tracking-wide">Glassium Studio</span>
+          <span className="text-[11px] text-white/40">·</span>
+          <span className="text-[11px] text-white/50">AI Coding Workspace</span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 text-xs">
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className="px-3 py-1.5 rounded-xl glass-jelly text-xs text-white/80 hover:text-white flex items-center gap-1.5"
+            className="text-white/70 hover:text-white transition flex items-center gap-1.5"
           >
             <Icon name="Key" size={13} />
-            <span>APIキー</span>
+            <span>API Key</span>
           </button>
+          <span className="text-white/20">|</span>
           <button
             onClick={() => setShowGithubModal(true)}
-            className="px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-xs text-cyan-300 flex items-center gap-1.5 border border-cyan-500/30 transition"
+            className="text-cyan-400 hover:text-cyan-300 transition flex items-center gap-1.5 font-medium"
           >
             <Icon name="Github" size={13} />
             <span>GitHub Push</span>
@@ -143,20 +141,20 @@ export function GlassiumStudioApp() {
         </div>
       </div>
 
-      {/* API Key Modal / Settings Panel */}
+      {/* API Key Panel */}
       {showSettings && (
-        <div className="p-4 bg-zinc-900/90 border-b border-white/10 flex items-center gap-3 shrink-0">
-          <div className="text-xs text-white/70">Gemini API Key (LocalStorage保存):</div>
+        <div className="px-4 py-3 bg-slate-900 border-b border-white/10 flex items-center gap-3 shrink-0">
+          <span className="text-xs text-white/70">Gemini API Key:</span>
           <input
             type="password"
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder="AIzaSy..."
-            className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-400"
+            className="flex-1 bg-black/40 border border-white/10 rounded px-3 py-1 text-xs text-white outline-none focus:border-cyan-400"
           />
           <button
             onClick={() => { saveApiKey(apiKey); setShowSettings(false); }}
-            className="px-4 py-1.5 rounded-lg bg-cyan-500 text-black text-xs font-semibold"
+            className="px-3 py-1 bg-cyan-500 text-black text-xs font-medium rounded hover:bg-cyan-400 transition"
           >
             保存
           </button>
@@ -164,29 +162,29 @@ export function GlassiumStudioApp() {
       )}
 
       {/* AI Prompt Input Bar */}
-      <div className="p-3 bg-white/[0.01] border-b border-white/[0.06] flex items-center gap-2 shrink-0">
+      <div className="p-3 border-b border-white/10 flex items-center gap-3 shrink-0 bg-slate-900/20">
         <input
           type="text"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
-          placeholder="例: ネオン調のおしゃれなTODOアプリを作って..."
-          className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
+          placeholder="作成したいWebアプリケーションの要件を入力してください..."
+          className="flex-1 bg-black/30 border border-white/10 rounded px-3 py-1.5 text-xs text-white outline-none focus:border-cyan-400"
         />
         <button
           onClick={handleGenerate}
           disabled={isGenerating}
-          className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-500 text-black font-semibold text-xs flex items-center gap-2 hover:brightness-110 transition disabled:opacity-50"
+          className="px-4 py-1.5 bg-white/10 hover:bg-white/15 text-white font-medium text-xs rounded transition flex items-center gap-1.5 disabled:opacity-40"
         >
           {isGenerating ? (
             <>
-              <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-              <span>生成中...</span>
+              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span>生成中</span>
             </>
           ) : (
             <>
-              <Icon name="Sparkles" size={14} />
-              <span>AIコード生成</span>
+              <Icon name="Sparkles" size={13} />
+              <span>生成</span>
             </>
           )}
         </button>
@@ -194,16 +192,17 @@ export function GlassiumStudioApp() {
 
       {/* Main Content: Preview vs Code Editor */}
       <div className="flex-1 min-h-0 flex flex-col relative">
-        <div className="absolute right-4 top-3 z-20 flex items-center gap-1 bg-black/60 backdrop-blur-xl p-1 rounded-xl border border-white/10">
+        <div className="absolute right-4 top-3 z-20 flex items-center gap-2 bg-slate-900/90 border border-white/10 px-2 py-1 rounded text-xs">
           <button
             onClick={() => setActiveTab('preview')}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition ${activeTab === 'preview' ? 'bg-cyan-500 text-black font-semibold' : 'text-white/70 hover:text-white'}`}
+            className={activeTab === 'preview' ? 'text-cyan-400 font-semibold' : 'text-white/60 hover:text-white'}
           >
             プレビュー
           </button>
+          <span className="text-white/20">|</span>
           <button
             onClick={() => setActiveTab('code')}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition ${activeTab === 'code' ? 'bg-cyan-500 text-black font-semibold' : 'text-white/70 hover:text-white'}`}
+            className={activeTab === 'code' ? 'text-cyan-400 font-semibold' : 'text-white/60 hover:text-white'}
           >
             ソースコード
           </button>
@@ -220,75 +219,77 @@ export function GlassiumStudioApp() {
             />
           </div>
         ) : (
-          <div className="h-full w-full p-4 bg-zinc-950 font-mono text-xs text-cyan-200 overflow-auto">
+          <div className="h-full w-full p-4 bg-zinc-950 font-mono text-xs text-slate-200 overflow-auto">
             <textarea
               value={code}
               onChange={(e) => setCode(e.target.value)}
-              className="h-full w-full bg-transparent resize-none focus:outline-none leading-relaxed text-xs text-white/90"
+              className="h-full w-full bg-transparent resize-none outline-none leading-relaxed text-xs text-white/90"
               spellCheck={false}
             />
           </div>
         )}
       </div>
 
-      {/* GitHub Commit / Push Modal */}
+      {/* GitHub Push Modal */}
       {showGithubModal && (
-        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-6">
-          <div className="w-full max-w-md bg-zinc-900 border border-white/15 rounded-2xl p-6 shadow-2xl flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <Icon name="Github" size={18} />
-                <span>GitHub リポジトリへプッシュ</span>
-              </div>
-              <button onClick={() => setShowGithubModal(false)} className="text-white/50 hover:text-white">
-                <Icon name="X" size={16} />
+        <div className="absolute inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-white/10 p-5 shadow-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <span className="text-xs font-bold text-white flex items-center gap-2">
+                <Icon name="Github" size={15} />
+                <span>GitHub リポジトリへ保存</span>
+              </span>
+              <button onClick={() => setShowGithubModal(false)} className="text-white/40 hover:text-white">
+                <Icon name="X" size={14} />
               </button>
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] text-white/60">リポジトリ (owner/repo):</label>
-              <input
-                type="text"
-                value={repoTarget}
-                onChange={(e) => setRepoTarget(e.target.value)}
-                className="bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
-              />
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block text-white/60 mb-1">リポジトリ (owner/repo)</label>
+                <input
+                  type="text"
+                  value={repoTarget}
+                  onChange={(e) => setRepoTarget(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded px-3 py-1.5 text-white outline-none focus:border-cyan-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-white/60 mb-1">Personal Access Token</label>
+                <input
+                  type="password"
+                  value={githubToken}
+                  onChange={(e) => setGithubToken(e.target.value)}
+                  placeholder="ghp_..."
+                  className="w-full bg-black/40 border border-white/10 rounded px-3 py-1.5 text-white outline-none focus:border-cyan-400"
+                />
+              </div>
+
+              <div>
+                <label className="block text-white/60 mb-1">コミットメッセージ</label>
+                <input
+                  type="text"
+                  value={commitMessage}
+                  onChange={(e) => setCommitMessage(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded px-3 py-1.5 text-white outline-none focus:border-cyan-400"
+                />
+              </div>
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] text-white/60">Personal Access Token (PAT):</label>
-              <input
-                type="password"
-                value={githubToken}
-                onChange={(e) => setGithubToken(e.target.value)}
-                placeholder="ghp_..."
-                className="bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="text-[11px] text-white/60">コミットメッセージ:</label>
-              <input
-                type="text"
-                value={commitMessage}
-                onChange={(e) => setCommitMessage(e.target.value)}
-                className="bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-2.5 mt-2">
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
               <button
                 onClick={() => setShowGithubModal(false)}
-                className="px-4 py-2 rounded-xl bg-white/10 text-xs text-white/80 hover:bg-white/15"
+                className="text-xs text-white/60 hover:text-white"
               >
                 キャンセル
               </button>
               <button
                 onClick={handlePushToGithub}
                 disabled={isPushing}
-                className="px-5 py-2 rounded-xl bg-cyan-500 text-black font-semibold text-xs flex items-center gap-2 hover:brightness-110 transition disabled:opacity-50"
+                className="px-4 py-1.5 bg-cyan-500 text-black text-xs font-semibold rounded hover:bg-cyan-400 transition disabled:opacity-50"
               >
-                {isPushing ? 'プッシュ中...' : 'コミット＆プッシュ'}
+                {isPushing ? '送信中...' : 'プッシュ'}
               </button>
             </div>
           </div>

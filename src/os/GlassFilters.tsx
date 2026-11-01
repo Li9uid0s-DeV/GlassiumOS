@@ -47,7 +47,7 @@ export function GlassFilters() {
       targetScaleRef.current += (distortionScale - targetScaleRef.current) * 0.04;
 
       if (dispRef.current) {
-        dispRef.current.scale.baseVal = currentScaleRef.current;
+        dispRef.current.scale.baseVal = 0;
       }
       if (turbRef.current && currentScaleRef.current > distortionScale + 1) {
         const dynamicFreq = baseFreq + (currentScaleRef.current - distortionScale) * 0.0006;
@@ -66,16 +66,16 @@ export function GlassFilters() {
   }, [distortionScale, glassWobble]);
 
   return (
-    <svg width="0" height="0" style={{ position: 'fixed', top: -9999, left: -9999, pointerEvents: 'none' }} aria-hidden="true">
+    <svg style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', pointerEvents: 'none' }} aria-hidden="true">
       <defs>
-        {/* Dynamic SVG Liquid Glass Refraction & Ripple Filter */}
+        {/* Dynamic SVG Liquid Glass Specular & Refraction Filter */}
         <filter id="glass-distortion" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
           <feTurbulence ref={turbRef} type="fractalNoise" baseFrequency="0.016" numOctaves={2} result="noise" />
           <feDisplacementMap
             ref={dispRef}
             in="SourceGraphic"
             in2="noise"
-            scale={distortionScale}
+            scale={0}
             xChannelSelector="R"
             yChannelSelector="G"
             result="displaced"
@@ -96,7 +96,7 @@ export function GlassFilters() {
         {/* Alias for liquid glass window lenses */}
         <filter id="liquid-glass-lens" x="-20%" y="-20%" width="140%" height="140%" colorInterpolationFilters="sRGB">
           <feTurbulence type="fractalNoise" baseFrequency="0.014" numOctaves={2} result="noise" />
-          <feDisplacementMap in="SourceGraphic" in2="noise" scale="10" xChannelSelector="R" yChannelSelector="G" result="displaced" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale={0} xChannelSelector="R" yChannelSelector="G" result="displaced" />
           <feSpecularLighting in="displaced" surfaceScale="2" specularConstant="0.75" specularExponent="22" lightingColor="#ffffff" result="specLight">
             <fePointLight x="240" y="160" z="80" />
           </feSpecularLighting>
@@ -107,7 +107,7 @@ export function GlassFilters() {
         <filter id="frosted-dock" x="-10%" y="-10%" width="120%" height="120%">
           <feTurbulence type="fractalNoise" baseFrequency="0.012 0.018" numOctaves={2} result="noise" />
           <feGaussianBlur in="noise" stdDeviation="1.5" result="blurred" />
-          <feDisplacementMap in="SourceGraphic" in2="blurred" scale="8" xChannelSelector="R" yChannelSelector="G" />
+          <feDisplacementMap in="SourceGraphic" in2="blurred" scale="0" xChannelSelector="R" yChannelSelector="G" />
         </filter>
 
         {/* Start Menu & Dialog Liquid Filter */}
