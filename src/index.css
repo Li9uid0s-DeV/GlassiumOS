@@ -65,6 +65,7 @@ body,
   background: var(--os-surface);
   backdrop-filter: blur(var(--theme-blur, 24px)) saturate(160%);
   -webkit-backdrop-filter: blur(var(--theme-blur, 24px)) saturate(160%);
+  filter: url(#glass-distortion);
   border: none !important;
   border-radius: var(--theme-radius, 16px);
   box-shadow:
@@ -76,7 +77,8 @@ body,
   transition:
     background-color 0.22s ease,
     box-shadow 0.22s ease,
-    color 0.22s ease;
+    color 0.22s ease,
+    filter 0.22s ease;
 }
 
 [data-theme='light'] .liquid-glass-window,
@@ -177,6 +179,7 @@ body,
   background: var(--os-surface);
   backdrop-filter: blur(24px) saturate(160%);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
+  filter: url(#frosted-dock);
   border: none !important;
   box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
   color: var(--os-text);
