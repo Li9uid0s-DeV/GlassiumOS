@@ -570,10 +570,12 @@ export function LockScreen({ locked, onUnlock, expectedPassword, userName }: Loc
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: 'spring', stiffness: 240, damping: 24 }}
                 onClick={handleQuickUnlock}
-                className="px-10 sm:px-16 py-8 sm:py-10 rounded-[44px] bg-slate-900/60 backdrop-blur-2xl shadow-[0_24px_64px_rgba(0,0,0,0.5)] cursor-pointer text-center"
-                style={{ filter: 'url(#glass-distortion)' }}
+                className="px-10 sm:px-16 py-8 sm:py-10 rounded-[44px] bg-slate-900/40 backdrop-blur-2xl shadow-[0_24px_64px_rgba(0,0,0,0.4)] cursor-pointer text-center"
               >
-                <div className="text-7xl sm:text-[116px] font-extrabold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-white/95 to-cyan-200/80 leading-none tabular-nums drop-shadow-[0_12px_32px_rgba(0,0,0,0.5)]">
+                <div
+                  className="text-7xl sm:text-[116px] font-extrabold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-white/95 to-cyan-200/80 leading-none tabular-nums drop-shadow-[0_12px_32px_rgba(0,0,0,0.5)]"
+                  style={{ filter: 'url(#glass-distortion)' }}
+                >
                   {timeStr}
                 </div>
               </motion.div>

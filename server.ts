@@ -556,7 +556,14 @@ async function startServer() {
 
     let targetUrl = rawUrl.trim();
 
-    if (/^(jsdelivr|gh):/i.test(targetUrl)) {
+    // Transform github.com/owner/repo to jsDelivr CDN for direct previewing
+    const ghRepoMatch = targetUrl.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)(\/?.*)?$/i);
+    if (ghRepoMatch) {
+      const owner = ghRepoMatch[1];
+      const repo = ghRepoMatch[2].replace(/\.git$/i, '');
+      const sub = ghRepoMatch[3] && ghRepoMatch[3].length > 1 ? ghRepoMatch[3] : '/index.html';
+      targetUrl = `https://cdn.jsdelivr.net/gh/${owner}/${repo}@latest${sub}`;
+    } else if (/^(jsdelivr|gh):/i.test(targetUrl)) {
       const repoPath = targetUrl.replace(/^(jsdelivr|gh):\/+/i, '').replace(/^(jsdelivr|gh):/i, '');
       const parts = repoPath.split('/');
       if (parts.length >= 2) {
@@ -609,7 +616,7 @@ async function startServer() {
     try {
       let response = await fetchWithFallback(targetUrl);
 
-      if (!response.ok && response.status === 404) {
+      if (!response.ok && (response.status === 404 || response.status >= 500)) {
         const ghPagesMatch = targetUrl.match(/^https?:\/\/([^.]+)\.github\.io\/([^/]+)(\/.*)?$/i);
         if (ghPagesMatch) {
           const owner = ghPagesMatch[1];
@@ -620,6 +627,14 @@ async function startServer() {
           if (fallbackResp.ok) {
             targetUrl = jsDelivrUrl;
             response = fallbackResp;
+          } else {
+            // Try raw github
+            const rawUrl = `https://raw.githubusercontent.com/${owner}/${repo}/main${subPath}`;
+            const rawResp = await fetchWithFallback(rawUrl);
+            if (rawResp.ok) {
+              targetUrl = rawUrl;
+              response = rawResp;
+            }
           }
         }
       }
