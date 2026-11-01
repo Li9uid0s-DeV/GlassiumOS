@@ -1,1742 +1,820 @@
-import { useRef, useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useOS, Wallpaper } from '../OSContext';
 import {
-  useOS,
-  Wallpaper,
-  AuroraColor,
-} from '../OSContext';
-import {
-  ShellMode,
-  DesignEngine,
-  LockScreenStyle,
-  ACCENT_COLOR_PRESETS,
   AppId,
-  DesktopIconSize,
-  DESKTOP_ICON_SIZE_PRESETS,
   UI_STYLES,
   SleepClockStyle,
   SleepBackground,
-  ClockPosition,
 } from '../types';
 import { WALLPAPERS } from '../wallpapers';
 import { Icon } from '../Icon';
-import { AppLogo } from '../AppLogo';
 
 const WALLPAPER_KEYS = Object.keys(WALLPAPERS) as Wallpaper[];
 
-type SettingsTab = 'appearance' | 'system' | 'display' | 'account' | 'apps';
+type NavCategory =
+  | 'system'
+  | 'personalization'
+  | 'apps'
+  | 'accounts'
+  | 'update';
 
-const AURORA_PALETTES: {
-  id: AuroraColor;
+type SystemSubView =
+  | 'main'
+  | 'display'
+  | 'sound'
+  | 'power'
+  | 'multitasking'
+  | 'aicomponents'
+  | 'about';
+
+interface NavItem {
+  id: NavCategory;
   label: string;
-  preview: string;
-}[] = [
-  { id: 'cyan-violet', label: 'Amethyst & Cyan', preview: 'linear-gradient(135deg, #a855f7, #6366f1, #06b6d4)' },
-  { id: 'emerald-sky', label: 'Polar Emerald', preview: 'linear-gradient(135deg, #10b981, #06b6d4, #3b82f6)' },
-  { id: 'rose-gold', label: 'Crimson Rose', preview: 'linear-gradient(135deg, #f43f5e, #d946ef, #f59e0b)' },
-  { id: 'ocean-blue', label: 'Abyssal Sapphire', preview: 'linear-gradient(135deg, #2563eb, #0ea5e9, #2dd4bf)' },
-  { id: 'sunset-magenta', label: 'Neon Dusk', preview: 'linear-gradient(135deg, #d946ef, #8b5cf6, #ec4899)' },
-];
-
-const SHELL_MODES: { id: ShellMode; label: string; desc: string }[] = [
-  { id: 'windows', label: 'Windows 11', desc: '標準フラットタスクバー ＆ スタートメニュー' },
-  { id: 'windows10', label: 'Windows 10', desc: 'クラシックタイル ＆ フラットバー' },
-  { id: 'mac', label: 'macOS Dock', desc: 'トップメニューバー ＆ 下部Dock' },
-  { id: 'zorin', label: 'Zorin Pro', desc: 'クリーンなLinuxデスクトップシェル' },
-  { id: 'chromeos', label: 'ChromeOS', desc: 'ミニマルなシェルフランチャー' },
-  { id: 'dex', label: 'Workstation DeX', desc: 'マルチウィンドウ生産性シェル' },
-  { id: 'vista', label: 'Vista Aero', desc: 'エアロガラス ＆ デスクトップガジェット' },
-  { id: 'xp', label: 'Classic XP', desc: 'レトロなルナテーマ ＆ 2列スタート' },
-];
-
-const DESIGN_ENGINES: { id: DesignEngine; label: string; desc: string }[] = [
-  { id: 'windows-mica', label: 'Flat Mica', desc: '落ち着きのあるフラット透過マイカ' },
-  { id: 'frosted-blur', label: 'Frosted Acrylic', desc: '高精細すりガラスアクリル' },
-  { id: 'dark-slate', label: 'Crisp Slate', desc: 'コントラスト重視のフラットスレート' },
-  { id: 'liquid-glass', label: 'Translucent Glass', desc: '滑らかな光学透過サーフェス' },
-];
-
-const LOCK_STYLES: { id: LockScreenStyle; label: string; desc: string }[] = [
-  { id: 'hyperos3', label: 'Large Depth Clock', desc: 'モダンな大型タイポグラフィ時計' },
-  { id: 'windows-hello', label: 'Windows Spotlight', desc: 'センター配置のサインイン画面' },
-  { id: 'miuix', label: 'Minimal Clean', desc: 'シンプルなミニマルロック画面' },
-  { id: 'cosmic-liquid', label: 'Ambient Glass', desc: '透過ガラスカードスタイル' },
-];
-
-interface SystemAppEntry {
-  appId: AppId;
-  name: string;
-  nameJa: string;
-  category: string;
-  description: string;
   icon: string;
 }
 
-const SYSTEM_APPS_CATALOG: SystemAppEntry[] = [
-  { appId: 'browser', name: 'Browser', nameJa: 'ブラウザ', category: 'Internet', description: 'プロキシ対応ウェブブラウザ', icon: 'browser' },
-  { appId: 'notepad', name: 'Editor', nameJa: 'テキストエディタ', category: 'Productivity', description: 'Markdown・テキスト編集ワークスペース', icon: 'notepad' },
-  { appId: 'terminal', name: 'Terminal', nameJa: 'ターミナル', category: 'Developer', description: 'コマンドラインシェル環境', icon: 'terminal' },
-  { appId: 'explorer', name: 'Files', nameJa: 'ファイル', category: 'System', description: '仮想ファイルシステム・フォルダ管理', icon: 'explorer' },
-  { appId: 'calculator', name: 'Calculator', nameJa: '電卓', category: 'Utilities', description: '関数・四則演算カリキュレーター', icon: 'calculator' },
-  { appId: 'settings', name: 'Settings', nameJa: '設定', category: 'System', description: 'OSシステム環境設定とカスタマイズ', icon: 'settings' },
-  { appId: 'taskmanager', name: 'Task Manager', nameJa: 'タスクマネージャー', category: 'System', description: '実行中プロセスの終了とリソース監視', icon: 'taskmanager' },
-  { appId: 'appstore', name: 'App Store', nameJa: 'アプリストア', category: 'System', description: 'アプリ・テーマ・Webアプリの追加と管理', icon: 'appstore' },
-  { appId: 'ai', name: 'AI Assistant', nameJa: 'AIアシスタント', category: 'AI', description: '質疑応答・コード生成・OS操作アシスタント', icon: 'ai' },
-  { appId: 'game', name: 'Games', nameJa: 'ゲームセンター', category: 'Games', description: '3D・アーケード・パズルゲームコレクション', icon: 'game' },
-  { appId: 'synth', name: 'Music', nameJa: 'ミュージック', category: 'Media', description: '音楽ストリーミング＆オーディオビジュアライザー', icon: 'synth' },
-  { appId: 'calendar', name: 'Calendar', nameJa: 'カレンダー', category: 'Productivity', description: 'スケジュール・タスク優先度管理', icon: 'calendar' },
-  { appId: 'weather', name: 'Weather', nameJa: '天気予報', category: 'Utilities', description: 'リアルタイム気象レーダーと週間予報', icon: 'weather' },
-  { appId: 'clock', name: 'Clock', nameJa: '時計・アラーム', category: 'Utilities', description: '世界時計・アラーム・ストップウォッチ', icon: 'clock' },
+// Only active, fully-implemented settings categories
+const SIDEBAR_NAV: NavItem[] = [
+  { id: 'system', label: 'System', icon: 'Monitor' },
+  { id: 'personalization', label: 'Personalization', icon: 'Palette' },
+  { id: 'apps', label: 'Apps', icon: 'LayoutGrid' },
+  { id: 'accounts', label: 'Accounts', icon: 'User' },
+  { id: 'update', label: 'Windows Update', icon: 'RefreshCw' },
+];
+
+interface SystemCard {
+  id: SystemSubView;
+  title: string;
+  desc: string;
+  icon: string;
+}
+
+// Only active, fully-implemented System setting cards
+const SYSTEM_CARDS: SystemCard[] = [
+  { id: 'display', title: 'Display', desc: 'Monitors, brightness, night light, display profile, wallpapers & aurora', icon: 'Monitor' },
+  { id: 'sound', title: 'Sound', desc: 'Volume levels, output, input, system sound effects', icon: 'Volume2' },
+  { id: 'power', title: 'Power & battery', desc: 'Screen lock and sleep, clock style, sleep backgrounds', icon: 'BatteryCharging' },
+  { id: 'multitasking', title: 'Multitasking', desc: 'Snap windows, virtual desktops, taskbar layout', icon: 'Layers' },
+  { id: 'aicomponents', title: 'AI components', desc: 'Manage Google Gemini API Key and AI assistant models', icon: 'Sparkles' },
+  { id: 'about', title: 'About', desc: 'Device specifications, GlassiumOS build, system specs', icon: 'Info' },
 ];
 
 export function SettingsApp() {
   const {
     wallpaper,
     setWallpaper,
-    customWallpapers,
-    addCustomWallpaper,
-    selectedCustomId,
-    setSelectedCustomId,
     theme,
     setTheme,
-    accentColor,
-    setAccentColor,
     uiStyle,
     setUiStyle,
     sleepClockStyle,
     setSleepClockStyle,
     sleepBackground,
     setSleepBackground,
-    clockPosition,
-    setClockPosition,
-    temperature,
-    taskbarAlign,
-    setTaskbarAlign,
     blurAmount,
     setBlurAmount,
     cornerRadius,
     setCornerRadius,
     transparency,
     setTransparency,
-    glassCurvature,
-    setGlassCurvature,
-    glassSpecular,
-    setGlassSpecular,
     glassWobble,
     setGlassWobble,
-    glassDispersion,
-    setGlassDispersion,
-    glassNoise,
-    setGlassNoise,
-    auroraColor,
-    setAuroraColor,
-    auroraSpeed,
-    setAuroraSpeed,
-    auroraIntensity,
-    setAuroraIntensity,
-    auroraParticles,
-    setAuroraParticles,
     volume,
     setVolume,
     soundEnabled,
     setSoundEnabled,
     playSound,
-    shellMode,
-    setShellMode,
-    designEngine,
-    setDesignEngine,
-    quickSettings,
-    toggleQuick,
-    liteMode,
-    setLiteMode,
-    touchMode,
-    setTouchMode,
-    snapAllWindows5050,
-    desktops,
-    activeDesktopId,
-    switchDesktop,
-    createDesktop,
-    addDeskNote,
-    resetDesktopIconPositions,
-    desktopIconSize,
-    setDesktopIconSize,
-    gridSnapEnabled,
-    setGridSnapEnabled,
-    isWallpaperBright,
-    emptyRecycleBin,
     user,
     setUser,
-    lockScreenStyle,
-    setLockScreenStyle,
     lockSystem,
-    notifications,
-    clearNotifications,
     installedApps,
-    uninstallApp,
-    launchInstalledApp,
     openApp,
-    windows,
+    addNotification,
+    snapAllWindows5050,
+    taskbarAlign,
+    setTaskbarAlign,
   } = useOS();
 
   const isLight = theme === 'light';
-  const [activeTab, setActiveTab] = useState<SettingsTab>('appearance');
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [activeCategory, setActiveCategory] = useState<NavCategory>('system');
+  const [systemSubView, setSystemSubView] = useState<SystemSubView>('main');
 
-  // Account tab local form state
+  // AI Key state
+  const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('gemini_api_key') || localStorage.getItem('glassium_ai_key') || '');
+  const [showKeyPassword, setShowKeyPassword] = useState(false);
+  const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [aiTestMessage, setAiTestMessage] = useState('');
+
+  // Account local state
   const [profileName, setProfileName] = useState(user?.name || 'Administrator');
   const [profilePassword, setProfilePassword] = useState(user?.password || '');
-  const [accountSavedMsg, setAccountSavedMsg] = useState('');
+  const [accountSaved, setAccountSaved] = useState(false);
 
-  // Apps tab search & filter
+  // App search
   const [appSearch, setAppSearch] = useState('');
-  const [appFilter, setAppFilter] = useState<'all' | 'system' | 'installed' | 'running'>('all');
 
-  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        addCustomWallpaper(file.name.replace(/\.[^.]+$/, ''), reader.result);
+  useEffect(() => {
+    if (geminiApiKey) {
+      localStorage.setItem('gemini_api_key', geminiApiKey);
+      localStorage.setItem('glassium_ai_key', geminiApiKey);
+    }
+  }, [geminiApiKey]);
+
+  const handleSaveApiKey = () => {
+    playSound('click');
+    localStorage.setItem('gemini_api_key', geminiApiKey.trim());
+    localStorage.setItem('glassium_ai_key', geminiApiKey.trim());
+    addNotification('AI 設定', 'Gemini APIキーを正常に保存しました。');
+  };
+
+  const handleTestApiKey = async () => {
+    if (!geminiApiKey.trim()) {
+      setAiTestStatus('error');
+      setAiTestMessage('APIキーを入力してください。');
+      return;
+    }
+    setAiTestStatus('testing');
+    setAiTestMessage('Gemini 3.8 Flash に接続確認中...');
+    playSound('click');
+
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: 'Hello, testing connection.',
+          apiKey: geminiApiKey.trim(),
+        }),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.reply) {
+        setAiTestStatus('success');
+        setAiTestMessage(`接続成功！ (${data.model || 'Gemini 3.8 Flash'})`);
+        addNotification('AI 接続成功', 'Gemini APIキーの検証に成功しました！');
+      } else {
+        throw new Error('無効な応答');
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err: unknown) {
+      setAiTestStatus('error');
+      setAiTestMessage(`接続失敗: ${err instanceof Error ? err.message : 'APIキーまたはネットワークを確認してください'}`);
+    }
   };
 
   const handleSaveAccount = (e: React.FormEvent) => {
     e.preventDefault();
-    const trimmed = profileName.trim() || 'Administrator';
     setUser({
-      name: trimmed,
+      name: profileName.trim() || 'Administrator',
       avatar: user?.avatar || 'User',
       password: profilePassword.trim() || undefined,
       createdAt: user?.createdAt || Date.now(),
     });
     playSound('notify');
-    setAccountSavedMsg('アカウント設定を保存しました');
-    setTimeout(() => setAccountSavedMsg(''), 3000);
+    setAccountSaved(true);
+    setTimeout(() => setAccountSaved(false), 3000);
   };
 
-  const runningAppIds = useMemo(() => new Set(windows.map((w) => w.appId)), [windows]);
-
-  const combinedApps = useMemo(() => {
-    const sysList = SYSTEM_APPS_CATALOG.map((sys) => ({
-      uid: `sys-${sys.appId}`,
-      id: sys.appId,
-      appId: sys.appId,
-      name: sys.name,
-      nameJa: sys.nameJa,
-      category: sys.category,
-      description: sys.description,
-      icon: sys.icon,
-      isSystem: true,
-      isRunning: runningAppIds.has(sys.appId),
-    }));
-
-    const sysIds = new Set(SYSTEM_APPS_CATALOG.map((s) => s.appId));
-    const storeList = installedApps
-      .filter((inst) => !sysIds.has(inst.appId as AppId))
-      .map((inst) => ({
-        uid: `inst-${inst.id}`,
-        id: inst.id,
-        appId: inst.appId,
-        name: inst.name,
-        nameJa: inst.name,
-        category: inst.category === 'games' ? 'Games' : 'Store App',
-        description: inst.description,
-        icon: inst.icon,
-        isSystem: false,
-        isRunning: runningAppIds.has(inst.appId),
-      }));
-
-    return [...sysList, ...storeList].filter((item) => {
-      if (appFilter === 'system' && !item.isSystem) return false;
-      if (appFilter === 'installed' && item.isSystem) return false;
-      if (appFilter === 'running' && !item.isRunning) return false;
-      if (appSearch.trim()) {
-        const q = appSearch.toLowerCase();
-        return (
-          item.name.toLowerCase().includes(q) ||
-          item.nameJa.toLowerCase().includes(q) ||
-          item.description.toLowerCase().includes(q) ||
-          item.category.toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
-  }, [installedApps, runningAppIds, appFilter, appSearch]);
-
-  const navItems: { id: SettingsTab; label: string; sub: string; icon: string }[] = [
-    { id: 'appearance', label: 'Appearance', sub: 'テーマ・アクセント・外観', icon: 'Palette' },
-    { id: 'system', label: 'System', sub: 'サウンド・電源・マルチタスク', icon: 'SlidersHorizontal' },
-    { id: 'display', label: 'Display', sub: '壁紙・オーロラ・アイコン配置', icon: 'Monitor' },
-    { id: 'account', label: 'Account', sub: 'プロフィール・ロック画面', icon: 'User' },
-    { id: 'apps', label: 'Apps', sub: 'アプリ一覧・起動・管理', icon: 'LayoutGrid' },
-  ];
-
-  const sectionClass =
-    'space-y-3 pb-8 mb-8 last:mb-0 last:pb-0';
-  const sectionTitleClass = 'text-xs font-bold tracking-tight text-slate-800 dark:text-slate-100';
-  const sectionDescClass = 'text-[11px] opacity-60';
-
-  const rowItemClass = `flex items-center justify-between p-2.5 rounded-lg transition-colors duration-150 ${
-    isLight ? 'hover:bg-slate-200/50' : 'hover:bg-white/[0.04]'
-  }`;
-
-  const subButtonClass = (active: boolean) =>
-    `rounded-lg px-3 py-2 text-xs font-medium transition-all duration-150 ${
-      active
-        ? 'os-accent-soft font-semibold shadow-sm'
-        : isLight
-        ? 'bg-slate-100/90 text-slate-700 hover:bg-slate-200/70'
-        : 'bg-white/[0.04] text-white/75 hover:bg-white/[0.08]'
-    }`;
+  const renderBreadcrumbHeader = (title: string) => (
+    <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-200 dark:border-white/10">
+      <button
+        type="button"
+        onClick={() => {
+          playSound('click');
+          setSystemSubView('main');
+        }}
+        className={`p-1.5 rounded-md transition ${
+          isLight ? 'hover:bg-slate-200 text-slate-700' : 'hover:bg-white/10 text-white/80'
+        }`}
+        title="Back to System"
+      >
+        <Icon name="ChevronLeft" size={18} />
+      </button>
+      <span className="text-xs font-medium opacity-60">System</span>
+      <span className="text-xs opacity-40">&gt;</span>
+      <span className="text-sm font-bold">{title}</span>
+    </div>
+  );
 
   return (
     <div
       className={`h-full w-full flex flex-col sm:flex-row overflow-hidden select-none transition-colors duration-200 ${
-        isLight ? 'bg-slate-50 text-slate-900' : 'bg-slate-950/60 text-white'
+        isLight ? 'bg-slate-100 text-slate-900' : 'bg-[#1c1c1e] text-white'
       }`}
     >
-      {/* Left Navigation Sidebar */}
+      {/* ==============================================================
+          LEFT SIDEBAR (Active Functional Nav Items)
+         ============================================================== */}
       <div
-        className={`w-full sm:w-56 p-3 flex sm:flex-col justify-between gap-2 shrink-0 transition-colors duration-200 ${
-          isLight ? 'bg-slate-100/80' : 'bg-slate-900/40'
+        className={`w-full sm:w-64 p-3 flex sm:flex-col justify-between shrink-0 border-r transition-colors duration-200 ${
+          isLight ? 'bg-slate-200/50 border-slate-300/60' : 'bg-[#252528]/80 border-white/[0.08]'
         }`}
       >
-        <div className="w-full">
-          {/* Header */}
-          <div className="hidden sm:flex items-center gap-2.5 px-2.5 py-2 mb-3">
-            <AppLogo size={22} />
+        <div className="w-full flex-1 overflow-y-auto scrollbar-none">
+          {/* User Account Header */}
+          <div className="hidden sm:flex items-center gap-3 px-3 py-3 mb-3">
+            <div className="w-10 h-10 rounded-full bg-slate-300 dark:bg-white/10 flex items-center justify-center shrink-0 text-slate-700 dark:text-white/80 shadow-inner">
+              <Icon name="User" size={20} />
+            </div>
             <div className="min-w-0">
-              <div className="text-xs font-bold tracking-tight truncate">Settings</div>
-              <div className="text-[10px] opacity-50 truncate">System Control Panel</div>
+              <div className="text-xs font-bold truncate">{user?.name || 'Administrator'}</div>
+              <div className="text-[11px] opacity-60 truncate">Local Account</div>
             </div>
           </div>
 
-          {/* 5 Category Tabs */}
-          <div className="flex sm:flex-col gap-1 overflow-x-auto w-full">
-            {navItems.map((item) => {
-              const active = activeTab === item.id;
+          {/* Search Box inside Sidebar */}
+          <div className="hidden sm:block px-2 mb-3">
+            <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs border ${
+              isLight ? 'bg-white border-slate-300 text-slate-800' : 'bg-black/30 border-white/10 text-white'
+            }`}>
+              <Icon name="Search" size={13} className="opacity-50 shrink-0" />
+              <input
+                type="text"
+                placeholder="Find a setting"
+                className="w-full bg-transparent outline-none text-xs placeholder-slate-400 dark:placeholder-white/40"
+              />
+            </div>
+          </div>
+
+          {/* Navigation Items */}
+          <div className="flex sm:flex-col gap-0.5 overflow-x-auto w-full">
+            {SIDEBAR_NAV.map((item) => {
+              const active = activeCategory === item.id;
               return (
                 <button
                   key={item.id}
                   type="button"
                   onClick={() => {
                     playSound('click');
-                    setActiveTab(item.id);
+                    setActiveCategory(item.id);
+                    if (item.id === 'system') {
+                      setSystemSubView('main');
+                    }
                   }}
-                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all shrink-0 sm:w-full ${
+                  className={`relative flex items-center gap-3 px-3 py-2.5 rounded-md text-left text-xs transition-all shrink-0 sm:w-full ${
                     active
                       ? isLight
-                        ? 'bg-white text-slate-900 shadow-sm font-semibold'
-                        : 'bg-white/10 text-white font-semibold'
+                        ? 'bg-white font-semibold text-sky-600 shadow-sm'
+                        : 'bg-white/[0.08] font-semibold text-sky-400'
                       : isLight
-                      ? 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900'
-                      : 'text-white/65 hover:bg-white/[0.05] hover:text-white'
+                      ? 'text-slate-700 hover:bg-slate-300/50'
+                      : 'text-white/75 hover:bg-white/[0.04]'
                   }`}
                 >
                   {active && (
-                    <motion.span
-                      layoutId="settings-nav-indicator"
-                      className="hidden sm:block absolute left-0 top-2 bottom-2 w-1 rounded-r os-accent-bg"
-                      transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-                    />
+                    <span className="hidden sm:block absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-md bg-sky-500" />
                   )}
-                  <Icon
-                    name={item.icon}
-                    size={16}
-                    className={active ? 'os-accent-text' : 'opacity-65'}
-                  />
-                  <div className="min-w-0">
-                    <div className="text-xs leading-tight">{item.label}</div>
-                    <div className="text-[10px] opacity-50 hidden sm:block truncate mt-0.5">
-                      {item.sub}
-                    </div>
-                  </div>
+                  <Icon name={item.icon} size={16} className={active ? 'text-sky-500' : 'opacity-70'} />
+                  <span className="truncate">{item.label}</span>
                 </button>
               );
             })}
           </div>
         </div>
-
-        {/* Bottom Profile Summary */}
-        <div
-          onClick={() => setActiveTab('account')}
-          className={`hidden sm:flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer transition ${
-            isLight
-              ? 'bg-white hover:bg-slate-200/60 shadow-sm'
-              : 'bg-white/[0.03] hover:bg-white/[0.06]'
-          }`}
-        >
-          <div className="w-7 h-7 rounded-full os-accent-bg flex items-center justify-center text-white text-xs font-bold shrink-0">
-            {(user?.name || 'A')[0].toUpperCase()}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-xs font-medium truncate">{user?.name || 'Administrator'}</div>
-            <div className="text-[10px] opacity-50 truncate">Local Administrator</div>
-          </div>
-        </div>
       </div>
 
-      {/* Main Content Area with Smooth Animated Transitions */}
-      <div className="flex-1 p-5 sm:p-6 overflow-y-auto">
+      {/* ==============================================================
+          RIGHT MAIN PANE
+         ============================================================== */}
+      <div className="flex-1 p-6 overflow-y-auto">
         <AnimatePresence mode="wait">
-          {/* ==============================================================
-              1. APPEARANCE (外観・テーマ・アクセントカラー・シェル)
-             ============================================================== */}
-          {activeTab === 'appearance' && (
+          {/* ==================== 1. SYSTEM PAGE ==================== */}
+          {activeCategory === 'system' && (
             <motion.div
-              key="tab-appearance"
-              initial={{ opacity: 0, y: 8 }}
+              key="cat-system"
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.18 }}
-              className="space-y-4 max-w-3xl"
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15 }}
+              className="max-w-4xl"
             >
-              <div>
-                <h2 className="text-base font-bold tracking-tight">Appearance</h2>
-                <p className="text-xs opacity-60 mt-0.5">
-                  UIスタイル（がち枠・ネタ枠）、カラーモード、スリープ画面、ウィンドウ透過度を調整します。
-                </p>
-              </div>
-
-              {/* ==============================================================
-                  UI STYLE SWITCHER (Zero Border Line Concept)
-                 ============================================================== */}
-              <div className={sectionClass}>
-                <div className="flex items-center justify-between mb-1">
-                  <div className={sectionTitleClass}>UI Style (UI スタイル)</div>
-                  <span className="text-[11px] font-mono os-accent-text uppercase">
-                    {UI_STYLES.find((s) => s.id === uiStyle)?.name || 'Glassium'}
-                  </span>
-                </div>
-                <div className={sectionDescClass + ' mb-3'}>
-                  公式デザイン言語に準拠したがち枠と、ユニークなネタ枠のUIスタイルをシンプルに切り替えます
-                </div>
-
-                {/* Authentic OS Presets */}
-                <div className="mb-3">
-                  <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-1.5 tracking-wider flex items-center gap-1.5">
-                    <Icon name="Shield" size={11} className="text-cyan-400" />
-                    <span>Authentic OS Modes (がち枠)</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                    {UI_STYLES.filter((s) => s.category === 'authentic').map((style) => {
-                      const active = uiStyle === style.id;
-                      return (
-                        <button
-                          key={style.id}
-                          type="button"
-                          onClick={() => {
-                            playSound('click');
-                            setUiStyle(style.id);
-                          }}
-                          className={`p-3 rounded-2xl text-left transition relative overflow-hidden flex flex-col justify-between ${
-                            active
-                              ? 'bg-slate-800/80 ring-2 ring-cyan-400 shadow-lg text-white'
-                              : isLight
-                              ? 'bg-white/80 hover:bg-white text-slate-900 shadow-sm'
-                              : 'bg-white/[0.04] hover:bg-white/[0.08] text-white shadow-sm'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2 mb-1.5">
-                            <span className="text-xs font-bold">{style.name}</span>
-                            <span
-                              className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-                              style={{ backgroundColor: `${style.accent}25`, color: style.accent }}
-                            >
-                              {style.badge}
-                            </span>
-                          </div>
-                          <div className="text-[11px] opacity-65 leading-relaxed line-clamp-2">
-                            {style.description}
-                          </div>
-                          <div
-                            className="mt-2.5 h-1 w-full rounded-full opacity-60"
-                            style={{ background: style.previewGradient }}
-                          />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Fun & Meme Modes */}
+              {systemSubView === 'main' ? (
                 <div>
-                  <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-1.5 tracking-wider flex items-center gap-1.5">
-                    <Icon name="Sparkles" size={11} className="text-pink-400" />
-                    <span>Fun & Meme Modes (ネタ枠)</span>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    {UI_STYLES.filter((s) => s.category === 'fun').map((style) => {
-                      const active = uiStyle === style.id;
-                      return (
-                        <button
-                          key={style.id}
-                          type="button"
-                          onClick={() => {
-                            playSound('click');
-                            setUiStyle(style.id);
-                          }}
-                          className={`p-3 rounded-2xl text-left transition relative overflow-hidden flex flex-col justify-between ${
-                            active
-                              ? 'bg-slate-800/80 ring-2 ring-pink-400 shadow-lg text-white'
-                              : isLight
-                              ? 'bg-white/80 hover:bg-white text-slate-900 shadow-sm'
-                              : 'bg-white/[0.04] hover:bg-white/[0.08] text-white shadow-sm'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2 mb-1.5">
-                            <span className="text-xs font-bold">{style.name}</span>
-                            <span
-                              className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
-                              style={{ backgroundColor: `${style.accent}25`, color: style.accent }}
-                            >
-                              {style.badge}
-                            </span>
-                          </div>
-                          <div className="text-[11px] opacity-65 leading-relaxed line-clamp-2">
-                            {style.description}
-                          </div>
-                          <div
-                            className="mt-2.5 h-1 w-full rounded-full opacity-60"
-                            style={{ background: style.previewGradient }}
-                          />
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+                  <h1 className="text-xl font-bold mb-4">System</h1>
 
-              {/* ==============================================================
-                  SLEEP SCREEN CUSTOMIZATION (Clock Style & Background)
-                 ============================================================== */}
-              <div className={sectionClass}>
-                <div className="flex items-center justify-between mb-1">
-                  <div className={sectionTitleClass}>Sleep Screen Customization (スリープ画面のカスタマイズ)</div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      playSound('click');
-                      lockSystem();
-                    }}
-                    className="px-2.5 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-[11px] font-bold flex items-center gap-1.5 transition"
-                  >
-                    <Icon name="Moon" size={12} />
-                    <span>スリープを試す</span>
-                  </button>
-                </div>
-                <div className={sectionDescClass + ' mb-3'}>
-                  UIスタイルに応じたレイアウト、時計の見た目（3D・アナログ・ミニマル・縦並び・サイバーHUD）、およびスリープ画面の背景を設定します（アンビエントライトは自動無効化されます）
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Clock Style Options */}
-                  <div>
-                    <div className="text-xs font-semibold mb-2 flex items-center gap-1.5">
-                      <Icon name="Clock" size={13} className="text-cyan-400" />
-                      <span>時計の見た目 (Clock Appearance)</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {[
-                        { id: 'depth' as SleepClockStyle, label: '3D Depth' },
-                        { id: 'analog' as SleepClockStyle, label: 'Analog' },
-                        { id: 'minimal' as SleepClockStyle, label: 'Minimal' },
-                        { id: 'vertical' as SleepClockStyle, label: 'Vertical' },
-                        { id: 'cyber' as SleepClockStyle, label: 'Cyber HUD' },
-                      ].map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => {
-                            playSound('click');
-                            setSleepClockStyle(c.id);
-                          }}
-                          className={subButtonClass(sleepClockStyle === c.id)}
-                        >
-                          {c.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Sleep Background Options */}
-                  <div>
-                    <div className="text-xs font-semibold mb-2 flex items-center gap-1.5">
-                      <Icon name="Image" size={13} className="text-cyan-400" />
-                      <span>スリープ背景 (Sleep Background)</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {[
-                        { id: 'aurora' as SleepBackground, label: 'Aurora' },
-                        { id: 'void' as SleepBackground, label: 'Void Space' },
-                        { id: 'matrix' as SleepBackground, label: 'Matrix' },
-                        { id: 'galaxy' as SleepBackground, label: 'Galaxy' },
-                        { id: 'retro' as SleepBackground, label: 'Synthwave' },
-                        { id: 'wallpaper' as SleepBackground, label: 'Desktop' },
-                      ].map((b) => (
-                        <button
-                          key={b.id}
-                          type="button"
-                          onClick={() => {
-                            playSound('click');
-                            setSleepBackground(b.id);
-                          }}
-                          className={subButtonClass(sleepBackground === b.id)}
-                        >
-                          {b.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Clock Position Options (Top / Center / Bottom) */}
-                  <div className="sm:col-span-2 pt-3 border-t border-slate-500/15">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="text-xs font-semibold flex items-center gap-1.5">
-                        <Icon name="MoveVertical" size={13} className="text-cyan-400" />
-                        <span>時計の配置場所 (Clock Position)</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 text-xs opacity-75">
-                        <Icon name="Sun" size={12} className="text-amber-400" />
-                        <span>天気表示: {temperature}°C (気温のみ表示)</span>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {([
-                        { id: 'top' as ClockPosition, label: 'Top (上部)' },
-                        { id: 'center' as ClockPosition, label: 'Center (中央)' },
-                        { id: 'bottom' as ClockPosition, label: 'Bottom (下部)' },
-                      ]).map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => {
-                            playSound('click');
-                            setClockPosition(p.id);
-                          }}
-                          className={subButtonClass(clockPosition === p.id)}
-                        >
-                          {p.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Theme Mode & Taskbar Alignment */}
-              <div className={sectionClass}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <div className={sectionTitleClass + ' mb-1'}>Color Mode (カラーモード)</div>
-                    <div className={sectionDescClass + ' mb-3'}>
-                      ウィンドウとシステム全体の配色を切り替えます
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
+                  {/* Functional System Cards Stack */}
+                  <div className="space-y-1.5">
+                    {SYSTEM_CARDS.map((card) => (
                       <button
+                        key={card.id}
                         type="button"
                         onClick={() => {
                           playSound('click');
-                          setTheme('dark');
+                          setSystemSubView(card.id);
                         }}
-                        className={subButtonClass(theme === 'dark')}
-                      >
-                        <span className="flex items-center justify-center gap-2">
-                          <Icon name="Moon" size={14} />
-                          <span>Dark</span>
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          playSound('click');
-                          setTheme('light');
-                        }}
-                        className={subButtonClass(theme === 'light')}
-                      >
-                        <span className="flex items-center justify-center gap-2">
-                          <Icon name="Sun" size={14} />
-                          <span>Light</span>
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className={sectionTitleClass + ' mb-1'}>Taskbar Alignment (タスクバー配置)</div>
-                    <div className={sectionDescClass + ' mb-3'}>
-                      タスクバーアイコンの配置位置を選択します
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          playSound('click');
-                          setTaskbarAlign('center');
-                        }}
-                        className={subButtonClass(taskbarAlign === 'center')}
-                      >
-                        <span className="flex items-center justify-center gap-2">
-                          <Icon name="LayoutGrid" size={14} />
-                          <span>Center (中央)</span>
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          playSound('click');
-                          setTaskbarAlign('left');
-                        }}
-                        className={subButtonClass(taskbarAlign === 'left')}
-                      >
-                        <span className="flex items-center justify-center gap-2">
-                          <Icon name="PanelLeft" size={14} />
-                          <span>Left (左揃え)</span>
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Accent Color Picker */}
-              <div className={sectionClass}>
-                <div className="flex items-center justify-between mb-1">
-                  <span className={sectionTitleClass}>Accent Color (アクセントカラー)</span>
-                  <span className="text-[11px] font-mono os-accent-text uppercase">
-                    {ACCENT_COLOR_PRESETS.find((c) => c.id === accentColor)?.labelJa}
-                  </span>
-                </div>
-                <div className={sectionDescClass + ' mb-3'}>
-                  ボタン、スライダー、スイッチ、フォーカス枠の強調色に反映されます
-                </div>
-                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
-                  {ACCENT_COLOR_PRESETS.map((preset) => {
-                    const selected = accentColor === preset.id;
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => {
-                          playSound('click');
-                          setAccentColor(preset.id);
-                        }}
-                        className={`flex items-center gap-2 p-2 rounded-lg text-left transition-all ${
-                          selected
-                            ? 'os-accent-soft font-semibold shadow-sm'
-                            : isLight
-                            ? 'bg-slate-100/70 hover:bg-slate-200/80'
-                            : 'bg-white/[0.03] hover:bg-white/[0.07]'
+                        className={`w-full flex items-center justify-between p-3.5 rounded-lg text-left transition ${
+                          isLight
+                            ? 'bg-white hover:bg-slate-50 border border-slate-200/80 shadow-xs'
+                            : 'bg-[#252528] hover:bg-[#2c2c30] border border-white/[0.06]'
                         }`}
                       >
-                        <span
-                          className="w-5 h-5 rounded-full flex items-center justify-center text-white shrink-0 shadow-sm"
-                          style={{ backgroundColor: preset.hex }}
-                        >
-                          {selected && <Icon name="Check" size={11} />}
-                        </span>
-                        <span className="text-xs truncate">{preset.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Desktop App Icon Size & Grid Placement Quick Control */}
-              <div className={sectionClass}>
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                  <div>
-                    <div className={sectionTitleClass}>Desktop App Size & Grid (デスクトップアプリの大きさ・グリッド配置)</div>
-                    <div className={sectionDescClass}>
-                      デスクトップ上のアプリアイコンのサイズ変更と規定グリッドへのスナップ配置を設定します
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs opacity-75">グリッド配置</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        playSound('click');
-                        setGridSnapEnabled(!gridSnapEnabled);
-                      }}
-                      className={`glass-switch ${gridSnapEnabled ? 'is-on' : ''}`}
-                    >
-                      <div className="glass-switch-thumb" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2.5">
-                  {(['small', 'medium', 'large'] as DesktopIconSize[]).map((sz) => {
-                    const preset = DESKTOP_ICON_SIZE_PRESETS[sz];
-                    const active = desktopIconSize === sz;
-                    return (
-                      <button
-                        key={sz}
-                        type="button"
-                        onClick={() => {
-                          playSound('click');
-                          setDesktopIconSize(sz);
-                        }}
-                        className={subButtonClass(active)}
-                      >
-                        <div className="flex items-center justify-center gap-2">
-                          <Icon name="LayoutGrid" size={sz === 'small' ? 12 : sz === 'medium' ? 15 : 18} />
-                          <span>
-                            {preset.label} ({preset.labelJa})
-                          </span>
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className={`w-9 h-9 rounded-md flex items-center justify-center shrink-0 ${
+                            card.id === 'aicomponents' ? 'bg-sky-500/15 text-sky-400' : isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/5 text-white/80'
+                          }`}>
+                            <Icon name={card.icon} size={18} />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-semibold flex items-center gap-2">
+                              <span>{card.title}</span>
+                              {card.id === 'aicomponents' && (
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-sky-500/20 text-sky-400 font-normal">
+                                  Gemini Enabled
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] opacity-60 truncate mt-0.5">{card.desc}</div>
+                          </div>
                         </div>
+
+                        <Icon name="ChevronRight" size={16} className="opacity-40 shrink-0 ml-3" />
                       </button>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              ) : systemSubView === 'aicomponents' ? (
+                /* ---------------- AI COMPONENTS SUB-PAGE ---------------- */
+                <div>
+                  {renderBreadcrumbHeader('AI components')}
 
-              {/* Window Surface & Advanced Optical Glass Controls */}
-              <div className={sectionClass}>
-                <div className={sectionTitleClass + ' mb-1'}>Advanced Optical Glass & Surface Geometry (詳細グラス・光学設定)</div>
-                <div className={sectionDescClass + ' mb-4'}>
-                  ぼかし、屈折率、色収差、表面ノイズ、液体ゆらぎを極細密に調整します
+                  <div className="space-y-5">
+                    <div className={`p-4 rounded-xl border ${isLight ? 'bg-white border-slate-200' : 'bg-[#252528] border-white/10'}`}>
+                      <div className="flex items-center gap-3 mb-2">
+                        <div className="w-8 h-8 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center">
+                          <Icon name="Sparkles" size={18} />
+                        </div>
+                        <div>
+                          <h2 className="text-sm font-bold">Google Gemini API Settings</h2>
+                          <p className="text-xs opacity-60">AI Assistant, Glassium Studio, and System Assistant AI model parameters</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 space-y-3">
+                        <div>
+                          <label className="block text-xs font-semibold mb-1">Gemini API Key</label>
+                          <div className="flex gap-2">
+                            <div className={`flex-1 flex items-center px-3 py-1.5 rounded-lg border ${
+                              isLight ? 'bg-slate-50 border-slate-300' : 'bg-black/40 border-white/10'
+                            }`}>
+                              <input
+                                type={showKeyPassword ? 'text' : 'password'}
+                                value={geminiApiKey}
+                                onChange={(e) => setGeminiApiKey(e.target.value)}
+                                placeholder="AIzaSy..."
+                                className="w-full bg-transparent text-xs outline-none font-mono"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowKeyPassword(!showKeyPassword)}
+                                className="opacity-50 hover:opacity-100 p-1"
+                              >
+                                <Icon name={showKeyPassword ? 'EyeOff' : 'Eye'} size={14} />
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleSaveApiKey}
+                              className="px-4 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-black text-xs font-bold transition shrink-0"
+                            >
+                              保存
+                            </button>
+                          </div>
+                          <p className="text-[11px] opacity-50 mt-1">
+                            設定されたAPIキーは `localStorage` に安全に保存され、すべてのAIコンポーネントで優先的に利用されます。
+                          </p>
+                        </div>
+
+                        {/* Connection Test */}
+                        <div className="pt-2 border-t border-slate-200 dark:border-white/10 flex flex-wrap items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={handleTestApiKey}
+                            disabled={aiTestStatus === 'testing'}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                              isLight ? 'bg-slate-200 hover:bg-slate-300 text-slate-800' : 'bg-white/10 hover:bg-white/15 text-white'
+                            }`}
+                          >
+                            <Icon name="RefreshCw" size={13} className={aiTestStatus === 'testing' ? 'animate-spin' : ''} />
+                            <span>接続テストを実行</span>
+                          </button>
+
+                          {aiTestMessage && (
+                            <span className={`text-xs font-medium px-2.5 py-1 rounded-md ${
+                              aiTestStatus === 'success' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' :
+                              aiTestStatus === 'error' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'text-sky-400'
+                            }`}>
+                              {aiTestMessage}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Available AI Models */}
+                    <div className={`p-4 rounded-xl border ${isLight ? 'bg-white border-slate-200' : 'bg-[#252528] border-white/10'}`}>
+                      <h3 className="text-xs font-bold mb-2">搭載されているAIコンポーネント</h3>
+                      <div className="space-y-2 text-xs">
+                        <div className="flex items-center justify-between p-2 rounded bg-slate-100 dark:bg-white/5">
+                          <span className="font-medium">Standard Text Model</span>
+                          <span className="font-mono text-sky-400">gemini-3.8-flash</span>
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded bg-slate-100 dark:bg-white/5">
+                          <span className="font-medium">Lite Model Fallback</span>
+                          <span className="font-mono text-sky-400">gemini-3.1-flash-lite</span>
+                        </div>
+                        <div className="flex items-center justify-between p-2 rounded bg-slate-100 dark:bg-white/5">
+                          <span className="font-medium">AI SDK Integration</span>
+                          <span className="font-mono opacity-60">@google/genai (v2.25+)</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  <div>
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <span className="opacity-80">Backdrop Blur (背景ぼかし)</span>
-                      <span className="font-mono os-accent-text">{blurAmount}px</span>
+              ) : systemSubView === 'display' ? (
+                /* ---------------- DISPLAY SUB-PAGE ---------------- */
+                <div>
+                  {renderBreadcrumbHeader('Display')}
+                  <div className="space-y-4">
+                    <div className={`p-4 rounded-xl border ${isLight ? 'bg-white border-slate-200' : 'bg-[#252528] border-white/10'}`}>
+                      <h3 className="text-xs font-bold mb-3">壁紙とオーロラ背景 (Wallpapers & Live Aurora)</h3>
+                      <div className="grid grid-cols-3 gap-2">
+                        {WALLPAPER_KEYS.map((k) => (
+                          <button
+                            key={k}
+                            type="button"
+                            onClick={() => { playSound('click'); setWallpaper(k); }}
+                            className={`p-2 rounded-lg text-xs text-center border transition ${
+                              wallpaper === k ? 'border-sky-500 bg-sky-500/10 font-bold' : 'border-transparent hover:bg-slate-200 dark:hover:bg-white/5'
+                            }`}
+                          >
+                            {k}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <input
-                      type="range"
-                      min={4}
-                      max={60}
-                      value={blurAmount}
-                      onChange={(e) => setBlurAmount(Number(e.target.value))}
-                      className="glass-slider"
-                    />
                   </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <span className="opacity-80">Surface Transparency (透過度)</span>
-                      <span className="font-mono os-accent-text">{transparency}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={10}
-                      max={95}
-                      value={transparency}
-                      onChange={(e) => setTransparency(Number(e.target.value))}
-                      className="glass-slider"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <span className="opacity-80">Window Corner Radius (角丸半径)</span>
-                      <span className="font-mono os-accent-text">{cornerRadius}px</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={36}
-                      value={cornerRadius}
-                      onChange={(e) => setCornerRadius(Number(e.target.value))}
-                      className="glass-slider"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <span className="opacity-80">Lens Curvature / Refraction (レンズ屈折率)</span>
-                      <span className="font-mono os-accent-text">{glassCurvature}px</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={64}
-                      value={glassCurvature}
-                      onChange={(e) => setGlassCurvature(Number(e.target.value))}
-                      className="glass-slider"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <span className="opacity-80">Specular Edge Highlight (エッジ輝度)</span>
-                      <span className="font-mono os-accent-text">{glassSpecular}%</span>
+                </div>
+              ) : systemSubView === 'sound' ? (
+                /* ---------------- SOUND SUB-PAGE ---------------- */
+                <div>
+                  {renderBreadcrumbHeader('Sound')}
+                  <div className={`p-4 rounded-xl border ${isLight ? 'bg-white border-slate-200' : 'bg-[#252528] border-white/10'} space-y-4`}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold">マスター音量 (Master Volume)</span>
+                      <span className="text-xs font-mono">{volume}%</span>
                     </div>
                     <input
                       type="range"
                       min={0}
                       max={100}
-                      value={glassSpecular}
-                      onChange={(e) => setGlassSpecular(Number(e.target.value))}
-                      className="glass-slider"
+                      value={volume}
+                      onChange={(e) => setVolume(Number(e.target.value))}
+                      className="w-full accent-sky-500"
                     />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <span className="opacity-80">Fluid Wobble / Resonance (流体ゆらぎ)</span>
-                      <span className="font-mono os-accent-text">{glassWobble}%</span>
+                    <div className="flex items-center justify-between pt-2">
+                      <span className="text-xs font-semibold">効果音 (Sound Effects)</span>
+                      <button
+                        type="button"
+                        onClick={() => { playSound('click'); setSoundEnabled(!soundEnabled); }}
+                        className={`px-3 py-1 rounded-md text-xs font-bold ${soundEnabled ? 'bg-sky-500 text-black' : 'bg-slate-300 dark:bg-white/10'}`}
+                      >
+                        {soundEnabled ? 'ON' : 'OFF'}
+                      </button>
                     </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={glassWobble}
-                      onChange={(e) => setGlassWobble(Number(e.target.value))}
-                      className="glass-slider"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <span className="opacity-80">Chromatic Aberration / Dispersion (色収差)</span>
-                      <span className="font-mono os-accent-text">{glassDispersion}px</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={20}
-                      value={glassDispersion}
-                      onChange={(e) => setGlassDispersion(Number(e.target.value))}
-                      className="glass-slider"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <span className="opacity-80">Frosted Glass Noise (すりガラス粒子)</span>
-                      <span className="font-mono os-accent-text">{glassNoise}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={50}
-                      value={glassNoise}
-                      onChange={(e) => setGlassNoise(Number(e.target.value))}
-                      className="glass-slider"
-                    />
                   </div>
                 </div>
-              </div>
+              ) : systemSubView === 'power' ? (
+                /* ---------------- POWER & BATTERY (SLEEP) ---------------- */
+                <div>
+                  {renderBreadcrumbHeader('Power & battery')}
+                  <div className={`p-4 rounded-xl border ${isLight ? 'bg-white border-slate-200' : 'bg-[#252528] border-white/10'} space-y-4`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-xs font-bold">画面スリープ (Lock / Sleep Screen)</h3>
+                        <p className="text-[11px] opacity-60">スリープ画面のスタイルと動作を設定します</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => lockSystem()}
+                        className="px-3 py-1.5 rounded-lg bg-sky-500 text-black text-xs font-bold"
+                      >
+                        スリープ起動
+                      </button>
+                    </div>
 
-               {/* Surface Material & Desktop Shell */}
-              <div className={sectionClass}>
-                <div className={sectionTitleClass + ' mb-2.5'}>Surface Material (ウィンドウ質感)</div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-                  {DESIGN_ENGINES.map((eng) => (
-                    <button
-                      key={eng.id}
-                      type="button"
-                      onClick={() => {
-                        playSound('click');
-                        setDesignEngine(eng.id);
-                      }}
-                      className={`p-2.5 rounded-lg text-left transition ${
-                        designEngine === eng.id
-                          ? 'os-accent-soft font-semibold shadow-sm'
-                          : isLight
-                          ? 'bg-slate-100/70 hover:bg-slate-200/80'
-                          : 'bg-white/[0.03] hover:bg-white/[0.07]'
-                      }`}
-                    >
-                      <div className="text-xs font-medium">{eng.label}</div>
-                      <div className="text-[10px] opacity-55 mt-0.5 line-clamp-1">{eng.desc}</div>
-                    </button>
-                  ))}
-                </div>
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <div>
+                        <label className="block text-xs font-semibold mb-1">時計スタイル</label>
+                        <select
+                          value={sleepClockStyle}
+                          onChange={(e) => setSleepClockStyle(e.target.value as SleepClockStyle)}
+                          className={`w-full text-xs p-2 rounded border outline-none ${isLight ? 'bg-slate-50 border-slate-300' : 'bg-black/30 border-white/10'}`}
+                        >
+                          <option value="depth">3D Depth Clock</option>
+                          <option value="analog">Analog Clock</option>
+                          <option value="minimal">Minimal</option>
+                          <option value="vertical">Vertical</option>
+                          <option value="cyber">Cyber HUD</option>
+                        </select>
+                      </div>
 
-                <div className={sectionTitleClass + ' mb-2.5'}>Desktop Shell Layout (OSシェルレイアウト)</div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {SHELL_MODES.map((mode) => (
-                    <button
-                      key={mode.id}
-                      type="button"
-                      onClick={() => {
-                        playSound('click');
-                        setShellMode(mode.id);
-                      }}
-                      className={`p-2.5 rounded-lg text-left transition ${
-                        shellMode === mode.id
-                          ? 'os-accent-soft font-semibold shadow-sm'
-                          : isLight
-                          ? 'bg-slate-100/70 hover:bg-slate-200/80'
-                          : 'bg-white/[0.03] hover:bg-white/[0.07]'
-                      }`}
-                    >
-                      <div className="text-xs font-medium">{mode.label}</div>
-                      <div className="text-[10px] opacity-55 mt-0.5 line-clamp-1">{mode.desc}</div>
-                    </button>
-                  ))}
+                      <div>
+                        <label className="block text-xs font-semibold mb-1">スリープ背景</label>
+                        <select
+                          value={sleepBackground}
+                          onChange={(e) => setSleepBackground(e.target.value as SleepBackground)}
+                          className={`w-full text-xs p-2 rounded border outline-none ${isLight ? 'bg-slate-50 border-slate-300' : 'bg-black/30 border-white/10'}`}
+                        >
+                          <option value="aurora">Live Aurora</option>
+                          <option value="void">Void Space</option>
+                          <option value="matrix">Matrix</option>
+                          <option value="galaxy">Galaxy</option>
+                          <option value="retro">Synthwave</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ) : systemSubView === 'multitasking' ? (
+                /* ---------------- MULTITASKING SUB-PAGE ---------------- */
+                <div>
+                  {renderBreadcrumbHeader('Multitasking')}
+                  <div className={`p-4 rounded-xl border ${isLight ? 'bg-white border-slate-200' : 'bg-[#252528] border-white/10'} space-y-4`}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-xs font-bold">ウィンドウの左右整列 (50:50 Snap)</h3>
+                        <p className="text-[11px] opacity-60">開いているウィンドウを画面の左右に50:50で即座にスナップ配置します</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { playSound('click'); snapAllWindows5050(); }}
+                        className="px-3 py-1.5 rounded-lg bg-sky-500 text-black text-xs font-bold"
+                      >
+                        ウィンドウ整列
+                      </button>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-200 dark:border-white/10 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-xs font-bold">タスクバーアイコン配置</h3>
+                        <p className="text-[11px] opacity-60">中央揃えまたは左揃えを切り替えます</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setTaskbarAlign('center')}
+                          className={`px-3 py-1 rounded text-xs font-semibold ${taskbarAlign === 'center' ? 'bg-sky-500 text-black' : 'bg-slate-200 dark:bg-white/10'}`}
+                        >
+                          中央揃え
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setTaskbarAlign('left')}
+                          className={`px-3 py-1 rounded text-xs font-semibold ${taskbarAlign === 'left' ? 'bg-sky-500 text-black' : 'bg-slate-200 dark:bg-white/10'}`}
+                        >
+                          左揃え
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* ---------------- ABOUT SUB-PAGE ---------------- */
+                <div>
+                  {renderBreadcrumbHeader('About')}
+                  <div className={`p-5 rounded-xl border ${isLight ? 'bg-white border-slate-200' : 'bg-[#252528] border-white/10'} space-y-3`}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-sm">
+                        OS
+                      </div>
+                      <div>
+                        <h2 className="text-sm font-bold">GlassiumOS V4.0 (Windows 11 Glassium Edition)</h2>
+                        <p className="text-xs opacity-60">Version 23H2 (OS Build 22631.3007)</p>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-200 dark:border-white/10 text-xs space-y-1.5">
+                      <p><strong>Device name:</strong> Glassium-PC</p>
+                      <p><strong>Processor:</strong> Virtual Octa-Core Processor @ 3.40GHz</p>
+                      <p><strong>Installed RAM:</strong> 16.0 GB (15.8 GB usable)</p>
+                      <p><strong>System type:</strong> 64-bit operating system, x64-based processor</p>
+                      <p><strong>AI Runtime:</strong> Google GenAI SDK (@google/genai)</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
 
-          {/* ==============================================================
-              2. SYSTEM (システム・サウンド・マルチタスク・仕様)
-             ============================================================== */}
-          {activeTab === 'system' && (
+          {/* ==================== 2. PERSONALIZATION PAGE ==================== */}
+          {activeCategory === 'personalization' && (
             <motion.div
-              key="tab-system"
-              initial={{ opacity: 0, y: 8 }}
+              key="cat-personalization"
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.18 }}
-              className="space-y-4 max-w-3xl"
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15 }}
+              className="max-w-4xl space-y-5"
             >
-              <div>
-                <h2 className="text-base font-bold tracking-tight">System</h2>
-                <p className="text-xs opacity-60 mt-0.5">
-                  オーディオ音量、接続・省電力モード、仮想デスクトップ、ストレージを管理します。
-                </p>
-              </div>
+              <h1 className="text-xl font-bold">Personalization</h1>
 
-              {/* Volume & Sound Controls */}
-              <div className={sectionClass}>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg os-accent-soft border flex items-center justify-center">
-                      <Icon name={soundEnabled && volume > 0 ? 'Volume2' : 'VolumeX'} size={18} />
-                    </div>
-                    <div>
-                      <div className={sectionTitleClass}>Master Volume & Audio (システム音量)</div>
-                      <div className={sectionDescClass}>Web Audio シンセサイザーおよび効果音出力</div>
-                    </div>
-                  </div>
-                  <span className="text-sm font-mono font-bold os-accent-text">
-                    {soundEnabled ? `${volume}%` : 'Muted'}
-                  </span>
-                </div>
+              {/* Theme Mode & UI Style */}
+              <div className={`p-4 rounded-xl border ${isLight ? 'bg-white border-slate-200' : 'bg-[#252528] border-white/10'} space-y-4`}>
+                <h2 className="text-xs font-bold uppercase tracking-wider text-sky-400">Color Mode & UI Style</h2>
 
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={soundEnabled ? volume : 0}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    setVolume(val);
-                    if (val > 0 && !soundEnabled) setSoundEnabled(true);
-                  }}
-                  className="glass-slider mb-4"
-                />
-
-                <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-500/15">
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-xs font-medium">UI効果音を有効化</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold">Color Mode</span>
+                  <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => setSoundEnabled(!soundEnabled)}
-                      className={`glass-switch ${soundEnabled ? 'is-on' : ''}`}
+                      onClick={() => setTheme('dark')}
+                      className={`px-3 py-1 rounded-md text-xs font-semibold ${theme === 'dark' ? 'bg-sky-500 text-black' : 'bg-slate-200 dark:bg-white/10'}`}
                     >
-                      <div className="glass-switch-thumb" />
+                      Dark Mode
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTheme('light')}
+                      className={`px-3 py-1 rounded-md text-xs font-semibold ${theme === 'light' ? 'bg-sky-500 text-black' : 'bg-slate-200 dark:bg-white/10'}`}
+                    >
+                      Light Mode
                     </button>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    {(['click', 'open', 'notify', 'lock'] as const).map((snd) => (
+                </div>
+
+                <div className="pt-3 border-t border-slate-200 dark:border-white/10">
+                  <h3 className="text-xs font-semibold mb-2">Authentic OS UI Styles</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {UI_STYLES.map((st) => (
                       <button
-                        key={snd}
+                        key={st.id}
                         type="button"
-                        onClick={() => playSound(snd)}
-                        className={`px-2.5 py-1 rounded-md border text-[11px] capitalize transition ${
-                          isLight
-                            ? 'bg-slate-100 border-slate-200 hover:bg-slate-200'
-                            : 'bg-white/[0.04] border-white/10 hover:bg-white/10'
+                        onClick={() => setUiStyle(st.id)}
+                        className={`p-2.5 rounded-lg text-left text-xs border transition ${
+                          uiStyle === st.id ? 'border-sky-500 bg-sky-500/10 font-bold' : 'border-transparent bg-slate-100 dark:bg-white/5'
                         }`}
                       >
-                        Test {snd}
+                        <div>{st.name}</div>
+                        <div className="text-[10px] opacity-60 font-normal">{st.badge}</div>
                       </button>
                     ))}
                   </div>
                 </div>
               </div>
 
-              {/* System Toggles */}
-              <div className={sectionClass}>
-                <div className={sectionTitleClass + ' mb-1'}>Device & Power (デバイス・接続・省電力)</div>
-                <div className="divide-y divide-slate-200/60 dark:divide-white/10">
-                  {[
-                    {
-                      title: 'Wi-Fi ネットワーク',
-                      sub: quickSettings.wifi ? 'Connected (Glassium-5G)' : 'Disconnected',
-                      icon: 'Wifi',
-                      active: quickSettings.wifi,
-                      onToggle: () => toggleQuick('wifi'),
-                    },
-                    {
-                      title: 'Bluetooth デバイス',
-                      sub: quickSettings.bluetooth ? 'Discoverable' : 'Off',
-                      icon: 'Bluetooth',
-                      active: quickSettings.bluetooth,
-                      onToggle: () => toggleQuick('bluetooth'),
-                    },
-                    {
-                      title: 'Lite Mode (省電力・軽量描画)',
-                      sub: 'ライブ壁紙エフェクトを抑えて高速化します',
-                      icon: 'Zap',
-                      active: liteMode,
-                      onToggle: () => setLiteMode(!liteMode),
-                    },
-                    {
-                      title: 'Touch Mode (タッチ操作最適化)',
-                      sub: 'タイトルバーやボタン間隔をタッチ向けに拡大',
-                      icon: 'Smartphone',
-                      active: touchMode,
-                      onToggle: () => setTouchMode((v) => !v),
-                    },
-                  ].map((item) => (
-                    <div key={item.title} className={rowItemClass}>
-                      <div className="flex items-center gap-3 min-w-0">
-                        <Icon name={item.icon} size={20} className={item.active ? 'os-accent-text' : 'opacity-50'} />
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold truncate">{item.title}</div>
-                          <div className={sectionDescClass + ' truncate'}>{item.sub}</div>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          playSound('click');
-                          item.onToggle();
-                        }}
-                        className={`glass-switch shrink-0 ${item.active ? 'is-on' : ''}`}
-                      >
-                        <div className="glass-switch-thumb" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Multitasking & Virtual Desktops */}
-              <div className={sectionClass}>
-                <div className="flex items-center justify-between mb-2">
+              {/* Glass Optical Settings */}
+              <div className={`p-4 rounded-xl border ${isLight ? 'bg-white border-slate-200' : 'bg-[#252528] border-white/10'} space-y-4`}>
+                <h2 className="text-xs font-bold uppercase tracking-wider text-sky-400">Advanced Optical Glass Parameters</h2>
+                <div className="grid grid-cols-2 gap-4 text-xs">
                   <div>
-                    <div className={sectionTitleClass}>Multitasking & Virtual Desktops (仮想デスクトップ)</div>
-                    <div className={sectionDescClass}>
-                      現在 {desktops.length} 個のデスクトップと {windows.length} 個のウィンドウが稼働中
+                    <div className="flex justify-between mb-1">
+                      <span>Blur Amount</span>
+                      <span className="font-mono">{blurAmount}px</span>
                     </div>
+                    <input type="range" min={4} max={60} value={blurAmount} onChange={(e) => setBlurAmount(Number(e.target.value))} className="w-full accent-sky-500" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={snapAllWindows5050}
-                      className={subButtonClass(false)}
-                    >
-                      左右50/50整列
-                    </button>
-                    <button
-                      type="button"
-                      onClick={createDesktop}
-                      className="px-3 py-1.5 rounded-lg os-accent-bg text-xs font-medium transition hover:opacity-90"
-                    >
-                      + 新規デスクトップ
-                    </button>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 overflow-x-auto pt-1">
-                  {desktops.map((d) => (
-                    <button
-                      key={d.id}
-                      type="button"
-                      onClick={() => switchDesktop(d.id)}
-                      className={subButtonClass(d.id === activeDesktopId)}
-                    >
-                      {d.name}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Storage & System Specs */}
-              <div className={sectionClass}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div>
-                    <div className={sectionTitleClass + ' mb-1'}>Storage & Recycle Bin (ストレージ管理)</div>
-                    <div className={sectionDescClass + ' mb-3'}>
-                      ローカル仮想ファイルシステム (LocalStorage 永続化)
+                    <div className="flex justify-between mb-1">
+                      <span>Corner Radius</span>
+                      <span className="font-mono">{cornerRadius}px</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => openApp('explorer')}
-                        className={subButtonClass(false)}
-                      >
-                        ファイルを開く
-                      </button>
-                      <button
-                        type="button"
-                        onClick={emptyRecycleBin}
-                        className="px-3 py-2 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 text-xs font-medium transition"
-                      >
-                        ゴミ箱を空にする
-                      </button>
-                    </div>
+                    <input type="range" min={0} max={36} value={cornerRadius} onChange={(e) => setCornerRadius(Number(e.target.value))} className="w-full accent-sky-500" />
                   </div>
-
                   <div>
-                    <div className={sectionTitleClass + ' mb-1'}>System Specifications</div>
-                    <div className="space-y-1.5 text-[11px] opacity-75 font-mono pt-1">
-                      <div className="flex justify-between border-b border-slate-500/10 pb-1">
-                        <span>OS Build:</span>
-                        <span>GlassiumOS-V4.0</span>
-                      </div>
-                      <div className="flex justify-between border-b border-slate-500/10 pb-1">
-                        <span>Active Shell:</span>
-                        <span className="uppercase">{shellMode}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Running Tasks:</span>
-                        <span>{windows.length} Processes</span>
-                      </div>
+                    <div className="flex justify-between mb-1">
+                      <span>Transparency</span>
+                      <span className="font-mono">{transparency}%</span>
                     </div>
+                    <input type="range" min={10} max={95} value={transparency} onChange={(e) => setTransparency(Number(e.target.value))} className="w-full accent-sky-500" />
+                  </div>
+                  <div>
+                    <div className="flex justify-between mb-1">
+                      <span>Glass Wobble</span>
+                      <span className="font-mono">{glassWobble}%</span>
+                    </div>
+                    <input type="range" min={0} max={100} value={glassWobble} onChange={(e) => setGlassWobble(Number(e.target.value))} className="w-full accent-sky-500" />
                   </div>
                 </div>
               </div>
             </motion.div>
           )}
 
-          {/* ==============================================================
-              3. DISPLAY (壁紙・オーロラ設定・アイコン整列 ※輝度は削除済み)
-             ============================================================== */}
-          {activeTab === 'display' && (
+          {/* ==================== 3. APPS PAGE ==================== */}
+          {activeCategory === 'apps' && (
             <motion.div
-              key="tab-display"
-              initial={{ opacity: 0, y: 8 }}
+              key="cat-apps"
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.18 }}
-              className="space-y-4 max-w-3xl"
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15 }}
+              className="max-w-4xl space-y-4"
             >
-              <div>
-                <h2 className="text-base font-bold tracking-tight">Display & Wallpaper</h2>
-                <p className="text-xs opacity-60 mt-0.5">
-                  デスクトップ壁紙、ライブオーロラの色彩と速度、デスクトップアイコンの整列を設定します。
-                </p>
-              </div>
-
-              {/* Wallpaper Selector */}
-              <div className={sectionClass}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className={sectionTitleClass}>Desktop Wallpaper (壁紙ギャラリー)</span>
-                  <button
-                    type="button"
-                    onClick={() => fileRef.current?.click()}
-                    className="px-3 py-1.5 rounded-lg os-accent-soft border text-xs font-medium flex items-center gap-1.5 transition"
-                  >
-                    <Icon name="Upload" size={14} />
-                    <span>画像をアップロード</span>
-                  </button>
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleUpload}
-                    className="hidden"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                  {WALLPAPER_KEYS.map((key: Wallpaper) => {
-                    const info = WALLPAPERS[key];
-                    const selected = wallpaper === key && !selectedCustomId;
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => {
-                          playSound('click');
-                          setSelectedCustomId(null);
-                          setWallpaper(key);
-                        }}
-                        className={`group relative h-20 rounded-lg overflow-hidden border text-left p-2.5 flex flex-col justify-end transition-all ${
-                          selected
-                            ? 'os-accent-border ring-2 ring-cyan-400/30'
-                            : 'border-white/10 hover:border-white/30'
-                        }`}
-                        style={{ background: info.preview }}
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-                        <div className="relative z-10 flex items-center justify-between w-full">
-                          <span className="text-xs font-semibold text-white">{info.label}</span>
-                          {selected && <Icon name="Check" size={13} className="text-white" />}
-                        </div>
-                      </button>
-                    );
-                  })}
-
-                  {customWallpapers.map((cw) => {
-                    const selected = selectedCustomId === cw.id;
-                    return (
-                      <button
-                        key={cw.id}
-                        type="button"
-                        onClick={() => {
-                          playSound('click');
-                          setSelectedCustomId(cw.id);
-                        }}
-                        className={`group relative h-20 rounded-lg overflow-hidden border text-left p-2.5 flex flex-col justify-end transition-all ${
-                          selected ? 'os-accent-border ring-2 ring-cyan-400/30' : 'border-white/10'
-                        }`}
-                        style={{
-                          backgroundImage: `url(${cw.dataUrl})`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                        }}
-                      >
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/75 to-transparent" />
-                        <div className="relative z-10 flex items-center justify-between w-full">
-                          <span className="text-xs font-semibold text-white truncate">{cw.name}</span>
-                          {selected && <Icon name="Check" size={13} className="text-white" />}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Aurora Live Wallpaper Settings */}
-              <div className={sectionClass}>
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <div className={sectionTitleClass}>Aurora Live Wallpaper (オーロラ設定)</div>
-                    <div className={sectionDescClass}>
-                      ライブ壁紙のカラーパレット、流速、輝き、パーティクルを調整します
-                    </div>
-                  </div>
-                  {wallpaper !== 'live2d' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedCustomId(null);
-                        setWallpaper('live2d');
-                      }}
-                      className="px-2.5 py-1 rounded-md os-accent-bg text-[11px] font-medium"
-                    >
-                      オーロラを有効化
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
-                  {AURORA_PALETTES.map((pal) => {
-                    const active = auroraColor === pal.id;
-                    return (
-                      <button
-                        key={pal.id}
-                        type="button"
-                        onClick={() => {
-                          playSound('click');
-                          setAuroraColor(pal.id);
-                          if (wallpaper !== 'live2d') {
-                            setSelectedCustomId(null);
-                            setWallpaper('live2d');
-                          }
-                        }}
-                        className={`p-2 rounded-lg border text-left transition ${
-                          active
-                            ? 'os-accent-soft border font-semibold'
-                            : isLight
-                            ? 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                            : 'bg-white/[0.03] border-white/10 hover:bg-white/[0.07]'
-                        }`}
-                      >
-                        <div className="h-5 w-full rounded mb-1.5" style={{ background: pal.preview }} />
-                        <div className="text-[11px] truncate">{pal.label}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <span className="opacity-80">Aurora Flow Speed (速度)</span>
-                      <span className="font-mono os-accent-text">{auroraSpeed.toFixed(1)}x</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0.2}
-                      max={3.0}
-                      step={0.1}
-                      value={auroraSpeed}
-                      onChange={(e) => setAuroraSpeed(Number(e.target.value))}
-                      className="glass-slider"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1.5">
-                      <span className="opacity-80">Aurora Intensity (輝度・濃さ)</span>
-                      <span className="font-mono os-accent-text">{auroraIntensity}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={20}
-                      max={100}
-                      value={auroraIntensity}
-                      onChange={(e) => setAuroraIntensity(Number(e.target.value))}
-                      className="glass-slider"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-500/15">
-                  <div>
-                    <div className="text-xs font-medium">Floating Light Particles (光の粒子エフェクト)</div>
-                    <div className={sectionDescClass}>オーロラ背景に浮遊する光の粒子を描画します</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setAuroraParticles(!auroraParticles)}
-                    className={`glass-switch ${auroraParticles ? 'is-on' : ''}`}
-                  >
-                    <div className="glass-switch-thumb" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Desktop App Size & Grid Placement */}
-              <div className={sectionClass}>
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                  <div>
-                    <div className={sectionTitleClass}>
-                      Desktop App Icon Size & Grid Slots (アプリの大きさ・規定グリッド配置)
-                    </div>
-                    <div className={sectionDescClass}>
-                      アイコンサイズ（小・中・大）と規定のグリッド枠へのスナップ整列を管理します
-                      {isWallpaperBright && ' · 明るい背景を検出し文字を自動で黒色表示中'}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium">グリッドに配置</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        playSound('click');
-                        setGridSnapEnabled(!gridSnapEnabled);
-                      }}
-                      className={`glass-switch ${gridSnapEnabled ? 'is-on' : ''}`}
-                    >
-                      <div className="glass-switch-thumb" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2.5 mb-3">
-                  {(['small', 'medium', 'large'] as DesktopIconSize[]).map((sz) => {
-                    const preset = DESKTOP_ICON_SIZE_PRESETS[sz];
-                    const active = desktopIconSize === sz;
-                    return (
-                      <button
-                        key={sz}
-                        type="button"
-                        onClick={() => {
-                          playSound('click');
-                          setDesktopIconSize(sz);
-                        }}
-                        className={subButtonClass(active)}
-                      >
-                        <div className="flex flex-col items-center gap-1 py-0.5">
-                          <span className="font-semibold">
-                            {preset.label} ({preset.labelJa})
-                          </span>
-                          <span className="text-[10px] opacity-60 font-mono">
-                            Icon {preset.iconPx}px · Grid {preset.cellW}×{preset.cellH}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-500/15">
-                  <button
-                    type="button"
-                    onClick={() => resetDesktopIconPositions(false)}
-                    className={subButtonClass(false)}
-                  >
-                    アイコンを規定グリッド順に整列
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => resetDesktopIconPositions(true)}
-                    className={subButtonClass(false)}
-                  >
-                    現在の位置を最寄りグリッドに揃える
-                  </button>
-                  <button
-                    type="button"
-                    onClick={addDeskNote}
-                    className={subButtonClass(false)}
-                  >
-                    + デスクトップ付箋を追加
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* ==============================================================
-              4. ACCOUNT (ユーザーアカウント・パスワード・ロック画面)
-             ============================================================== */}
-          {activeTab === 'account' && (
-            <motion.div
-              key="tab-account"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.18 }}
-              className="space-y-4 max-w-3xl"
-            >
-              <div>
-                <h2 className="text-base font-bold tracking-tight">Account & Security</h2>
-                <p className="text-xs opacity-60 mt-0.5">
-                  ユーザープロフィール、ロック画面のパスワード保護、時計スタイルを設定します。
-                </p>
-              </div>
-
-              {/* User Profile Form */}
-              <form onSubmit={handleSaveAccount} className={sectionClass}>
-                <div className="flex items-center gap-4 mb-3">
-                  <div className="w-14 h-14 rounded-full os-accent-bg flex items-center justify-center text-white text-xl font-bold shrink-0">
-                    {(profileName.trim() || 'A')[0].toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="text-sm font-bold">{user?.name || 'Administrator'}</div>
-                    <div className="text-xs opacity-55">GlassiumOS Local Administrator Account</div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                  <div>
-                    <label className="block text-xs font-medium mb-1 opacity-80">
-                      Display Name (表示名)
-                    </label>
-                    <input
-                      type="text"
-                      value={profileName}
-                      onChange={(e) => setProfileName(e.target.value)}
-                      placeholder="Administrator"
-                      className={`w-full rounded-lg border px-3 py-2 text-xs outline-none ${
-                        isLight
-                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-slate-500'
-                          : 'bg-slate-950/60 border-white/15 text-white focus:border-white/35'
-                      }`}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium mb-1 opacity-80">
-                      Lock Screen PIN / Password (空欄でパスワードなし)
-                    </label>
-                    <input
-                      type="password"
-                      value={profilePassword}
-                      onChange={(e) => setProfilePassword(e.target.value)}
-                      placeholder="PIN またはパスワードを入力"
-                      className={`w-full rounded-lg border px-3 py-2 text-xs outline-none ${
-                        isLight
-                          ? 'bg-slate-50 border-slate-300 text-slate-900 focus:border-slate-500'
-                          : 'bg-slate-950/60 border-white/15 text-white focus:border-white/35'
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="text-xs os-accent-text font-medium">{accountSavedMsg}</div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={lockSystem}
-                      className={subButtonClass(false)}
-                    >
-                      今すぐロック (Alt+L)
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-4 py-2 rounded-lg os-accent-bg text-xs font-semibold hover:opacity-90 transition"
-                    >
-                      プロフィールを保存
-                    </button>
-                  </div>
-                </div>
-              </form>
-
-              {/* Lock Screen Style */}
-              <div className={sectionClass}>
-                <div className={sectionTitleClass + ' mb-2'}>Lock Screen Clock & Layout (ロック画面スタイル)</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {LOCK_STYLES.map((st) => (
-                    <button
-                      key={st.id}
-                      type="button"
-                      onClick={() => {
-                        playSound('click');
-                        setLockScreenStyle(st.id);
-                      }}
-                      className={`p-3 rounded-lg border text-left transition ${
-                        lockScreenStyle === st.id
-                          ? 'os-accent-soft border font-semibold'
-                          : isLight
-                          ? 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-                          : 'bg-white/[0.03] border-white/10 hover:bg-white/[0.07]'
-                      }`}
-                    >
-                      <div className="text-xs font-medium">{st.label}</div>
-                      <div className="text-[11px] opacity-55 mt-0.5">{st.desc}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Notifications History */}
-              <div className={sectionClass}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className={sectionTitleClass}>Notifications (システム通知履歴)</div>
-                    <div className={sectionDescClass}>
-                      現在 {notifications.length} 件の通知が保存されています
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={clearNotifications}
-                    className={subButtonClass(false)}
-                  >
-                    通知をすべて消去
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* ==============================================================
-              5. APPS (アプリ一覧・起動・アンインストール管理)
-             ============================================================== */}
-          {activeTab === 'apps' && (
-            <motion.div
-              key="tab-apps"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.18 }}
-              className="space-y-4 max-w-3xl"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h2 className="text-base font-bold tracking-tight">Apps & Features</h2>
-                  <p className="text-xs opacity-60 mt-0.5">
-                    システムアプリおよびインストール済みアプリの一覧表示・起動・アンインストールを行います。
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => openApp('appstore')}
-                  className="px-3.5 py-2 rounded-lg os-accent-bg text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 transition"
-                >
-                  <Icon name="Store" size={16} />
-                  <span>App Store を開く</span>
-                </button>
-              </div>
-
-              {/* Search & Filter Bar */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pb-2">
-                <div
-                  className={`flex items-center gap-2 flex-1 rounded-lg border px-3 py-1.5 ${
-                    isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-white/10'
-                  }`}
-                >
-                  <Icon name="Search" size={15} className="opacity-50" />
+              <h1 className="text-xl font-bold">Installed Apps</h1>
+              <div className={`p-4 rounded-xl border ${isLight ? 'bg-white border-slate-200' : 'bg-[#252528] border-white/10'}`}>
+                <div className="mb-3">
                   <input
                     type="text"
                     value={appSearch}
                     onChange={(e) => setAppSearch(e.target.value)}
-                    placeholder="アプリ名や機能で検索..."
-                    className="w-full bg-transparent text-xs outline-none"
+                    placeholder="Search installed apps..."
+                    className={`w-full p-2 text-xs rounded border outline-none ${isLight ? 'bg-slate-50 border-slate-300' : 'bg-black/30 border-white/10'}`}
                   />
                 </div>
-                <div className="flex items-center gap-1.5 overflow-x-auto">
-                  {(
-                    [
-                      { id: 'all', label: 'すべて' },
-                      { id: 'system', label: 'システム' },
-                      { id: 'installed', label: '追加アプリ' },
-                      { id: 'running', label: '実行中' },
-                    ] as const
-                  ).map((f) => (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => setAppFilter(f.id)}
-                      className={subButtonClass(appFilter === f.id)}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Applications List — Continuous Unified List Table */}
-              <div className="divide-y divide-slate-200/60 dark:divide-white/10 border-t border-slate-200/60 dark:border-white/10">
-                {combinedApps.map((item) => (
-                  <div
-                    key={item.uid}
-                    className="flex items-center justify-between gap-3 py-2.5 px-2 rounded-lg hover:bg-slate-200/40 dark:hover:bg-white/[0.04] transition"
-                  >
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-10 h-10 flex items-center justify-center shrink-0">
-                        <Icon name={item.icon} size={30} />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold truncate">{item.name}</span>
-                          <span className="text-[11px] opacity-50 truncate">({item.nameJa})</span>
-                          {item.isRunning && (
-                            <span className="text-[10px] font-mono os-accent-text">● Running</span>
-                          )}
+                <div className="space-y-2">
+                  {installedApps
+                    .filter((a) => !appSearch || a.name.toLowerCase().includes(appSearch.toLowerCase()))
+                    .map((app) => (
+                      <div key={app.id} className="flex items-center justify-between p-2.5 rounded bg-slate-100 dark:bg-white/5">
+                        <div className="flex items-center gap-3">
+                          <Icon name={app.icon || 'AppWindow'} size={20} className="text-sky-400" />
+                          <div>
+                            <div className="text-xs font-semibold">{app.name}</div>
+                            <div className="text-[10px] opacity-60">{app.description}</div>
+                          </div>
                         </div>
-                        <div className="text-[11px] opacity-60 truncate mt-0.5">
-                          {item.category} · {item.description}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (item.isSystem) openApp(item.appId as AppId);
-                          else launchInstalledApp(item.id);
-                        }}
-                        className={subButtonClass(false)}
-                      >
-                        起動
-                      </button>
-                      {!item.isSystem && (
                         <button
                           type="button"
-                          onClick={() => uninstallApp(item.id)}
-                          className="px-2.5 py-2 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 text-xs font-medium transition"
+                          onClick={() => openApp(app.appId as AppId)}
+                          className="px-3 py-1 rounded bg-sky-500 text-black text-xs font-bold"
                         >
-                          削除
+                          開く
                         </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </motion.div>
+          )}
 
-                {combinedApps.length === 0 && (
-                  <div className="py-12 text-center text-xs opacity-50">
-                    条件に一致するアプリケーションが見つかりませんでした
+          {/* ==================== 4. ACCOUNTS PAGE ==================== */}
+          {activeCategory === 'accounts' && (
+            <motion.div
+              key="cat-accounts"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15 }}
+              className="max-w-4xl space-y-4"
+            >
+              <h1 className="text-xl font-bold">Accounts</h1>
+              <form onSubmit={handleSaveAccount} className={`p-4 rounded-xl border ${isLight ? 'bg-white border-slate-200' : 'bg-[#252528] border-white/10'} space-y-4`}>
+                <div>
+                  <label className="block text-xs font-semibold mb-1">ユーザー名 (User Name)</label>
+                  <input
+                    type="text"
+                    value={profileName}
+                    onChange={(e) => setProfileName(e.target.value)}
+                    className={`w-full p-2 text-xs rounded border outline-none ${isLight ? 'bg-slate-50 border-slate-300' : 'bg-black/30 border-white/10'}`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1">パスワード (Password)</label>
+                  <input
+                    type="password"
+                    value={profilePassword}
+                    onChange={(e) => setProfilePassword(e.target.value)}
+                    placeholder="Enter password"
+                    className={`w-full p-2 text-xs rounded border outline-none ${isLight ? 'bg-slate-50 border-slate-300' : 'bg-black/30 border-white/10'}`}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <button type="submit" className="px-4 py-1.5 bg-sky-500 text-black text-xs font-bold rounded-lg">
+                    設定を保存
+                  </button>
+                  {accountSaved && <span className="text-xs text-emerald-400 font-medium">アカウント情報を保存しました！</span>}
+                </div>
+              </form>
+            </motion.div>
+          )}
+
+          {/* ==================== 5. WINDOWS UPDATE PAGE ==================== */}
+          {activeCategory === 'update' && (
+            <motion.div
+              key="cat-update"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15 }}
+              className="max-w-4xl space-y-4"
+            >
+              <h1 className="text-xl font-bold">Windows Update</h1>
+              <div className={`p-4 rounded-xl border ${isLight ? 'bg-white border-slate-200' : 'bg-[#252528] border-white/10'} space-y-3`}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                    <Icon name="CheckCircle2" size={24} />
                   </div>
-                )}
+                  <div>
+                    <h2 className="text-sm font-bold">You're up to date</h2>
+                    <p className="text-xs opacity-60">Last checked: Today, {new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-200 dark:border-white/10 text-xs space-y-1">
+                  <p><strong>OS Version:</strong> Windows 11 Glassium Edition 23H2</p>
+                  <p><strong>OS Build:</strong> 22631.3007</p>
+                  <p><strong>AI Engine:</strong> @google/genai (Gemini 3.8 Flash)</p>
+                </div>
               </div>
             </motion.div>
           )}

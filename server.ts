@@ -729,13 +729,15 @@ async function startServer() {
   // AI Chat Endpoint using @google/genai + Live Knowledge Fallback
   app.post('/api/ai/chat', async (req, res) => {
     try {
-      const { message, history, context } = req.body;
+      const { message, history, context, apiKey: clientApiKey } = req.body;
       if (!message || typeof message !== 'string') {
         return res.status(400).json({ error: 'Message is required' });
       }
 
       const explicitAction = detectExplicitOSAction(message);
-      const apiKey = process.env.GEMINI_API_KEY || process.env.API_KEY;
+      const authHeaderKey = req.headers?.authorization?.replace(/^Bearer\s+/i, '');
+      const apiKey = clientApiKey || authHeaderKey || process.env.GEMINI_API_KEY || process.env.API_KEY;
+
       if (!apiKey) {
         return res.json(await getIntelligentLocalResponse(message, history));
       }
@@ -792,10 +794,9 @@ async function startServer() {
       }
 
       const modelsToTry = [
-        'gemini-3-flash-preview',
-        'gemini-2.5-flash',
         'gemini-3.8-flash',
         'gemini-flash-latest',
+        'gemini-3.1-flash-lite',
       ];
       let replyText = '';
       const parsedAction: ActionPayload | null = explicitAction?.action ?? null;

@@ -66,11 +66,13 @@ export function GlassiumStudioApp() {
     setIsGenerating(true);
 
     try {
+      const activeKey = apiKey || localStorage.getItem('gemini_api_key') || localStorage.getItem('glassium_ai_key') || undefined;
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: `あなたはGlassium StudioのAIコードジェネレーターです。以下の要件に基づいて、完全に動作する美しいHTML/CSS/JSの単一コード（<!DOCTYPE html>から</html>まで）を生成してください。余計な解説やMarkdownコードブロックの記法（\`\`\`html など）は一切含めず、純粋なHTML文字列のみを出力してください。\n\n要件: ${prompt}`,
+          apiKey: activeKey,
           history: [],
         }),
       });

@@ -89,6 +89,7 @@ const ICON_MAP: Record<string, FluentIconType> = {
   'retro-2048': 'grid3x3',
   'retro-snake': 'game',
   'cosmic-maze': 'game',
+  'glassium-studio': 'pentool',
 
   // Lucide icon name mappings
   Globe: 'browser',
@@ -96,6 +97,8 @@ const ICON_MAP: Record<string, FluentIconType> = {
   BookOpen: 'notepad',
   SquareTerminal: 'terminal',
   Terminal: 'terminal',
+  Code: 'terminal',
+  Code2: 'terminal',
   Calculator: 'calculator',
   FolderOpen: 'explorer',
   Folder: 'explorer',
@@ -170,6 +173,7 @@ const ICON_MAP: Record<string, FluentIconType> = {
   Smartphone: 'smartphone',
   Save: 'save',
   Plus: 'plus',
+  PlusSquare: 'plus',
   RefreshCw: 'refresh',
   RotateCw: 'refresh',
   RotateCcw: 'refresh',
@@ -189,6 +193,14 @@ const ICON_MAP: Record<string, FluentIconType> = {
   Play: 'play',
   Pause: 'pause',
   Flashlight: 'sun',
+  Wrench: 'settings',
+  Share2: 'send',
+  MonitorUp: 'monitor',
+  ScreenShare: 'monitor',
+  Clipboard: 'notepad',
+  Box: 'sysmon',
+  Info: 'ai',
+  Home: 'browser',
 };
 
 export function resolveFluentIconType(nameOrId: string): FluentIconType | null {

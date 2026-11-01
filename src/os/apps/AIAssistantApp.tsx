@@ -115,11 +115,13 @@ export function AIAssistantApp() {
     setIsThinking(true);
 
     try {
+      const storedKey = localStorage.getItem('gemini_api_key') || localStorage.getItem('glassium_ai_key') || undefined;
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: textToSend,
+          apiKey: storedKey,
           history: messages.slice(-10).map((m) => ({
             role: m.sender === 'user' ? 'user' : 'model',
             content: m.text,
