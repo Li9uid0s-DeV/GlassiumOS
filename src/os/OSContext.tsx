@@ -180,6 +180,8 @@ export interface OSContextValue {
   setLiteMode: (v: boolean) => void;
   taskbarAlign: TaskbarAlign;
   setTaskbarAlign: (a: TaskbarAlign) => void;
+  autoHideTaskbar: boolean;
+  setAutoHideTaskbar: (v: boolean) => void;
 
   startOpen: boolean;
   setStartOpen: (v: boolean) => void;
@@ -540,6 +542,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
   );
   const [liteMode, setLiteMode] = useState<boolean>(persistedSettings.liteMode ?? false);
   const [taskbarAlign, setTaskbarAlign] = useState<TaskbarAlign>(persistedSettings.taskbarAlign ?? 'center');
+  const [autoHideTaskbar, setAutoHideTaskbar] = useState<boolean>(persistedSettings.autoHideTaskbar ?? false);
   const [startOpen, setStartOpen] = useState(false);
 
   const [installedApps, setInstalledApps] = useState<InstalledApp[]>(() => {
@@ -729,6 +732,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.setAttribute('data-accent', accentColor);
     document.documentElement.setAttribute('data-ui-style', uiStyle);
+    document.documentElement.setAttribute('data-design-engine', designEngine);
     document.documentElement.setAttribute('data-wallpaper-tone', isWallpaperBright ? 'bright' : 'dark');
     document.documentElement.style.setProperty('--os-accent', preset.hex);
     document.documentElement.style.setProperty('--os-accent-rgb', preset.rgb);
@@ -738,7 +742,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     document.documentElement.style.setProperty('--glass-curvature', `${glassCurvature}px`);
     document.documentElement.style.setProperty('--glass-specular', `${glassSpecular / 100}`);
     document.documentElement.style.setProperty('--glass-wobble', `${glassWobble / 100}`);
-  }, [theme, accentColor, uiStyle, isWallpaperBright, blurAmount, transparency, cornerRadius, glassCurvature, glassSpecular, glassWobble]);
+  }, [theme, accentColor, uiStyle, designEngine, isWallpaperBright, blurAmount, transparency, cornerRadius, glassCurvature, glassSpecular, glassWobble]);
 
   // Persist Settings
   useEffect(() => {
@@ -757,6 +761,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
           shellMode,
           taskbarStyle,
           designEngine,
+          autoHideTaskbar,
           nebulaPreset,
           blurAmount,
           cornerRadius,
@@ -797,6 +802,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     shellMode,
     taskbarStyle,
     designEngine,
+    autoHideTaskbar,
     nebulaPreset,
     blurAmount,
     cornerRadius,
@@ -1736,6 +1742,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
     setLiteMode,
     taskbarAlign,
     setTaskbarAlign,
+    autoHideTaskbar,
+    setAutoHideTaskbar,
     startOpen,
     setStartOpen,
     toggleStart,

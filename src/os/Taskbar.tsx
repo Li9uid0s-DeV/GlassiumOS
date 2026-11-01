@@ -40,6 +40,7 @@ export function Taskbar(_props?: TaskbarProps) {
     quickSettings,
     toggleQuick,
     taskbarAlign,
+    autoHideTaskbar,
     startOpen,
     setStartOpen,
     installedApps,
@@ -85,6 +86,24 @@ export function Taskbar(_props?: TaskbarProps) {
       setStartPos({ x: rect.left, width: rect.width });
     }
   }, []);
+
+  const [isTaskbarHovered, setIsTaskbarHovered] = useState(false);
+
+  useEffect(() => {
+    if (!autoHideTaskbar) {
+      setIsTaskbarHovered(true);
+      return;
+    }
+    const handleMouseMove = (e: MouseEvent) => {
+      if (e.clientY >= window.innerHeight - 14 || startOpen || trayOpen || calendarFlyoutOpen) {
+        setIsTaskbarHovered(true);
+      } else if (e.clientY < window.innerHeight - 60) {
+        setIsTaskbarHovered(false);
+      }
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, [autoHideTaskbar, startOpen, trayOpen, calendarFlyoutOpen]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -415,14 +434,24 @@ export function Taskbar(_props?: TaskbarProps) {
           5. GLASSIUMOS-V4.0 FLAT TASKBAR (DEFAULT)
          ============================================================== */}
       {!isXP && !isVista && !isWin10 && !isDeX && !isChromeOS && !isZorin && (
-        <div
-          className={`fixed bottom-0 inset-x-0 h-12 w-screen z-[5000] backdrop-blur-2xl flex items-center justify-between px-3 select-none transition-colors duration-200 shadow-[0_-8px_32px_rgba(0,0,0,0.3)] ${
-            isLight
-              ? 'bg-slate-100/45 text-slate-900 shadow-[0_-8px_32px_rgba(0,0,0,0.08)]'
-              : 'bg-slate-900/38 text-white'
-          }`}
-          style={{ position: 'fixed', bottom: 0, left: 0, right: 0, width: '100vw', borderRadius: 0 }}
-        >
+        <>
+          {autoHideTaskbar && (
+            <div
+              className="fixed bottom-0 left-0 right-0 h-1.5 z-[5001] cursor-pointer"
+              onMouseEnter={() => setIsTaskbarHovered(true)}
+            />
+          )}
+          <div
+            className={`fixed bottom-0 inset-x-0 h-12 w-screen z-[5000] backdrop-blur-2xl flex items-center justify-between px-3 select-none transition-all duration-200 shadow-[0_-8px_32px_rgba(0,0,0,0.3)] ${
+              autoHideTaskbar && !isTaskbarHovered ? 'translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
+            } ${
+              isLight
+                ? 'bg-slate-100/45 text-slate-900 shadow-[0_-8px_32px_rgba(0,0,0,0.08)]'
+                : 'bg-slate-900/38 text-white'
+            }`}
+            style={{ position: 'fixed', bottom: 0, left: 0, right: 0, width: '100vw', borderRadius: 0 }}
+            onMouseEnter={() => setIsTaskbarHovered(true)}
+          >
           {/* Left: Start Button + Flat App Search Bar + Task View */}
           <div className="flex items-center gap-2 min-w-0" ref={searchContainerRef}>
             <button
@@ -897,7 +926,8 @@ export function Taskbar(_props?: TaskbarProps) {
             </button>
           </div>
         </div>
-      )}
+      </>
+    )}
 
       {/* Instant App Search Dropdown */}
       <AnimatePresence>

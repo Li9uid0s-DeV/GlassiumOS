@@ -258,6 +258,58 @@ input[type='range'].glass-slider::-moz-range-thumb {
   cursor: pointer;
 }
 
+/* ============================================================
+   SURFACE MATERIAL ENGINE OVERRIDES
+   ============================================================ */
+[data-design-engine='windows-mica'] .liquid-glass-window,
+[data-design-engine='windows-mica'] .liquid-glass-card {
+  background: rgba(15, 23, 42, 0.92) !important;
+  backdrop-filter: blur(16px) saturate(130%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+[data-theme='light'][data-design-engine='windows-mica'] .liquid-glass-window,
+[data-theme='light'][data-design-engine='windows-mica'] .liquid-glass-card {
+  background: rgba(241, 245, 249, 0.94) !important;
+  backdrop-filter: blur(16px) saturate(130%) !important;
+  border: 1px solid rgba(15, 23, 42, 0.08) !important;
+}
+
+[data-design-engine='frosted-blur'] .liquid-glass-window,
+[data-design-engine='frosted-blur'] .liquid-glass-card {
+  background: rgba(15, 23, 42, 0.62) !important;
+  backdrop-filter: blur(40px) saturate(220%) !important;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+}
+
+[data-design-engine='dark-slate'] .liquid-glass-window,
+[data-design-engine='dark-slate'] .liquid-glass-card {
+  background: #090d16 !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+[data-theme='light'][data-design-engine='dark-slate'] .liquid-glass-window,
+[data-theme='light'][data-design-engine='dark-slate'] .liquid-glass-card {
+  background: #f8fafc !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(15, 23, 42, 0.12) !important;
+}
+
+[data-design-engine='cyberpunk-neon'] .liquid-glass-window,
+[data-design-engine='cyberpunk-neon'] .liquid-glass-card {
+  background: rgba(6, 11, 25, 0.95) !important;
+  border: 1px solid rgba(var(--os-accent-rgb), 0.5) !important;
+  box-shadow: 0 0 32px rgba(var(--os-accent-rgb), 0.22), 0 20px 54px rgba(0, 0, 0, 0.8) !important;
+}
+
+[data-design-engine='miuix-glass'] .liquid-glass-window,
+[data-design-engine='miuix-glass'] .liquid-glass-card {
+  background: rgba(255, 255, 255, 0.07) !important;
+  backdrop-filter: blur(32px) saturate(180%) !important;
+  border-radius: 24px !important;
+}
+
 /* Flat Accent Toggle Switch */
 .glass-switch {
   position: relative;
