@@ -131,8 +131,6 @@ export type ShellMode =
   | 'windows11'
   | 'windows10'
   | 'windows8'
-  | 'vista'
-  | 'xp'
   | 'dex'
   | 'chromeos'
   | 'mac'
@@ -367,58 +365,6 @@ export interface StoreTheme {
 }
 
 export const STORE_THEMES: StoreTheme[] = [
-  {
-    id: 'xp-luna',
-    name: 'Windows XP Luna Classic',
-    nameJa: 'Windows XP ルナ・クラシック',
-    description: 'Iconic royal blue taskbar, emerald green Start button, Bliss rolling hills wallpaper, and nostalgic Luna titlebars.',
-    descriptionJa: '象徴的なロイヤルブルータスクバー、エメラルドグリーンのスタートボタン、草原の壁紙、懐かしのルナUI。',
-    author: 'Microsoft Retro Archives',
-    category: 'retro',
-    rating: 4.9,
-    downloads: '1.4M',
-    version: '5.1.2600',
-    size: '4.2 MB',
-    badge: 'Retro Classic',
-    previewGradient: 'from-blue-600 via-sky-500 to-emerald-500',
-    accentColor: '#22c55e',
-    config: {
-      shellMode: 'xp',
-      designEngine: 'liquid-glass',
-      wallpaper: 'forest',
-      theme: 'light',
-      blurAmount: 6,
-      cornerRadius: 6,
-      transparency: 15,
-      accentColor: '#16a34a',
-    },
-  },
-  {
-    id: 'vista-aero',
-    name: 'Windows Vista Aero Glass',
-    nameJa: 'Windows Vista アルティメット・エアロ',
-    description: 'Frosted smoked glass translucency, radiant Start Orb, and live desktop Sidebar with analog clock and real-time CPU gauges.',
-    descriptionJa: 'すりガラスのエアロ透過、光るスタートオーブ、アナログ時計とCPUメーターが動く本物のデスクトップサイドバー。',
-    author: 'Aero Design Labs',
-    category: 'retro',
-    rating: 4.8,
-    downloads: '980K',
-    version: '6.0.6002',
-    size: '5.8 MB',
-    badge: 'Aero Glass',
-    previewGradient: 'from-slate-900 via-cyan-900 to-teal-500',
-    accentColor: '#0ea5e9',
-    config: {
-      shellMode: 'vista',
-      designEngine: 'frosted-blur',
-      wallpaper: 'aurora',
-      theme: 'dark',
-      blurAmount: 18,
-      cornerRadius: 8,
-      transparency: 28,
-      accentColor: '#38bdf8',
-    },
-  },
   {
     id: 'win10-fluent',
     name: 'Windows 10 Fluent Dark',

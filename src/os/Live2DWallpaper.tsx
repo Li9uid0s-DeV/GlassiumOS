@@ -309,9 +309,13 @@ export function Live2DWallpaper({ lite = false }: Live2DWallpaperProps) {
   if (lite) return null;
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="pointer-events-none fixed inset-0 z-0 h-full w-full"
-    />
+    <div className="fixed inset-0 z-0 pointer-events-none h-full w-full overflow-hidden">
+      <canvas
+        ref={canvasRef}
+        className="pointer-events-none absolute inset-0 z-0 h-full w-full"
+      />
+      {/* Dark Ambient Vignette Overlay for High-Contrast Text Readability */}
+      <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-black/40 via-transparent to-black/60 backdrop-brightness-95" />
+    </div>
   );
 }

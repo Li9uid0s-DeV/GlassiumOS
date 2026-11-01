@@ -540,6 +540,17 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Global CORS & OPTIONS Preflight Handler to prevent 405 Method Not Allowed
+  app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   app.get('/api/health', (_req, res) => {
     res.json({
       status: 'ok',
@@ -705,31 +716,14 @@ async function startServer() {
     }
   });
 
-  // Proxy endpoint for Browser to bypass CORS
-  app.get('/api/proxy', async (req, res) => {
-    const targetUrl = req.query.url as string;
-    if (!targetUrl) {
-      return res.status(400).json({ error: 'url parameter is required' });
-    }
-    try {
-      const response = await fetch(targetUrl, {
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) GlassiumOS-Browser/4.6',
-        },
-      });
-      const contentType = response.headers.get('content-type') || 'text/html';
-      const body = await response.text();
-      res.setHeader('Content-Type', contentType);
-      res.send(body);
-    } catch (err) {
-      res.status(500).send(`Proxy Error: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  });
-
   // AI Chat Endpoint using @google/genai + Live Knowledge Fallback
-  app.post('/api/ai/chat', async (req, res) => {
+  app.all('/api/ai/chat', async (req, res) => {
     try {
-      const { message, history, context, apiKey: clientApiKey } = req.body;
+      const message = req.body?.message || (req.query?.message as string) || '';
+      const history = req.body?.history;
+      const context = req.body?.context;
+      const clientApiKey = req.body?.apiKey || (req.query?.apiKey as string);
+
       if (!message || typeof message !== 'string') {
         return res.status(400).json({ error: 'Message is required' });
       }

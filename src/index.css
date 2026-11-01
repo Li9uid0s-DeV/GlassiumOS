@@ -519,14 +519,38 @@ input[type='range'].glass-slider::-moz-range-thumb {
 }
 
 /* ============================================================
+   ACCENT COLOR DIRECT OVERRIDES
+   ============================================================ */
+[data-accent='cyan'] {
+  --os-accent: #06b6d4 !important;
+  --os-accent-rgb: 6, 182, 212 !important;
+}
+[data-accent='blue'] {
+  --os-accent: #3b82f6 !important;
+  --os-accent-rgb: 59, 130, 246 !important;
+}
+[data-accent='violet'] {
+  --os-accent: #8b5cf6 !important;
+  --os-accent-rgb: 139, 92, 246 !important;
+}
+[data-accent='emerald'] {
+  --os-accent: #10b981 !important;
+  --os-accent-rgb: 16, 185, 129 !important;
+}
+[data-accent='rose'] {
+  --os-accent: #f43f5e !important;
+  --os-accent-rgb: 244, 63, 94 !important;
+}
+[data-accent='amber'] {
+  --os-accent: #f59e0b !important;
+  --os-accent-rgb: 245, 158, 11 !important;
+}
+
+/* ============================================================
    UI STYLE ENGINES (AUTHENTIC & FUN PRESETS)
    ============================================================ */
 
 /* 1. Glassium (Zero Border Line Standard) */
-[data-ui-style='glassium'] {
-  --os-accent: #06b6d4;
-  --os-accent-rgb: 6, 182, 212;
-}
 [data-ui-style='glassium'] .liquid-glass-window {
   border-radius: 18px;
   box-shadow:
@@ -537,8 +561,6 @@ input[type='range'].glass-slider::-moz-range-thumb {
 
 /* 2. macOS (Apple Human Interface Guidelines) */
 [data-ui-style='macos'] {
-  --os-accent: #3b82f6;
-  --os-accent-rgb: 59, 130, 246;
   --theme-radius: 14px;
 }
 [data-ui-style='macos'] .liquid-glass-window {
@@ -557,8 +579,6 @@ input[type='range'].glass-slider::-moz-range-thumb {
 
 /* 3. One UI (Samsung Reachability & Comfort Curve) */
 [data-ui-style='one-ui'] {
-  --os-accent: #2563eb;
-  --os-accent-rgb: 37, 99, 235;
   --theme-radius: 26px;
 }
 [data-ui-style='one-ui'] .liquid-glass-window {
@@ -575,8 +595,6 @@ input[type='range'].glass-slider::-moz-range-thumb {
 
 /* 4. MIUI (Alive Aesthetics & Kenya Hara Superellipse) */
 [data-ui-style='miui'] {
-  --os-accent: #f97316;
-  --os-accent-rgb: 249, 115, 22;
   --theme-radius: 22px;
 }
 [data-ui-style='miui'] .liquid-glass-window {
@@ -585,14 +603,12 @@ input[type='range'].glass-slider::-moz-range-thumb {
   -webkit-backdrop-filter: blur(28px) saturate(175%);
   box-shadow:
     0 24px 64px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(249, 115, 22, 0.12),
+    0 0 0 1px rgba(var(--os-accent-rgb), 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 /* 5. Material 3 (Google Material You Dynamic Tonal) */
 [data-ui-style='material3'] {
-  --os-accent: #8b5cf6;
-  --os-accent-rgb: 139, 92, 246;
   --theme-radius: 28px;
 }
 [data-ui-style='material3'] .liquid-glass-window {
@@ -608,8 +624,6 @@ input[type='range'].glass-slider::-moz-range-thumb {
 
 /* 6. The AI (Neural Matrix Cyber Sci-Fi) */
 [data-ui-style='the-ai'] {
-  --os-accent: #10b981;
-  --os-accent-rgb: 16, 185, 129;
   --theme-radius: 10px;
 }
 [data-ui-style='the-ai'] .liquid-glass-window {
@@ -628,8 +642,6 @@ input[type='range'].glass-slider::-moz-range-thumb {
 
 /* 7. Nyan Cat (Rainbow Arcade Pop) */
 [data-ui-style='nyan-cat'] {
-  --os-accent: #ec4899;
-  --os-accent-rgb: 236, 72, 153;
   --theme-radius: 20px;
 }
 [data-ui-style='nyan-cat'] .liquid-glass-window {
@@ -645,8 +657,6 @@ input[type='range'].glass-slider::-moz-range-thumb {
 
 /* 8. Meme (Much OS, Such Window, Very Doge) */
 [data-ui-style='meme'] {
-  --os-accent: #eab308;
-  --os-accent-rgb: 234, 179, 8;
   --theme-radius: 18px;
 }
 [data-ui-style='meme'] .liquid-glass-window {

@@ -22,7 +22,7 @@ type NavCategory = 'system' | 'personalization' | 'apps' | 'accounts';
 
 type SystemSubView = 'main' | 'display' | 'sound' | 'power' | 'multitasking' | 'aicomponents';
 type PersonalizationSubView = 'main' | 'uistyle' | 'surface' | 'accent' | 'wallpaper' | 'glass';
-type AccountsSubView = 'main' | 'profile' | 'security' | 'info';
+type AccountsSubView = 'main' | 'profile' | 'security';
 
 interface NavItem {
   id: NavCategory;
@@ -31,10 +31,10 @@ interface NavItem {
 }
 
 const SIDEBAR_NAV: NavItem[] = [
-  { id: 'system', label: 'System', icon: 'Monitor' },
-  { id: 'personalization', label: 'Personalization', icon: 'Palette' },
-  { id: 'apps', label: 'Apps', icon: 'LayoutGrid' },
-  { id: 'accounts', label: 'Accounts', icon: 'User' },
+  { id: 'system', label: 'システム (System)', icon: 'Monitor' },
+  { id: 'personalization', label: '個人設定 (Personalization)', icon: 'Palette' },
+  { id: 'apps', label: 'アプリ (Apps)', icon: 'LayoutGrid' },
+  { id: 'accounts', label: 'アカウント (Accounts)', icon: 'User' },
 ];
 
 interface SystemCard {
@@ -45,41 +45,96 @@ interface SystemCard {
 }
 
 const SYSTEM_CARDS: SystemCard[] = [
-  { id: 'display', title: 'Display', desc: '壁紙、2Dオーロラ背景、アイコンサイズ、グリッドスナップ', icon: 'Monitor' },
+  { id: 'display', title: 'Display & Wallpapers', desc: '壁紙、2Dオーロラライブ背景、アイコンサイズ、グリッドスナップ', icon: 'Monitor' },
   { id: 'sound', title: 'Sound', desc: 'マスター音量、システム効果音', icon: 'Volume2' },
-  { id: 'power', title: 'Power & battery', desc: '画面ロック、スリープ時計スタイル、画面の配置', icon: 'BatteryCharging' },
+  { id: 'power', title: 'Power & Sleep', desc: '画面スリープ起動、ロック画面スタイル、スリープ時計', icon: 'BatteryCharging' },
   { id: 'multitasking', title: 'Multitasking & Taskbar', desc: '50:50 ウィンドウスナップ、タスクバー配置、自動隠す', icon: 'Layers' },
-  { id: 'aicomponents', title: 'AI components', desc: 'Google Gemini API Key 接続・レスポンス検証', icon: 'Sparkles' },
+  { id: 'aicomponents', title: 'AI Components', desc: 'Google Gemini API Key 接続・レスポンス検証', icon: 'Sparkles' },
 ];
 
-const AURORA_PALETTES: { id: AuroraColor; label: string; preview: string }[] = [
-  { id: 'cyan-violet', label: 'Amethyst & Cyan', preview: 'from-cyan-500 via-indigo-500 to-purple-600' },
-  { id: 'emerald-sky', label: 'Polar Emerald', preview: 'from-emerald-400 via-teal-500 to-sky-600' },
-  { id: 'rose-gold', label: 'Crimson Rose', preview: 'from-rose-500 via-pink-500 to-amber-500' },
-  { id: 'ocean-blue', label: 'Abyssal Sapphire', preview: 'from-sky-400 via-blue-600 to-indigo-800' },
-  { id: 'sunset-magenta', label: 'Neon Dusk', preview: 'from-pink-500 via-purple-600 to-indigo-800' },
+const AURORA_PALETTES: { id: AuroraColor; label: string; desc: string; preview: string }[] = [
+  { id: 'cyan-violet', label: 'Amethyst & Cyan Silk', desc: '深いインディゴ宇宙とシアンのシルク光線', preview: 'from-cyan-900 via-indigo-900 to-purple-950' },
+  { id: 'emerald-sky', label: 'Polar Emerald Aurora', desc: '極北のミッドナイトグリーンとターコイズ粒子', preview: 'from-emerald-950 via-teal-900 to-sky-950' },
+  { id: 'rose-gold', label: 'Crimson Rose Nebula', desc: '深紅のローズゴールドと黄金のオーロラ輝き', preview: 'from-rose-950 via-pink-900 to-amber-950' },
+  { id: 'ocean-blue', label: 'Abyssal Deep Ocean', desc: '深海のロイヤルブルーとサファイアの波紋', preview: 'from-slate-950 via-blue-950 to-cyan-950' },
+  { id: 'sunset-magenta', label: 'Neon Cyber Dusk', desc: 'サイバーパンク感溢れるマゼンタと夕焼け', preview: 'from-purple-950 via-fuchsia-900 to-rose-950' },
 ];
 
-const SHELL_MODES: { id: ShellMode; label: string; desc: string; preview: string }[] = [
-  { id: 'windows', label: 'Windows 11', desc: '中央配置タスクバー ＆ 丸角フロートスタート', preview: 'bg-slate-900 border-sky-400/40' },
-  { id: 'windows10', label: 'Windows 10', desc: '左揃えタスクバー ＆ ライブタイルスタート', preview: 'bg-zinc-950 border-blue-500/40' },
-  { id: 'windows8', label: 'Windows 8 (Metro)', desc: '全画面ライブタイルアプリアニメーション', preview: 'bg-teal-950 border-teal-400/40' },
-  { id: 'mac', label: 'macOS Sonoma', desc: 'トップシステムバー ＆ フロートガラスDock', preview: 'bg-stone-900 border-rose-400/40' },
-  { id: 'ubuntu', label: 'Ubuntu Linux', desc: '左側常駐ドック ＆ オレンジアクセント', preview: 'bg-orange-950 border-orange-500/40' },
-  { id: 'dex', label: 'Samsung DeX', desc: 'マルチウィンドウワークステーション', preview: 'bg-blue-950 border-blue-400/40' },
-  { id: 'chromeos', label: 'ChromeOS', desc: 'マテリアルピルシェルフ ＆ パステルUI', preview: 'bg-purple-950 border-purple-400/40' },
-  { id: 'zorin', label: 'Zorin Pro', desc: 'エレガントモダンLinuxデスクトップ', preview: 'bg-slate-950 border-cyan-400/40' },
-  { id: 'vista', label: 'Vista Aero', desc: 'エアロガラス ＆ ガジェットバー', preview: 'bg-cyan-950 border-cyan-300/40' },
-  { id: 'xp', label: 'Classic XP', desc: 'レトロルナブルー ＆ エメラルドスタート', preview: 'bg-blue-800 border-emerald-400/40' },
+// Shell mode configurations with detailed distinct mockups
+interface ShellModeOption {
+  id: ShellMode;
+  label: string;
+  desc: string;
+  accentBg: string;
+  mockupType: 'win11' | 'win10' | 'win8' | 'ubuntu' | 'mac' | 'dex' | 'chromeos' | 'zorin';
+}
+
+const SHELL_MODES: ShellModeOption[] = [
+  {
+    id: 'windows11',
+    label: 'Windows 11',
+    desc: '中央配置タスクバー ＆ 丸角フロートスタートメニュー',
+    accentBg: 'from-sky-950 to-blue-900 border-sky-500/40',
+    mockupType: 'win11',
+  },
+  {
+    id: 'windows10',
+    label: 'Windows 10',
+    desc: '左揃えタスクバー ＆ ライブタイルマトリクス',
+    accentBg: 'from-zinc-950 to-blue-950 border-blue-500/40',
+    mockupType: 'win10',
+  },
+  {
+    id: 'windows8',
+    label: 'Windows 8 (Metro)',
+    desc: '全画面マルチカラーライブタイルグリッド',
+    accentBg: 'from-teal-950 to-emerald-900 border-teal-400/40',
+    mockupType: 'win8',
+  },
+  {
+    id: 'ubuntu',
+    label: 'Ubuntu Linux',
+    desc: '左側常駐アプリアンカードック ＆ オレンジアクセント',
+    accentBg: 'from-amber-950 to-orange-950 border-orange-500/40',
+    mockupType: 'ubuntu',
+  },
+  {
+    id: 'mac',
+    label: 'macOS Sonoma',
+    desc: 'トップシステムバー ＆ ボトムフロートガラスDock',
+    accentBg: 'from-rose-950 to-purple-900 border-rose-400/40',
+    mockupType: 'mac',
+  },
+  {
+    id: 'dex',
+    label: 'Samsung DeX',
+    desc: 'モバイルPCワークステーション ＆ アプリグリッド',
+    accentBg: 'from-blue-950 to-indigo-900 border-blue-400/40',
+    mockupType: 'dex',
+  },
+  {
+    id: 'chromeos',
+    label: 'ChromeOS',
+    desc: 'Material 3 ピルシェルフ ＆ ラウンドランチャー',
+    accentBg: 'from-purple-950 to-indigo-900 border-purple-400/40',
+    mockupType: 'chromeos',
+  },
+  {
+    id: 'zorin',
+    label: 'Zorin OS Pro',
+    desc: 'エレガントモダンLinux ＆ クリスタルタスクバー',
+    accentBg: 'from-slate-950 to-cyan-950 border-cyan-400/40',
+    mockupType: 'zorin',
+  },
 ];
 
 const DESIGN_ENGINES: { id: DesignEngine; label: string; desc: string; bg: string }[] = [
-  { id: 'liquid-glass', label: 'Translucent Glass', desc: '屈折と反射を伴う液体ガラスサーフェス', bg: 'from-cyan-900/60 to-purple-900/60 backdrop-blur-md' },
-  { id: 'windows-mica', label: 'Flat Mica', desc: 'Windows 11に馴染む静かな不透明マイカ', bg: 'from-slate-900/90 to-slate-800/90 backdrop-blur-sm' },
+  { id: 'liquid-glass', label: 'Liquid Refraction Glass', desc: '屈折と反射を伴う液体ガラスサーフェス', bg: 'from-cyan-900/60 to-purple-900/60 backdrop-blur-md' },
+  { id: 'windows-mica', label: 'Flat Mica Surface', desc: 'Windows 11に馴染む静かな不透明マイカ', bg: 'from-slate-900/90 to-slate-800/90 backdrop-blur-sm' },
   { id: 'frosted-blur', label: 'Frosted Acrylic', desc: '高精細すりガラスディープアクリル', bg: 'from-slate-950/40 to-blue-950/40 backdrop-blur-2xl' },
-  { id: 'dark-slate', label: 'Crisp Slate', desc: 'ハイコントラストで明瞭なフラットスレート', bg: 'from-zinc-950 to-black' },
-  { id: 'cyberpunk-neon', label: 'Cyberpunk HUD', desc: '高輝度ネオン線とサイバーパンク感', bg: 'from-black via-cyan-950/80 to-emerald-950/80 border border-cyan-500/40' },
-  { id: 'miuix-glass', label: 'Hyper Glass 3', desc: '角丸24pxと超平滑グラデーション', bg: 'from-indigo-900/50 via-purple-900/50 to-pink-900/50 backdrop-blur-xl' },
+  { id: 'dark-slate', label: 'Crisp High-Contrast Slate', desc: 'ハイコントラストで明瞭なフラットスレート', bg: 'from-zinc-950 to-black' },
+  { id: 'cyberpunk-neon', label: 'Cyberpunk HUD Neon', desc: '高輝度ネオン線とサイバーパンク感', bg: 'from-black via-cyan-950/80 to-emerald-950/80 border border-cyan-500/40' },
+  { id: 'miuix-glass', label: 'Hyper Glass 3 (MIUI)', desc: '角丸24pxと超平滑グラデーション', bg: 'from-indigo-900/50 via-purple-900/50 to-pink-900/50 backdrop-blur-xl' },
 ];
 
 const PRESET_AVATARS = [
@@ -146,7 +201,7 @@ function CustomSlider({
       {label && (
         <div className="flex justify-between text-xs">
           <span className="font-semibold opacity-90">{label}</span>
-          <span className="font-mono text-sky-400 font-bold">{valueText ?? value}</span>
+          <span className="font-mono text-[var(--os-accent)] font-bold">{valueText ?? value}</span>
         </div>
       )}
       <input
@@ -158,6 +213,158 @@ function CustomSlider({
         onChange={(e) => onChange(Number(e.target.value))}
         className="glass-slider w-full cursor-pointer"
       />
+    </div>
+  );
+}
+
+// Distinct Visual Mockups for Each OS Shell
+function ShellMockupDiagram({ type }: { type: ShellModeOption['mockupType'] }) {
+  if (type === 'win11') {
+    return (
+      <div className="w-full h-16 rounded-xl bg-slate-900 border border-sky-500/40 p-2 flex flex-col justify-between overflow-hidden relative shadow-inner">
+        {/* Floating Centered Start Menu Mockup */}
+        <div className="self-center w-24 h-8 rounded-lg bg-slate-800/90 border border-sky-400/40 p-1 flex flex-col justify-between">
+          <div className="grid grid-cols-4 gap-0.5">
+            <div className="w-2 h-1.5 rounded bg-sky-400/80" />
+            <div className="w-2 h-1.5 rounded bg-violet-400/80" />
+            <div className="w-2 h-1.5 rounded bg-emerald-400/80" />
+            <div className="w-2 h-1.5 rounded bg-amber-400/80" />
+          </div>
+        </div>
+        {/* Centered Taskbar */}
+        <div className="w-full h-3 rounded-md bg-slate-950/80 border border-white/10 flex items-center justify-center gap-1.5 px-2">
+          <div className="w-2.5 h-2 rounded bg-sky-400" />
+          <div className="w-2 h-2 rounded bg-white/40" />
+          <div className="w-2 h-2 rounded bg-white/40" />
+          <div className="w-2 h-2 rounded bg-white/40" />
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'win10') {
+    return (
+      <div className="w-full h-16 rounded-xl bg-zinc-950 border border-blue-500/40 p-2 flex flex-col justify-between overflow-hidden relative shadow-inner">
+        {/* Live Tiles Start Menu */}
+        <div className="w-20 h-9 rounded bg-zinc-900 border border-blue-400/30 p-1 grid grid-cols-2 gap-1">
+          <div className="bg-blue-600/80 rounded-[2px]" />
+          <div className="bg-cyan-600/80 rounded-[2px]" />
+          <div className="bg-emerald-600/80 rounded-[2px]" />
+          <div className="bg-purple-600/80 rounded-[2px]" />
+        </div>
+        {/* Left Taskbar */}
+        <div className="w-full h-3 bg-black border-t border-white/10 flex items-center justify-start gap-1 px-1.5">
+          <div className="w-2.5 h-2.5 bg-blue-500 rounded-[1px]" />
+          <div className="w-8 h-2 rounded bg-white/10" />
+          <div className="w-2 h-2 rounded bg-white/40" />
+          <div className="w-2 h-2 rounded bg-white/40" />
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'win8') {
+    return (
+      <div className="w-full h-16 rounded-xl bg-teal-950 border border-teal-400/40 p-2 flex flex-col justify-between overflow-hidden relative shadow-inner">
+        {/* Metro Tile Matrix */}
+        <div className="w-full h-full grid grid-cols-4 gap-1 p-0.5">
+          <div className="bg-teal-600/90 rounded p-0.5 font-mono text-[6px] text-white">Mail</div>
+          <div className="bg-purple-600/90 rounded p-0.5 font-mono text-[6px] text-white">Store</div>
+          <div className="bg-blue-600/90 rounded p-0.5 font-mono text-[6px] text-white">Photos</div>
+          <div className="bg-amber-600/90 rounded p-0.5 font-mono text-[6px] text-white">Music</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'ubuntu') {
+    return (
+      <div className="w-full h-16 rounded-xl bg-stone-950 border border-orange-500/40 p-1 flex overflow-hidden relative shadow-inner">
+        {/* Left Vertical Dock */}
+        <div className="w-4 h-full bg-slate-900 border-r border-orange-500/30 flex flex-col items-center py-1 gap-1">
+          <div className="w-2.5 h-2.5 rounded-md bg-orange-500" />
+          <div className="w-2 h-2 rounded bg-white/40" />
+          <div className="w-2 h-2 rounded bg-white/40" />
+        </div>
+        {/* Top Bar */}
+        <div className="flex-1 flex flex-col justify-between p-1">
+          <div className="w-full h-2 bg-orange-950/60 rounded flex items-center justify-between px-1">
+            <span className="text-[6px] text-orange-400 font-mono">Ubuntu</span>
+            <span className="text-[6px] text-white/50">16:45</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'mac') {
+    return (
+      <div className="w-full h-16 rounded-xl bg-stone-900 border border-rose-400/40 p-1 flex flex-col justify-between overflow-hidden relative shadow-inner">
+        {/* Top Menu Bar */}
+        <div className="w-full h-2.5 bg-black/50 rounded-t px-1.5 flex items-center justify-between">
+          <div className="flex items-center gap-1">
+            <div className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+            <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+          </div>
+          <span className="text-[6px] text-white/60 font-mono">Finder</span>
+        </div>
+        {/* Floating Bottom Dock */}
+        <div className="self-center w-28 h-3 rounded-full bg-white/20 border border-white/20 flex items-center justify-center gap-1.5 px-2 mb-0.5">
+          <div className="w-2 h-2 rounded-full bg-blue-400" />
+          <div className="w-2 h-2 rounded-full bg-rose-400" />
+          <div className="w-2 h-2 rounded-full bg-amber-400" />
+          <div className="w-2 h-2 rounded-full bg-emerald-400" />
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'dex') {
+    return (
+      <div className="w-full h-16 rounded-xl bg-blue-950 border border-blue-400/40 p-1.5 flex flex-col justify-between overflow-hidden relative shadow-inner">
+        <div className="flex-1" />
+        {/* DeX Mobile Taskbar */}
+        <div className="w-full h-3 rounded-lg bg-black/60 border border-blue-400/30 flex items-center justify-between px-1.5">
+          <div className="flex items-center gap-1">
+            <div className="w-2.5 h-2.5 rounded bg-blue-500" />
+            <div className="w-2 h-2 rounded bg-white/40" />
+          </div>
+          <div className="text-[6px] text-blue-300 font-mono">Galaxy DeX</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'chromeos') {
+    return (
+      <div className="w-full h-16 rounded-xl bg-purple-950 border border-purple-400/40 p-1.5 flex flex-col justify-between overflow-hidden relative shadow-inner">
+        <div className="flex-1" />
+        {/* Material 3 Pill Shelf */}
+        <div className="self-center w-32 h-3.5 rounded-full bg-purple-900/80 border border-purple-400/40 flex items-center justify-between px-2">
+          <div className="w-2.5 h-2.5 rounded-full bg-purple-400" />
+          <div className="flex gap-1">
+            <div className="w-2 h-2 rounded-full bg-white/40" />
+            <div className="w-2 h-2 rounded-full bg-white/40" />
+          </div>
+          <div className="w-2.5 h-2.5 rounded-full bg-sky-400" />
+        </div>
+      </div>
+    );
+  }
+
+  // Zorin
+  return (
+    <div className="w-full h-16 rounded-xl bg-slate-950 border border-cyan-400/40 p-1.5 flex flex-col justify-between overflow-hidden relative shadow-inner">
+      <div className="flex-1" />
+      {/* Zorin Crystal Panel */}
+      <div className="w-full h-3 rounded bg-cyan-950/80 border border-cyan-400/30 flex items-center justify-between px-1.5">
+        <div className="flex items-center gap-1">
+          <div className="w-2.5 h-2 rounded bg-cyan-400" />
+          <div className="w-2 h-2 rounded bg-white/40" />
+        </div>
+        <div className="w-2 h-1 bg-cyan-400 rounded-full" />
+      </div>
     </div>
   );
 }
@@ -340,15 +547,63 @@ export function SettingsApp() {
     setTimeout(() => setAccountSaved(false), 3000);
   };
 
+  const handleSelectShellMode = (smId: ShellMode) => {
+    playSound('click');
+    setShellMode(smId);
+    if (smId === 'mac') setUiStyle('macos');
+    else if (smId === 'dex') setUiStyle('one-ui');
+    else if (smId === 'chromeos') setUiStyle('material3');
+    else if (smId === 'windows8') setUiStyle('glassium');
+    else setUiStyle('glassium');
+  };
+
+  const handleSelectSurfaceEngine = (deId: DesignEngine) => {
+    playSound('click');
+    setDesignEngine(deId);
+
+    // Dynamic glass parameters mapping for authentic Surface Material Engine experience
+    if (deId === 'liquid-glass') {
+      setBlurAmount(24);
+      setCornerRadius(18);
+      setTransparency(78);
+      setGlassWobble(75);
+    } else if (deId === 'windows-mica') {
+      setBlurAmount(14);
+      setCornerRadius(12);
+      setTransparency(90);
+      setGlassWobble(20);
+    } else if (deId === 'frosted-blur') {
+      setBlurAmount(38);
+      setCornerRadius(16);
+      setTransparency(65);
+      setGlassWobble(85);
+    } else if (deId === 'dark-slate') {
+      setBlurAmount(8);
+      setCornerRadius(8);
+      setTransparency(95);
+      setGlassWobble(0);
+    } else if (deId === 'cyberpunk-neon') {
+      setBlurAmount(16);
+      setCornerRadius(6);
+      setTransparency(85);
+      setGlassWobble(50);
+    } else if (deId === 'miuix-glass') {
+      setBlurAmount(28);
+      setCornerRadius(24);
+      setTransparency(72);
+      setGlassWobble(60);
+    }
+  };
+
   const renderBreadcrumbHeader = (
     title: string,
     onBack: () => void
   ) => (
-    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-200/60 dark:border-white/[0.06]">
+    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-200/60 dark:border-white/[0.08]">
       <button
         type="button"
         onClick={() => { playSound('click'); onBack(); }}
-        className={`p-1.5 rounded-lg transition ${isLight ? 'hover:bg-slate-200/80 text-slate-700' : 'hover:bg-white/10 text-white/80'}`}
+        className={`p-1.5 rounded-lg transition ${isLight ? 'hover:bg-slate-200/80 text-slate-800' : 'hover:bg-white/10 text-white/90'}`}
         title="戻る"
       >
         <Icon name="ArrowLeft" size={16} />
@@ -358,12 +613,12 @@ export function SettingsApp() {
   );
 
   return (
-    <div className="flex h-full w-full bg-slate-100/90 dark:bg-slate-950/90 text-slate-900 dark:text-slate-100 select-none overflow-hidden font-sans">
+    <div className={`flex h-full w-full select-none overflow-hidden font-sans ${isLight ? 'bg-slate-100 text-slate-900' : 'bg-slate-950 text-slate-100'}`}>
       {/* Sidebar Navigation */}
-      <div className="w-52 shrink-0 border-r border-slate-200/60 dark:border-white/[0.06] p-3 flex flex-col justify-between bg-slate-200/30 dark:bg-black/20">
+      <div className={`w-56 shrink-0 border-r p-3 flex flex-col justify-between ${isLight ? 'bg-slate-200/50 border-slate-300/60' : 'bg-black/30 border-white/[0.08]'}`}>
         <div className="space-y-4">
           {/* User Compact Profile */}
-          <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-200/50 dark:bg-white/[0.04]">
+          <div className={`flex items-center gap-3 p-2.5 rounded-2xl ${isLight ? 'bg-white border border-slate-300/80 shadow-xs' : 'bg-white/[0.05] border border-white/10'}`}>
             <div className="w-9 h-9 rounded-full bg-[var(--os-accent)]/20 text-[var(--os-accent)] flex items-center justify-center font-bold overflow-hidden shrink-0">
               {customAvatarUrl ? (
                 <img src={customAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
@@ -396,8 +651,8 @@ export function SettingsApp() {
                     active
                       ? 'bg-[var(--os-accent)] text-black font-bold shadow-md'
                       : isLight
-                      ? 'text-slate-700 hover:bg-slate-200/60'
-                      : 'text-slate-300 hover:bg-white/[0.06]'
+                      ? 'text-slate-800 hover:bg-slate-300/60'
+                      : 'text-slate-200 hover:bg-white/[0.08]'
                   }`}
                 >
                   <Icon name={nav.icon} size={18} />
@@ -409,14 +664,14 @@ export function SettingsApp() {
         </div>
 
         {/* System Version Tag */}
-        <div className="px-3 py-2 text-[10px] opacity-50 border-t border-slate-200/60 dark:border-white/[0.06] flex items-center justify-between font-mono">
+        <div className="px-3 py-2 text-[10px] opacity-60 border-t border-slate-300/60 dark:border-white/[0.08] flex items-center justify-between font-mono">
           <span>GlassiumOS</span>
           <span>v4.7</span>
         </div>
       </div>
 
       {/* Main Content View Container */}
-      <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
         <AnimatePresence mode="wait">
           {/* ==================== 1. SYSTEM CATEGORY ==================== */}
           {activeCategory === 'system' && (
@@ -431,19 +686,19 @@ export function SettingsApp() {
               {systemSubView === 'main' ? (
                 <>
                   <div className="mb-4">
-                    <h1 className="text-xl font-bold">System</h1>
-                    <p className="text-xs opacity-60">ディスプレイ、サウンド、通知、電源とスリープの設定</p>
+                    <h1 className="text-xl font-bold">System (システム設定)</h1>
+                    <p className="text-xs opacity-60">ディスプレイ、音量、電源・スリープ、タスクバーのカスタマイズ</p>
                   </div>
 
                   {/* Windows 11 Clean Hairline Card List */}
-                  <div className="divide-y divide-slate-200/60 dark:divide-white/[0.06]">
+                  <div className="divide-y divide-slate-200/60 dark:divide-white/[0.08]">
                     {SYSTEM_CARDS.map((card) => (
                       <button
                         key={card.id}
                         type="button"
                         onClick={() => { playSound('click'); setSystemSubView(card.id); }}
                         className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${
-                          isLight ? 'hover:bg-slate-200/40' : 'hover:bg-white/[0.04]'
+                          isLight ? 'hover:bg-slate-200/50' : 'hover:bg-white/[0.04]'
                         }`}
                       >
                         <div className="flex items-center gap-3.5 min-w-0">
@@ -451,7 +706,7 @@ export function SettingsApp() {
                             <Icon name={card.icon} size={20} />
                           </div>
                           <div>
-                            <div className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-[var(--os-accent)] transition-colors">
+                            <div className="text-xs font-bold group-hover:text-[var(--os-accent)] transition-colors">
                               {card.title}
                             </div>
                             <div className="text-[11px] opacity-60 truncate">{card.desc}</div>
@@ -465,7 +720,7 @@ export function SettingsApp() {
               ) : systemSubView === 'display' ? (
                 /* ---------------- DISPLAY SUB-PAGE ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('Display (ディスプレイ ＆ 壁紙)', () => setSystemSubView('main'))}
+                  {renderBreadcrumbHeader('Display & Wallpapers (壁紙 ＆ ディスプレイ)', () => setSystemSubView('main'))}
 
                   {/* Static Wallpapers Preview Cards */}
                   <div>
@@ -480,17 +735,17 @@ export function SettingsApp() {
                             type="button"
                             onClick={() => { playSound('click'); setWallpaper(k); }}
                             className={`p-2.5 rounded-2xl border text-left transition relative overflow-hidden flex flex-col justify-between h-24 ${
-                              selected ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30' : 'border-slate-200/60 dark:border-white/[0.08]'
+                              selected ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30' : 'border-slate-300/80 dark:border-white/[0.08]'
                             }`}
                           >
-                            <div className={`absolute inset-0 opacity-40 bg-gradient-to-br ${wp?.gradient || 'from-sky-900 to-indigo-950'}`} />
+                            <div className={`absolute inset-0 opacity-50 bg-gradient-to-br ${wp?.gradient || 'from-sky-900 to-indigo-950'}`} />
                             <div className="relative z-10 flex items-center justify-between">
-                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-black/40 text-white">
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-black/60 text-white">
                                 {k}
                               </span>
                               {selected && <Icon name="CheckCircle2" size={16} className="text-[var(--os-accent)]" />}
                             </div>
-                            <div className="relative z-10 text-[10px] opacity-80 line-clamp-1">{wp?.nameJa || k}</div>
+                            <div className="relative z-10 text-[10px] text-white font-medium drop-shadow line-clamp-1">{wp?.nameJa || k}</div>
                           </button>
                         );
                       })}
@@ -498,7 +753,7 @@ export function SettingsApp() {
                   </div>
 
                   {/* Custom Wallpaper Upload */}
-                  <div className="pt-4 border-t border-slate-200/60 dark:border-white/[0.06] flex items-center justify-between">
+                  <div className="pt-4 border-t border-slate-300/60 dark:border-white/[0.08] flex items-center justify-between">
                     <div>
                       <h3 className="text-xs font-bold">カスタム壁紙のアップロード</h3>
                       <p className="text-[11px] opacity-60">お好みの画像ファイルを壁紙として適用します</p>
@@ -506,7 +761,7 @@ export function SettingsApp() {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      className="px-3.5 py-1.5 rounded-xl bg-[var(--os-accent)] text-black text-xs font-bold shadow transition hover:brightness-110"
+                      className="px-3.5 py-1.5 rounded-xl bg-[var(--os-accent)] text-black text-xs font-bold shadow hover:brightness-110"
                     >
                       画像を選択
                     </button>
@@ -514,11 +769,11 @@ export function SettingsApp() {
                   </div>
 
                   {/* Live 2D Aurora Options */}
-                  <div className="pt-4 border-t border-slate-200/60 dark:border-white/[0.06] space-y-4">
+                  <div className="pt-4 border-t border-slate-300/60 dark:border-white/[0.08] space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-xs font-bold">2D オーロラ ＆ ライブインタラクティブ背景</h3>
-                        <p className="text-[11px] opacity-60">動的粒子アニメーションと速度のカスタマイズ</p>
+                        <p className="text-[11px] opacity-60">動的粒子アニメーションと流速のカスタマイズ</p>
                       </div>
                       <ToggleSwitch checked={auroraParticles} onChange={setAuroraParticles} />
                     </div>
@@ -536,14 +791,15 @@ export function SettingsApp() {
                               setAuroraColor(p.id);
                             }}
                             className={`p-3 rounded-2xl border text-left transition relative overflow-hidden h-20 flex flex-col justify-between ${
-                              selected ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30' : 'border-slate-200/60 dark:border-white/[0.08]'
+                              selected ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30' : 'border-slate-300/80 dark:border-white/[0.08]'
                             }`}
                           >
-                            <div className={`absolute inset-0 opacity-50 bg-gradient-to-r ${p.preview}`} />
+                            <div className={`absolute inset-0 opacity-80 bg-gradient-to-r ${p.preview}`} />
                             <div className="relative z-10 flex items-center justify-between">
                               <span className="text-xs font-bold text-white shadow-xs">{p.label}</span>
                               {selected && <Icon name="CheckCircle2" size={16} className="text-white" />}
                             </div>
+                            <span className="relative z-10 text-[10px] text-white/80 line-clamp-1">{p.desc}</span>
                           </button>
                         );
                       })}
@@ -556,7 +812,7 @@ export function SettingsApp() {
                   </div>
 
                   {/* Desktop Icon Size & Grid Placement */}
-                  <div className="pt-4 border-t border-slate-200/60 dark:border-white/[0.06] space-y-3">
+                  <div className="pt-4 border-t border-slate-300/60 dark:border-white/[0.08] space-y-3">
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-xs font-bold">デスクトップグリッドスナップ</h3>
@@ -589,7 +845,7 @@ export function SettingsApp() {
                   <div className="space-y-4">
                     <CustomSlider min={0} max={100} value={volume} onChange={setVolume} label="マスター音量 (Master Volume)" valueText={`${volume}%`} />
 
-                    <div className="pt-4 border-t border-slate-200/60 dark:border-white/[0.06] flex items-center justify-between">
+                    <div className="pt-4 border-t border-slate-300/60 dark:border-white/[0.08] flex items-center justify-between">
                       <div>
                         <div className="text-xs font-bold">システム効果音</div>
                         <div className="text-[11px] opacity-60">クリックや通知音を再生します</div>
@@ -601,7 +857,7 @@ export function SettingsApp() {
               ) : systemSubView === 'power' ? (
                 /* ---------------- POWER & BATTERY ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('Power & battery (スリープ ＆ ロック)', () => setSystemSubView('main'))}
+                  {renderBreadcrumbHeader('Power & Sleep (スリープ ＆ ロック)', () => setSystemSubView('main'))}
 
                   <div className="space-y-5">
                     <div className="flex items-center justify-between">
@@ -624,7 +880,7 @@ export function SettingsApp() {
                         <select
                           value={lockScreenStyle}
                           onChange={(e) => setLockScreenStyle(e.target.value as LockScreenStyle)}
-                          className={`w-full text-xs p-2.5 rounded-xl border outline-none ${isLight ? 'bg-white border-slate-300' : 'bg-black/30 border-white/10'}`}
+                          className={`w-full text-xs p-2.5 rounded-xl border outline-none ${isLight ? 'bg-white border-slate-300' : 'bg-black/40 border-white/10'}`}
                         >
                           <option value="hyperos3">HyperOS 3 Depth</option>
                           <option value="windows-hello">Windows Hello</option>
@@ -638,7 +894,7 @@ export function SettingsApp() {
                         <select
                           value={sleepClockStyle}
                           onChange={(e) => setSleepClockStyle(e.target.value as SleepClockStyle)}
-                          className={`w-full text-xs p-2.5 rounded-xl border outline-none ${isLight ? 'bg-white border-slate-300' : 'bg-black/30 border-white/10'}`}
+                          className={`w-full text-xs p-2.5 rounded-xl border outline-none ${isLight ? 'bg-white border-slate-300' : 'bg-black/40 border-white/10'}`}
                         >
                           <option value="depth">3D Depth Clock</option>
                           <option value="analog">Analog Clock</option>
@@ -649,7 +905,7 @@ export function SettingsApp() {
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-slate-200/60 dark:border-white/[0.06]">
+                    <div className="pt-3 border-t border-slate-300/60 dark:border-white/[0.08]">
                       <label className="block text-xs font-semibold mb-2">スリープ背景テーマ</label>
                       <div className="grid grid-cols-3 gap-2 text-xs">
                         {(['aurora', 'void', 'matrix', 'galaxy', 'retro', 'wallpaper'] as SleepBackground[]).map((bg) => (
@@ -667,7 +923,7 @@ export function SettingsApp() {
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-slate-200/60 dark:border-white/[0.06]">
+                    <div className="pt-3 border-t border-slate-300/60 dark:border-white/[0.08]">
                       <label className="block text-xs font-semibold mb-2">時計の配置場所</label>
                       <div className="grid grid-cols-3 gap-2 text-xs">
                         {(['top', 'center', 'bottom'] as ClockPosition[]).map((pos) => (
@@ -706,7 +962,7 @@ export function SettingsApp() {
                       </button>
                     </div>
 
-                    <div className="pt-4 border-t border-slate-200/60 dark:border-white/[0.06] flex items-center justify-between">
+                    <div className="pt-4 border-t border-slate-300/60 dark:border-white/[0.08] flex items-center justify-between">
                       <div>
                         <h3 className="text-xs font-bold">タスクバーアイコン配置</h3>
                         <p className="text-[11px] opacity-60">中央揃えまたは左揃えを切り替えます</p>
@@ -729,7 +985,7 @@ export function SettingsApp() {
                       </div>
                     </div>
 
-                    <div className="pt-4 border-t border-slate-200/60 dark:border-white/[0.06] flex items-center justify-between">
+                    <div className="pt-4 border-t border-slate-300/60 dark:border-white/[0.08] flex items-center justify-between">
                       <div>
                         <h3 className="text-xs font-bold">タスクバーを自動的に隠す</h3>
                         <p className="text-[11px] opacity-60">カーソルを画面下部に移動した際のみ表示します</p>
@@ -752,7 +1008,7 @@ export function SettingsApp() {
                           value={geminiApiKey}
                           onChange={(e) => setGeminiApiKey(e.target.value)}
                           placeholder="AI Studio Gemini API Key"
-                          className={`flex-1 p-2.5 text-xs rounded-xl border outline-none font-mono ${isLight ? 'bg-white border-slate-300' : 'bg-black/30 border-white/10'}`}
+                          className={`flex-1 p-2.5 text-xs rounded-xl border outline-none font-mono ${isLight ? 'bg-white border-slate-300' : 'bg-black/40 border-white/10'}`}
                         />
                         <button
                           type="button"
@@ -797,12 +1053,12 @@ export function SettingsApp() {
               {personalSubView === 'main' ? (
                 <>
                   <div className="mb-4">
-                    <h1 className="text-xl font-bold">Personalization</h1>
-                    <p className="text-xs opacity-60">UIスタイル、マテリアルエンジン、アクセントカラー、透過パラメーターの調整</p>
+                    <h1 className="text-xl font-bold">Personalization (個人設定)</h1>
+                    <p className="text-xs opacity-60">UIスタイル、マテリアルエンジン、アクセントカラー、光学的パラメーターの調整</p>
                   </div>
 
                   {/* Clean Hairline Divided Row List */}
-                  <div className="divide-y divide-slate-200/60 dark:divide-white/[0.06]">
+                  <div className="divide-y divide-slate-200/60 dark:divide-white/[0.08]">
                     <div className="py-3.5 px-3 flex items-center justify-between">
                       <div className="flex items-center gap-3.5">
                         <div className="p-2 rounded-xl bg-[var(--os-accent)]/15 text-[var(--os-accent)]">
@@ -834,15 +1090,15 @@ export function SettingsApp() {
                     <button
                       type="button"
                       onClick={() => { playSound('click'); setPersonalSubView('uistyle'); }}
-                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${isLight ? 'hover:bg-slate-200/40' : 'hover:bg-white/[0.04]'}`}
+                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${isLight ? 'hover:bg-slate-200/50' : 'hover:bg-white/[0.04]'}`}
                     >
                       <div className="flex items-center gap-3.5">
                         <div className="p-2 rounded-xl bg-[var(--os-accent)]/15 text-[var(--os-accent)]">
                           <Icon name="Layout" size={20} />
                         </div>
                         <div>
-                          <div className="text-xs font-bold group-hover:text-[var(--os-accent)] transition-colors">UI Style Presets (各モードイメージ図付き)</div>
-                          <div className="text-[11px] opacity-60">Windows 11、macOS、Ubuntu、Windows 8などのプレビュー選択</div>
+                          <div className="text-xs font-bold group-hover:text-[var(--os-accent)] transition-colors">UI Style Presets (各OS特徴キャプチャ図付き)</div>
+                          <div className="text-[11px] opacity-60">Windows 11、Windows 10、Windows 8、Ubuntu、macOS などの特徴的な構成ダイアグラム</div>
                         </div>
                       </div>
                       <Icon name="ChevronRight" size={16} className="opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition" />
@@ -851,7 +1107,7 @@ export function SettingsApp() {
                     <button
                       type="button"
                       onClick={() => { playSound('click'); setPersonalSubView('surface'); }}
-                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${isLight ? 'hover:bg-slate-200/40' : 'hover:bg-white/[0.04]'}`}
+                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${isLight ? 'hover:bg-slate-200/50' : 'hover:bg-white/[0.04]'}`}
                     >
                       <div className="flex items-center gap-3.5">
                         <div className="p-2 rounded-xl bg-[var(--os-accent)]/15 text-[var(--os-accent)]">
@@ -859,7 +1115,7 @@ export function SettingsApp() {
                         </div>
                         <div>
                           <div className="text-xs font-bold group-hover:text-[var(--os-accent)] transition-colors">Surface Material Engine (質感エンジン)</div>
-                          <div className="text-[11px] opacity-60">Mica, Acrylic, Glass, Slate, Cyberpunk HUD の即時適用</div>
+                          <div className="text-[11px] opacity-60">Liquid Glass, Mica, Frosted Acrylic, Slate, Cyberpunk HUD の即時連動適用</div>
                         </div>
                       </div>
                       <Icon name="ChevronRight" size={16} className="opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition" />
@@ -868,7 +1124,7 @@ export function SettingsApp() {
                     <button
                       type="button"
                       onClick={() => { playSound('click'); setPersonalSubView('accent'); }}
-                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${isLight ? 'hover:bg-slate-200/40' : 'hover:bg-white/[0.04]'}`}
+                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${isLight ? 'hover:bg-slate-200/50' : 'hover:bg-white/[0.04]'}`}
                     >
                       <div className="flex items-center gap-3.5">
                         <div className="p-2 rounded-xl bg-[var(--os-accent)]/15 text-[var(--os-accent)]">
@@ -885,7 +1141,7 @@ export function SettingsApp() {
                     <button
                       type="button"
                       onClick={() => { playSound('click'); setPersonalSubView('glass'); }}
-                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${isLight ? 'hover:bg-slate-200/40' : 'hover:bg-white/[0.04]'}`}
+                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${isLight ? 'hover:bg-slate-200/50' : 'hover:bg-white/[0.04]'}`}
                     >
                       <div className="flex items-center gap-3.5">
                         <div className="p-2 rounded-xl bg-[var(--os-accent)]/15 text-[var(--os-accent)]">
@@ -901,9 +1157,9 @@ export function SettingsApp() {
                   </div>
                 </>
               ) : personalSubView === 'uistyle' ? (
-                /* ---------------- UI STYLE WITH VISUAL DIAGRAMS ---------------- */
+                /* ---------------- UI STYLE WITH DISTINCT DIAGRAMS ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('UI Style Presets (イメージ図付きプレビュー)', () => setPersonalSubView('main'))}
+                  {renderBreadcrumbHeader('UI Style Presets (各OSの特徴捉えた図解プレビュー)', () => setPersonalSubView('main'))}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {SHELL_MODES.map((sm) => {
@@ -912,35 +1168,13 @@ export function SettingsApp() {
                         <button
                           key={sm.id}
                           type="button"
-                          onClick={() => {
-                            playSound('click');
-                            setShellMode(sm.id);
-                            if (sm.id === 'mac') setUiStyle('macos');
-                            else if (sm.id === 'dex') setUiStyle('one-ui');
-                            else if (sm.id === 'chromeos') setUiStyle('material3');
-                            else setUiStyle('glassium');
-                          }}
+                          onClick={() => handleSelectShellMode(sm.id)}
                           className={`p-3.5 rounded-2xl border text-left transition relative flex flex-col justify-between h-36 ${
-                            selected ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30 bg-[var(--os-accent)]/10' : 'border-slate-200/60 dark:border-white/[0.08] hover:border-slate-400'
+                            selected ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30 bg-[var(--os-accent)]/10 font-bold' : 'border-slate-300/80 dark:border-white/[0.08] hover:border-slate-400'
                           }`}
                         >
-                          {/* Visual Diagram Box Header */}
-                          <div className={`w-full h-14 rounded-xl border p-2 flex flex-col justify-between overflow-hidden relative ${sm.preview}`}>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-1">
-                                <div className="w-2 h-2 rounded-full bg-rose-500/80" />
-                                <div className="w-2 h-2 rounded-full bg-amber-500/80" />
-                                <div className="w-2 h-2 rounded-full bg-emerald-500/80" />
-                              </div>
-                              <span className="text-[9px] font-mono opacity-60 text-white">[{sm.id}]</span>
-                            </div>
-                            {/* Diagram Taskbar Mockup Line */}
-                            <div className="w-full h-2 rounded-md bg-white/20 flex items-center justify-center gap-1 px-2">
-                              <div className="w-2 h-1 rounded bg-white/60" />
-                              <div className="w-2 h-1 rounded bg-white/60" />
-                              <div className="w-2 h-1 rounded bg-white/60" />
-                            </div>
-                          </div>
+                          {/* Distinct Visual Diagram Box */}
+                          <ShellMockupDiagram type={sm.mockupType} />
 
                           <div className="mt-2 flex items-center justify-between">
                             <div>
@@ -957,7 +1191,7 @@ export function SettingsApp() {
               ) : personalSubView === 'surface' ? (
                 /* ---------------- SURFACE MATERIAL ENGINE ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('Surface Material Engine (質感エンジン)', () => setPersonalSubView('main'))}
+                  {renderBreadcrumbHeader('Surface Material Engine (質感エンジン連動)', () => setPersonalSubView('main'))}
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {DESIGN_ENGINES.map((de) => {
@@ -966,9 +1200,9 @@ export function SettingsApp() {
                         <button
                           key={de.id}
                           type="button"
-                          onClick={() => { playSound('click'); setDesignEngine(de.id); }}
+                          onClick={() => handleSelectSurfaceEngine(de.id)}
                           className={`p-4 rounded-2xl border text-left transition relative overflow-hidden flex flex-col justify-between h-32 bg-gradient-to-br ${de.bg} ${
-                            selected ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30' : 'border-slate-200/60 dark:border-white/[0.08]'
+                            selected ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30' : 'border-slate-300/80 dark:border-white/[0.08]'
                           }`}
                         >
                           <div className="flex items-center justify-between">
@@ -984,7 +1218,7 @@ export function SettingsApp() {
               ) : personalSubView === 'accent' ? (
                 /* ---------------- ACCENT COLOR ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('Accent Color (アクセントカラー)', () => setPersonalSubView('main'))}
+                  {renderBreadcrumbHeader('Accent Color (アクセントカラー切り替え)', () => setPersonalSubView('main'))}
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {ACCENT_COLOR_PRESETS.map((p) => {
@@ -993,16 +1227,19 @@ export function SettingsApp() {
                         <button
                           key={p.id}
                           type="button"
-                          onClick={() => { playSound('click'); setAccentColor(p.id); }}
+                          onClick={() => {
+                            playSound('click');
+                            setAccentColor(p.id);
+                          }}
                           className={`p-3.5 rounded-2xl border flex items-center justify-between transition ${
-                            selected ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30 font-bold' : 'border-slate-200/60 dark:border-white/[0.08]'
+                            selected ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30 font-bold bg-[var(--os-accent)]/10' : 'border-slate-300/80 dark:border-white/[0.08]'
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            <span className="w-5 h-5 rounded-full shrink-0 shadow-md" style={{ backgroundColor: p.hex }} />
-                            <span className="text-xs">{p.labelJa}</span>
+                            <span className="w-6 h-6 rounded-full shrink-0 shadow-md border border-white/20" style={{ backgroundColor: p.hex }} />
+                            <span className="text-xs font-bold">{p.labelJa}</span>
                           </div>
-                          {selected && <Icon name="CheckCircle2" size={16} className="text-[var(--os-accent)]" />}
+                          {selected && <Icon name="CheckCircle2" size={18} className="text-[var(--os-accent)]" />}
                         </button>
                       );
                     })}
@@ -1035,7 +1272,7 @@ export function SettingsApp() {
               className="max-w-4xl space-y-4"
             >
               <div className="mb-4">
-                <h1 className="text-xl font-bold">Installed Apps</h1>
+                <h1 className="text-xl font-bold">Installed Apps (アプリ管理)</h1>
                 <p className="text-xs opacity-60">インストール済みシステムアプリおよびストアアプリの一覧と起動</p>
               </div>
 
@@ -1044,10 +1281,10 @@ export function SettingsApp() {
                 value={appSearch}
                 onChange={(e) => setAppSearch(e.target.value)}
                 placeholder="アプリを検索..."
-                className={`w-full p-2.5 text-xs rounded-xl border outline-none ${isLight ? 'bg-white border-slate-300' : 'bg-black/30 border-white/10'}`}
+                className={`w-full p-2.5 text-xs rounded-xl border outline-none ${isLight ? 'bg-white border-slate-300' : 'bg-black/40 border-white/10'}`}
               />
 
-              <div className="divide-y divide-slate-200/60 dark:divide-white/[0.06]">
+              <div className="divide-y divide-slate-200/60 dark:divide-white/[0.08]">
                 {installedApps
                   .filter((a) => !appSearch || a.name.toLowerCase().includes(appSearch.toLowerCase()))
                   .map((app) => (
@@ -1087,16 +1324,16 @@ export function SettingsApp() {
               {accountsSubView === 'main' ? (
                 <>
                   <div className="mb-4">
-                    <h1 className="text-xl font-bold">Accounts</h1>
-                    <p className="text-xs opacity-60">ユーザープロファイル、セキュリティPIN、権限ロールの設定</p>
+                    <h1 className="text-xl font-bold">Accounts (アカウント設定)</h1>
+                    <p className="text-xs opacity-60">ユーザープロファイル、セキュリティPIN、権限グループの詳細カスタマイズ</p>
                   </div>
 
                   {/* Clean Hairline Divided Row List */}
-                  <div className="divide-y divide-slate-200/60 dark:divide-white/[0.06]">
+                  <div className="divide-y divide-slate-200/60 dark:divide-white/[0.08]">
                     <button
                       type="button"
                       onClick={() => { playSound('click'); setAccountsSubView('profile'); }}
-                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${isLight ? 'hover:bg-slate-200/40' : 'hover:bg-white/[0.04]'}`}
+                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${isLight ? 'hover:bg-slate-200/50' : 'hover:bg-white/[0.04]'}`}
                     >
                       <div className="flex items-center gap-3.5">
                         <div className="p-2 rounded-xl bg-[var(--os-accent)]/15 text-[var(--os-accent)]">
@@ -1113,7 +1350,7 @@ export function SettingsApp() {
                     <button
                       type="button"
                       onClick={() => { playSound('click'); setAccountsSubView('security'); }}
-                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${isLight ? 'hover:bg-slate-200/40' : 'hover:bg-white/[0.04]'}`}
+                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${isLight ? 'hover:bg-slate-200/50' : 'hover:bg-white/[0.04]'}`}
                     >
                       <div className="flex items-center gap-3.5">
                         <div className="p-2 rounded-xl bg-[var(--os-accent)]/15 text-[var(--os-accent)]">
@@ -1150,7 +1387,7 @@ export function SettingsApp() {
                                 setCustomAvatarUrl(null);
                               }}
                               className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition ${
-                                selected ? 'border-[var(--os-accent)] bg-[var(--os-accent)]/15 text-[var(--os-accent)] font-bold' : 'border-slate-200/60 dark:border-white/[0.08]'
+                                selected ? 'border-[var(--os-accent)] bg-[var(--os-accent)]/15 text-[var(--os-accent)] font-bold' : 'border-slate-300/80 dark:border-white/[0.08]'
                               }`}
                               title={av.name}
                             >
@@ -1180,7 +1417,7 @@ export function SettingsApp() {
                           type="text"
                           value={profileName}
                           onChange={(e) => setProfileName(e.target.value)}
-                          className={`w-full p-2.5 text-xs rounded-xl border outline-none ${isLight ? 'bg-white border-slate-300' : 'bg-black/30 border-white/10'}`}
+                          className={`w-full p-2.5 text-xs rounded-xl border outline-none ${isLight ? 'bg-white border-slate-300' : 'bg-black/40 border-white/10'}`}
                         />
                       </div>
 
@@ -1190,7 +1427,7 @@ export function SettingsApp() {
                           type="email"
                           value={profileEmail}
                           onChange={(e) => setProfileEmail(e.target.value)}
-                          className={`w-full p-2.5 text-xs rounded-xl border outline-none ${isLight ? 'bg-white border-slate-300' : 'bg-black/30 border-white/10'}`}
+                          className={`w-full p-2.5 text-xs rounded-xl border outline-none ${isLight ? 'bg-white border-slate-300' : 'bg-black/40 border-white/10'}`}
                         />
                       </div>
                     </div>
@@ -1200,7 +1437,7 @@ export function SettingsApp() {
                       <select
                         value={profileRole}
                         onChange={(e) => setProfileRole(e.target.value as 'Administrator' | 'Developer' | 'Guest')}
-                        className={`w-full text-xs p-2.5 rounded-xl border outline-none ${isLight ? 'bg-white border-slate-300' : 'bg-black/30 border-white/10'}`}
+                        className={`w-full text-xs p-2.5 rounded-xl border outline-none ${isLight ? 'bg-white border-slate-300' : 'bg-black/40 border-white/10'}`}
                       >
                         <option value="Administrator">Administrator (管理者権限)</option>
                         <option value="Developer">Developer (開発者アカウント)</option>
@@ -1229,7 +1466,7 @@ export function SettingsApp() {
                         value={profilePassword}
                         onChange={(e) => setProfilePassword(e.target.value)}
                         placeholder="パスワードを入力"
-                        className={`w-full p-2.5 text-xs rounded-xl border outline-none ${isLight ? 'bg-white border-slate-300' : 'bg-black/30 border-white/10'}`}
+                        className={`w-full p-2.5 text-xs rounded-xl border outline-none ${isLight ? 'bg-white border-slate-300' : 'bg-black/40 border-white/10'}`}
                       />
                     </div>
 
@@ -1240,7 +1477,7 @@ export function SettingsApp() {
                         maxLength={4}
                         value={securityPin}
                         onChange={(e) => setSecurityPin(e.target.value)}
-                        className={`w-full p-2.5 text-xs font-mono rounded-xl border outline-none ${isLight ? 'bg-white border-slate-300' : 'bg-black/30 border-white/10'}`}
+                        className={`w-full p-2.5 text-xs font-mono rounded-xl border outline-none ${isLight ? 'bg-white border-slate-300' : 'bg-black/40 border-white/10'}`}
                       />
                     </div>
 
@@ -1266,3 +1503,4 @@ export function SettingsApp() {
     </div>
   );
 }
+
