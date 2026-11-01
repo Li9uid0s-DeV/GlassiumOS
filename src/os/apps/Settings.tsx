@@ -13,6 +13,9 @@ import {
   AppId,
   DesktopIconSize,
   DESKTOP_ICON_SIZE_PRESETS,
+  UI_STYLES,
+  SleepClockStyle,
+  SleepBackground,
 } from '../types';
 import { WALLPAPERS } from '../wallpapers';
 import { Icon } from '../Icon';
@@ -97,6 +100,12 @@ export function SettingsApp() {
     setTheme,
     accentColor,
     setAccentColor,
+    uiStyle,
+    setUiStyle,
+    sleepClockStyle,
+    setSleepClockStyle,
+    sleepBackground,
+    setSleepBackground,
     taskbarAlign,
     setTaskbarAlign,
     blurAmount,
@@ -253,10 +262,13 @@ export function SettingsApp() {
     { id: 'apps', label: 'Apps', sub: 'アプリ一覧・起動・管理', icon: 'LayoutGrid' },
   ];
 
-  const cardClass = `rounded-xl p-4 border transition-colors duration-200 ${
-    isLight
-      ? 'bg-white border-slate-200/90 shadow-sm'
-      : 'bg-slate-900/55 border-white/10'
+  const sectionClass =
+    'space-y-3 pb-5 border-b border-slate-200/70 dark:border-white/10 last:border-b-0 last:pb-0';
+  const sectionTitleClass = 'text-xs font-bold tracking-tight text-slate-800 dark:text-slate-100';
+  const sectionDescClass = 'text-[11px] opacity-60';
+
+  const rowItemClass = `flex items-center justify-between p-2.5 rounded-lg transition-colors duration-150 ${
+    isLight ? 'hover:bg-slate-200/50' : 'hover:bg-white/[0.04]'
   }`;
 
   const subButtonClass = (active: boolean) =>
@@ -373,92 +385,287 @@ export function SettingsApp() {
               <div>
                 <h2 className="text-base font-bold tracking-tight">Appearance</h2>
                 <p className="text-xs opacity-60 mt-0.5">
-                  ダーク/ライトモード、アクセントカラー、デスクトップシェル、ウィンドウの透過度を調整します。
+                  UIスタイル（がち枠・ネタ枠）、カラーモード、スリープ画面、ウィンドウ透過度を調整します。
                 </p>
               </div>
 
-              {/* Theme Mode & Taskbar Alignment */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className={cardClass}>
-                  <div className="text-xs font-semibold mb-1">Color Mode (カラーモード)</div>
-                  <div className="text-[11px] opacity-55 mb-3">
-                    ウィンドウとシステム全体の配色を切り替えます
+              {/* ==============================================================
+                  UI STYLE SWITCHER (Zero Border Line Concept)
+                 ============================================================== */}
+              <div className={sectionClass}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className={sectionTitleClass}>UI Style (UI スタイル)</div>
+                  <span className="text-[11px] font-mono os-accent-text uppercase">
+                    {UI_STYLES.find((s) => s.id === uiStyle)?.name || 'Glassium'}
+                  </span>
+                </div>
+                <div className={sectionDescClass + ' mb-3'}>
+                  公式デザイン言語に準拠したがち枠と、ユニークなネタ枠のUIスタイルをシンプルに切り替えます
+                </div>
+
+                {/* Authentic OS Presets */}
+                <div className="mb-3">
+                  <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-1.5 tracking-wider flex items-center gap-1.5">
+                    <Icon name="Shield" size={11} className="text-cyan-400" />
+                    <span>Authentic OS Modes (がち枠)</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        playSound('click');
-                        setTheme('dark');
-                      }}
-                      className={subButtonClass(theme === 'dark')}
-                    >
-                      <span className="flex items-center justify-center gap-2">
-                        <Icon name="Moon" size={14} />
-                        <span>Dark</span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        playSound('click');
-                        setTheme('light');
-                      }}
-                      className={subButtonClass(theme === 'light')}
-                    >
-                      <span className="flex items-center justify-center gap-2">
-                        <Icon name="Sun" size={14} />
-                        <span>Light</span>
-                      </span>
-                    </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {UI_STYLES.filter((s) => s.category === 'authentic').map((style) => {
+                      const active = uiStyle === style.id;
+                      return (
+                        <button
+                          key={style.id}
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            setUiStyle(style.id);
+                          }}
+                          className={`p-3 rounded-2xl text-left transition relative overflow-hidden flex flex-col justify-between ${
+                            active
+                              ? 'bg-slate-800/80 ring-2 ring-cyan-400 shadow-lg text-white'
+                              : isLight
+                              ? 'bg-white/80 hover:bg-white text-slate-900 shadow-sm'
+                              : 'bg-white/[0.04] hover:bg-white/[0.08] text-white shadow-sm'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1.5">
+                            <span className="text-xs font-bold">{style.name}</span>
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                              style={{ backgroundColor: `${style.accent}25`, color: style.accent }}
+                            >
+                              {style.badge}
+                            </span>
+                          </div>
+                          <div className="text-[11px] opacity-65 leading-relaxed line-clamp-2">
+                            {style.description}
+                          </div>
+                          <div
+                            className="mt-2.5 h-1 w-full rounded-full opacity-60"
+                            style={{ background: style.previewGradient }}
+                          />
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                <div className={cardClass}>
-                  <div className="text-xs font-semibold mb-1">Taskbar Alignment (タスクバー配置)</div>
-                  <div className="text-[11px] opacity-55 mb-3">
-                    タスクバーアイコンの配置位置を選択します
+                {/* Fun & Meme Modes */}
+                <div>
+                  <div className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 mb-1.5 tracking-wider flex items-center gap-1.5">
+                    <Icon name="Sparkles" size={11} className="text-pink-400" />
+                    <span>Fun & Meme Modes (ネタ枠)</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        playSound('click');
-                        setTaskbarAlign('center');
-                      }}
-                      className={subButtonClass(taskbarAlign === 'center')}
-                    >
-                      <span className="flex items-center justify-center gap-2">
-                        <Icon name="LayoutGrid" size={14} />
-                        <span>Center (中央)</span>
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        playSound('click');
-                        setTaskbarAlign('left');
-                      }}
-                      className={subButtonClass(taskbarAlign === 'left')}
-                    >
-                      <span className="flex items-center justify-center gap-2">
-                        <Icon name="PanelLeft" size={14} />
-                        <span>Left (左揃え)</span>
-                      </span>
-                    </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {UI_STYLES.filter((s) => s.category === 'fun').map((style) => {
+                      const active = uiStyle === style.id;
+                      return (
+                        <button
+                          key={style.id}
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            setUiStyle(style.id);
+                          }}
+                          className={`p-3 rounded-2xl text-left transition relative overflow-hidden flex flex-col justify-between ${
+                            active
+                              ? 'bg-slate-800/80 ring-2 ring-pink-400 shadow-lg text-white'
+                              : isLight
+                              ? 'bg-white/80 hover:bg-white text-slate-900 shadow-sm'
+                              : 'bg-white/[0.04] hover:bg-white/[0.08] text-white shadow-sm'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2 mb-1.5">
+                            <span className="text-xs font-bold">{style.name}</span>
+                            <span
+                              className="text-[10px] px-1.5 py-0.5 rounded-full font-medium"
+                              style={{ backgroundColor: `${style.accent}25`, color: style.accent }}
+                            >
+                              {style.badge}
+                            </span>
+                          </div>
+                          <div className="text-[11px] opacity-65 leading-relaxed line-clamp-2">
+                            {style.description}
+                          </div>
+                          <div
+                            className="mt-2.5 h-1 w-full rounded-full opacity-60"
+                            style={{ background: style.previewGradient }}
+                          />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* ==============================================================
+                  SLEEP SCREEN CUSTOMIZATION (Clock Style & Background)
+                 ============================================================== */}
+              <div className={sectionClass}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className={sectionTitleClass}>Sleep Screen Customization (スリープ画面のカスタマイズ)</div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playSound('click');
+                      lockSystem();
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black text-[11px] font-bold flex items-center gap-1.5 transition"
+                  >
+                    <Icon name="Moon" size={12} />
+                    <span>スリープを試す</span>
+                  </button>
+                </div>
+                <div className={sectionDescClass + ' mb-3'}>
+                  UIスタイルに応じたレイアウト、時計の見た目（3D・アナログ・ミニマル・縦並び・サイバーHUD）、およびスリープ画面の背景を設定します（アンビエントライトは自動無効化されます）
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Clock Style Options */}
+                  <div>
+                    <div className="text-xs font-semibold mb-2 flex items-center gap-1.5">
+                      <Icon name="Clock" size={13} className="text-cyan-400" />
+                      <span>時計の見た目 (Clock Appearance)</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[
+                        { id: 'depth' as SleepClockStyle, label: '3D Depth' },
+                        { id: 'analog' as SleepClockStyle, label: 'Analog' },
+                        { id: 'minimal' as SleepClockStyle, label: 'Minimal' },
+                        { id: 'vertical' as SleepClockStyle, label: 'Vertical' },
+                        { id: 'cyber' as SleepClockStyle, label: 'Cyber HUD' },
+                      ].map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            setSleepClockStyle(c.id);
+                          }}
+                          className={subButtonClass(sleepClockStyle === c.id)}
+                        >
+                          {c.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Sleep Background Options */}
+                  <div>
+                    <div className="text-xs font-semibold mb-2 flex items-center gap-1.5">
+                      <Icon name="Image" size={13} className="text-cyan-400" />
+                      <span>スリープ背景 (Sleep Background)</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[
+                        { id: 'aurora' as SleepBackground, label: 'Aurora' },
+                        { id: 'void' as SleepBackground, label: 'Void Space' },
+                        { id: 'matrix' as SleepBackground, label: 'Matrix' },
+                        { id: 'galaxy' as SleepBackground, label: 'Galaxy' },
+                        { id: 'retro' as SleepBackground, label: 'Synthwave' },
+                        { id: 'wallpaper' as SleepBackground, label: 'Desktop' },
+                      ].map((b) => (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            setSleepBackground(b.id);
+                          }}
+                          className={subButtonClass(sleepBackground === b.id)}
+                        >
+                          {b.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Theme Mode & Taskbar Alignment */}
+              <div className={sectionClass}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <div className={sectionTitleClass + ' mb-1'}>Color Mode (カラーモード)</div>
+                    <div className={sectionDescClass + ' mb-3'}>
+                      ウィンドウとシステム全体の配色を切り替えます
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playSound('click');
+                          setTheme('dark');
+                        }}
+                        className={subButtonClass(theme === 'dark')}
+                      >
+                        <span className="flex items-center justify-center gap-2">
+                          <Icon name="Moon" size={14} />
+                          <span>Dark</span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playSound('click');
+                          setTheme('light');
+                        }}
+                        className={subButtonClass(theme === 'light')}
+                      >
+                        <span className="flex items-center justify-center gap-2">
+                          <Icon name="Sun" size={14} />
+                          <span>Light</span>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className={sectionTitleClass + ' mb-1'}>Taskbar Alignment (タスクバー配置)</div>
+                    <div className={sectionDescClass + ' mb-3'}>
+                      タスクバーアイコンの配置位置を選択します
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playSound('click');
+                          setTaskbarAlign('center');
+                        }}
+                        className={subButtonClass(taskbarAlign === 'center')}
+                      >
+                        <span className="flex items-center justify-center gap-2">
+                          <Icon name="LayoutGrid" size={14} />
+                          <span>Center (中央)</span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playSound('click');
+                          setTaskbarAlign('left');
+                        }}
+                        className={subButtonClass(taskbarAlign === 'left')}
+                      >
+                        <span className="flex items-center justify-center gap-2">
+                          <Icon name="PanelLeft" size={14} />
+                          <span>Left (左揃え)</span>
+                        </span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Accent Color Picker */}
-              <div className={cardClass}>
+              <div className={sectionClass}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold">Accent Color (アクセントカラー)</span>
+                  <span className={sectionTitleClass}>Accent Color (アクセントカラー)</span>
                   <span className="text-[11px] font-mono os-accent-text uppercase">
                     {ACCENT_COLOR_PRESETS.find((c) => c.id === accentColor)?.labelJa}
                   </span>
                 </div>
-                <div className="text-[11px] opacity-55 mb-3">
+                <div className={sectionDescClass + ' mb-3'}>
                   ボタン、スライダー、スイッチ、フォーカス枠の強調色に反映されます
                 </div>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
@@ -494,11 +701,11 @@ export function SettingsApp() {
               </div>
 
               {/* Desktop App Icon Size & Grid Placement Quick Control */}
-              <div className={cardClass}>
+              <div className={sectionClass}>
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
                   <div>
-                    <div className="text-xs font-semibold">Desktop App Size & Grid (デスクトップアプリの大きさ・グリッド配置)</div>
-                    <div className="text-[11px] opacity-55">
+                    <div className={sectionTitleClass}>Desktop App Size & Grid (デスクトップアプリの大きさ・グリッド配置)</div>
+                    <div className={sectionDescClass}>
                       デスクトップ上のアプリアイコンのサイズ変更と規定グリッドへのスナップ配置を設定します
                     </div>
                   </div>
@@ -544,8 +751,8 @@ export function SettingsApp() {
               </div>
 
               {/* Window Surface & Blur Controls */}
-              <div className={cardClass}>
-                <div className="text-xs font-semibold mb-3">Window & Surface Geometry (ウィンドウ透過・角丸)</div>
+              <div className={sectionClass}>
+                <div className={sectionTitleClass + ' mb-3'}>Window & Surface Geometry (ウィンドウ透過・角丸)</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <div className="flex justify-between text-xs mb-1.5">
@@ -610,8 +817,8 @@ export function SettingsApp() {
               </div>
 
               {/* Surface Material & Desktop Shell */}
-              <div className={cardClass}>
-                <div className="text-xs font-semibold mb-2.5">Surface Material (ウィンドウ質感)</div>
+              <div className={sectionClass}>
+                <div className={sectionTitleClass + ' mb-2.5'}>Surface Material (ウィンドウ質感)</div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
                   {DESIGN_ENGINES.map((eng) => (
                     <button
@@ -635,7 +842,7 @@ export function SettingsApp() {
                   ))}
                 </div>
 
-                <div className="text-xs font-semibold mb-2.5">Desktop Shell Layout (OSシェルレイアウト)</div>
+                <div className={sectionTitleClass + ' mb-2.5'}>Desktop Shell Layout (OSシェルレイアウト)</div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {SHELL_MODES.map((mode) => (
                     <button
@@ -682,15 +889,15 @@ export function SettingsApp() {
               </div>
 
               {/* Volume & Sound Controls */}
-              <div className={cardClass}>
+              <div className={sectionClass}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg os-accent-soft border flex items-center justify-center">
-                      <Icon name={soundEnabled && volume > 0 ? 'Volume2' : 'VolumeX'} size={16} />
+                      <Icon name={soundEnabled && volume > 0 ? 'Volume2' : 'VolumeX'} size={18} />
                     </div>
                     <div>
-                      <div className="text-xs font-semibold">Master Volume & Audio (システム音量)</div>
-                      <div className="text-[11px] opacity-55">Web Audio シンセサイザーおよび効果音出力</div>
+                      <div className={sectionTitleClass}>Master Volume & Audio (システム音量)</div>
+                      <div className={sectionDescClass}>Web Audio シンセサイザーおよび効果音出力</div>
                     </div>
                   </div>
                   <span className="text-sm font-mono font-bold os-accent-text">
@@ -742,65 +949,68 @@ export function SettingsApp() {
               </div>
 
               {/* System Toggles */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  {
-                    title: 'Wi-Fi ネットワーク',
-                    sub: quickSettings.wifi ? 'Connected (Glassium-5G)' : 'Disconnected',
-                    icon: 'Wifi',
-                    active: quickSettings.wifi,
-                    onToggle: () => toggleQuick('wifi'),
-                  },
-                  {
-                    title: 'Bluetooth デバイス',
-                    sub: quickSettings.bluetooth ? 'Discoverable' : 'Off',
-                    icon: 'Bluetooth',
-                    active: quickSettings.bluetooth,
-                    onToggle: () => toggleQuick('bluetooth'),
-                  },
-                  {
-                    title: 'Lite Mode (省電力・軽量描画)',
-                    sub: 'ライブ壁紙エフェクトを抑えて高速化します',
-                    icon: 'Zap',
-                    active: liteMode,
-                    onToggle: () => setLiteMode(!liteMode),
-                  },
-                  {
-                    title: 'Touch Mode (タッチ操作最適化)',
-                    sub: 'タイトルバーやボタン間隔をタッチ向けに拡大',
-                    icon: 'Smartphone',
-                    active: touchMode,
-                    onToggle: () => setTouchMode((v) => !v),
-                  },
-                ].map((item) => (
-                  <div key={item.title} className={`${cardClass} flex items-center justify-between gap-3`}>
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <Icon name={item.icon} size={16} className={item.active ? 'os-accent-text' : 'opacity-50'} />
-                      <div className="min-w-0">
-                        <div className="text-xs font-semibold truncate">{item.title}</div>
-                        <div className="text-[10px] opacity-55 truncate">{item.sub}</div>
+              <div className={sectionClass}>
+                <div className={sectionTitleClass + ' mb-1'}>Device & Power (デバイス・接続・省電力)</div>
+                <div className="divide-y divide-slate-200/60 dark:divide-white/10">
+                  {[
+                    {
+                      title: 'Wi-Fi ネットワーク',
+                      sub: quickSettings.wifi ? 'Connected (Glassium-5G)' : 'Disconnected',
+                      icon: 'Wifi',
+                      active: quickSettings.wifi,
+                      onToggle: () => toggleQuick('wifi'),
+                    },
+                    {
+                      title: 'Bluetooth デバイス',
+                      sub: quickSettings.bluetooth ? 'Discoverable' : 'Off',
+                      icon: 'Bluetooth',
+                      active: quickSettings.bluetooth,
+                      onToggle: () => toggleQuick('bluetooth'),
+                    },
+                    {
+                      title: 'Lite Mode (省電力・軽量描画)',
+                      sub: 'ライブ壁紙エフェクトを抑えて高速化します',
+                      icon: 'Zap',
+                      active: liteMode,
+                      onToggle: () => setLiteMode(!liteMode),
+                    },
+                    {
+                      title: 'Touch Mode (タッチ操作最適化)',
+                      sub: 'タイトルバーやボタン間隔をタッチ向けに拡大',
+                      icon: 'Smartphone',
+                      active: touchMode,
+                      onToggle: () => setTouchMode((v) => !v),
+                    },
+                  ].map((item) => (
+                    <div key={item.title} className={rowItemClass}>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Icon name={item.icon} size={20} className={item.active ? 'os-accent-text' : 'opacity-50'} />
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold truncate">{item.title}</div>
+                          <div className={sectionDescClass + ' truncate'}>{item.sub}</div>
+                        </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playSound('click');
+                          item.onToggle();
+                        }}
+                        className={`glass-switch shrink-0 ${item.active ? 'is-on' : ''}`}
+                      >
+                        <div className="glass-switch-thumb" />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        playSound('click');
-                        item.onToggle();
-                      }}
-                      className={`glass-switch shrink-0 ${item.active ? 'is-on' : ''}`}
-                    >
-                      <div className="glass-switch-thumb" />
-                    </button>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
 
               {/* Multitasking & Virtual Desktops */}
-              <div className={cardClass}>
-                <div className="flex items-center justify-between mb-3">
+              <div className={sectionClass}>
+                <div className="flex items-center justify-between mb-2">
                   <div>
-                    <div className="text-xs font-semibold">Multitasking & Virtual Desktops (仮想デスクトップ)</div>
-                    <div className="text-[11px] opacity-55">
+                    <div className={sectionTitleClass}>Multitasking & Virtual Desktops (仮想デスクトップ)</div>
+                    <div className={sectionDescClass}>
                       現在 {desktops.length} 個のデスクトップと {windows.length} 個のウィンドウが稼働中
                     </div>
                   </div>
@@ -836,44 +1046,46 @@ export function SettingsApp() {
               </div>
 
               {/* Storage & System Specs */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className={cardClass}>
-                  <div className="text-xs font-semibold mb-2">Storage & Recycle Bin (ストレージ管理)</div>
-                  <div className="text-[11px] opacity-60 mb-3">
-                    ローカル仮想ファイルシステム (LocalStorage 永続化)
+              <div className={sectionClass}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div>
+                    <div className={sectionTitleClass + ' mb-1'}>Storage & Recycle Bin (ストレージ管理)</div>
+                    <div className={sectionDescClass + ' mb-3'}>
+                      ローカル仮想ファイルシステム (LocalStorage 永続化)
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openApp('explorer')}
+                        className={subButtonClass(false)}
+                      >
+                        ファイルを開く
+                      </button>
+                      <button
+                        type="button"
+                        onClick={emptyRecycleBin}
+                        className="px-3 py-2 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 text-xs font-medium transition"
+                      >
+                        ゴミ箱を空にする
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openApp('explorer')}
-                      className={subButtonClass(false)}
-                    >
-                      ファイルを開く
-                    </button>
-                    <button
-                      type="button"
-                      onClick={emptyRecycleBin}
-                      className="px-3 py-2 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-500 hover:bg-rose-500/20 text-xs font-medium transition"
-                    >
-                      ゴミ箱を空にする
-                    </button>
-                  </div>
-                </div>
 
-                <div className={cardClass}>
-                  <div className="text-xs font-semibold mb-2">System Specifications</div>
-                  <div className="space-y-1 text-[11px] opacity-75 font-mono">
-                    <div className="flex justify-between">
-                      <span>OS Build:</span>
-                      <span>GlassiumOS-V4.0</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Active Shell:</span>
-                      <span className="uppercase">{shellMode}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Running Tasks:</span>
-                      <span>{windows.length} Processes</span>
+                  <div>
+                    <div className={sectionTitleClass + ' mb-1'}>System Specifications</div>
+                    <div className="space-y-1.5 text-[11px] opacity-75 font-mono pt-1">
+                      <div className="flex justify-between border-b border-slate-500/10 pb-1">
+                        <span>OS Build:</span>
+                        <span>GlassiumOS-V4.0</span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-500/10 pb-1">
+                        <span>Active Shell:</span>
+                        <span className="uppercase">{shellMode}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Running Tasks:</span>
+                        <span>{windows.length} Processes</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -901,15 +1113,15 @@ export function SettingsApp() {
               </div>
 
               {/* Wallpaper Selector */}
-              <div className={cardClass}>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold">Desktop Wallpaper (壁紙ギャラリー)</span>
+              <div className={sectionClass}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className={sectionTitleClass}>Desktop Wallpaper (壁紙ギャラリー)</span>
                   <button
                     type="button"
                     onClick={() => fileRef.current?.click()}
                     className="px-3 py-1.5 rounded-lg os-accent-soft border text-xs font-medium flex items-center gap-1.5 transition"
                   >
-                    <Icon name="Upload" size={13} />
+                    <Icon name="Upload" size={14} />
                     <span>画像をアップロード</span>
                   </button>
                   <input
@@ -981,11 +1193,11 @@ export function SettingsApp() {
               </div>
 
               {/* Aurora Live Wallpaper Settings */}
-              <div className={cardClass}>
-                <div className="flex items-center justify-between mb-3">
+              <div className={sectionClass}>
+                <div className="flex items-center justify-between mb-2">
                   <div>
-                    <div className="text-xs font-semibold">Aurora Live Wallpaper (オーロラ設定)</div>
-                    <div className="text-[11px] opacity-55">
+                    <div className={sectionTitleClass}>Aurora Live Wallpaper (オーロラ設定)</div>
+                    <div className={sectionDescClass}>
                       ライブ壁紙のカラーパレット、流速、輝き、パーティクルを調整します
                     </div>
                   </div>
@@ -1069,7 +1281,7 @@ export function SettingsApp() {
                 <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-500/15">
                   <div>
                     <div className="text-xs font-medium">Floating Light Particles (光の粒子エフェクト)</div>
-                    <div className="text-[11px] opacity-55">オーロラ背景に浮遊する光の粒子を描画します</div>
+                    <div className={sectionDescClass}>オーロラ背景に浮遊する光の粒子を描画します</div>
                   </div>
                   <button
                     type="button"
@@ -1081,14 +1293,14 @@ export function SettingsApp() {
                 </div>
               </div>
 
-              {/* Desktop App Size & Grid Placement Card */}
-              <div className={cardClass}>
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+              {/* Desktop App Size & Grid Placement */}
+              <div className={sectionClass}>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                   <div>
-                    <div className="text-xs font-semibold">
+                    <div className={sectionTitleClass}>
                       Desktop App Icon Size & Grid Slots (アプリの大きさ・規定グリッド配置)
                     </div>
-                    <div className="text-[11px] opacity-55">
+                    <div className={sectionDescClass}>
                       アイコンサイズ（小・中・大）と規定のグリッド枠へのスナップ整列を管理します
                       {isWallpaperBright && ' · 明るい背景を検出し文字を自動で黒色表示中'}
                     </div>
@@ -1181,9 +1393,9 @@ export function SettingsApp() {
                 </p>
               </div>
 
-              {/* User Profile Card */}
-              <form onSubmit={handleSaveAccount} className={cardClass}>
-                <div className="flex items-center gap-4 mb-4">
+              {/* User Profile Form */}
+              <form onSubmit={handleSaveAccount} className={sectionClass}>
+                <div className="flex items-center gap-4 mb-3">
                   <div className="w-14 h-14 rounded-full os-accent-bg flex items-center justify-center text-white text-xl font-bold shrink-0">
                     {(profileName.trim() || 'A')[0].toUpperCase()}
                   </div>
@@ -1193,7 +1405,7 @@ export function SettingsApp() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                   <div>
                     <label className="block text-xs font-medium mb-1 opacity-80">
                       Display Name (表示名)
@@ -1250,8 +1462,8 @@ export function SettingsApp() {
               </form>
 
               {/* Lock Screen Style */}
-              <div className={cardClass}>
-                <div className="text-xs font-semibold mb-2.5">Lock Screen Clock & Layout (ロック画面スタイル)</div>
+              <div className={sectionClass}>
+                <div className={sectionTitleClass + ' mb-2'}>Lock Screen Clock & Layout (ロック画面スタイル)</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   {LOCK_STYLES.map((st) => (
                     <button
@@ -1277,20 +1489,22 @@ export function SettingsApp() {
               </div>
 
               {/* Notifications History */}
-              <div className={`${cardClass} flex items-center justify-between`}>
-                <div>
-                  <div className="text-xs font-semibold">Notifications (システム通知履歴)</div>
-                  <div className="text-[11px] opacity-55">
-                    現在 {notifications.length} 件の通知が保存されています
+              <div className={sectionClass}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className={sectionTitleClass}>Notifications (システム通知履歴)</div>
+                    <div className={sectionDescClass}>
+                      現在 {notifications.length} 件の通知が保存されています
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={clearNotifications}
+                    className={subButtonClass(false)}
+                  >
+                    通知をすべて消去
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={clearNotifications}
-                  className={subButtonClass(false)}
-                >
-                  通知をすべて消去
-                </button>
               </div>
             </motion.div>
           )}
@@ -1319,19 +1533,19 @@ export function SettingsApp() {
                   onClick={() => openApp('appstore')}
                   className="px-3.5 py-2 rounded-lg os-accent-bg text-xs font-semibold flex items-center gap-1.5 hover:opacity-90 transition"
                 >
-                  <Icon name="Store" size={14} />
+                  <Icon name="Store" size={16} />
                   <span>App Store を開く</span>
                 </button>
               </div>
 
               {/* Search & Filter Bar */}
-              <div className={`${cardClass} flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5`}>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pb-2">
                 <div
                   className={`flex items-center gap-2 flex-1 rounded-lg border px-3 py-1.5 ${
                     isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-950/60 border-white/10'
                   }`}
                 >
-                  <Icon name="Search" size={14} className="opacity-50" />
+                  <Icon name="Search" size={15} className="opacity-50" />
                   <input
                     type="text"
                     value={appSearch}
@@ -1361,17 +1575,14 @@ export function SettingsApp() {
                 </div>
               </div>
 
-              {/* Applications List */}
-              <div className="space-y-2">
+              {/* Applications List — Continuous Unified List Table */}
+              <div className="divide-y divide-slate-200/60 dark:divide-white/10 border-t border-slate-200/60 dark:border-white/10">
                 {combinedApps.map((item) => (
-                  <motion.div
+                  <div
                     key={item.uid}
-                    layout
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`${cardClass} flex items-center justify-between gap-3 py-3`}
+                    className="flex items-center justify-between gap-3 py-2.5 px-2 rounded-lg hover:bg-slate-200/40 dark:hover:bg-white/[0.04] transition"
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3.5 min-w-0">
                       <div className="w-10 h-10 flex items-center justify-center shrink-0">
                         <Icon name={item.icon} size={30} />
                       </div>
@@ -1410,11 +1621,11 @@ export function SettingsApp() {
                         </button>
                       )}
                     </div>
-                  </motion.div>
+                  </div>
                 ))}
 
                 {combinedApps.length === 0 && (
-                  <div className={`${cardClass} py-10 text-center text-xs opacity-50`}>
+                  <div className="py-12 text-center text-xs opacity-50">
                     条件に一致するアプリケーションが見つかりませんでした
                   </div>
                 )}

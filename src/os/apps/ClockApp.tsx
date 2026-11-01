@@ -367,7 +367,7 @@ export function ClockApp() {
                 Global Cities
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                 {WORLD_CITIES.map((c) => {
                   const cityTime = new Date().toLocaleTimeString([], {
                     timeZone: c.timeZone,
@@ -377,7 +377,7 @@ export function ClockApp() {
                   return (
                     <div
                       key={c.city}
-                      className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06] hover:bg-white/[0.05] transition flex items-center justify-between"
+                      className="p-3.5 rounded-lg border-b border-white/10 sm:border sm:border-white/[0.07] hover:bg-white/[0.04] transition flex items-center justify-between"
                     >
                       <div>
                         <div className="font-medium text-white text-sm">{c.city}</div>
@@ -477,14 +477,14 @@ export function ClockApp() {
             )}
 
             {/* List of Alarms */}
-            <div className="space-y-2.5">
+            <div className="divide-y divide-white/10 border-y border-white/10">
               {alarms.map((alarm) => (
                 <div
                   key={alarm.id}
-                  className={`p-4 sm:p-5 rounded-2xl border transition flex items-center justify-between ${
+                  className={`py-3.5 px-3 transition flex items-center justify-between ${
                     alarm.enabled
-                      ? 'bg-white/[0.03] border-white/[0.08] shadow-lg shadow-black/20'
-                      : 'bg-white/[0.015] border-white/[0.04] opacity-50'
+                      ? 'hover:bg-white/[0.03]'
+                      : 'opacity-50 hover:bg-white/[0.02]'
                   }`}
                 >
                   <div className="flex items-center gap-4">

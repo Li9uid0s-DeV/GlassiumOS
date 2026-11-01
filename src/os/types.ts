@@ -730,3 +730,114 @@ export const STORE_THEMES: StoreTheme[] = [
     },
   },
 ];
+
+// -------------------------------------------------------------------------
+// UI Styles (8 Styles: 3 Fun/Meme + 5 Authentic Researched OS Systems)
+// -------------------------------------------------------------------------
+export type UIStyle =
+  | 'the-ai'
+  | 'nyan-cat'
+  | 'meme'
+  | 'miui'
+  | 'macos'
+  | 'glassium'
+  | 'one-ui'
+  | 'material3';
+
+export interface UIStyleInfo {
+  id: UIStyle;
+  name: string; // Simple name
+  sub: string;
+  category: 'fun' | 'authentic';
+  accent: string;
+  badge: string;
+  previewGradient: string;
+  description: string;
+}
+
+export const UI_STYLES: UIStyleInfo[] = [
+  {
+    id: 'glassium',
+    name: 'Glassium',
+    sub: 'Zero Border Line',
+    category: 'authentic',
+    accent: '#06b6d4',
+    badge: 'Standard',
+    previewGradient: 'linear-gradient(135deg, rgba(6,182,212,0.8), rgba(99,102,241,0.8))',
+    description: '枠線を一切排除したZero Border Lineコンセプト。光沢反射と滑らかな液体ガラス透過サーフェス。',
+  },
+  {
+    id: 'macos',
+    name: 'macOS',
+    sub: 'Human Interface',
+    category: 'authentic',
+    accent: '#3b82f6',
+    badge: 'Apple HIG',
+    previewGradient: 'linear-gradient(135deg, #1e3a8a, #3b82f6, #60a5fa)',
+    description: 'Human Interface Guidelines準拠。フロストすりガラス、3色トラフィックライト、洗練されたフォント。',
+  },
+  {
+    id: 'one-ui',
+    name: 'One UI',
+    sub: 'Reachability Comfort',
+    category: 'authentic',
+    accent: '#2563eb',
+    badge: 'Samsung',
+    previewGradient: 'linear-gradient(135deg, #1d4ed8, #0ea5e9, #38bdf8)',
+    description: '上下分割の操作エリア配置（Comfort Curve）。親指の届く下部インタラクションと大きな丸みスクワークル。',
+  },
+  {
+    id: 'miui',
+    name: 'MIUI',
+    sub: 'Alive Aesthetics',
+    category: 'authentic',
+    accent: '#f97316',
+    badge: 'Alive / HyperOS',
+    previewGradient: 'linear-gradient(135deg, #ea580c, #f97316, #fb923c)',
+    description: '超楕円（n=3 スーパーエリプス）による有機的な丸み。生命感あるリアルタイム光線と流体トランジション。',
+  },
+  {
+    id: 'material3',
+    name: 'Material 3',
+    sub: 'Material You',
+    category: 'authentic',
+    accent: '#8b5cf6',
+    badge: 'Google M3',
+    previewGradient: 'linear-gradient(135deg, #6d28d9, #8b5cf6, #c084fc)',
+    description: 'トーン別カラーシステム、完全角丸ピル形状のナビゲーション＆ボタン、柔らかな階層サーフェス。',
+  },
+  {
+    id: 'the-ai',
+    name: 'The AI',
+    sub: 'Neural Matrix',
+    category: 'fun',
+    accent: '#10b981',
+    badge: 'Cyber Sci-Fi',
+    previewGradient: 'linear-gradient(135deg, #022c22, #059669, #34d399)',
+    description: 'サイバーネティックAIターミナル。ネオングリーンの走査線、モノスペースプロンプト、AIパルス光。',
+  },
+  {
+    id: 'nyan-cat',
+    name: 'Nyan Cat',
+    sub: 'Rainbow Pixel',
+    category: 'fun',
+    accent: '#ec4899',
+    badge: 'Arcade Pop',
+    previewGradient: 'linear-gradient(135deg, #f43f5e, #fb923c, #facc15, #4ade80, #38bdf8, #a855f7)',
+    description: '虹の軌跡と8ビットピクセルスター。ポップタルトの甘いパステルカラーとレトロゲームサウンド。',
+  },
+  {
+    id: 'meme',
+    name: 'Meme',
+    sub: 'Much OS, Very Fast',
+    category: 'fun',
+    accent: '#eab308',
+    badge: 'Doge Web',
+    previewGradient: 'linear-gradient(135deg, #ca8a04, #eab308, #fde047)',
+    description: 'Doge・コミック・カオスな楽しさ全開のミームモード。ゴールドのバッジとユーモア溢れるアラート。',
+  },
+];
+
+// Sleep Screen Customization Types
+export type SleepClockStyle = 'depth' | 'analog' | 'minimal' | 'vertical' | 'cyber';
+export type SleepBackground = 'aurora' | 'void' | 'matrix' | 'galaxy' | 'retro' | 'wallpaper';

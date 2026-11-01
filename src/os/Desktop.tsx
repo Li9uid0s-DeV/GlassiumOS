@@ -128,6 +128,7 @@ export function Desktop() {
     selectedCustomId,
     theme,
     accentColor,
+    uiStyle,
     liteMode,
     transparency,
     locked,
@@ -142,7 +143,6 @@ export function Desktop() {
     nebulaPreset,
     openApp,
     focusWindow,
-    minimizeWindow,
     restoreWindow,
     installedApps,
     launchInstalledApp,
@@ -205,20 +205,16 @@ export function Desktop() {
       openApp('explorer', { payload: { folderPath: ['Recycle Bin'] } });
       return;
     }
-    const wins = activeDesktopWindows.filter((w) => w.appId === appId);
+    const wins = windows.filter((w) => w.appId === appId);
     if (wins.length === 0) {
       openApp(appId as AppId);
     } else {
       const top = wins.reduce((a, b) => (a.zIndex > b.zIndex ? a : b));
-      if (top.minimized) restoreWindow(top.id);
-      else {
-        const visibleWins = activeDesktopWindows.filter((w) => !w.minimized);
-        const isTopmost =
-          visibleWins.length > 0 &&
-          visibleWins.reduce((a, b) => (a.zIndex > b.zIndex ? a : b)).id === top.id;
-        if (isTopmost) minimizeWindow(top.id);
-        else focusWindow(top.id);
+      if (top.desktopId && top.desktopId !== activeDesktopId) {
+        moveWindowToDesktop(top.id, activeDesktopId);
       }
+      restoreWindow(top.id);
+      focusWindow(top.id);
     }
   };
 
@@ -330,6 +326,7 @@ export function Desktop() {
     <div
       data-theme={theme}
       data-accent={accentColor}
+      data-ui-style={uiStyle}
       className={`relative h-full w-full overflow-hidden select-none engine-${designEngine} ${liteMode ? 'lite-mode' : ''}`}
       onPointerDown={() => {
         setSelectedIconId(null);

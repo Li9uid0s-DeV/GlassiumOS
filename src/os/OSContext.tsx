@@ -29,6 +29,9 @@ import {
   UserProfile,
   NotificationItem,
   VirtualDesktop,
+  UIStyle,
+  SleepClockStyle,
+  SleepBackground,
 } from './types';
 import { VirtualFolder, getInitialFileSystem, VirtualNode } from './fileSystem';
 import { WALLPAPERS } from './wallpapers';
@@ -101,6 +104,8 @@ export interface OSContextValue {
   setAccentColor: (c: AccentColor) => void;
 
   // Customization & Shell Engines
+  uiStyle: UIStyle;
+  setUiStyle: (style: UIStyle) => void;
   shellMode: ShellMode;
   setShellMode: (mode: ShellMode) => void;
   taskbarStyle: WindowsTaskbarStyle;
@@ -109,6 +114,10 @@ export interface OSContextValue {
   setDesignEngine: (engine: DesignEngine) => void;
   nebulaPreset: NebulaPreset;
   setNebulaPreset: (preset: NebulaPreset) => void;
+  sleepClockStyle: SleepClockStyle;
+  setSleepClockStyle: (style: SleepClockStyle) => void;
+  sleepBackground: SleepBackground;
+  setSleepBackground: (bg: SleepBackground) => void;
 
   // Fine-grain sliders & 3D Liquid Glass Physics
   blurAmount: number;
@@ -410,6 +419,43 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const [accentColor, setAccentColor] = useState<AccentColor>(persistedSettings.accentColor ?? 'cyan');
   const [customWallpaperBright, setCustomWallpaperBright] = useState<boolean>(false);
 
+  // UI Styles & Shell Modes
+  const [uiStyle, setUiStyleState] = useState<UIStyle>(() => {
+    return loadPersisted<UIStyle>('glassium-ui-style', (persistedSettings.uiStyle as UIStyle) ?? 'glassium');
+  });
+  const setUiStyle = useCallback((style: UIStyle) => {
+    setUiStyleState(style);
+    try {
+      localStorage.setItem('glassium-ui-style', style);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const [sleepClockStyle, setSleepClockStyleState] = useState<SleepClockStyle>(() => {
+    return loadPersisted<SleepClockStyle>('glassium-sleep-clock', 'depth');
+  });
+  const setSleepClockStyle = useCallback((style: SleepClockStyle) => {
+    setSleepClockStyleState(style);
+    try {
+      localStorage.setItem('glassium-sleep-clock', style);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const [sleepBackground, setSleepBackgroundState] = useState<SleepBackground>(() => {
+    return loadPersisted<SleepBackground>('glassium-sleep-bg', 'aurora');
+  });
+  const setSleepBackground = useCallback((bg: SleepBackground) => {
+    setSleepBackgroundState(bg);
+    try {
+      localStorage.setItem('glassium-sleep-bg', bg);
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // Shell & Design Engines — Default to desktop 'windows' shell so all icons & taskbar are immediately accessible
   const [shellMode, setShellMode] = useState<ShellMode>(() => {
     return (persistedSettings.shellMode as ShellMode) ?? 'windows';
@@ -643,6 +689,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     const preset = ACCENT_COLOR_PRESETS.find((p) => p.id === accentColor) ?? ACCENT_COLOR_PRESETS[0];
     document.documentElement.setAttribute('data-theme', theme);
     document.documentElement.setAttribute('data-accent', accentColor);
+    document.documentElement.setAttribute('data-ui-style', uiStyle);
     document.documentElement.setAttribute('data-wallpaper-tone', isWallpaperBright ? 'bright' : 'dark');
     document.documentElement.style.setProperty('--os-accent', preset.hex);
     document.documentElement.style.setProperty('--os-accent-rgb', preset.rgb);
@@ -652,7 +699,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     document.documentElement.style.setProperty('--glass-curvature', `${glassCurvature}px`);
     document.documentElement.style.setProperty('--glass-specular', `${glassSpecular / 100}`);
     document.documentElement.style.setProperty('--glass-wobble', `${glassWobble / 100}`);
-  }, [theme, accentColor, isWallpaperBright, blurAmount, transparency, cornerRadius, glassCurvature, glassSpecular, glassWobble]);
+  }, [theme, accentColor, uiStyle, isWallpaperBright, blurAmount, transparency, cornerRadius, glassCurvature, glassSpecular, glassWobble]);
 
   // Persist Settings
   useEffect(() => {
@@ -660,6 +707,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(
         LS_KEY,
         JSON.stringify({
+          uiStyle,
           wallpaper,
           customWallpapers,
           selectedCustomId,
@@ -697,6 +745,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
       // Ignore quota error
     }
   }, [
+    uiStyle,
     wallpaper,
     customWallpapers,
     selectedCustomId,
@@ -1084,14 +1133,15 @@ export function OSProvider({ children }: { children: ReactNode }) {
       playSound('open');
       setTaskViewOpen(false);
       setWindows((ws) => {
-        const existingOnCurrent = ws.find(
-          (w) => w.appId === appId && (!w.desktopId || w.desktopId === activeDesktopId)
-        );
-        if (existingOnCurrent && appId !== 'notepad' && !opts?.payload) {
+        // If window exists on current or any other virtual desktop, bring it to current desktop and unminimize
+        const existing = ws.find((w) => w.appId === appId);
+        if (existing && appId !== 'notepad' && !opts?.payload) {
           zCounter.current += 1;
           const z = zCounter.current;
           return ws.map((w) =>
-            w.id === existingOnCurrent.id ? { ...w, zIndex: z, minimized: false } : w
+            w.id === existing.id
+              ? { ...w, zIndex: z, minimized: false, desktopId: activeDesktopId }
+              : w
           );
         }
         const def = APP_DEFAULTS[appId] ?? {
@@ -1625,6 +1675,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
     setTheme,
     accentColor,
     setAccentColor,
+    uiStyle,
+    setUiStyle,
     shellMode,
     setShellMode,
     taskbarStyle,
@@ -1633,6 +1685,10 @@ export function OSProvider({ children }: { children: ReactNode }) {
     setDesignEngine,
     nebulaPreset,
     setNebulaPreset,
+    sleepClockStyle,
+    setSleepClockStyle,
+    sleepBackground,
+    setSleepBackground,
     blurAmount,
     setBlurAmount,
     cornerRadius,

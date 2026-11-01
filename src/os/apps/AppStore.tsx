@@ -143,10 +143,8 @@ export function AppStoreApp() {
     setTimeout(() => setCustomSuccess(''), 3000);
   };
 
-  const rowClass = `rounded-xl p-3.5 border flex items-center justify-between gap-4 transition-colors duration-150 ${
-    isLight
-      ? 'bg-white border-slate-200/90 hover:border-slate-300'
-      : 'bg-slate-900/55 border-white/10 hover:border-white/20'
+  const rowClass = `py-3 px-3 flex items-center justify-between gap-4 transition-colors duration-150 ${
+    isLight ? 'hover:bg-slate-200/40' : 'hover:bg-white/[0.04]'
   }`;
 
   const btnPrimary =
@@ -284,7 +282,7 @@ export function AppStoreApp() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                <div className="divide-y divide-slate-200/60 dark:divide-white/10 border-y border-slate-200/60 dark:border-white/10">
                   {filteredApps.map((app) => {
                     const installed = isInstalled(app.id);
                     const busy = installingId === app.id;
@@ -361,7 +359,7 @@ export function AppStoreApp() {
                   </p>
                 </div>
 
-                <div className="space-y-2">
+                <div className="divide-y divide-slate-200/60 dark:divide-white/10 border-y border-slate-200/60 dark:border-white/10">
                   {filteredThemes.map((t) => {
                     const installed = isThemeInstalled(t.id);
                     const isCurrent = currentThemeId === t.id;
@@ -435,11 +433,9 @@ export function AppStoreApp() {
               >
                 <form
                   onSubmit={handleAddCustomApp}
-                  className={`rounded-xl p-5 border space-y-4 ${
-                    isLight ? 'bg-white border-slate-200' : 'bg-slate-900/55 border-white/10'
-                  }`}
+                  className="space-y-5 pb-4"
                 >
-                  <div>
+                  <div className="pb-3 border-b border-slate-200/60 dark:border-white/10">
                     <h2 className="text-sm font-bold">Web Application Installer</h2>
                     <p className="text-xs opacity-55 mt-0.5">
                       任意のWebサイトURLまたはGitHubリポジトリをネイティブウィンドウアプリとして追加します。
@@ -457,8 +453,8 @@ export function AppStoreApp() {
                         placeholder="例: Docs Viewer"
                         className={`w-full rounded-lg border px-3 py-2 text-xs outline-none ${
                           isLight
-                            ? 'bg-slate-50 border-slate-300 text-slate-900'
-                            : 'bg-slate-950/60 border-white/15 text-white'
+                            ? 'bg-white border-slate-300 text-slate-900 focus:border-sky-500'
+                            : 'bg-white/[0.05] border-white/15 text-white focus:border-sky-400'
                         }`}
                       />
                     </div>
@@ -470,8 +466,8 @@ export function AppStoreApp() {
                         onChange={(e) => setCustomCategory(e.target.value as 'utilities' | 'games')}
                         className={`w-full rounded-lg border px-3 py-2 text-xs outline-none ${
                           isLight
-                            ? 'bg-slate-50 border-slate-300 text-slate-900'
-                            : 'bg-slate-950/60 border-white/15 text-white'
+                            ? 'bg-white border-slate-300 text-slate-900'
+                            : 'bg-white/[0.05] border-white/15 text-white'
                         }`}
                       >
                         <option value="utilities">Utilities (ツール)</option>
@@ -492,8 +488,8 @@ export function AppStoreApp() {
                       placeholder="https://example.com または https://github.com/user/repo"
                       className={`w-full rounded-lg border px-3 py-2 text-xs font-mono outline-none ${
                         isLight
-                          ? 'bg-slate-50 border-slate-300 text-slate-900'
-                          : 'bg-slate-950/60 border-white/15 text-white'
+                          ? 'bg-white border-slate-300 text-slate-900 focus:border-sky-500'
+                          : 'bg-white/[0.05] border-white/15 text-white focus:border-sky-400'
                       }`}
                     />
                   </div>
@@ -507,8 +503,8 @@ export function AppStoreApp() {
                       placeholder="アプリの簡単な説明"
                       className={`w-full rounded-lg border px-3 py-2 text-xs outline-none ${
                         isLight
-                          ? 'bg-slate-50 border-slate-300 text-slate-900'
-                          : 'bg-slate-950/60 border-white/15 text-white'
+                          ? 'bg-white border-slate-300 text-slate-900 focus:border-sky-500'
+                          : 'bg-white/[0.05] border-white/15 text-white focus:border-sky-400'
                       }`}
                     />
                   </div>
@@ -525,7 +521,7 @@ export function AppStoreApp() {
                             customIcon === ic
                               ? 'os-accent-soft border'
                               : isLight
-                              ? 'bg-slate-50 border-slate-200 hover:bg-slate-100'
+                              ? 'bg-white border-slate-200 hover:bg-slate-100'
                               : 'bg-white/[0.04] border-white/10 hover:bg-white/10'
                           }`}
                         >
@@ -535,7 +531,7 @@ export function AppStoreApp() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-500/15">
+                  <div className="flex items-center justify-between pt-3 border-t border-slate-200/60 dark:border-white/10">
                     <label className="flex items-center gap-2 text-xs cursor-pointer">
                       <input
                         type="checkbox"
@@ -578,15 +574,11 @@ export function AppStoreApp() {
                 </div>
 
                 {installedApps.length === 0 ? (
-                  <div
-                    className={`rounded-xl p-10 border text-center text-xs opacity-55 ${
-                      isLight ? 'bg-white border-slate-200' : 'bg-slate-900/55 border-white/10'
-                    }`}
-                  >
+                  <div className="py-12 border-y border-slate-200/60 dark:border-white/10 text-center text-xs opacity-55">
                     インストール済みの追加パッケージはありません
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="divide-y divide-slate-200/60 dark:divide-white/10 border-y border-slate-200/60 dark:border-white/10">
                     {installedApps.map((app) => (
                       <div key={app.id} className={rowClass}>
                         <div className="flex items-center gap-3.5 min-w-0">

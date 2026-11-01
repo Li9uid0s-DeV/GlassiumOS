@@ -22,11 +22,35 @@ export function GameApp({ payload }: GameAppProps) {
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
   const [highScore, setHighScore] = useState(() => {
-    return Number(localStorage.getItem('liquidos_velocity_high_score') || '0');
+    const initialMode = mapPayloadToMode(payload?.gameId);
+    return Number(localStorage.getItem(`game_high_${initialMode}`) || '0');
   });
   const [speedGauge, setSpeedGauge] = useState(120);
   const [gameOver, setGameOver] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+
+  // Sync high score on mode switch
+  useEffect(() => {
+    setHighScore(Number(localStorage.getItem(`game_high_${mode}`) || '0'));
+  }, [mode]);
+
+  const updateScore = useCallback(
+    (newScore: number) => {
+      setScore(newScore);
+      setHighScore((prev) => {
+        if (newScore > prev) {
+          try {
+            localStorage.setItem(`game_high_${mode}`, String(newScore));
+          } catch {
+            // ignore
+          }
+          return newScore;
+        }
+        return prev;
+      });
+    },
+    [mode]
+  );
 
   // 2048 state
   const [grid2048, setGrid2048] = useState<number[][]>(() => createInitial2048Grid());
@@ -596,7 +620,7 @@ export function GameApp({ payload }: GameAppProps) {
         snake.unshift(head);
         if (head.x === food.x && head.y === food.y) {
           currentScore += 100;
-          setScore(currentScore);
+          updateScore(currentScore);
           playSound('score');
           spawnFood();
         } else {
@@ -766,7 +790,7 @@ export function GameApp({ payload }: GameAppProps) {
           b.alive = false;
           ball.vy *= -1;
           currentScore += 50;
-          setScore(currentScore);
+          updateScore(currentScore);
           playSound('score');
           break;
         }
@@ -959,11 +983,11 @@ export function GameApp({ payload }: GameAppProps) {
           ))}
         </div>
 
-        <div className="flex items-center gap-4 font-mono text-xs shrink-0">
+        <div className="flex items-center gap-3.5 font-mono text-xs shrink-0">
           {mode === 'velocity' && (
             <div className="hidden md:flex items-center gap-1.5">
               <span className="text-white/50">SPEED</span>
-              <span className="font-bold text-sky-400">{speedGauge}</span>
+              <span className="font-bold text-sky-400">{speedGauge} km/h</span>
             </div>
           )}
           {(mode === 'maze' || mode === 'breaker') && (
@@ -976,9 +1000,13 @@ export function GameApp({ payload }: GameAppProps) {
             <span className="text-white/50">SCORE</span>
             <span className="font-bold text-emerald-400">{score}</span>
           </div>
+          <div className="hidden sm:flex items-center gap-1.5">
+            <span className="text-white/40">HI</span>
+            <span className="font-bold text-amber-300">{highScore}</span>
+          </div>
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
-            className="p-1.5 rounded-lg glass-jelly text-white/80 hover:text-white"
+            className="p-1.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.15] text-white/80 transition"
             title="サウンド切替"
           >
             <Icon name={soundEnabled ? 'Volume2' : 'VolumeX'} size={14} />
