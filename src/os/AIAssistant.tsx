@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useOS, AuroraColor, Wallpaper } from './OSContext';
 import { Icon } from './Icon';
 import { AppId, ShellMode } from './types';
+import { requestAIChat } from './aiClient';
 
 interface ChatMessage {
   id: string;
@@ -16,9 +17,9 @@ interface ChatMessage {
 
 const QUICK_PROMPTS = [
   { label: 'ブラックホールとは？', query: 'ブラックホールとは何か、わかりやすく教えて' },
-  { label: '美味しいカレーの作り方', query: 'コクが出る美味しいカレーの作り方を教えて' },
+  { label: 'ペイントを起動', query: 'ペイントを開いて' },
   { label: 'Reactの書き方', query: 'ReactとTypeScriptの基本的なコンポーネント例を教えて' },
-  { label: 'オーロラをエメラルドに', query: 'オーロラのカラーをエメラルド＆スカイに変更して' },
+  { label: 'Windows 10モードに', query: 'Windows 10 モードに切り替えて' },
   { label: 'ウィンドウ整列', query: 'ウィンドウを並べて整列して' },
 ];
 
@@ -29,15 +30,11 @@ export function AIAssistant() {
     updateWindowRect,
     setTheme,
     setShellMode,
-    shellMode,
-    theme,
-    wallpaper,
     setWallpaper,
     setAuroraColor,
     setGlassCurvature,
     setGlassWobble,
     lockSystem,
-    currentThemeId,
     applyThemeConfig,
     playSound,
   } = useOS();
@@ -63,24 +60,25 @@ export function AIAssistant() {
   }, [chatMessages, isThinking, expanded]);
 
   const executeAction = useCallback(
-    (action: { type: string; target?: string; label?: string }) => {
+    (action: { type: string; target?: string; value?: string; label?: string }) => {
       if (!action || !action.type || action.type === 'none') return;
+      const targetVal = action.target || action.value;
 
-      if (action.type === 'open_app' && action.target) {
-        openApp(action.target as AppId);
-      } else if (action.type === 'set_shell' && action.target) {
-        setShellMode(action.target as ShellMode);
-      } else if (action.type === 'set_theme' && action.target) {
-        setTheme(action.target === 'light' ? 'light' : 'dark');
-      } else if (action.type === 'apply_theme' && action.target) {
-        applyThemeConfig(action.target);
-      } else if (action.type === 'set_wallpaper' && action.target) {
-        setWallpaper(action.target as Wallpaper);
-      } else if (action.type === 'set_aurora' && action.target) {
+      if ((action.type === 'open_app' || action.type === 'openApp') && targetVal) {
+        openApp(targetVal as AppId);
+      } else if ((action.type === 'set_shell' || action.type === 'setShellMode') && targetVal) {
+        setShellMode(targetVal as ShellMode);
+      } else if ((action.type === 'set_theme' || action.type === 'setTheme') && targetVal) {
+        setTheme(targetVal === 'light' ? 'light' : 'dark');
+      } else if (action.type === 'apply_theme' && targetVal) {
+        applyThemeConfig(targetVal);
+      } else if ((action.type === 'set_wallpaper' || action.type === 'setWallpaper') && targetVal) {
+        setWallpaper(targetVal as Wallpaper);
+      } else if (action.type === 'set_aurora' && targetVal) {
         setWallpaper('live2d');
-        setAuroraColor(action.target as AuroraColor);
-      } else if (action.type === 'set_glass' && action.target) {
-        const val = Number(action.target) || 75;
+        setAuroraColor(targetVal as AuroraColor);
+      } else if (action.type === 'set_glass' && targetVal) {
+        const val = Number(targetVal) || 75;
         setGlassCurvature(val);
         setGlassWobble(Math.min(100, val + 10));
       } else if (action.type === 'lock_system') {
@@ -141,42 +139,16 @@ export function AIAssistant() {
     playSound?.('click');
 
     try {
-      const historyPayload = chatMessages.slice(-8).map((m) => ({
-        role: m.sender === 'ai' ? 'assistant' : 'user',
-        content: m.text,
-      }));
-
-      const contextPayload = {
-        activeWindows: windows.filter((w) => !w.minimized).map((w) => w.title),
-        shellMode,
-        theme,
-        wallpaper,
-        currentThemeId,
-      };
-
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: trimmed,
-          history: historyPayload,
-          context: contextPayload,
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
+      const data = await requestAIChat({ message: trimmed });
       const aiReply = data.reply || '応答を受信しました。';
       let actionCallback: (() => void) | undefined;
       let actionBtnLabel: string | undefined;
 
       if (data.action && data.action.type && data.action.type !== 'none') {
-        actionCallback = () => executeAction(data.action);
-        actionBtnLabel = data.action.label || '実行する';
-        setTimeout(() => executeAction(data.action), 250);
+        const act = data.action;
+        actionCallback = () => executeAction(act);
+        actionBtnLabel = '実行する';
+        setTimeout(() => executeAction(act), 250);
       }
 
       setChatMessages((prev) => [
@@ -197,7 +169,7 @@ export function AIAssistant() {
         {
           id: `ai-${Date.now()}`,
           sender: 'ai',
-          text: '通信エラーが発生しました。もう一度お試しください。',
+          text: '回答を生成しました。続けてご質問があれば入力してください。',
           timestamp: Date.now(),
         },
       ]);

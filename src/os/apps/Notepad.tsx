@@ -2,8 +2,11 @@ import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOS } from '../OSContext';
 import { Icon } from '../Icon';
+import { requestAIChat } from '../aiClient';
+import { WordCountDiffView } from './ExtraAppsSuite';
 
 interface Props {
+  initialTab?: string;
   payload?: { fileName?: string; content?: string };
 }
 
@@ -301,10 +304,9 @@ function fallbackCorrectGrammar(text: string): { corrected: string; changes: str
   return { corrected: result, changes: changes.length > 0 ? changes : ['文章の全体的なレイアウトと句読点を最適化しました。'] };
 }
 
-export function NotepadApp({ payload }: Props) {
+export function NotepadApp({ initialTab, payload }: Props) {
   const { saveFile } = useOS();
 
-  // Notes state initialized from localStorage
   const [notes, setNotes] = useState<MemoNote[]>(() => {
     try {
       const saved = localStorage.getItem('glassium_editor_notes_v2');
@@ -315,9 +317,17 @@ export function NotepadApp({ payload }: Props) {
     return DEFAULT_NOTES;
   });
 
-  // Current View mode: 'dashboard' | 'editor'
-  const [viewMode, setViewMode] = useState<'dashboard' | 'editor'>('dashboard');
+  // Current View mode: 'dashboard' | 'editor' | 'wordcount'
+  const [viewMode, setViewMode] = useState<'dashboard' | 'editor' | 'wordcount'>(() =>
+    initialTab === 'wordcount' || initialTab === 'diff' ? 'wordcount' : 'dashboard'
+  );
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialTab === 'wordcount' || initialTab === 'diff') {
+      setViewMode('wordcount');
+    }
+  }, [initialTab]);
 
   // Active note editor state
   const [title, setTitle] = useState('');
@@ -504,29 +514,19 @@ export function NotepadApp({ payload }: Props) {
     }
 
     try {
-      const response = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: `${systemPrompt}\n\n${userMsg}`,
-        }),
+      const data = await requestAIChat({
+        message: `${systemPrompt}\n\n${userMsg}`,
       });
-
-      if (response.ok) {
-        const data = await response.json();
-        const reply = data.reply || '';
-        if (reply) {
-          if (aiActionType === 'generate') {
-            setContent((prev) => (prev ? prev + '\n\n' + reply : reply));
-          } else {
-            setContent(reply);
-          }
-          setAiStatusMsg('✨ AI処理が完了し、ドキュメントに反映されました！');
+      const reply = data.reply || '';
+      if (reply) {
+        if (aiActionType === 'generate') {
+          setContent((prev) => (prev ? prev + '\n\n' + reply : reply));
         } else {
-          throw new Error('Empty response');
+          setContent(reply);
         }
+        setAiStatusMsg('✨ AI処理が完了し、ドキュメントに反映されました！');
       } else {
-        throw new Error('API failed');
+        throw new Error('Empty response');
       }
     } catch {
       // Fallback to local grammar engine
@@ -613,99 +613,101 @@ export function NotepadApp({ payload }: Props) {
         )}
       </AnimatePresence>
 
+      {/* Top Unified Navigation Strip */}
+      <div className="flex items-center justify-between border-b border-white/10 px-6 text-xs shrink-0">
+        <div className="flex items-center gap-6">
+          <button
+            onClick={() => setViewMode('dashboard')}
+            className={`py-3 border-b-2 font-medium flex items-center gap-1.5 transition-colors ${
+              viewMode === 'dashboard' ? 'border-cyan-400 text-cyan-300' : 'border-transparent text-white/50 hover:text-white'
+            }`}
+          >
+            <Icon name="FileText" size={14} /> メモ一覧
+          </button>
+          {activeNoteId && (
+            <button
+              onClick={() => setViewMode('editor')}
+              className={`py-3 border-b-2 font-medium flex items-center gap-1.5 transition-colors ${
+                viewMode === 'editor' ? 'border-cyan-400 text-cyan-300' : 'border-transparent text-white/50 hover:text-white'
+              }`}
+            >
+              <Icon name="PenTool" size={14} /> 編集 ({title || '無題'})
+            </button>
+          )}
+          <button
+            onClick={() => setViewMode('wordcount')}
+            className={`py-3 border-b-2 font-medium flex items-center gap-1.5 transition-colors ${
+              viewMode === 'wordcount' ? 'border-cyan-400 text-cyan-300' : 'border-transparent text-white/50 hover:text-white'
+            }`}
+          >
+            <Icon name="Layers" size={14} /> 文字数・差分解析
+          </button>
+        </div>
+
+        <div className="flex items-center gap-4 py-1.5">
+          <button
+            onClick={() => setShowTemplateModal(true)}
+            className="text-white/70 hover:text-white transition flex items-center gap-1.5"
+          >
+            <Icon name="Grid3x3" size={13} /> テンプレート
+          </button>
+          <button
+            onClick={() => handleCreateNew('blank')}
+            className="text-cyan-400 hover:text-cyan-300 font-semibold transition flex items-center gap-1"
+          >
+            <Icon name="Plus" size={14} /> 新規メモ作成
+          </button>
+        </div>
+      </div>
+
       {/* ========================================================================= */}
-      {/* 1. DASHBOARD VIEW                                                         */}
+      {/* 1. DASHBOARD VIEW (Borderless Hairline Layout)                            */}
       {/* ========================================================================= */}
       {viewMode === 'dashboard' && (
-        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar p-6 space-y-6">
-          {/* Top Dashboard Header */}
-          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5">
-            <div>
-              <div className="flex items-center gap-2">
-                <div className="p-2 rounded-xl bg-gradient-to-br from-brand-500/30 to-violet-500/30 border border-brand-400/30">
-                  <Icon name="FileText" size={22} className="text-brand-300" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-                    Glassium Memo & Editor
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30">
-                      v4.7 AI
-                    </span>
-                  </h1>
-                  <p className="text-xs text-white/50">
-                    ドキュメント作成、AI文章校正、テンプレート & ダイナミックSVGグラフ
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowTemplateModal(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-xs font-medium text-white transition active:scale-95"
-              >
-                <Icon name="Sparkles" size={14} className="text-yellow-400" />
-                テンプレートから選択
-              </button>
-              <button
-                onClick={() => handleCreateNew('blank')}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-brand-500 to-violet-600 hover:from-brand-400 hover:to-violet-500 text-xs font-semibold text-white shadow-lg shadow-brand-500/20 transition active:scale-95"
-              >
-                <Icon name="Plus" size={16} />
-                新規メモ作成
-              </button>
-            </div>
-          </div>
-
-          {/* Quick Start Templates Section */}
-          <div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-white/40 mb-3 flex items-center gap-1.5">
-              <Icon name="Grid3x3" size={12} />
-              クイックテンプレート作成
+        <div className="flex-1 flex flex-col min-h-0 overflow-y-auto custom-scrollbar px-6 py-5 space-y-6">
+          {/* Quick Start Templates Section (Hairline Divided) */}
+          <div className="border-b border-white/10 pb-5">
+            <h2 className="text-xs font-medium text-white/50 mb-3">
+              テンプレートから作成
             </h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 divide-x divide-white/10 border-t border-b border-white/10">
               {TEMPLATES.map((tmpl) => (
-                <motion.button
+                <button
                   key={tmpl.id}
-                  whileHover={{ y: -3, scale: 1.02 }}
-                  whileTap={{ scale: 0.97 }}
                   onClick={() => handleCreateNew(tmpl.id)}
-                  className="flex flex-col items-start p-3.5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-left transition group"
+                  className="flex flex-col items-start p-3.5 hover:bg-white/[0.04] text-left transition group"
                 >
-                  <div className="p-2 rounded-lg bg-white/10 text-brand-300 mb-2 group-hover:scale-110 transition">
-                    <Icon name={tmpl.icon} size={16} />
-                  </div>
-                  <span className="text-xs font-semibold text-white group-hover:text-brand-300 transition line-clamp-1">
+                  <Icon name={tmpl.icon} size={16} className="text-cyan-400 mb-2" />
+                  <span className="text-xs font-semibold text-white group-hover:text-cyan-300 transition line-clamp-1">
                     {tmpl.name}
                   </span>
-                  <span className="text-[10px] text-white/40 line-clamp-2 mt-1">
+                  <span className="text-[10px] text-white/45 line-clamp-2 mt-1">
                     {tmpl.desc}
                   </span>
-                </motion.button>
+                </button>
               ))}
             </div>
           </div>
 
-          {/* Filter Bar & Search */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-white/5 p-2 rounded-2xl border border-white/10">
-            {/* Category tabs */}
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+          {/* Filter Bar & Search (Hairline) */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-2">
+            <div className="flex items-center gap-4 overflow-x-auto no-scrollbar">
               {[
                 { id: 'all', label: 'すべて' },
                 { id: 'General', label: '全般' },
-                { id: 'Meeting', label: '📋 議事録' },
-                { id: 'Journal', label: '📔 日報' },
-                { id: 'Brainstorm', label: '💡 アイデア' },
-                { id: 'Project', label: '🚀 計画' },
-                { id: 'TechSpec', label: '💻 仕様書' },
+                { id: 'Meeting', label: '議事録' },
+                { id: 'Journal', label: '日報' },
+                { id: 'Brainstorm', label: 'アイデア' },
+                { id: 'Project', label: '計画' },
+                { id: 'TechSpec', label: '仕様書' },
               ].map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setSelectedCatFilter(tab.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap transition ${
+                  className={`py-1.5 border-b-2 text-xs font-medium whitespace-nowrap transition-colors ${
                     selectedCatFilter === tab.id
-                      ? 'bg-brand-500 text-white font-semibold shadow-md'
-                      : 'text-white/60 hover:text-white hover:bg-white/10'
+                      ? 'border-cyan-400 text-cyan-300 font-semibold'
+                      : 'border-transparent text-white/55 hover:text-white'
                   }`}
                 >
                   {tab.label}
@@ -713,20 +715,19 @@ export function NotepadApp({ payload }: Props) {
               ))}
             </div>
 
-            {/* Search Box */}
-            <div className="relative flex-1 max-w-xs">
-              <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+            <div className="flex items-center gap-2 border-b border-white/20 pb-1 w-56">
+              <Icon name="Search" size={13} className="text-white/40" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="メモを検索..."
-                className="w-full pl-8 pr-3 py-1.5 rounded-xl bg-black/40 border border-white/10 text-xs text-white placeholder-white/40 outline-none focus:border-brand-400 transition"
+                className="w-full bg-transparent text-xs text-white placeholder-white/40 outline-none"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                  className="text-white/40 hover:text-white"
                 >
                   <Icon name="X" size={12} />
                 </button>
@@ -734,74 +735,69 @@ export function NotepadApp({ payload }: Props) {
             </div>
           </div>
 
-          {/* Memo Notes Grid */}
+          {/* Memo Notes Hairline List */}
           <div className="flex-1">
             {filteredNotes.length === 0 ? (
-              <div className="flex flex-col items-center justify-center p-12 text-center border border-dashed border-white/10 rounded-2xl">
-                <Icon name="FileText" size={36} className="text-white/20 mb-3" />
+              <div className="py-12 text-center border-b border-white/10">
                 <p className="text-sm font-medium text-white/60">メモが見つかりません</p>
-                <p className="text-xs text-white/40 mt-1">「新規メモ作成」からドキュメントを作成できます。</p>
+                <p className="text-xs text-white/40 mt-1">右上の「新規メモ作成」からドキュメントを作成できます。</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {filteredNotes.map((note) => {
-                  const theme = BG_THEMES[note.bgColor] || BG_THEMES.dark;
-                  return (
-                    <motion.div
-                      key={note.id}
-                      layout
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      whileHover={{ y: -4 }}
-                      onClick={() => handleOpenNote(note)}
-                      className={`relative flex flex-col justify-between p-4 rounded-2xl border ${theme.borderClass} ${theme.bgClass} cursor-pointer shadow-lg hover:shadow-xl transition group min-h-[160px] overflow-hidden`}
-                    >
-                      {/* Pinned Indicator & Category Badge */}
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${theme.accentClass}`}>
+              <div className="divide-y divide-white/10 border-b border-white/10">
+                {filteredNotes.map((note) => (
+                  <div
+                    key={note.id}
+                    onClick={() => handleOpenNote(note)}
+                    className="flex items-center justify-between py-4 px-2 hover:bg-white/[0.04] cursor-pointer transition group"
+                  >
+                    <div className="min-w-0 flex-1 pr-6">
+                      <div className="flex items-center gap-3 mb-1">
+                        <span className="text-sm font-semibold text-white group-hover:text-cyan-300 transition truncate">
+                          {note.title}
+                        </span>
+                        <span className="text-[11px] font-mono text-white/45 shrink-0">
                           {note.category}
                         </span>
-                        <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition">
-                          <button
-                            onClick={(e) => handleTogglePin(note.id, e)}
-                            className={`p-1 rounded hover:bg-black/20 ${note.pinned ? 'text-amber-400' : 'text-white/40'}`}
-                            title={note.pinned ? 'ピン留め解除' : 'ピン留め'}
-                          >
-                            <Icon name="Pin" size={12} />
-                          </button>
-                          <button
-                            onClick={(e) => handleDeleteNote(note.id, e)}
-                            className="p-1 rounded text-white/40 hover:text-red-400 hover:bg-black/20"
-                            title="削除"
-                          >
-                            <Icon name="Trash2" size={12} />
-                          </button>
-                        </div>
+                        {note.pinned && (
+                          <span className="text-[10px] text-amber-400 font-medium shrink-0">Pinned</span>
+                        )}
                       </div>
+                      <p className="text-xs text-white/55 truncate font-mono">
+                        {note.content.replace(/#+|\*+|`+|\[CHART:[^\]]+\]/g, '').trim() || '（内容なし）'}
+                      </p>
+                    </div>
 
-                      {/* Title & Preview Content */}
-                      <div className="flex-1 space-y-1">
-                        <h3 className="text-xs font-bold line-clamp-1 group-hover:text-brand-300 transition">
-                          {note.title}
-                        </h3>
-                        <p className="text-[11px] opacity-70 line-clamp-3 font-mono leading-relaxed whitespace-pre-wrap">
-                          {note.content.replace(/#+|\*+|`+|\[CHART:[^\]]+\]/g, '').trim() || '（内容なし）'}
-                        </p>
-                      </div>
-
-                      {/* Date Timestamp */}
-                      <div className="mt-3 pt-2 border-t border-current/10 flex items-center justify-between text-[10px] opacity-50">
-                        <span>{new Date(note.updatedAt).toLocaleDateString('ja-JP')}</span>
-                        <span className="group-hover:translate-x-1 transition flex items-center gap-1">
-                          開く <Icon name="ChevronRight" size={10} />
-                        </span>
-                      </div>
-                    </motion.div>
-                  );
-                })}
+                    <div className="flex items-center gap-4 shrink-0 text-xs text-white/45">
+                      <span className="font-mono">{new Date(note.updatedAt).toLocaleDateString('ja-JP')}</span>
+                      <button
+                        onClick={(e) => handleTogglePin(note.id, e)}
+                        className={`p-1 hover:text-white ${note.pinned ? 'text-amber-400' : 'text-white/35'}`}
+                        title={note.pinned ? 'ピン留め解除' : 'ピン留め'}
+                      >
+                        <Icon name="Pin" size={13} />
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteNote(note.id, e)}
+                        className="p-1 text-white/35 hover:text-rose-400"
+                        title="削除"
+                      >
+                        <Icon name="Trash2" size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 1B. WORD COUNT & TEXT DIFF ANALYZER VIEW                                  */}
+      {/* ========================================================================= */}
+      {viewMode === 'wordcount' && (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <WordCountDiffView />
         </div>
       )}
 

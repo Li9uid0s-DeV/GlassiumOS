@@ -33,6 +33,7 @@ import {
   SleepClockStyle,
   SleepBackground,
   ClockPosition,
+  OSLanguage,
 } from './types';
 import { VirtualFolder, getInitialFileSystem, VirtualNode } from './fileSystem';
 import { WALLPAPERS } from './wallpapers';
@@ -104,6 +105,8 @@ export interface OSContextValue {
   setTheme: (t: Theme) => void;
   accentColor: AccentColor;
   setAccentColor: (c: AccentColor) => void;
+  language: OSLanguage;
+  setLanguage: (lang: OSLanguage) => void;
 
   // Customization & Shell Engines
   uiStyle: UIStyle;
@@ -297,6 +300,36 @@ const APP_DEFAULTS: Record<AppId, { title: string; icon: string; width: number; 
   ai: { title: 'AI Assistant', icon: 'Sparkles', width: 860, height: 600 },
   studio: { title: 'Glassium Studio', icon: 'Code2', width: 900, height: 620 },
   retrocade: { title: 'RetroCade', icon: 'Gamepad2', width: 880, height: 600 },
+  paint: { title: 'Paint Studio (お絵かき)', icon: 'Palette', width: 820, height: 560 },
+  pomodoro: { title: 'Pomodoro Timer (集中タイマー)', icon: 'Clock', width: 520, height: 440 },
+  unitconverter: { title: 'Unit Converter (単位変換)', icon: 'SlidersHorizontal', width: 620, height: 480 },
+  colorpicker: { title: 'Color Studio (カラーピッカー)', icon: 'Palette', width: 560, height: 460 },
+  passgen: { title: 'Password Generator (パスワード生成)', icon: 'Key', width: 540, height: 440 },
+  qrcode: { title: 'QR Matrix Studio (QRコード作成)', icon: 'Grid3x3', width: 500, height: 480 },
+  jsonformat: { title: 'JSON Formatter (JSON整形)', icon: 'Code2', width: 720, height: 500 },
+  regex: { title: 'Regex Tester (正規表現テスト)', icon: 'Search', width: 680, height: 480 },
+  markdown: { title: 'Markdown Reader (MDビューア)', icon: 'FileText', width: 780, height: 520 },
+  kanban: { title: 'Kanban Board (カンバン管理)', icon: 'LayoutGrid', width: 840, height: 540 },
+  habit: { title: 'Habit Tracker (習慣トラッカー)', icon: 'CheckCircle2', width: 700, height: 460 },
+  expense: { title: 'Expense Ledger (家計簿・収支)', icon: 'Calculator', width: 620, height: 480 },
+  bmi: { title: 'Health & BMI (健康・BMI計算)', icon: 'Activity', width: 540, height: 440 },
+  worldclock: { title: 'World Clock Hub (世界時計)', icon: 'Globe', width: 580, height: 480 },
+  morse: { title: 'Morse & Cipher (モールス変換)', icon: 'Zap', width: 560, height: 420 },
+  base64: { title: 'Base64 & URL Tool (エンコーダー)', icon: 'Code2', width: 640, height: 480 },
+  diff: { title: 'Text Diff Viewer (差分比較)', icon: 'Layers', width: 760, height: 520 },
+  wordcount: { title: 'Word Analyzer (文字数カウント)', icon: 'FileText', width: 660, height: 480 },
+  flashcards: { title: 'Flashcards Deck (暗記カード)', icon: 'BookOpen', width: 600, height: 460 },
+  whiteboard: { title: 'Idea Board (アイデア付箋)', icon: 'PenTool', width: 740, height: 500 },
+  drumpad: { title: '808 Drum Pad (ドラムパッド)', icon: 'Music', width: 520, height: 480 },
+  tuner: { title: 'Frequency Synth (周波数ジェネレータ)', icon: 'Volume2', width: 520, height: 440 },
+  minesweeper: { title: 'Cyber Minesweeper (マインスイーパー)', icon: 'Gamepad2', width: 480, height: 500 },
+  tictactoe: { title: 'Tic-Tac-Toe AI (〇×ゲーム)', icon: 'Grid3x3', width: 460, height: 460 },
+  memory: { title: 'Memory Match (神経衰弱)', icon: 'Sparkles', width: 480, height: 480 },
+  typing: { title: 'Typing Trainer (タイピング練習)', icon: 'SquareTerminal', width: 680, height: 440 },
+  sudoku: { title: 'Mini Sudoku (ナンプレパズル)', icon: 'Grid3x3', width: 480, height: 460 },
+  periodic: { title: 'Periodic Table (元素周期表)', icon: 'Sparkles', width: 720, height: 500 },
+  dictionary: { title: 'Tech Lexicon (IT・用語辞典)', icon: 'BookOpen', width: 640, height: 480 },
+  sysinfo: { title: 'System Diagnostics (システム診断)', icon: 'Cpu', width: 620, height: 480 },
 };
 
 const INITIAL_TASKS: CalendarTask[] = [
@@ -432,6 +465,15 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const [selectedCustomId, setSelectedCustomId] = useState<string | null>(persistedSettings.selectedCustomId ?? null);
   const [theme, setThemeState] = useState<Theme>(persistedSettings.theme ?? 'dark');
   const [accentColor, setAccentColor] = useState<AccentColor>(persistedSettings.accentColor ?? 'cyan');
+  const [language, setLanguageState] = useState<OSLanguage>(
+    (persistedSettings.language as OSLanguage) ?? 'en'
+  );
+  const setLanguage = useCallback((lang: OSLanguage) => {
+    setLanguageState(lang);
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = lang;
+    }
+  }, []);
   const [customWallpaperBright, setCustomWallpaperBright] = useState<boolean>(false);
 
   // UI Styles & Shell Modes
@@ -734,6 +776,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     document.documentElement.setAttribute('data-ui-style', uiStyle);
     document.documentElement.setAttribute('data-design-engine', designEngine);
     document.documentElement.setAttribute('data-wallpaper-tone', isWallpaperBright ? 'bright' : 'dark');
+    document.documentElement.lang = language;
     document.documentElement.style.setProperty('--os-accent', preset.hex);
     document.documentElement.style.setProperty('--os-accent-rgb', preset.rgb);
     document.documentElement.style.setProperty('--theme-blur', `${blurAmount}px`);
@@ -742,7 +785,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     document.documentElement.style.setProperty('--glass-curvature', `${glassCurvature}px`);
     document.documentElement.style.setProperty('--glass-specular', `${glassSpecular / 100}`);
     document.documentElement.style.setProperty('--glass-wobble', `${glassWobble / 100}`);
-  }, [theme, accentColor, uiStyle, designEngine, isWallpaperBright, blurAmount, transparency, cornerRadius, glassCurvature, glassSpecular, glassWobble]);
+  }, [theme, accentColor, language, uiStyle, designEngine, isWallpaperBright, blurAmount, transparency, cornerRadius, glassCurvature, glassSpecular, glassWobble]);
 
   // Persist Settings
   useEffect(() => {
@@ -756,6 +799,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
           selectedCustomId,
           theme,
           accentColor,
+          language,
           desktopIconSize,
           gridSnapEnabled,
           shellMode,
@@ -797,6 +841,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     selectedCustomId,
     theme,
     accentColor,
+    language,
     desktopIconSize,
     gridSnapEnabled,
     shellMode,
@@ -1685,6 +1730,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
     setTheme,
     accentColor,
     setAccentColor,
+    language,
+    setLanguage,
     uiStyle,
     setUiStyle,
     shellMode,

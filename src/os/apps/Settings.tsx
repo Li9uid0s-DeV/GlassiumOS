@@ -15,12 +15,13 @@ import {
 } from '../types';
 import { WALLPAPERS } from '../wallpapers';
 import { Icon } from '../Icon';
+import { requestAIChat } from '../aiClient';
 
 const WALLPAPER_KEYS = Object.keys(WALLPAPERS) as Wallpaper[];
 
 type NavCategory = 'system' | 'personalization' | 'apps' | 'accounts';
 
-type SystemSubView = 'main' | 'display' | 'sound' | 'power' | 'multitasking' | 'aicomponents';
+type SystemSubView = 'main' | 'display' | 'sound' | 'power' | 'multitasking' | 'language' | 'aicomponents';
 type PersonalizationSubView = 'main' | 'uistyle' | 'surface' | 'accent' | 'wallpaper' | 'glass';
 type AccountsSubView = 'main' | 'profile' | 'security';
 
@@ -31,10 +32,10 @@ interface NavItem {
 }
 
 const SIDEBAR_NAV: NavItem[] = [
-  { id: 'system', label: 'システム (System)', icon: 'Monitor' },
-  { id: 'personalization', label: '個人設定 (Personalization)', icon: 'Palette' },
-  { id: 'apps', label: 'アプリ (Apps)', icon: 'LayoutGrid' },
-  { id: 'accounts', label: 'アカウント (Accounts)', icon: 'User' },
+  { id: 'system', label: 'System (システム)', icon: 'Monitor' },
+  { id: 'personalization', label: 'Personalization (個人設定)', icon: 'Palette' },
+  { id: 'apps', label: 'Apps (アプリ)', icon: 'LayoutGrid' },
+  { id: 'accounts', label: 'Accounts (アカウント)', icon: 'User' },
 ];
 
 interface SystemCard {
@@ -45,86 +46,86 @@ interface SystemCard {
 }
 
 const SYSTEM_CARDS: SystemCard[] = [
-  { id: 'display', title: 'Display & Wallpapers', desc: '壁紙、2Dオーロラライブ背景、アイコンサイズ、グリッドスナップ', icon: 'Monitor' },
-  { id: 'sound', title: 'Sound', desc: 'マスター音量、システム効果音', icon: 'Volume2' },
-  { id: 'power', title: 'Power & Sleep', desc: '画面スリープ起動、ロック画面スタイル、スリープ時計', icon: 'BatteryCharging' },
-  { id: 'multitasking', title: 'Multitasking & Taskbar', desc: '50:50 ウィンドウスナップ、タスクバー配置、自動隠す', icon: 'Layers' },
-  { id: 'aicomponents', title: 'AI Components', desc: 'Google Gemini API Key 接続・レスポンス検証', icon: 'Sparkles' },
+  { id: 'display', title: 'Display & Wallpapers', desc: 'Wallpapers, 2D Aurora, icon sizing, grid snap', icon: 'Monitor' },
+  { id: 'sound', title: 'Sound', desc: 'Master volume and system audio effects', icon: 'Volume2' },
+  { id: 'power', title: 'Power & Sleep', desc: 'Screen sleep, lock screen style, sleep clock', icon: 'BatteryCharging' },
+  { id: 'multitasking', title: 'Multitasking & Taskbar', desc: '50:50 window snap, taskbar alignment, auto-hide', icon: 'Layers' },
+  { id: 'language', title: 'Language & Region (言語と地域)', desc: 'OS system language selection (English [Default] / 日本語)', icon: 'Globe' },
+  { id: 'aicomponents', title: 'AI Components', desc: 'Google Gemini API key setup and verification', icon: 'Sparkles' },
 ];
 
 const AURORA_PALETTES: { id: AuroraColor; label: string; desc: string; preview: string }[] = [
-  { id: 'cyan-violet', label: 'Amethyst & Cyan Silk', desc: '深いインディゴ宇宙とシアンのシルク光線', preview: 'from-cyan-900 via-indigo-900 to-purple-950' },
-  { id: 'emerald-sky', label: 'Polar Emerald Aurora', desc: '極北のミッドナイトグリーンとターコイズ粒子', preview: 'from-emerald-950 via-teal-900 to-sky-950' },
-  { id: 'rose-gold', label: 'Crimson Rose Nebula', desc: '深紅のローズゴールドと黄金のオーロラ輝き', preview: 'from-rose-950 via-pink-900 to-amber-950' },
-  { id: 'ocean-blue', label: 'Abyssal Deep Ocean', desc: '深海のロイヤルブルーとサファイアの波紋', preview: 'from-slate-950 via-blue-950 to-cyan-950' },
-  { id: 'sunset-magenta', label: 'Neon Cyber Dusk', desc: 'サイバーパンク感溢れるマゼンタと夕焼け', preview: 'from-purple-950 via-fuchsia-900 to-rose-950' },
+  { id: 'cyan-violet', label: 'Amethyst & Cyan Silk', desc: 'Deep indigo space with cyan silk rays', preview: 'from-cyan-900 via-indigo-900 to-purple-950' },
+  { id: 'emerald-sky', label: 'Polar Emerald Aurora', desc: 'Midnight green with turquoise particles', preview: 'from-emerald-950 via-teal-900 to-sky-950' },
+  { id: 'rose-gold', label: 'Crimson Rose Nebula', desc: 'Deep rose gold with golden aurora glow', preview: 'from-rose-950 via-pink-900 to-amber-950' },
+  { id: 'ocean-blue', label: 'Abyssal Deep Ocean', desc: 'Royal blue with sapphire wave ripples', preview: 'from-slate-950 via-blue-950 to-cyan-950' },
+  { id: 'sunset-magenta', label: 'Neon Cyber Dusk', desc: 'Cyberpunk magenta and sunset sunset glow', preview: 'from-purple-950 via-fuchsia-900 to-rose-950' },
 ];
 
-// Shell mode configurations with detailed distinct mockups
 interface ShellModeOption {
   id: ShellMode;
   label: string;
   desc: string;
   accentBg: string;
-  mockupType: 'win11' | 'win10' | 'win8' | 'ubuntu' | 'mac' | 'dex' | 'chromeos' | 'zorin';
+  mockupType: 'gl5' | 'win11' | 'win10' | 'win8' | 'ubuntu' | 'mac' | 'dex' | 'chromeos';
 }
 
 const SHELL_MODES: ShellModeOption[] = [
   {
+    id: 'windows',
+    label: 'GlassiumOS 5 (標準)',
+    desc: '直線と余白によるミニマルUI・タスクバーAIオムニバー統合',
+    accentBg: 'from-cyan-950 to-slate-950 border-cyan-400/40',
+    mockupType: 'gl5',
+  },
+  {
     id: 'windows11',
     label: 'Windows 11',
-    desc: '中央配置タスクバー ＆ 丸角フロートスタートメニュー',
+    desc: '中央揃えタスクバーとフローティングスタートメニュー',
     accentBg: 'from-sky-950 to-blue-900 border-sky-500/40',
     mockupType: 'win11',
   },
   {
     id: 'windows10',
     label: 'Windows 10',
-    desc: '左揃えタスクバー ＆ ライブタイルマトリクス',
+    desc: '左揃えタスクバーとライブタイルスタートメニュー',
     accentBg: 'from-zinc-950 to-blue-950 border-blue-500/40',
     mockupType: 'win10',
   },
   {
     id: 'windows8',
     label: 'Windows 8 (Metro)',
-    desc: '全画面マルチカラーライブタイルグリッド',
+    desc: 'フルスクリーンライブタイルグリッド',
     accentBg: 'from-teal-950 to-emerald-900 border-teal-400/40',
     mockupType: 'win8',
   },
   {
     id: 'ubuntu',
     label: 'Ubuntu Linux',
-    desc: '左側常駐アプリアンカードック ＆ オレンジアクセント',
+    desc: '左垂直ランチャードックとトップバー',
     accentBg: 'from-amber-950 to-orange-950 border-orange-500/40',
     mockupType: 'ubuntu',
   },
   {
     id: 'mac',
     label: 'macOS Sonoma',
-    desc: 'トップシステムバー ＆ ボトムフロートガラスDock',
+    desc: '上部メニューバーと下部フローティングDock',
     accentBg: 'from-rose-950 to-purple-900 border-rose-400/40',
     mockupType: 'mac',
   },
   {
     id: 'dex',
     label: 'Samsung DeX',
-    desc: 'モバイルPCワークステーション ＆ アプリグリッド',
+    desc: 'デスクトップワークステーション＆アプリランチャー',
     accentBg: 'from-blue-950 to-indigo-900 border-blue-400/40',
     mockupType: 'dex',
   },
   {
     id: 'chromeos',
     label: 'ChromeOS',
-    desc: 'Material 3 ピルシェルフ ＆ ラウンドランチャー',
+    desc: 'ボトムシェルフとアプリランチャー',
     accentBg: 'from-purple-950 to-indigo-900 border-purple-400/40',
     mockupType: 'chromeos',
-  },
-  {
-    id: 'zorin',
-    label: 'Zorin OS Pro',
-    desc: 'エレガントモダンLinux ＆ クリスタルタスクバー',
-    accentBg: 'from-slate-950 to-cyan-950 border-cyan-400/40',
-    mockupType: 'zorin',
   },
 ];
 
@@ -219,6 +220,34 @@ function CustomSlider({
 
 // Distinct Visual Mockups for Each OS Shell
 function ShellMockupDiagram({ type }: { type: ShellModeOption['mockupType'] }) {
+  if (type === 'gl5') {
+    return (
+      <div className="w-full h-16 bg-slate-950 border-b border-cyan-500/40 p-2 flex flex-col justify-between overflow-hidden relative">
+        <div className="self-center w-28 h-8 bg-slate-900 border-t-2 border-cyan-400 p-1 grid grid-cols-2 gap-1">
+          <div className="border-r border-white/10 pr-1 flex flex-col justify-between">
+            <div className="h-1 w-full bg-cyan-400/70" />
+            <div className="h-1 w-3/4 bg-white/30" />
+          </div>
+          <div className="flex flex-col justify-between">
+            <div className="h-1 w-full bg-white/30" />
+            <div className="h-1 w-2/3 bg-white/20" />
+          </div>
+        </div>
+        <div className="w-full h-3 bg-slate-950 border-t border-white/15 flex items-center justify-between px-2">
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 bg-cyan-400" />
+            <div className="w-10 h-1 bg-cyan-400/50" />
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-2 h-2 border-t border-cyan-400 bg-white/20" />
+            <div className="w-2 h-2 bg-white/20" />
+          </div>
+          <div className="w-4 h-1 bg-white/30" />
+        </div>
+      </div>
+    );
+  }
+
   if (type === 'win11') {
     return (
       <div className="w-full h-16 rounded-xl bg-slate-900 border border-sky-500/40 p-2 flex flex-col justify-between overflow-hidden relative shadow-inner">
@@ -353,20 +382,7 @@ function ShellMockupDiagram({ type }: { type: ShellModeOption['mockupType'] }) {
     );
   }
 
-  // Zorin
-  return (
-    <div className="w-full h-16 rounded-xl bg-slate-950 border border-cyan-400/40 p-1.5 flex flex-col justify-between overflow-hidden relative shadow-inner">
-      <div className="flex-1" />
-      {/* Zorin Crystal Panel */}
-      <div className="w-full h-3 rounded bg-cyan-950/80 border border-cyan-400/30 flex items-center justify-between px-1.5">
-        <div className="flex items-center gap-1">
-          <div className="w-2.5 h-2 rounded bg-cyan-400" />
-          <div className="w-2 h-2 rounded bg-white/40" />
-        </div>
-        <div className="w-2 h-1 bg-cyan-400 rounded-full" />
-      </div>
-    </div>
-  );
+  return null;
 }
 
 export function SettingsApp() {
@@ -378,6 +394,8 @@ export function SettingsApp() {
     setTheme,
     accentColor,
     setAccentColor,
+    language,
+    setLanguage,
     setUiStyle,
     shellMode,
     setShellMode,
@@ -509,17 +527,10 @@ export function SettingsApp() {
     playSound('click');
 
     try {
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: 'Hello, testing connection.',
-          apiKey: geminiApiKey.trim(),
-        }),
+      const data = await requestAIChat({
+        message: 'Hello, testing connection.',
+        apiKey: geminiApiKey.trim(),
       });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
       if (data.reply) {
         setAiTestStatus('success');
         setAiTestMessage(`接続成功！ (${data.model || 'Gemini 3.8 Flash'})`);
@@ -617,8 +628,8 @@ export function SettingsApp() {
       {/* Sidebar Navigation */}
       <div className={`w-56 shrink-0 border-r p-3 flex flex-col justify-between ${isLight ? 'bg-slate-200/50 border-slate-300/60' : 'bg-black/30 border-white/[0.08]'}`}>
         <div className="space-y-4">
-          {/* User Compact Profile */}
-          <div className={`flex items-center gap-3 p-2.5 rounded-2xl ${isLight ? 'bg-white border border-slate-300/80 shadow-xs' : 'bg-white/[0.05] border border-white/10'}`}>
+        {/* User Compact Profile */}
+          <div className={`flex items-center gap-3 pb-3 border-b ${isLight ? 'border-slate-300/80' : 'border-white/10'}`}>
             <div className="w-9 h-9 rounded-full bg-[var(--os-accent)]/20 text-[var(--os-accent)] flex items-center justify-center font-bold overflow-hidden shrink-0">
               {customAvatarUrl ? (
                 <img src={customAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
@@ -633,7 +644,7 @@ export function SettingsApp() {
           </div>
 
           {/* Navigation Items */}
-          <nav className="space-y-1">
+          <nav className="divide-y divide-slate-200/40 dark:divide-white/[0.05]">
             {SIDEBAR_NAV.map((nav) => {
               const active = activeCategory === nav.id;
               return (
@@ -647,12 +658,12 @@ export function SettingsApp() {
                     setPersonalSubView('main');
                     setAccountsSubView('main');
                   }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-xs font-semibold transition-all ${
                     active
-                      ? 'bg-[var(--os-accent)] text-black font-bold shadow-md'
+                      ? 'border-l-2 border-[var(--os-accent)] text-[var(--os-accent)] font-bold bg-[var(--os-accent)]/10'
                       : isLight
-                      ? 'text-slate-800 hover:bg-slate-300/60'
-                      : 'text-slate-200 hover:bg-white/[0.08]'
+                      ? 'text-slate-800 hover:bg-slate-300/40'
+                      : 'text-slate-200 hover:bg-white/[0.05]'
                   }`}
                 >
                   <Icon name={nav.icon} size={18} />
@@ -666,7 +677,7 @@ export function SettingsApp() {
         {/* System Version Tag */}
         <div className="px-3 py-2 text-[10px] opacity-60 border-t border-slate-300/60 dark:border-white/[0.08] flex items-center justify-between font-mono">
           <span>GlassiumOS</span>
-          <span>v4.7</span>
+          <span>v5.0</span>
         </div>
       </div>
 
@@ -994,6 +1005,54 @@ export function SettingsApp() {
                     </div>
                   </div>
                 </div>
+              ) : systemSubView === 'language' ? (
+                /* ---------------- LANGUAGE & REGION ---------------- */
+                <div className="space-y-6">
+                  {renderBreadcrumbHeader('Language & Region (言語と地域)', () => setSystemSubView('main'))}
+
+                  <div className="space-y-5">
+                    <div>
+                      <h3 className="text-xs font-bold mb-1">System Display Language (システム表示言語)</h3>
+                      <p className="text-[11px] opacity-60 mb-3">
+                        Choose the primary display language for the OS interface and applications.
+                      </p>
+
+                      <div className="divide-y divide-slate-200/60 dark:divide-white/[0.08] border-y border-slate-200/60 dark:border-white/[0.08]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            setLanguage('en');
+                            addNotification({ title: 'Language Changed', message: 'System language set to English (US).' });
+                          }}
+                          className="w-full py-3.5 px-2 text-left flex items-center justify-between transition hover:bg-white/[0.03]"
+                        >
+                          <div>
+                            <div className={`text-xs font-bold ${language === 'en' ? 'text-[var(--os-accent)]' : ''}`}>English (US) [Default]</div>
+                            <div className="text-[11px] opacity-60">Primary OS System Language</div>
+                          </div>
+                          {language === 'en' && <Icon name="CheckCircle2" size={18} className="text-[var(--os-accent)] shrink-0" />}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            setLanguage('ja');
+                            addNotification({ title: '言語変更', message: 'システム言語を日本語に設定しました。' });
+                          }}
+                          className="w-full py-3.5 px-2 text-left flex items-center justify-between transition hover:bg-white/[0.03]"
+                        >
+                          <div>
+                            <div className={`text-xs font-bold ${language === 'ja' ? 'text-[var(--os-accent)]' : ''}`}>日本語 (Japanese)</div>
+                            <div className="text-[11px] opacity-60">日本語表示モード</div>
+                          </div>
+                          {language === 'ja' && <Icon name="CheckCircle2" size={18} className="text-[var(--os-accent)] shrink-0" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               ) : (
                 /* ---------------- AI COMPONENTS ---------------- */
                 <div className="space-y-6">
@@ -1159,9 +1218,9 @@ export function SettingsApp() {
               ) : personalSubView === 'uistyle' ? (
                 /* ---------------- UI STYLE WITH DISTINCT DIAGRAMS ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('UI Style Presets (各OSの特徴捉えた図解プレビュー)', () => setPersonalSubView('main'))}
+                  {renderBreadcrumbHeader('UI Style Presets (GlassiumOS 5 / Windows 11 / 各OSスタイル)', () => setPersonalSubView('main'))}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="divide-y divide-slate-200/60 dark:divide-white/[0.08] border-y border-slate-200/60 dark:border-white/[0.08]">
                     {SHELL_MODES.map((sm) => {
                       const selected = shellMode === sm.id;
                       return (
@@ -1169,20 +1228,18 @@ export function SettingsApp() {
                           key={sm.id}
                           type="button"
                           onClick={() => handleSelectShellMode(sm.id)}
-                          className={`p-3.5 rounded-2xl border text-left transition relative flex flex-col justify-between h-36 ${
-                            selected ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30 bg-[var(--os-accent)]/10 font-bold' : 'border-slate-300/80 dark:border-white/[0.08] hover:border-slate-400'
+                          className={`w-full py-3.5 px-2 text-left transition flex items-center gap-4 ${
+                            selected ? 'bg-[var(--os-accent)]/10' : 'hover:bg-white/[0.03]'
                           }`}
                         >
-                          {/* Distinct Visual Diagram Box */}
-                          <ShellMockupDiagram type={sm.mockupType} />
-
-                          <div className="mt-2 flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-bold">{sm.label}</div>
-                              <div className="text-[10px] opacity-60 line-clamp-1">{sm.desc}</div>
-                            </div>
-                            {selected && <Icon name="CheckCircle2" size={18} className="text-[var(--os-accent)] shrink-0" />}
+                          <div className="w-36 shrink-0">
+                            <ShellMockupDiagram type={sm.mockupType} />
                           </div>
+                          <div className="flex-1 min-w-0">
+                            <div className={`text-xs font-bold ${selected ? 'text-[var(--os-accent)]' : ''}`}>{sm.label}</div>
+                            <div className="text-[11px] opacity-60 mt-0.5">{sm.desc}</div>
+                          </div>
+                          {selected && <Icon name="CheckCircle2" size={18} className="text-[var(--os-accent)] shrink-0" />}
                         </button>
                       );
                     })}
@@ -1193,7 +1250,7 @@ export function SettingsApp() {
                 <div className="space-y-6">
                   {renderBreadcrumbHeader('Surface Material Engine (質感エンジン連動)', () => setPersonalSubView('main'))}
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="divide-y divide-slate-200/60 dark:divide-white/[0.08] border-y border-slate-200/60 dark:border-white/[0.08]">
                     {DESIGN_ENGINES.map((de) => {
                       const selected = designEngine === de.id;
                       return (
@@ -1201,15 +1258,18 @@ export function SettingsApp() {
                           key={de.id}
                           type="button"
                           onClick={() => handleSelectSurfaceEngine(de.id)}
-                          className={`p-4 rounded-2xl border text-left transition relative overflow-hidden flex flex-col justify-between h-32 bg-gradient-to-br ${de.bg} ${
-                            selected ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30' : 'border-slate-300/80 dark:border-white/[0.08]'
+                          className={`w-full py-3.5 px-2 text-left transition flex items-center justify-between gap-4 ${
+                            selected ? 'bg-[var(--os-accent)]/10' : 'hover:bg-white/[0.03]'
                           }`}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-white shadow-xs">{de.label}</span>
-                            {selected && <Icon name="CheckCircle2" size={18} className="text-[var(--os-accent)]" />}
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            <div className={`w-12 h-8 shrink-0 bg-gradient-to-br ${de.bg}`} />
+                            <div>
+                              <div className={`text-xs font-bold ${selected ? 'text-[var(--os-accent)]' : ''}`}>{de.label}</div>
+                              <div className="text-[11px] opacity-60">{de.desc}</div>
+                            </div>
                           </div>
-                          <p className="text-[11px] text-white/80 leading-snug">{de.desc}</p>
+                          {selected && <Icon name="CheckCircle2" size={18} className="text-[var(--os-accent)] shrink-0" />}
                         </button>
                       );
                     })}
@@ -1220,7 +1280,7 @@ export function SettingsApp() {
                 <div className="space-y-6">
                   {renderBreadcrumbHeader('Accent Color (アクセントカラー切り替え)', () => setPersonalSubView('main'))}
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="divide-y divide-slate-200/60 dark:divide-white/[0.08] border-y border-slate-200/60 dark:border-white/[0.08]">
                     {ACCENT_COLOR_PRESETS.map((p) => {
                       const selected = accentColor === p.id;
                       return (
@@ -1231,13 +1291,13 @@ export function SettingsApp() {
                             playSound('click');
                             setAccentColor(p.id);
                           }}
-                          className={`p-3.5 rounded-2xl border flex items-center justify-between transition ${
-                            selected ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]/30 font-bold bg-[var(--os-accent)]/10' : 'border-slate-300/80 dark:border-white/[0.08]'
+                          className={`w-full py-3 px-2 flex items-center justify-between transition ${
+                            selected ? 'bg-[var(--os-accent)]/10 font-bold' : 'hover:bg-white/[0.03]'
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            <span className="w-6 h-6 rounded-full shrink-0 shadow-md border border-white/20" style={{ backgroundColor: p.hex }} />
-                            <span className="text-xs font-bold">{p.labelJa}</span>
+                            <span className="w-5 h-5 rounded-full shrink-0" style={{ backgroundColor: p.hex }} />
+                            <span className={`text-xs font-bold ${selected ? 'text-[var(--os-accent)]' : ''}`}>{p.labelJa}</span>
                           </div>
                           {selected && <Icon name="CheckCircle2" size={18} className="text-[var(--os-accent)]" />}
                         </button>

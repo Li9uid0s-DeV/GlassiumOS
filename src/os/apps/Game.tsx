@@ -1,15 +1,20 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { Icon } from '../Icon';
+import { PuzzleGamesView } from './ExtraAppsSuite';
 
-export type GameMode = 'velocity' | 'maze' | '2048' | 'snake' | 'breaker' | 'gameboy';
+export type GameMode = 'velocity' | 'maze' | '2048' | 'snake' | 'breaker' | 'gameboy' | 'puzzles';
 
 interface GameAppProps {
+  initialTab?: string;
   payload?: { gameId?: string };
 }
 
 function mapPayloadToMode(gameId?: string): GameMode {
-  if (!gameId) return 'velocity';
+  if (!gameId || gameId === 'game') return 'velocity';
+  if (['minesweeper', 'tictactoe', 'memory', 'typing', 'sudoku', 'puzzles'].some((k) => gameId.includes(k))) {
+    return 'puzzles';
+  }
   if (gameId.includes('2048')) return '2048';
   if (gameId.includes('snake')) return 'snake';
   if (gameId.includes('maze')) return 'maze';
@@ -26,11 +31,12 @@ interface Weapon {
   range: number;
 }
 
-export function GameApp({ payload }: GameAppProps) {
-  const [mode, setMode] = useState<GameMode>(() => mapPayloadToMode(payload?.gameId));
+export function GameApp({ initialTab, payload }: GameAppProps) {
+  const effectiveGameId = payload?.gameId || initialTab;
+  const [mode, setMode] = useState<GameMode>(() => mapPayloadToMode(effectiveGameId));
   const [score, setScore] = useState(0);
   const [highScore, setHighScore] = useState(() => {
-    const initialMode = mapPayloadToMode(payload?.gameId);
+    const initialMode = mapPayloadToMode(effectiveGameId);
     return Number(localStorage.getItem(`game_high_${initialMode}`) || '0');
   });
   const [speedGauge, setSpeedGauge] = useState(120);
@@ -90,10 +96,10 @@ export function GameApp({ payload }: GameAppProps) {
   const audioCtxRef = useRef<AudioContext | null>(null);
 
   useEffect(() => {
-    if (payload?.gameId) {
-      setMode(mapPayloadToMode(payload.gameId));
+    if (effectiveGameId) {
+      setMode(mapPayloadToMode(effectiveGameId));
     }
-  }, [payload?.gameId]);
+  }, [effectiveGameId]);
 
   const controlsRef = useRef({
     left: false,
@@ -748,23 +754,24 @@ export function GameApp({ payload }: GameAppProps) {
   const GAME_TABS: { id: GameMode; label: string; icon: string }[] = [
     { id: 'velocity', label: 'Slope Glider', icon: 'Flame' },
     { id: 'maze', label: 'FPS RPG Maze', icon: 'Compass' },
-    { id: '2048', label: '2048 Glass', icon: 'LayoutGrid' },
+    { id: '2048', label: '2048', icon: 'LayoutGrid' },
+    { id: 'puzzles', label: 'パズル・タイピング', icon: 'Grid3x3' },
     { id: 'gameboy', label: 'Game Boy', icon: 'Gamepad2' },
   ];
 
   return (
     <div className="flex h-full w-full select-none flex-col bg-slate-950 text-white relative touch-none">
       {/* Top Game Switcher Bar */}
-      <div className="flex items-center justify-between border-b border-white/10 bg-slate-900/80 px-3 py-2 text-xs backdrop-blur-md shrink-0 z-20 gap-2 overflow-x-auto">
-        <div className="flex items-center gap-1.5 shrink-0">
+      <div className="flex items-center justify-between border-b border-white/10 bg-slate-900/80 px-4 text-xs backdrop-blur-md shrink-0 z-20 gap-2 overflow-x-auto">
+        <div className="flex items-center gap-4 shrink-0">
           {GAME_TABS.map((t) => (
             <button
               key={t.id}
               onClick={() => setMode(t.id)}
-              className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 font-medium transition-all ${
+              className={`flex items-center gap-1.5 border-b-2 py-2.5 font-medium transition-colors ${
                 mode === t.id
-                  ? 'glass-jelly text-sky-300 font-semibold'
-                  : 'text-white/60 hover:bg-white/5 hover:text-white'
+                  ? 'border-sky-400 text-sky-300 font-semibold'
+                  : 'border-transparent text-white/55 hover:text-white'
               }`}
             >
               <Icon name={t.icon} size={13} />
@@ -885,6 +892,19 @@ export function GameApp({ payload }: GameAppProps) {
                 リセット
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Puzzle & Typing Suite */}
+        {mode === 'puzzles' && (
+          <div className="absolute inset-0 z-20 bg-slate-950 overflow-hidden">
+            <PuzzleGamesView
+              initialGame={
+                effectiveGameId && ['minesweeper', 'tictactoe', 'memory', 'typing', 'sudoku'].includes(effectiveGameId)
+                  ? (effectiveGameId as 'minesweeper' | 'tictactoe' | 'memory' | 'typing' | 'sudoku')
+                  : undefined
+              }
+            />
           </div>
         )}
 

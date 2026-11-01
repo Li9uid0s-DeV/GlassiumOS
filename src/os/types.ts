@@ -15,7 +15,37 @@ export type AppId =
   | 'clock'
   | 'ai'
   | 'studio'
-  | 'retrocade';
+  | 'retrocade'
+  | 'paint'
+  | 'pomodoro'
+  | 'unitconverter'
+  | 'colorpicker'
+  | 'passgen'
+  | 'qrcode'
+  | 'jsonformat'
+  | 'regex'
+  | 'markdown'
+  | 'kanban'
+  | 'habit'
+  | 'expense'
+  | 'bmi'
+  | 'worldclock'
+  | 'morse'
+  | 'base64'
+  | 'diff'
+  | 'wordcount'
+  | 'flashcards'
+  | 'whiteboard'
+  | 'drumpad'
+  | 'tuner'
+  | 'minesweeper'
+  | 'tictactoe'
+  | 'memory'
+  | 'typing'
+  | 'sudoku'
+  | 'periodic'
+  | 'dictionary'
+  | 'sysinfo';
 
 // Custom installed apps use a string ID prefixed with 'custom:'
 export type WindowAppId = AppId | string;
@@ -126,6 +156,8 @@ export const ACCENT_COLOR_PRESETS: {
   { id: 'amber', label: 'Amber', labelJa: 'アンバー', hex: '#f59e0b', rgb: '245, 158, 11' },
 ];
 
+export type OSLanguage = 'en' | 'ja';
+
 export type ShellMode =
   | 'windows'
   | 'windows11'
@@ -135,7 +167,6 @@ export type ShellMode =
   | 'chromeos'
   | 'mac'
   | 'ubuntu'
-  | 'zorin'
   | 'android'
   | 'ios'
   | 'metro';
@@ -318,9 +349,39 @@ export const STORE_CATALOG: StoreApp[] = [
     author: 'AI Studio Core',
     rating: 5.0,
     size: '4.8 MB',
-    version: '4.1.0',
+    version: '4.7.0',
     builtInAppId: 'ai',
   },
+  { id: 'paint', name: 'Paint Studio (お絵かき)', description: 'Freehand digital canvas with brushes, color palette, and PNG export.', category: 'utilities', icon: 'Palette', author: 'Glassium Creative', rating: 4.9, size: '1.4 MB', version: '4.7.0', builtInAppId: 'paint' },
+  { id: 'pomodoro', name: 'Pomodoro Timer (集中タイマー)', description: '25/5 focus and break timer for deep productivity.', category: 'utilities', icon: 'Clock', author: 'Glassium Core', rating: 4.9, size: '920 KB', version: '4.7.0', builtInAppId: 'pomodoro' },
+  { id: 'unitconverter', name: 'Unit Converter (単位変換)', description: 'Convert length, weight, temperature, and digital storage.', category: 'utilities', icon: 'SlidersHorizontal', author: 'Glassium Tools', rating: 4.8, size: '880 KB', version: '4.7.0', builtInAppId: 'unitconverter' },
+  { id: 'colorpicker', name: 'Color Studio (カラーピッカー)', description: 'RGB/HSL mixer, HEX generator, and color palettes.', category: 'utilities', icon: 'Palette', author: 'Glassium Creative', rating: 4.9, size: '1.1 MB', version: '4.7.0', builtInAppId: 'colorpicker' },
+  { id: 'passgen', name: 'Password Generator (パスワード生成)', description: 'Cryptographic password generator with entropy controls.', category: 'utilities', icon: 'Key', author: 'Glassium Security', rating: 4.9, size: '750 KB', version: '4.7.0', builtInAppId: 'passgen' },
+  { id: 'qrcode', name: 'QR Matrix Studio (QRコード作成)', description: 'Generate visual matrix codes for URLs and text.', category: 'utilities', icon: 'Grid3x3', author: 'Glassium Tools', rating: 4.8, size: '990 KB', version: '4.7.0', builtInAppId: 'qrcode' },
+  { id: 'jsonformat', name: 'JSON Formatter (JSON整形)', description: 'Format, validate, and minify JSON payloads.', category: 'utilities', icon: 'Code2', author: 'Glassium Dev', rating: 4.9, size: '840 KB', version: '4.7.0', builtInAppId: 'jsonformat' },
+  { id: 'regex', name: 'Regex Tester (正規表現テスト)', description: 'Test regular expressions with real-time match highlighting.', category: 'utilities', icon: 'Search', author: 'Glassium Dev', rating: 4.8, size: '910 KB', version: '4.7.0', builtInAppId: 'regex' },
+  { id: 'markdown', name: 'Markdown Reader (MDビューア)', description: 'Side-by-side live Markdown editor and reader.', category: 'utilities', icon: 'FileText', author: 'TextCraft', rating: 4.9, size: '1.2 MB', version: '4.7.0', builtInAppId: 'markdown' },
+  { id: 'kanban', name: 'Kanban Board (カンバン管理)', description: 'Agile task management across Todo, Doing, and Done.', category: 'utilities', icon: 'LayoutGrid', author: 'Glassium Work', rating: 5.0, size: '1.6 MB', version: '4.7.0', builtInAppId: 'kanban' },
+  { id: 'habit', name: 'Habit Tracker (習慣トラッカー)', description: 'Track daily routines and weekly completion streaks.', category: 'utilities', icon: 'CheckCircle2', author: 'Glassium Life', rating: 4.8, size: '1.1 MB', version: '4.7.0', builtInAppId: 'habit' },
+  { id: 'expense', name: 'Expense Ledger (家計簿・収支)', description: 'Personal budget and expense tracker.', category: 'utilities', icon: 'Calculator', author: 'Glassium Finance', rating: 4.9, size: '1.3 MB', version: '4.7.0', builtInAppId: 'expense' },
+  { id: 'bmi', name: 'Health & BMI (健康・BMI計算)', description: 'Calculate BMI and ideal weight range.', category: 'utilities', icon: 'Activity', author: 'Glassium Health', rating: 4.7, size: '820 KB', version: '4.7.0', builtInAppId: 'bmi' },
+  { id: 'worldclock', name: 'World Clock Hub (世界時計)', description: 'Compare global time zones simultaneously.', category: 'utilities', icon: 'Globe', author: 'Liquid Chronometry', rating: 4.9, size: '1.0 MB', version: '4.7.0', builtInAppId: 'worldclock' },
+  { id: 'morse', name: 'Morse & Cipher (モールス変換)', description: 'Encode/decode Morse code instantly.', category: 'utilities', icon: 'Zap', author: 'Glassium Tools', rating: 4.7, size: '780 KB', version: '4.7.0', builtInAppId: 'morse' },
+  { id: 'base64', name: 'Base64 & URL Tool (エンコーダー)', description: 'UTF-8 Base64 and URL encoder/decoder.', category: 'utilities', icon: 'Code2', author: 'Glassium Dev', rating: 4.8, size: '790 KB', version: '4.7.0', builtInAppId: 'base64' },
+  { id: 'diff', name: 'Text Diff Viewer (差分比較)', description: 'Compare two texts line-by-line to spot changes.', category: 'utilities', icon: 'Layers', author: 'Glassium Dev', rating: 4.8, size: '940 KB', version: '4.7.0', builtInAppId: 'diff' },
+  { id: 'wordcount', name: 'Word Analyzer (文字数カウント)', description: 'Count characters, words, lines, and reading time.', category: 'utilities', icon: 'FileText', author: 'TextCraft', rating: 4.9, size: '720 KB', version: '4.7.0', builtInAppId: 'wordcount' },
+  { id: 'flashcards', name: 'Flashcards Deck (暗記カード)', description: 'Interactive flip cards for studying tech and languages.', category: 'utilities', icon: 'BookOpen', author: 'Glassium Study', rating: 4.9, size: '1.1 MB', version: '4.7.0', builtInAppId: 'flashcards' },
+  { id: 'whiteboard', name: 'Idea Board (アイデア付箋)', description: 'Organize brainstorm cards by priority.', category: 'utilities', icon: 'PenTool', author: 'Glassium Work', rating: 4.8, size: '1.2 MB', version: '4.7.0', builtInAppId: 'whiteboard' },
+  { id: 'drumpad', name: '808 Drum Pad (ドラムパッド)', description: 'Synthesized 9-pad beat maker with WebAudio.', category: 'utilities', icon: 'Music', author: 'Monochrome Audio', rating: 5.0, size: '1.8 MB', version: '4.7.0', builtInAppId: 'drumpad' },
+  { id: 'tuner', name: 'Frequency Synth (周波数ジェネレータ)', description: 'Audio pitch and waveform generator (80Hz - 1200Hz).', category: 'utilities', icon: 'Volume2', author: 'Monochrome Audio', rating: 4.8, size: '960 KB', version: '4.7.0', builtInAppId: 'tuner' },
+  { id: 'minesweeper', name: 'Cyber Minesweeper (マインスイーパー)', description: 'Classic logic grid puzzle.', category: 'games', icon: 'Gamepad2', author: 'PuzzleCraft', rating: 4.9, size: '1.1 MB', version: '4.7.0', builtInAppId: 'minesweeper' },
+  { id: 'tictactoe', name: 'Tic-Tac-Toe AI (〇×ゲーム)', description: 'Play Tic-Tac-Toe on a sleek grid.', category: 'games', icon: 'Grid3x3', author: 'PuzzleCraft', rating: 4.8, size: '740 KB', version: '4.7.0', builtInAppId: 'tictactoe' },
+  { id: 'memory', name: 'Memory Match (神経衰弱)', description: 'Flip and match pairs of icons.', category: 'games', icon: 'Sparkles', author: 'RetroByte', rating: 4.9, size: '950 KB', version: '4.7.0', builtInAppId: 'memory' },
+  { id: 'typing', name: 'Typing Trainer (タイピング練習)', description: 'Test your WPM speed and accuracy with code & phrases.', category: 'games', icon: 'SquareTerminal', author: 'Velocity Studios', rating: 4.9, size: '1.2 MB', version: '4.7.0', builtInAppId: 'typing' },
+  { id: 'sudoku', name: 'Mini Sudoku (ナンプレパズル)', description: 'Logic number puzzle with instant verification.', category: 'games', icon: 'Grid3x3', author: 'PuzzleCraft', rating: 4.8, size: '890 KB', version: '4.7.0', builtInAppId: 'sudoku' },
+  { id: 'periodic', name: 'Periodic Table (元素周期表)', description: 'Interactive chemical elements reference.', category: 'utilities', icon: 'Sparkles', author: 'Glassium Science', rating: 5.0, size: '1.5 MB', version: '4.7.0', builtInAppId: 'periodic' },
+  { id: 'dictionary', name: 'Tech Lexicon (IT・用語辞典)', description: 'Searchable dictionary of software and AI terms.', category: 'utilities', icon: 'BookOpen', author: 'Glassium Study', rating: 4.8, size: '1.3 MB', version: '4.7.0', builtInAppId: 'dictionary' },
+  { id: 'sysinfo', name: 'System Diagnostics (システム診断)', description: 'Hardware, display, and browser runtime diagnostics.', category: 'utilities', icon: 'Cpu', author: 'Glassium Core', rating: 4.9, size: '900 KB', version: '4.7.0', builtInAppId: 'sysinfo' },
 ];
 
 export interface InstalledApp {
@@ -623,32 +684,6 @@ export const STORE_THEMES: StoreTheme[] = [
       cornerRadius: 16,
       transparency: 32,
       accentColor: '#a855f7',
-    },
-  },
-  {
-    id: 'zorin-pro',
-    name: 'Zorin OS 17 Pro Elegance',
-    nameJa: 'Zorin OS 17 プロ・エレガンス',
-    description: 'Clean modern Linux desktop with floating pill dock, categorized quick launcher, high-contrast cyan accents, and fluid transitions.',
-    descriptionJa: '洗練されたモダンLinux。フローティングピルドック、整理されたカテゴリランチャー、鮮やかなシアンアクセント。',
-    author: 'Zorin Group',
-    category: 'modern',
-    rating: 4.9,
-    downloads: '1.7M',
-    version: '17.1 Pro',
-    size: '4.5 MB',
-    badge: 'Linux Pro',
-    previewGradient: 'from-slate-950 via-sky-950 to-blue-800',
-    accentColor: '#0ea5e9',
-    config: {
-      shellMode: 'zorin',
-      designEngine: 'frosted-blur',
-      wallpaper: 'aurora',
-      theme: 'dark',
-      blurAmount: 16,
-      cornerRadius: 12,
-      transparency: 20,
-      accentColor: '#0ea5e9',
     },
   },
   {

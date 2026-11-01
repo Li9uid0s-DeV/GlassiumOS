@@ -8,9 +8,8 @@ interface AppLogoProps {
 }
 
 /**
- * GlassiumOS-V4.0 Official Brand Emblem: Abstracted Flat 2D Gradient Mark
- * Deconstructed, asymmetric geometric ribbon flow inspired by Microsoft 365 / Copilot
- * that subtly hints at a "G" vortex without being a literal letterform. Pure flat 2D.
+ * GlassiumOS 5 Official Emblem
+ * Clean geometric 5-plane prism mark with cyan-to-indigo gradient.
  */
 export function AppLogo({ size = 32, className = '', variant = 'raw' }: AppLogoProps) {
   const uid = React.useId().replace(/:/g, '');
@@ -22,55 +21,51 @@ export function AppLogo({ size = 32, className = '', variant = 'raw' }: AppLogoP
       height={size}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className="shrink-0 transition-transform duration-300"
+      className="shrink-0 transition-transform duration-200"
     >
       <defs>
-        {/* Ribbon 1 (Top-Left Diagonal Sweep): Pink -> Magenta -> Amethyst */}
-        <linearGradient id={`g-abs-1-${uid}`} x1="188" y1="28" x2="32" y2="164" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#f472b6" />
-          <stop offset="45%" stopColor="#d946ef" />
-          <stop offset="100%" stopColor="#7c3aed" />
+        <linearGradient id={`gl5-top-${uid}`} x1="36" y1="36" x2="220" y2="96" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#38bdf8" />
+          <stop offset="100%" stopColor="#06b6d4" />
         </linearGradient>
-
-        {/* Ribbon 2 (Bottom Asymmetric Arc): Amethyst -> Indigo -> Royal Blue */}
-        <linearGradient id={`g-abs-2-${uid}`} x1="48" y1="168" x2="224" y2="184" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#9333ea" />
-          <stop offset="50%" stopColor="#6366f1" />
-          <stop offset="100%" stopColor="#2563eb" />
+        <linearGradient id={`gl5-mid-${uid}`} x1="40" y1="128" x2="216" y2="128" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#06b6d4" />
+          <stop offset="50%" stopColor="#3b82f6" />
+          <stop offset="100%" stopColor="#6366f1" />
         </linearGradient>
-
-        {/* Ribbon 3 (Floating Diagonal Inner Wing): Cobalt -> Cyan -> Bright Aqua */}
-        <linearGradient id={`g-abs-3-${uid}`} x1="108" y1="148" x2="228" y2="88" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#3b82f6" />
-          <stop offset="55%" stopColor="#06b6d4" />
-          <stop offset="100%" stopColor="#2dd4bf" />
+        <linearGradient id={`gl5-bot-${uid}`} x1="44" y1="196" x2="216" y2="224" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#6366f1" />
+          <stop offset="100%" stopColor="#8b5cf6" />
         </linearGradient>
       </defs>
 
-      {/* Part 1: Deconstructed Upper-Left Sweeping Blade (Tilted & Tapered) */}
+      {/* Top horizontal prism bar of "5" / "G" */}
       <path
-        d="M178 36C132 20 76 38 46 82C24 114 24 154 42 184C48 194 62 194 68 184C73 176 72 166 68 156C58 134 62 106 80 86C102 62 138 56 166 68C178 73 192 66 194 54C196 44 188 39 178 36Z"
-        fill={`url(#g-abs-1-${uid})`}
+        d="M56 36H204C212.837 36 220 43.1634 220 52C220 60.8366 212.837 68 204 68H88V108H56V52C56 43.1634 63.1634 36 72 36H56Z"
+        fill={`url(#gl5-top-${uid})`}
       />
 
-      {/* Part 2: Detached Lower-Right Flowing Ribbon with Negative-Space Gap */}
+      {/* Center geometric core plane */}
       <path
-        d="M78 206C114 232 168 228 202 194C222 174 232 146 228 118C226 106 214 100 204 106L182 119C187 138 182 158 168 172C146 194 112 196 88 178C78 170 64 174 62 186C60 194 68 200 78 206Z"
-        fill={`url(#g-abs-2-${uid})`}
+        d="M56 112H172C198.51 112 220 133.49 220 160C220 168.837 212.837 176 204 176C195.163 176 188 168.837 188 160C188 151.163 180.837 144 172 144H56V112Z"
+        fill={`url(#gl5-mid-${uid})`}
       />
 
-      {/* Part 3: Stylized Floating Diagonal Wing (Replaces literal horizontal G bar) */}
+      {/* Bottom harmonic sweep */}
       <path
-        d="M112 142C104 132 108 116 120 110L192 74C206 67 222 74 226 88C230 100 222 114 210 120L138 156C128 161 118 150 112 142Z"
-        fill={`url(#g-abs-3-${uid})`}
+        d="M56 188H172C180.837 188 188 180.837 188 172H220C220 198.51 198.51 220 172 220H72C63.1634 220 56 212.837 56 204V188Z"
+        fill={`url(#gl5-bot-${uid})`}
       />
+
+      {/* Subtle accent node */}
+      <circle cx="204" cy="106" r="14" fill="#38bdf8" />
     </svg>
   );
 
   if (variant === 'squircle') {
     return (
       <div
-        className={`rounded-2xl bg-slate-900/70 p-1.5 flex items-center justify-center ${className}`}
+        className={`rounded-xl bg-slate-900/70 p-1.5 flex items-center justify-center ${className}`}
         style={{ width: size * 1.3, height: size * 1.3 }}
       >
         {svgContent}
@@ -81,7 +76,7 @@ export function AppLogo({ size = 32, className = '', variant = 'raw' }: AppLogoP
   if (variant === 'glass') {
     return (
       <div
-        className={`rounded-xl bg-slate-900/50 p-1 flex items-center justify-center ${className}`}
+        className={`rounded-lg bg-slate-900/50 p-1 flex items-center justify-center ${className}`}
         style={{ width: size * 1.25, height: size * 1.25 }}
       >
         {svgContent}

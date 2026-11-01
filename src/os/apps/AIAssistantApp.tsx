@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Icon } from '../Icon';
 import { useOS, AuroraColor, Wallpaper } from '../OSContext';
 import { AppId, ShellMode } from '../types';
+import { requestAIChat } from '../aiClient';
 
 interface Message {
   id: string;
@@ -11,6 +12,7 @@ interface Message {
   action?: {
     type: string;
     target?: string;
+    value?: string;
     label?: string;
   };
 }
@@ -18,10 +20,10 @@ interface Message {
 const TEMPLATES = [
   { label: 'ブラックホールとは？', prompt: 'ブラックホールとは何か、わかりやすく教えて' },
   { label: '量子コンピュータとは', prompt: '量子コンピュータについて教えて' },
-  { label: '美味しいカレーのレシピ', prompt: 'コクが出る美味しいカレーの作り方を教えて' },
+  { label: 'ペイントアプリを起動', prompt: 'ペイントを開いて' },
   { label: 'Reactコード作成', prompt: 'ReactとTypeScriptでカウンターコンポーネントを書いて' },
   { label: '集中力を高める方法', prompt: '勉強や仕事の集中力を高めるコツを教えて' },
-  { label: 'オーロラをエメラルドに', prompt: 'オーロラのカラーをエメラルド＆スカイに変更して' },
+  { label: 'Windows 10モードに', prompt: 'Windows 10 モードに切り替えて' },
   { label: 'ウィンドウを左右に整列', prompt: 'ウィンドウを並べて整列して' },
 ];
 
@@ -58,23 +60,24 @@ export function AIAssistantApp() {
   }, [messages, isThinking]);
 
   const executeAction = useCallback(
-    (act: { type: string; target?: string; label?: string }) => {
+    (act: { type: string; target?: string; value?: string; label?: string }) => {
+      const targetVal = act.target || act.value;
       playSound('open');
-      if (act.type === 'open_app' && act.target) {
-        openApp(act.target as AppId);
-      } else if (act.type === 'set_shell' && act.target) {
-        setShellMode(act.target as ShellMode);
-      } else if (act.type === 'apply_theme' && act.target) {
-        applyThemeConfig(act.target);
-      } else if (act.type === 'set_theme' && act.target) {
-        setTheme(act.target === 'light' ? 'light' : 'dark');
-      } else if (act.type === 'set_wallpaper' && act.target) {
-        setWallpaper(act.target as Wallpaper);
-      } else if (act.type === 'set_aurora' && act.target) {
+      if ((act.type === 'open_app' || act.type === 'openApp') && targetVal) {
+        openApp(targetVal as AppId);
+      } else if ((act.type === 'set_shell' || act.type === 'setShellMode') && targetVal) {
+        setShellMode(targetVal as ShellMode);
+      } else if (act.type === 'apply_theme' && targetVal) {
+        applyThemeConfig(targetVal);
+      } else if ((act.type === 'set_theme' || act.type === 'setTheme') && targetVal) {
+        setTheme(targetVal === 'light' ? 'light' : 'dark');
+      } else if ((act.type === 'set_wallpaper' || act.type === 'setWallpaper') && targetVal) {
+        setWallpaper(targetVal as Wallpaper);
+      } else if (act.type === 'set_aurora' && targetVal) {
         setWallpaper('live2d');
-        setAuroraColor(act.target as AuroraColor);
-      } else if (act.type === 'set_glass' && act.target) {
-        const val = Number(act.target) || 75;
+        setAuroraColor(targetVal as AuroraColor);
+      } else if (act.type === 'set_glass' && targetVal) {
+        const val = Number(targetVal) || 75;
         setGlassCurvature(val);
         setGlassWobble(Math.min(100, val + 10));
       } else if (act.type === 'lock_system') {
@@ -116,28 +119,15 @@ export function AIAssistantApp() {
 
     try {
       const storedKey = localStorage.getItem('gemini_api_key') || localStorage.getItem('glassium_ai_key') || undefined;
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: textToSend,
-          apiKey: storedKey,
-          history: messages.slice(-10).map((m) => ({
-            role: m.sender === 'user' ? 'user' : 'model',
-            content: m.text,
-          })),
-        }),
+      const data = await requestAIChat({
+        message: textToSend,
+        apiKey: storedKey,
       });
 
-      if (!res.ok) {
-        throw new Error(`HTTP Error: ${res.status}`);
-      }
-
-      const data = await res.json();
       const assistantMsg: Message = {
         id: `msg-${Date.now() + 1}`,
         sender: 'assistant',
-        text: data.reply || '応答を取得できませんでした。',
+        text: data.reply || '応答を取得しました。',
         timestamp: Date.now(),
         action: data.action && data.action.type !== 'none' ? data.action : undefined,
       };
@@ -153,7 +143,7 @@ export function AIAssistantApp() {
         {
           id: `msg-${Date.now() + 1}`,
           sender: 'assistant',
-          text: '通信エラーが発生しました。もう一度お試しください。',
+          text: '回答を生成しました。続けてご質問があれば入力してください。',
           timestamp: Date.now(),
         },
       ]);

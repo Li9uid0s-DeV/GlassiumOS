@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOS } from './OSContext';
-import { TASKBAR_APPS, AppId } from './types';
+import { TASKBAR_APPS, AppId, Wallpaper, AccentColorId } from './types';
 import { Icon } from './Icon';
 import { StartMenu } from './StartMenu';
 import { AIAssistant } from './AIAssistant';
 import { AppLogo } from './AppLogo';
+import { requestAIChat } from './aiClient';
 
 interface TaskbarProps {
   onLock?: () => void;
@@ -26,6 +27,36 @@ const SEARCHABLE_APPS: { appId: AppId; label: string; keywords: string; icon: st
   { appId: 'ai', label: 'AI Assistant', keywords: 'gemini chat copilot アシスタント', icon: 'Sparkles' },
   { appId: 'taskmanager', label: 'Task Manager', keywords: 'processes windows cpu memory タスク', icon: 'Cpu' },
   { appId: 'appstore', label: 'App Store', keywords: 'install store ストア', icon: 'Store' },
+  { appId: 'paint', label: 'Paint Studio', keywords: 'draw canvas art ペイント お絵かき', icon: 'Palette' },
+  { appId: 'pomodoro', label: 'Pomodoro Timer', keywords: 'focus study timer ポモドーロ 集中', icon: 'Clock' },
+  { appId: 'unitconverter', label: 'Unit Converter', keywords: 'length weight temp 単位変換', icon: 'SlidersHorizontal' },
+  { appId: 'colorpicker', label: 'Color Studio', keywords: 'rgb hex palette カラー 色', icon: 'Palette' },
+  { appId: 'passgen', label: 'Password Generator', keywords: 'security key パスワード', icon: 'Key' },
+  { appId: 'qrcode', label: 'QR Matrix Studio', keywords: 'qr barcode QRコード', icon: 'Grid3x3' },
+  { appId: 'jsonformat', label: 'JSON Formatter', keywords: 'json format validate 整形', icon: 'Code2' },
+  { appId: 'regex', label: 'Regex Tester', keywords: 'regexp pattern 正規表現', icon: 'Search' },
+  { appId: 'markdown', label: 'Markdown Reader', keywords: 'md preview マークダウン', icon: 'FileText' },
+  { appId: 'kanban', label: 'Kanban Board', keywords: 'todo project task カンバン', icon: 'LayoutGrid' },
+  { appId: 'habit', label: 'Habit Tracker', keywords: 'routine streak 習慣', icon: 'CheckCircle2' },
+  { appId: 'expense', label: 'Expense Ledger', keywords: 'budget money 家計簿 収支', icon: 'Calculator' },
+  { appId: 'bmi', label: 'Health & BMI', keywords: 'weight health 健康 BMI', icon: 'Activity' },
+  { appId: 'worldclock', label: 'World Clock Hub', keywords: 'timezone global 世界時計', icon: 'Globe' },
+  { appId: 'morse', label: 'Morse & Cipher', keywords: 'morse code モールス 暗号', icon: 'Zap' },
+  { appId: 'base64', label: 'Base64 & URL Tool', keywords: 'encode decode エンコード', icon: 'Code2' },
+  { appId: 'diff', label: 'Text Diff Viewer', keywords: 'compare difference 差分', icon: 'Layers' },
+  { appId: 'wordcount', label: 'Word Analyzer', keywords: 'character count 文字数', icon: 'FileText' },
+  { appId: 'flashcards', label: 'Flashcards Deck', keywords: 'study quiz 暗記 カード', icon: 'BookOpen' },
+  { appId: 'whiteboard', label: 'Idea Board', keywords: 'sticky brainstorm アイデア 付箋', icon: 'PenTool' },
+  { appId: 'drumpad', label: '808 Drum Pad', keywords: 'beat drum music ドラム', icon: 'Music' },
+  { appId: 'tuner', label: 'Frequency Synth', keywords: 'hz pitch audio 周波数', icon: 'Volume2' },
+  { appId: 'minesweeper', label: 'Minesweeper', keywords: 'mine puzzle マインスイーパー', icon: 'Gamepad2' },
+  { appId: 'tictactoe', label: 'Tic-Tac-Toe AI', keywords: 'ox game マルバツ 〇×', icon: 'Grid3x3' },
+  { appId: 'memory', label: 'Memory Match', keywords: 'cards match 神経衰弱', icon: 'Sparkles' },
+  { appId: 'typing', label: 'Typing Trainer', keywords: 'wpm keyboard タイピング', icon: 'SquareTerminal' },
+  { appId: 'sudoku', label: 'Mini Sudoku', keywords: 'number puzzle ナンプレ 数独', icon: 'Grid3x3' },
+  { appId: 'periodic', label: 'Periodic Table', keywords: 'chemistry elements 元素周期表', icon: 'Sparkles' },
+  { appId: 'dictionary', label: 'Tech Lexicon', keywords: 'words lexicon 辞典 辞書', icon: 'BookOpen' },
+  { appId: 'sysinfo', label: 'System Diagnostics', keywords: 'hardware specs システム診断', icon: 'Cpu' },
 ];
 
 export function Taskbar(_props?: TaskbarProps) {
@@ -55,6 +86,9 @@ export function Taskbar(_props?: TaskbarProps) {
     setTaskViewOpen,
     toggleTaskView,
     theme,
+    setTheme,
+    setWallpaper,
+    setAccentColor,
   } = useOS();
   const isLight = theme === 'light';
 
@@ -73,6 +107,34 @@ export function Taskbar(_props?: TaskbarProps) {
   const searchContainerRef = useRef<HTMLDivElement>(null);
   const searchDropdownRef = useRef<HTMLDivElement>(null);
   const [startPos, setStartPos] = useState<{ x: number; width: number } | null>(null);
+
+  // OS-Level Integrated AI Omnibar state (GlassiumOS 5)
+  const [aiOmniInput, setAiOmniInput] = useState('');
+  const [aiOmniReply, setAiOmniReply] = useState<string | null>(null);
+  const [aiOmniLoading, setAiOmniLoading] = useState(false);
+  const [aiOmniOpen, setAiOmniOpen] = useState(false);
+
+  const handleRunOmniAI = async () => {
+    const q = aiOmniInput.trim();
+    if (!q || aiOmniLoading) return;
+    setAiOmniLoading(true);
+    setAiOmniOpen(true);
+    try {
+      const res = await requestAIChat({ message: q });
+      setAiOmniReply(res.reply);
+      if (res.osAction) {
+        if (res.osAction.type === 'theme') setTheme(res.osAction.value as 'dark' | 'light');
+        if (res.osAction.type === 'wallpaper') setWallpaper(res.osAction.value as Wallpaper);
+        if (res.osAction.type === 'accent') setAccentColor(res.osAction.value as AccentColorId);
+        if (res.osAction.type === 'openApp') openApp(res.osAction.value as AppId);
+      }
+      setAiOmniInput('');
+    } catch {
+      setAiOmniReply('応答を取得できませんでした。');
+    } finally {
+      setAiOmniLoading(false);
+    }
+  };
 
   const handleMouseEnterIcon = (e: React.MouseEvent<HTMLDivElement>, appId: string) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -95,7 +157,7 @@ export function Taskbar(_props?: TaskbarProps) {
       return;
     }
     const handleMouseMove = (e: MouseEvent) => {
-      if (e.clientY >= window.innerHeight - 14 || startOpen || trayOpen || calendarFlyoutOpen) {
+      if (e.clientY >= window.innerHeight - 14 || startOpen || trayOpen || calendarFlyoutOpen || aiOmniOpen) {
         setIsTaskbarHovered(true);
       } else if (e.clientY < window.innerHeight - 60) {
         setIsTaskbarHovered(false);
@@ -103,7 +165,7 @@ export function Taskbar(_props?: TaskbarProps) {
     };
     window.addEventListener('mousemove', handleMouseMove);
     return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [autoHideTaskbar, startOpen, trayOpen, calendarFlyoutOpen]);
+  }, [autoHideTaskbar, startOpen, trayOpen, calendarFlyoutOpen, aiOmniOpen]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -143,6 +205,7 @@ export function Taskbar(_props?: TaskbarProps) {
     setSearchFocused(false);
     setTrayOpen(false);
     setTaskViewOpen(false);
+    setAiOmniOpen(false);
     setStartOpen(!startOpen);
   };
 
@@ -190,7 +253,7 @@ export function Taskbar(_props?: TaskbarProps) {
   const isWin10 = shellMode === 'windows10';
   const isDeX = shellMode === 'dex';
   const isChromeOS = shellMode === 'chromeos';
-  const isZorin = shellMode === 'zorin';
+  const isGlassium5 = shellMode === 'windows';
 
   return (
     <>
@@ -379,9 +442,9 @@ export function Taskbar(_props?: TaskbarProps) {
       )}
 
       {/* ==============================================================
-          4. SAMSUNG DEX / CHROMEOS / ZORIN SHELLS
+          4. SAMSUNG DEX / CHROMEOS SHELLS
          ============================================================== */}
-      {(isDeX || isChromeOS || isZorin) && (
+      {(isDeX || isChromeOS) && (
         <div
           className="fixed bottom-0 inset-x-0 h-11 w-screen z-[5000] flex items-center justify-between px-3 select-none font-sans bg-slate-900/60 backdrop-blur-2xl shadow-[0_-8px_32px_rgba(0,0,0,0.45)] text-white"
         >
@@ -431,9 +494,260 @@ export function Taskbar(_props?: TaskbarProps) {
       )}
 
       {/* ==============================================================
-          5. GLASSIUMOS-V4.0 FLAT TASKBAR (DEFAULT)
+          5. GLASSIUMOS 5 MINIMAL HAIRLINE TASKBAR (shellMode === 'windows')
          ============================================================== */}
-      {!isXP && !isVista && !isWin10 && !isDeX && !isChromeOS && !isZorin && (
+      {isGlassium5 && (
+        <>
+          {autoHideTaskbar && (
+            <div
+              className="fixed bottom-0 left-0 right-0 h-1.5 z-[5001] cursor-pointer"
+              onMouseEnter={() => setIsTaskbarHovered(true)}
+            />
+          )}
+
+          {/* OS-Level Integrated AI Omnibar Reply Popover */}
+          <AnimatePresence>
+            {aiOmniOpen && (aiOmniReply || aiOmniLoading) && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 8 }}
+                transition={{ duration: 0.14 }}
+                className={`fixed bottom-12 left-4 z-[5400] w-96 max-w-[calc(100vw-32px)] backdrop-blur-2xl border-t-2 border-[var(--os-accent)] shadow-2xl p-4 font-sans ${
+                  isLight ? 'bg-white/95 text-slate-900' : 'bg-slate-950/95 text-white'
+                }`}
+              >
+                <div className={`flex items-center justify-between pb-2 mb-2 border-b ${isLight ? 'border-slate-200' : 'border-white/10'}`}>
+                  <div className="flex items-center gap-2 text-xs font-bold">
+                    <Icon name="Sparkles" size={14} className="text-[var(--os-accent)]" />
+                    <span>GlassiumOS 5 AI コア応答</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAiOmniOpen(false);
+                        openApp('ai');
+                      }}
+                      className="text-[11px] text-[var(--os-accent)] hover:underline"
+                    >
+                      AI アプリを開く
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAiOmniOpen(false)}
+                      className="opacity-50 hover:opacity-100"
+                    >
+                      <Icon name="X" size={13} />
+                    </button>
+                  </div>
+                </div>
+                <div className="text-xs leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
+                  {aiOmniLoading ? '処理中...' : aiOmniReply}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div
+            className={`fixed bottom-0 inset-x-0 h-11 w-screen z-[5000] backdrop-blur-2xl flex items-center justify-between px-4 select-none transition-all duration-200 border-t ${
+              autoHideTaskbar && !isTaskbarHovered ? 'translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
+            } ${
+              isLight
+                ? 'bg-white/85 border-slate-300/80 text-slate-900'
+                : 'bg-slate-950/88 border-white/10 text-white'
+            }`}
+            onMouseEnter={() => setIsTaskbarHovered(true)}
+          >
+            {/* Left: Start Logo + OS-Level AI & App Omnibar + Desk View */}
+            <div className="flex items-center gap-4 min-w-0" ref={searchContainerRef}>
+              <button
+                ref={startBtnRef}
+                type="button"
+                onClick={handleStartClick}
+                className="h-11 px-2 flex items-center gap-2 transition-opacity hover:opacity-100 relative"
+                title="GlassiumOS 5 スタート"
+              >
+                {startOpen && <span className="absolute top-0 left-0 right-0 h-0.5 bg-[var(--os-accent)]" />}
+                <AppLogo size={20} glow={startOpen} />
+                <span className="text-xs font-bold tracking-tight hidden md:inline">OS 5</span>
+              </button>
+
+              <div className={`h-4 w-px ${isLight ? 'bg-slate-300' : 'bg-white/10'}`} />
+
+              {/* Hairline Integrated Search & OS AI Omnibar */}
+              <div className="flex items-center gap-3">
+                <div className={`flex items-center gap-2 h-7 border-b transition-all ${
+                  searchFocused
+                    ? 'w-36 sm:w-44 border-[var(--os-accent)]'
+                    : isLight
+                    ? 'w-28 sm:w-36 border-slate-300'
+                    : 'w-28 sm:w-36 border-white/15'
+                }`}>
+                  <Icon name="Search" size={13} className={searchFocused ? 'text-[var(--os-accent)]' : 'opacity-45'} />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onFocus={() => {
+                      setStartOpen(false);
+                      setTrayOpen(false);
+                      setTaskViewOpen(false);
+                      setSearchFocused(true);
+                    }}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setSearchFocused(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && filteredSearchApps.length > 0) {
+                        openApp(filteredSearchApps[0].appId);
+                        setSearchQuery('');
+                        setSearchFocused(false);
+                      } else if (e.key === 'Escape') {
+                        setSearchFocused(false);
+                      }
+                    }}
+                    placeholder="アプリ検索"
+                    className="w-full bg-transparent outline-none text-xs"
+                  />
+                </div>
+
+                {/* Direct OS AI Command / Question Omnibar */}
+                <div className={`hidden lg:flex items-center gap-2 h-7 border-b transition-all w-48 xl:w-60 ${
+                  aiOmniInput ? 'border-[var(--os-accent)]' : isLight ? 'border-slate-300' : 'border-white/15'
+                }`}>
+                  <Icon name="Sparkles" size={13} className="text-[var(--os-accent)] shrink-0" />
+                  <input
+                    type="text"
+                    value={aiOmniInput}
+                    onChange={(e) => setAiOmniInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleRunOmniAI();
+                    }}
+                    placeholder="AI操作・質問 (例: ライトモード / 計算)"
+                    className="w-full bg-transparent outline-none text-xs"
+                  />
+                  {aiOmniInput && (
+                    <button
+                      type="button"
+                      onClick={handleRunOmniAI}
+                      className="text-[10px] font-bold text-[var(--os-accent)] shrink-0"
+                    >
+                      実行
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={toggleTaskView}
+                className={`h-11 px-2 flex items-center justify-center relative transition-opacity ${
+                  taskViewOpen ? 'text-[var(--os-accent)]' : 'opacity-65 hover:opacity-100'
+                }`}
+                title="仮想デスクトップ"
+              >
+                {taskViewOpen && <span className="absolute top-0 left-0 right-0 h-0.5 bg-[var(--os-accent)]" />}
+                <Icon name="Layers" size={16} />
+              </button>
+            </div>
+
+            {/* Center: Borderless Hairline Indicator App Icons */}
+            <div
+              className={`flex items-center gap-1 h-full ${
+                taskbarAlign === 'left' ? 'justify-start pl-4' : 'justify-center'
+              } flex-1 max-w-xl px-2`}
+            >
+              {TASKBAR_APPS.map((app) => {
+                const wins = currentDesktopWindows.filter((w) => w.appId === app.appId);
+                const active = wins.length > 0;
+                const anyVisible = wins.some((w) => !w.minimized);
+                return (
+                  <div
+                    key={app.appId}
+                    className="relative h-full flex items-center shrink-0"
+                    onMouseEnter={(e) => handleMouseEnterIcon(e, app.appId)}
+                    onMouseLeave={() => { setHoveredApp(null); setHoverPos(null); }}
+                  >
+                    <button
+                      onClick={() => handleAppClick(app.appId)}
+                      className={`relative h-full px-2.5 flex items-center justify-center transition-opacity ${
+                        anyVisible ? 'opacity-100' : active ? 'opacity-85' : 'opacity-70 hover:opacity-100'
+                      }`}
+                      title={app.label}
+                    >
+                      {active && (
+                        <span
+                          className={`absolute top-0 left-1 right-1 h-0.5 bg-[var(--os-accent)] transition-all ${
+                            anyVisible ? 'opacity-100' : 'opacity-45'
+                          }`}
+                        />
+                      )}
+                      <Icon name={app.appId} size={20} />
+                    </button>
+                  </div>
+                );
+              })}
+
+              {/* Non-pinned open windows */}
+              {currentDesktopWindows
+                .filter(
+                  (w, idx, arr) =>
+                    !TASKBAR_APPS.some((t) => t.appId === w.appId) &&
+                    !installedApps.some((i) => i.appId === w.appId) &&
+                    arr.findIndex((x) => x.appId === w.appId) === idx
+                )
+                .map((win) => {
+                  const anyVisible = !win.minimized;
+                  return (
+                    <button
+                      key={win.id}
+                      onClick={() => handleAppClick(win.appId as AppId)}
+                      className="relative h-full px-2.5 flex items-center justify-center shrink-0"
+                      title={win.title}
+                    >
+                      <span
+                        className={`absolute top-0 left-1 right-1 h-0.5 bg-[var(--os-accent)] ${
+                          anyVisible ? 'opacity-100' : 'opacity-45'
+                        }`}
+                      />
+                      <Icon name={win.appId} size={20} />
+                    </button>
+                  );
+                })}
+            </div>
+
+            {/* Right: Minimal Hairline System Tray */}
+            <div className="flex items-center gap-3 h-full min-w-0 justify-end">
+              <AIAssistant />
+              <div className={`h-4 w-px shrink-0 ${isLight ? 'bg-slate-300' : 'bg-white/10'}`} />
+              <button
+                onClick={() => setTrayOpen((v) => !v)}
+                className="flex items-center gap-2.5 h-full px-2 transition-opacity opacity-85 hover:opacity-100"
+                title="システムコントロール"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Icon name="Wifi" size={13} className={quickSettings.wifi ? 'text-[var(--os-accent)]' : 'opacity-40'} />
+                  <Icon
+                    name={soundEnabled && volume > 0 ? 'Volume2' : 'VolumeX'}
+                    size={13}
+                    className={soundEnabled && volume > 0 ? 'text-[var(--os-accent)]' : 'opacity-40'}
+                  />
+                </div>
+                <div className="text-right leading-tight hidden sm:block">
+                  <div className="text-[11px] font-medium tabular-nums font-mono">{timeStr}</div>
+                  <div className="text-[9px] opacity-55">{dateStr}</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ==============================================================
+          6. WINDOWS 11 TASKBAR (shellMode === 'windows11')
+         ============================================================== */}
+      {!isXP && !isVista && !isWin10 && !isDeX && !isChromeOS && !isGlassium5 && (
         <>
           {autoHideTaskbar && (
             <div
@@ -465,7 +779,7 @@ export function Taskbar(_props?: TaskbarProps) {
                   ? 'bg-slate-900/5 hover:bg-slate-900/10 active:scale-95'
                   : 'bg-white/[0.06] hover:bg-white/[0.12] active:scale-95'
               }`}
-              title="GlassiumOS-V4.0 Start"
+              title="Windows 11 Start"
             >
               <AppLogo size={20} glow={startOpen} />
             </button>

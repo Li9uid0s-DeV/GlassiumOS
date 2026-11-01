@@ -25,6 +25,7 @@ import { TaskManager } from './apps/TaskManager';
 import { SynthVisualizerApp } from './apps/SynthVisualizer';
 import { GlassiumStudioApp } from './apps/GlassiumStudio';
 import { RetroCadeApp } from './apps/RetroCade';
+import { renderExtraApp } from './apps/ExtraAppsSuite';
 import { Icon } from './Icon';
 import { AppId, TASKBAR_APPS, DESKTOP_ICON_SIZE_PRESETS, DesktopIconSize } from './types';
 import { AppLogo } from './AppLogo';
@@ -34,7 +35,10 @@ function renderApp(appId: string, payload?: unknown) {
     case 'terminal':
       return <TerminalApp />;
     case 'notepad':
-      return <NotepadApp payload={payload as { fileName?: string; content?: string }} />;
+    case 'markdown':
+    case 'diff':
+    case 'wordcount':
+      return <NotepadApp initialTab={appId} payload={payload as { fileName?: string; content?: string }} />;
     case 'explorer':
       return <FileExplorerApp payload={payload as { folderPath?: string[] }} />;
     case 'browser':
@@ -42,30 +46,54 @@ function renderApp(appId: string, payload?: unknown) {
     case 'settings':
       return <SettingsApp />;
     case 'game':
-      return <GameApp payload={payload as { gameId?: string }} />;
+    case 'minesweeper':
+    case 'tictactoe':
+    case 'memory':
+    case 'typing':
+    case 'sudoku':
+      return <GameApp initialTab={appId} payload={payload as { gameId?: string }} />;
     case 'appstore':
       return <AppStoreApp />;
     case 'calculator':
-      return <Calculator />;
+    case 'unitconverter':
+    case 'bmi':
+    case 'expense':
+      return <Calculator initialTab={appId} />;
     case 'taskmanager':
     case 'sysmon':
-      return <TaskManager />;
+    case 'sysinfo':
+      return <TaskManager initialTab={appId} />;
     case 'calendar':
-      return <CalendarApp />;
+    case 'kanban':
+    case 'habit':
+    case 'whiteboard':
+      return <CalendarApp initialTab={appId} />;
     case 'synth':
-      return <SynthVisualizerApp />;
+    case 'drumpad':
+    case 'tuner':
+      return <SynthVisualizerApp initialTab={appId} />;
     case 'weather':
       return <WeatherApp />;
     case 'clock':
-      return <ClockApp />;
+    case 'pomodoro':
+    case 'worldclock':
+      return <ClockApp initialTab={appId} />;
     case 'ai':
       return <AIAssistantApp />;
     case 'studio':
-      return <GlassiumStudioApp />;
+    case 'jsonformat':
+    case 'regex':
+    case 'base64':
+    case 'morse':
+    case 'passgen':
+      return <GlassiumStudioApp initialTab={appId} />;
     case 'retrocade':
       return <RetroCadeApp />;
-    default:
+    default: {
+      const extra = renderExtraApp(appId);
+      if (extra) return extra;
       return <CustomAppView payload={payload as { url?: string; isCustomApp?: boolean }} />;
+    }
   }
 }
 
@@ -188,8 +216,7 @@ export function Desktop() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [draggingNote, setDraggingNote] = useState<{ id: string; x: number; y: number } | null>(null);
   const [showWhatsNewModal, setShowWhatsNewModal] = useState<boolean>(() => {
-    // Show What's New Modal on startup if not dismissed for this version
-    const dismissed = localStorage.getItem('glassium_v4.6_whats_new_dismissed');
+    const dismissed = localStorage.getItem('glassium_v5.0_whats_new_dismissed');
     return !dismissed;
   });
 
@@ -328,6 +355,9 @@ export function Desktop() {
     { id: 'weather', label: 'Weather', icon: 'weather' },
     { id: 'clock', label: 'Clock', icon: 'clock' },
     { id: 'ai', label: 'AI Assistant', icon: 'ai' },
+    { id: 'studio', label: 'Studio IDE', icon: 'studio' },
+    { id: 'paint', label: 'Creative Hub', icon: 'Palette' },
+    { id: 'dictionary', label: 'Reference', icon: 'BookOpen' },
     { id: 'taskmanager', label: 'Task Manager', icon: 'taskmanager' },
     { id: 'appstore', label: 'App Store', icon: 'appstore' },
     { id: 'recycle', label: 'Trash', icon: 'recycle' },
@@ -1644,7 +1674,7 @@ export function Desktop() {
         )}
       </AnimatePresence>
 
-      {/* What's New Release Notes Modal */}
+      {/* What's New Release Notes Modal (GlassiumOS 5.0) */}
       <AnimatePresence>
         {showWhatsNewModal && (
           <motion.div
@@ -1653,116 +1683,71 @@ export function Desktop() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-6"
             onClick={() => {
-              localStorage.setItem('glassium_v4.6_whats_new_dismissed', 'true');
+              localStorage.setItem('glassium_v5.0_whats_new_dismissed', 'true');
               setShowWhatsNewModal(false);
             }}
           >
             <motion.div
-              initial={{ scale: 0.9, y: 20 }}
+              initial={{ scale: 0.96, y: 12 }}
               animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.9, y: 20 }}
-              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+              exit={{ scale: 0.96, y: 12 }}
+              transition={{ duration: 0.18 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-xl max-h-[85vh] bg-zinc-900/95 border border-white/20 rounded-3xl p-6 sm:p-8 shadow-[0_25px_70px_rgba(0,0,0,0.8)] flex flex-col gap-5 overflow-hidden relative text-white"
+              className="w-full max-w-xl max-h-[85vh] bg-zinc-950/95 border-t border-b border-white/20 p-6 sm:p-8 shadow-2xl flex flex-col gap-5 overflow-hidden relative text-white"
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b border-white/10 pb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 to-fuchsia-500 flex items-center justify-center text-black font-bold shadow-lg">
-                    <Icon name="Sparkles" size={20} />
-                  </div>
+                  <AppLogo size={26} />
                   <div>
-                    <h2 className="text-lg font-bold tracking-tight">GlassiumOS V4.6 Update Notes</h2>
-                    <p className="text-xs text-cyan-300 font-mono">新機能・機能進化のおしらせ</p>
+                    <h2 className="text-lg font-bold tracking-tight">GlassiumOS 5.0 更新内容</h2>
+                    <p className="text-xs text-white/50 font-mono">Version 5.0 Release Notes</p>
                   </div>
                 </div>
                 <button
                   onClick={() => {
-                    localStorage.setItem('glassium_v4.6_whats_new_dismissed', 'true');
+                    localStorage.setItem('glassium_v5.0_whats_new_dismissed', 'true');
                     setShowWhatsNewModal(false);
                   }}
-                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition"
+                  className="p-1.5 text-white/60 hover:text-white transition"
                 >
                   <Icon name="X" size={18} />
                 </button>
               </div>
 
               {/* Release Notes Content List */}
-              <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs divide-y divide-white/10">
-                {/* 1. Live Hover Preview */}
-                <div className="pt-3 first:pt-0 flex flex-col gap-1">
-                  <div className="font-semibold text-white">タスクバー ホバープレビュー</div>
+              <div className="flex-1 overflow-y-auto pr-1 text-xs divide-y divide-white/10">
+                <div className="py-3.5 first:pt-0 flex flex-col gap-1">
+                  <div className="font-semibold text-white">1. GlassiumOS 5 インターフェースと新ロゴ</div>
                   <p className="text-white/65 leading-relaxed">
-                    タスクバーのアイコンにホバーすると、該当アプリのウィンドウ真上に小さなプレビュー画面を表示します。
+                    余白とシンプルな直線のみを用いたミニマルなUIと新しいプリズムロゴを採用しました。設定アプリの「個人設定 &gt; UIスタイル」から、従来の Windows 11 モードや Windows 10 / 8 / Ubuntu モードへいつでも切り替え可能です。
                   </p>
                 </div>
 
-                {/* 2. Glassium Studio */}
-                <div className="pt-3 flex flex-col gap-1">
-                  <div className="flex items-center justify-between font-semibold text-white">
-                    <span>Glassium Studio (AI 開発環境)</span>
-                    <button
-                      onClick={() => {
-                        localStorage.setItem('glassium_v4.6_whats_new_dismissed', 'true');
-                        setShowWhatsNewModal(false);
-                        openApp('studio');
-                      }}
-                      className="text-[11px] text-cyan-400 hover:underline"
-                    >
-                      起動
-                    </button>
-                  </div>
+                <div className="py-3.5 flex flex-col gap-1">
+                  <div className="font-semibold text-white">2. タスクバー直結の OS レベル AI 統合</div>
                   <p className="text-white/65 leading-relaxed">
-                    Gemini APIキーを使用してHTML/CSS/JSコードを自動生成・実行・編集できる内蔵統合環境です。GitHubリポジトリへの直接プッシュに対応しています。
+                    タスクバーの AI 入力バーから直接質問や計算、OS 設定の変更（ダークモード切替、壁紙変更、アプリ起動など）を実行できます。通信エラーが発生しないマルチフォールバック構成を採用しています。
                   </p>
                 </div>
 
-                {/* 3. Mac Quick Look */}
-                <div className="pt-3 flex flex-col gap-1">
-                  <div className="font-semibold text-white">Quick Look (スペースキープレビュー)</div>
+                <div className="py-3.5 flex flex-col gap-1">
+                  <div className="font-semibold text-white">3. 機能別アプリケーションの統合</div>
                   <p className="text-white/65 leading-relaxed">
-                    ファイルマネージャーでファイルを選択しスペースキーを押すことで、アプリを開かずに内容をすばやくプレビュー表示します。
-                  </p>
-                </div>
-
-                {/* 4. RetroCade */}
-                <div className="pt-3 flex flex-col gap-1">
-                  <div className="flex items-center justify-between font-semibold text-white">
-                    <span>RetroCade (ゲームエミュレータ)</span>
-                    <button
-                      onClick={() => {
-                        localStorage.setItem('glassium_v4.6_whats_new_dismissed', 'true');
-                        setShowWhatsNewModal(false);
-                        openApp('retrocade');
-                      }}
-                      className="text-[11px] text-cyan-400 hover:underline"
-                    >
-                      起動
-                    </button>
-                  </div>
-                  <p className="text-white/65 leading-relaxed">
-                    ローカルのROMファイル（.nes, .gb）を読み込んで再生できるWebAssemblyベースのエミュレータです。
-                  </p>
-                </div>
-
-                {/* 5. Proxy Browser & SW */}
-                <div className="pt-3 flex flex-col gap-1">
-                  <div className="font-semibold text-white">Service Worker プロキシ機能</div>
-                  <p className="text-white/65 leading-relaxed">
-                    CORSおよびフレーム埋め込み制限を緩和するプロキシを実装し、ブラウザ内での外部サイト閲覧やGitHubアプリの直接ロードを可能にします。
+                    関連するツールをコアアプリ内のタブへ統合しました。電卓（単位変換・BMI・収支）、時計（ポモドーロ）、カレンダー（カンバン・習慣・付箋）、Studio（JSON・正規表現・Base64・パスワード）、エディタ（文字数・差分解析）、音楽（ドラムパッド・周波数）、ゲーム（マインスイーパー・ナンプレ・タイピング等）、タスクマネージャー（システム診断）から利用できます。
                   </p>
                 </div>
               </div>
 
               {/* Modal Footer */}
               <div className="pt-3 border-t border-white/10 flex items-center justify-between">
-                <span className="text-[11px] text-white/40 font-mono">GlassiumOS v4.6</span>
+                <span className="text-[11px] text-white/40 font-mono">GlassiumOS 5.0</span>
                 <button
                   onClick={() => {
-                    localStorage.setItem('glassium_v4.6_whats_new_dismissed', 'true');
+                    localStorage.setItem('glassium_v5.0_whats_new_dismissed', 'true');
                     setShowWhatsNewModal(false);
                   }}
-                  className="px-4 py-1.5 bg-white text-black font-semibold text-xs rounded hover:bg-slate-200 transition"
+                  className="px-4 py-1.5 bg-white text-black font-semibold text-xs hover:bg-slate-200 transition"
                 >
                   閉じる
                 </button>

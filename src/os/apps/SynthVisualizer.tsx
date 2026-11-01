@@ -6,12 +6,26 @@ import {
   MonochromeTrack,
 } from '../proxyService';
 import { useOS } from '../OSContext';
+import { DrumPadTunerView } from './ExtraAppsSuite';
 
-export function SynthVisualizerApp() {
+type SynthTab = 'player' | 'lyrics' | 'synth' | 'drumpad' | 'proxy';
+
+function resolveInitialSynthTab(tab?: string): SynthTab {
+  if (tab === 'drumpad' || tab === 'tuner') return 'drumpad';
+  if (tab === 'lyrics') return 'lyrics';
+  if (tab === 'synth') return 'synth';
+  if (tab === 'proxy') return 'proxy';
+  return 'player';
+}
+
+export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {}) {
   const { openApp } = useOS();
 
-  // Active View Tab: 'player' (Monochrome Hi-Fi) | 'lyrics' (Full Synced Lyrics) | 'synth' (Translucent Synthesizer) | 'proxy' (Tunnel Diagnostics)
-  const [activeTab, setActiveTab] = useState<'player' | 'lyrics' | 'synth' | 'proxy'>('player');
+  const [activeTab, setActiveTab] = useState<SynthTab>(() => resolveInitialSynthTab(initialTab));
+
+  useEffect(() => {
+    if (initialTab) setActiveTab(resolveInitialSynthTab(initialTab));
+  }, [initialTab]);
 
   // Proxy Engine State
   const [proxyEngine, setProxyEngine] = useState<ProxyEngine>('scramjet');
@@ -398,79 +412,48 @@ export function SynthVisualizerApp() {
       {/* -------------------------------------------------------------------
           Top Monochrome Hi-Fi Header & Proxy Tunnel Indicator
          ------------------------------------------------------------------- */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-black/50 border-b border-white/10 shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-orange-500 to-amber-400 flex items-center justify-center shadow-md shadow-orange-500/20">
-            <Icon name="Music" size={16} className="text-black" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold tracking-wider uppercase text-white">Monochrome Music</span>
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-mono">
-                HI-FI LOSSLESS
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 text-[10px] text-white/50">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span>
-                Streamed via <strong className="text-orange-400 uppercase">{proxyEngine}</strong> Proxy Tunnel ({proxyLatency}ms)
-              </span>
-            </div>
-          </div>
+      <div className="flex items-center justify-between px-4 bg-black/50 border-b border-white/10 shrink-0">
+        <div className="flex items-center gap-2.5 py-2.5">
+          <Icon name="Music" size={16} className="text-orange-400" />
+          <span className="text-xs font-bold tracking-wider uppercase text-white">Monochrome Music</span>
+          <span className="text-[10px] text-white/45 font-mono">
+            {proxyEngine.toUpperCase()} ({proxyLatency}ms)
+          </span>
         </div>
 
-        {/* View Mode Navigation Tabs */}
-        <div className="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/10">
-          <button
-            onClick={() => setActiveTab('player')}
-            className={`px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${
-              activeTab === 'player' ? 'bg-orange-500 text-white shadow-md' : 'text-white/60 hover:text-white'
-            }`}
-          >
-            <Icon name="Disc" size={13} />
-            <span>Player</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('lyrics')}
-            className={`px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${
-              activeTab === 'lyrics' ? 'bg-orange-500 text-white shadow-md' : 'text-white/60 hover:text-white'
-            }`}
-          >
-            <Icon name="Mic2" size={13} />
-            <span>Synced Lyrics</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('synth')}
-            className={`px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${
-              activeTab === 'synth' ? 'bg-orange-500 text-white shadow-md' : 'text-white/60 hover:text-white'
-            }`}
-          >
-            <Icon name="Sliders" size={13} />
-            <span>Translucent Synth</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('proxy')}
-            className={`px-3 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 transition ${
-              activeTab === 'proxy' ? 'bg-orange-500 text-white shadow-md' : 'text-white/60 hover:text-white'
-            }`}
-          >
-            <Icon name="Server" size={13} />
-            <span>Proxy Status</span>
-          </button>
+        {/* Hairline View Mode Navigation Tabs */}
+        <div className="flex items-center gap-4">
+          {[
+            { id: 'player' as const, label: 'プレイヤー', icon: 'Disc' },
+            { id: 'lyrics' as const, label: '同期歌詞', icon: 'Mic2' },
+            { id: 'synth' as const, label: 'シンセ', icon: 'Sliders' },
+            { id: 'drumpad' as const, label: 'ドラム・周波数', icon: 'Volume2' },
+            { id: 'proxy' as const, label: 'プロキシ状態', icon: 'Server' },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`py-3 border-b-2 text-xs font-medium flex items-center gap-1.5 transition-colors ${
+                activeTab === t.id ? 'border-orange-500 text-orange-400' : 'border-transparent text-white/55 hover:text-white'
+              }`}
+            >
+              <Icon name={t.icon} size={13} />
+              <span>{t.label}</span>
+            </button>
+          ))}
         </div>
 
-        {/* Action: Open Current Track in Proxy Browser */}
         <button
           onClick={() =>
             openApp('browser', {
               payload: { url: `https://monochrome.liquid.fm/track/${currentTrack.id}` },
             })
           }
-          className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white/80 hover:text-white text-xs font-medium flex items-center gap-1.5 transition border border-white/10"
-          title="Open in Proxy Browser (Ultraviolet / Scramjet)"
+          className="py-1.5 text-white/70 hover:text-white text-xs font-medium flex items-center gap-1.5 transition"
+          title="ブラウザで開く"
         >
           <Icon name="Globe" size={13} />
-          <span>Open in Browser</span>
+          <span>ブラウザ</span>
         </button>
       </div>
 
@@ -780,6 +763,12 @@ export function SynthVisualizerApp() {
                 Processed via LiquidOS Web Audio Pipeline with zero rendering latency.
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'drumpad' && (
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <DrumPadTunerView />
           </div>
         )}
 
