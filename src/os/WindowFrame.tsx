@@ -341,10 +341,10 @@ export function WindowFrame({ win, children }: Props) {
       <motion.div
         className={`flex flex-col overflow-hidden select-none ${windowFrameClasses} ${isTopmost ? 'is-focused' : ''} ${dragging ? 'is-dragging shadow-2xl' : ''}`}
         style={style}
-        initial={{ opacity: 0, scale: isMetro ? 1 : 0.96, y: isMetro ? 0 : 8 }}
+        initial={{ opacity: 0, scale: isMetro ? 1 : 0.97, y: isMetro ? 0 : 6 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: isMetro ? 1 : 0.96, y: isMetro ? 0 : 8 }}
-        transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+        exit={{ opacity: 0, scale: isMetro ? 1 : 0.97, y: isMetro ? 0 : 6 }}
+        transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
         onPointerDownCapture={(e) => {
           const targetEl = e.target as HTMLElement | null;
           if (targetEl?.closest('.window-controls-container')) return;

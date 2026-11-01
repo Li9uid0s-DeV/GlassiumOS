@@ -1,6 +1,6 @@
 {
-  "name": "GlassiumOS V4.6 Pro",
-  "description": "An advanced web operating system featuring liquid glass UI, Glassium Studio AI workspace, RetroCade emulator, Service Worker proxy browser, Quick Look, and GitHub project loader.",
+  "name": "GlassiumOS 4.7",
+  "description": "An advanced web operating system featuring GlassiumOS 4.7 (Windows 11 inspired UI), Glassium Studio AI workspace, RetroCade emulator, Service Worker proxy browser, Quick Look, and Gemini AI integration.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
