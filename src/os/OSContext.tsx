@@ -293,6 +293,8 @@ const APP_DEFAULTS: Record<AppId, { title: string; icon: string; width: number; 
   weather: { title: 'Weather', icon: 'CloudSun', width: 840, height: 580 },
   clock: { title: 'Clock', icon: 'Clock', width: 780, height: 540 },
   ai: { title: 'AI Assistant', icon: 'Sparkles', width: 860, height: 600 },
+  studio: { title: 'Glassium Studio', icon: 'Code2', width: 900, height: 620 },
+  retrocade: { title: 'RetroCade', icon: 'Gamepad2', width: 880, height: 600 },
 };
 
 const INITIAL_TASKS: CalendarTask[] = [
@@ -324,6 +326,8 @@ export const DEFAULT_DESKTOP_ICON_ORDER = [
   'weather',
   'clock',
   'ai',
+  'studio',
+  'retrocade',
   'taskmanager',
   'appstore',
   'recycle',

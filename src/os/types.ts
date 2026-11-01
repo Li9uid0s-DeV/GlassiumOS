@@ -13,7 +13,9 @@ export type AppId =
   | 'taskmanager'
   | 'weather'
   | 'clock'
-  | 'ai';
+  | 'ai'
+  | 'studio'
+  | 'retrocade';
 
 // Custom installed apps use a string ID prefixed with 'custom:'
 export type WindowAppId = AppId | string;

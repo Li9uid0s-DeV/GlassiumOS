@@ -705,6 +705,27 @@ async function startServer() {
     }
   });
 
+  // Proxy endpoint for Browser to bypass CORS
+  app.get('/api/proxy', async (req, res) => {
+    const targetUrl = req.query.url as string;
+    if (!targetUrl) {
+      return res.status(400).json({ error: 'url parameter is required' });
+    }
+    try {
+      const response = await fetch(targetUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) GlassiumOS-Browser/4.6',
+        },
+      });
+      const contentType = response.headers.get('content-type') || 'text/html';
+      const body = await response.text();
+      res.setHeader('Content-Type', contentType);
+      res.send(body);
+    } catch (err) {
+      res.status(500).send(`Proxy Error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  });
+
   // AI Chat Endpoint using @google/genai + Live Knowledge Fallback
   app.post('/api/ai/chat', async (req, res) => {
     try {

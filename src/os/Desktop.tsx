@@ -23,6 +23,8 @@ import { AIAssistantApp } from './apps/AIAssistantApp';
 import { Calculator } from './apps/Calculator';
 import { TaskManager } from './apps/TaskManager';
 import { SynthVisualizerApp } from './apps/SynthVisualizer';
+import { GlassiumStudioApp } from './apps/GlassiumStudio';
+import { RetroCadeApp } from './apps/RetroCade';
 import { Icon } from './Icon';
 import { AppId, TASKBAR_APPS, DESKTOP_ICON_SIZE_PRESETS, DesktopIconSize } from './types';
 import { AppLogo } from './AppLogo';
@@ -58,6 +60,10 @@ function renderApp(appId: string, payload?: unknown) {
       return <ClockApp />;
     case 'ai':
       return <AIAssistantApp />;
+    case 'studio':
+      return <GlassiumStudioApp />;
+    case 'retrocade':
+      return <RetroCadeApp />;
     default:
       return <CustomAppView payload={payload as { url?: string; isCustomApp?: boolean }} />;
   }
