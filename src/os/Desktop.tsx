@@ -187,6 +187,11 @@ export function Desktop() {
   const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [draggingNote, setDraggingNote] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [showWhatsNewModal, setShowWhatsNewModal] = useState<boolean>(() => {
+    // Show What's New Modal on startup if not dismissed for this version
+    const dismissed = localStorage.getItem('glassium_v4.6_whats_new_dismissed');
+    return !dismissed;
+  });
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -1302,8 +1307,21 @@ export function Desktop() {
                 theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-white/10'
               }`}
             >
-              <Icon name="Settings" size={14} className="opacity-70" />
-              <span>設定 (アイコンサイズ・外観)</span>
+              <Icon name="Settings" size={14} className="text-cyan-400" />
+              <span>OS設定</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowWhatsNewModal(true);
+                setContextMenu(null);
+              }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition ${
+                theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-white/10'
+              }`}
+            >
+              <Icon name="Sparkles" size={14} className="text-fuchsia-400" />
+              <span>What's New (更新内容を見る)</span>
             </button>
           </motion.div>
         )}
@@ -1622,6 +1640,174 @@ export function Desktop() {
             <span className="text-sm text-white/90 font-medium">
               Welcome back, {user.name}.
             </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* What's New Release Notes Modal */}
+      <AnimatePresence>
+        {showWhatsNewModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-6"
+            onClick={() => {
+              localStorage.setItem('glassium_v4.6_whats_new_dismissed', 'true');
+              setShowWhatsNewModal(false);
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-xl max-h-[85vh] bg-zinc-900/95 border border-white/20 rounded-3xl p-6 sm:p-8 shadow-[0_25px_70px_rgba(0,0,0,0.8)] flex flex-col gap-5 overflow-hidden relative text-white"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-white/10 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 to-fuchsia-500 flex items-center justify-center text-black font-bold shadow-lg">
+                    <Icon name="Sparkles" size={20} />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold tracking-tight">GlassiumOS V4.6 Update Notes</h2>
+                    <p className="text-xs text-cyan-300 font-mono">新機能・機能進化のおしらせ</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    localStorage.setItem('glassium_v4.6_whats_new_dismissed', 'true');
+                    setShowWhatsNewModal(false);
+                  }}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition"
+                >
+                  <Icon name="X" size={18} />
+                </button>
+              </div>
+
+              {/* Release Notes Content List */}
+              <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                {/* 1. Live Hover Preview */}
+                <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex items-start gap-3.5">
+                  <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-300 shrink-0 mt-0.5">
+                    <Icon name="Monitor" size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-white flex items-center gap-2">
+                      <span>タスクバーの「ホバー・ライブプレビュー」</span>
+                      <span className="text-[9px] bg-cyan-500/30 text-cyan-300 font-mono px-1.5 py-0.5 rounded">新機能</span>
+                    </h3>
+                    <p className="text-xs text-white/65 mt-1 leading-relaxed">
+                      タスクバーで実行中のアプリアイコンにマウスを重ねると、アクティブウィンドウのライブサムネイルがふんわりアニメーションで浮き出ます。
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. Glassium Studio */}
+                <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex items-start gap-3.5">
+                  <div className="p-2.5 rounded-xl bg-fuchsia-500/20 text-fuchsia-300 shrink-0 mt-0.5">
+                    <Icon name="Code2" size={18} />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xs font-bold text-white flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <span>🤖 Glassium Studio (AIコーディングスタジオ)</span>
+                        <span className="text-[9px] bg-fuchsia-500/30 text-fuchsia-300 font-mono px-1.5 py-0.5 rounded">フラッグシップ</span>
+                      </span>
+                      <button
+                        onClick={() => {
+                          localStorage.setItem('glassium_v4.6_whats_new_dismissed', 'true');
+                          setShowWhatsNewModal(false);
+                          openApp('studio');
+                        }}
+                        className="text-[10px] text-cyan-300 hover:underline font-semibold"
+                      >
+                        今すぐ起動 →
+                      </button>
+                    </h3>
+                    <p className="text-xs text-white/65 mt-1 leading-relaxed">
+                      Gemini APIキーを安全保存し、AI指示だけで即座にHTML/CSS/JSアプリを完全自動生成。内蔵コードエディタ＆サンドボックスプレビューと、本物GitHubへの直接コミット・プッシュ（Commit & Push）を完備。
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3. Mac Quick Look */}
+                <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex items-start gap-3.5">
+                  <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-300 shrink-0 mt-0.5">
+                    <Icon name="FileText" size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-white flex items-center gap-2">
+                      <span>Mac風「Quick Look (スペースキープレビュー)」</span>
+                      <span className="text-[9px] bg-amber-500/30 text-amber-300 font-mono px-1.5 py-0.5 rounded">爆速操作</span>
+                    </h3>
+                    <p className="text-xs text-white/65 mt-1 leading-relaxed">
+                      Files（ファイルマネージャー）でファイルを選択し、[Space] キーを叩くだけでアプリを開かずにすりガラス背景のモーダルで即座に中身を爆速プレビューできます。
+                    </p>
+                  </div>
+                </div>
+
+                {/* 4. RetroCade */}
+                <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex items-start gap-3.5">
+                  <div className="p-2.5 rounded-xl bg-rose-500/20 text-rose-300 shrink-0 mt-0.5">
+                    <Icon name="Gamepad2" size={18} />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xs font-bold text-white flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <span>🎮 RetroCade (Wasmローカルゲームエミュレータ)</span>
+                        <span className="text-[9px] bg-rose-500/30 text-rose-300 font-mono px-1.5 py-0.5 rounded">新アプリ</span>
+                      </span>
+                      <button
+                        onClick={() => {
+                          localStorage.setItem('glassium_v4.6_whats_new_dismissed', 'true');
+                          setShowWhatsNewModal(false);
+                          openApp('retrocade');
+                        }}
+                        className="text-[10px] text-cyan-300 hover:underline font-semibold"
+                      >
+                        今すぐ起動 →
+                      </button>
+                    </h3>
+                    <p className="text-xs text-white/65 mt-1 leading-relaxed">
+                      自分のPCからレトロゲーム（.nes / .gb）のROMファイルをドラッグ＆ドロップして遊べるゲームアプリ。ハイスコアとプレイ状況はLocalStorageに保存されます。
+                    </p>
+                  </div>
+                </div>
+
+                {/* 5. Proxy Browser & SW */}
+                <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex items-start gap-3.5">
+                  <div className="p-2.5 rounded-xl bg-emerald-500/20 text-emerald-300 shrink-0 mt-0.5">
+                    <Icon name="Globe" size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-white flex items-center gap-2">
+                      <span>Service Worker完全プロキシブラウザ & GitHubロード</span>
+                      <span className="text-[9px] bg-emerald-500/30 text-emerald-300 font-mono px-1.5 py-0.5 rounded">インフラ強化</span>
+                    </h3>
+                    <p className="text-xs text-white/65 mt-1 leading-relaxed">
+                      Service Worker (`sw-proxy.js`) とバックエンドプロキシが自動連携。CORSやフレーム制約をバイパスし、外部Webサイト閲覧やGitHubリポジトリ（`owner/repo`）のアプリ直接ロードを実現します。
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="pt-2 border-t border-white/10 flex items-center justify-between">
+                <span className="text-[11px] text-white/40 font-mono">GlassiumOS v4.6.0 Build</span>
+                <button
+                  onClick={() => {
+                    localStorage.setItem('glassium_v4.6_whats_new_dismissed', 'true');
+                    setShowWhatsNewModal(false);
+                  }}
+                  className="px-6 py-2.5 rounded-xl bg-cyan-500 text-black font-bold text-xs hover:brightness-110 transition shadow-lg"
+                >
+                  確認してデスクトップへ
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

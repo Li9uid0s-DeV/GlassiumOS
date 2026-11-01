@@ -592,28 +592,60 @@ export function Taskbar(_props?: TaskbarProps) {
               )
               .map((win) => {
                 const anyVisible = !win.minimized;
+                const wins = currentDesktopWindows.filter((w) => w.appId === win.appId);
                 return (
-                  <button
+                  <div
                     key={win.id}
-                    onClick={() => handleAppClick(win.appId as AppId)}
-                    className={`relative h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-150 shrink-0 group ${
-                      anyVisible
-                        ? isLight
-                          ? 'bg-slate-900/10'
-                          : 'bg-white/15'
-                        : isLight
-                        ? 'hover:bg-slate-900/6 active:scale-95'
-                        : 'hover:bg-white/10 active:scale-95'
-                    }`}
-                    title={win.title}
+                    className="relative group shrink-0"
+                    onMouseEnter={() => setHoveredApp(win.appId)}
+                    onMouseLeave={() => setHoveredApp(null)}
                   >
-                    <Icon name={win.appId} size={22} className="transition-transform duration-150 group-hover:scale-105" />
-                    <span
-                      className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 rounded-full os-accent-bg transition-all ${
-                        anyVisible ? 'w-4' : 'w-1.5 opacity-70'
+                    <button
+                      onClick={() => handleAppClick(win.appId as AppId)}
+                      className={`relative h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-150 group ${
+                        anyVisible
+                          ? isLight
+                            ? 'bg-slate-900/10'
+                            : 'bg-white/15'
+                          : isLight
+                          ? 'hover:bg-slate-900/6 active:scale-95'
+                          : 'hover:bg-white/10 active:scale-95'
                       }`}
-                    />
-                  </button>
+                      title={win.title}
+                    >
+                      <Icon name={win.appId} size={22} className="transition-transform duration-150 group-hover:scale-105" />
+                      <span
+                        className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 rounded-full os-accent-bg transition-all ${
+                          anyVisible ? 'w-4' : 'w-1.5 opacity-70'
+                        }`}
+                      />
+                    </button>
+
+                    {/* Live Preview Card */}
+                    <AnimatePresence>
+                      {hoveredApp === win.appId && wins.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute bottom-12 left-1/2 -translate-x-1/2 z-50 w-52 p-2.5 rounded-2xl bg-zinc-900/90 backdrop-blur-2xl border border-white/20 shadow-2xl flex flex-col gap-2 pointer-events-none"
+                        >
+                          <div className="flex items-center justify-between text-[11px] font-semibold text-white/90 px-1 border-b border-white/10 pb-1">
+                            <span className="truncate">{win.title}</span>
+                            <span className="text-[9px] text-cyan-400 font-mono">Live</span>
+                          </div>
+                          <div className="h-28 w-full bg-black/60 rounded-xl border border-white/10 overflow-hidden flex items-center justify-center relative">
+                            <div className="text-center p-2">
+                              <Icon name={win.appId} size={28} className="mx-auto text-cyan-300/80 mb-1" />
+                              <div className="text-[10px] text-white/60 truncate">{win.title}</div>
+                            </div>
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-cyan-500/20 to-transparent h-6" />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 );
               })}
 
@@ -633,29 +665,60 @@ export function Taskbar(_props?: TaskbarProps) {
                 const active = wins.length > 0;
                 const anyVisible = wins.some((w) => !w.minimized);
                 return (
-                  <button
+                  <div
                     key={`${app.id || app.appId}-${idx}`}
-                    onClick={() => handleInstalledAppClick(app.id || app.appId)}
-                    className={`relative h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-150 shrink-0 group ${
-                      anyVisible
-                        ? isLight
-                          ? 'bg-slate-900/10'
-                          : 'bg-white/15'
-                        : isLight
-                        ? 'hover:bg-slate-900/6 active:scale-95'
-                        : 'hover:bg-white/10 active:scale-95'
-                    }`}
-                    title={app.name}
+                    className="relative group shrink-0"
+                    onMouseEnter={() => setHoveredApp(app.id || app.appId)}
+                    onMouseLeave={() => setHoveredApp(null)}
                   >
-                    <Icon name={app.icon} size={22} className="transition-transform duration-150 group-hover:scale-105" />
-                    {active && (
-                      <span
-                        className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 rounded-full os-accent-bg transition-all ${
-                          anyVisible ? 'w-4' : 'w-1.5 opacity-60'
-                        }`}
-                      />
-                    )}
-                  </button>
+                    <button
+                      onClick={() => handleInstalledAppClick(app.id || app.appId)}
+                      className={`relative h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-150 group ${
+                        anyVisible
+                          ? isLight
+                            ? 'bg-slate-900/10'
+                            : 'bg-white/15'
+                          : isLight
+                          ? 'hover:bg-slate-900/6 active:scale-95'
+                          : 'hover:bg-white/10 active:scale-95'
+                      }`}
+                      title={app.name}
+                    >
+                      <Icon name={app.icon} size={22} className="transition-transform duration-150 group-hover:scale-105" />
+                      {active && (
+                        <span
+                          className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 rounded-full os-accent-bg transition-all ${
+                            anyVisible ? 'w-4' : 'w-1.5 opacity-60'
+                          }`}
+                        />
+                      )}
+                    </button>
+
+                    {/* Live Preview Card for Installed Apps */}
+                    <AnimatePresence>
+                      {hoveredApp === (app.id || app.appId) && wins.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 6, scale: 0.95 }}
+                          transition={{ duration: 0.15 }}
+                          className="absolute bottom-12 left-1/2 -translate-x-1/2 z-50 w-52 p-2.5 rounded-2xl bg-zinc-900/90 backdrop-blur-2xl border border-white/20 shadow-2xl flex flex-col gap-2 pointer-events-none"
+                        >
+                          <div className="flex items-center justify-between text-[11px] font-semibold text-white/90 px-1 border-b border-white/10 pb-1">
+                            <span className="truncate">{wins[0].title}</span>
+                            <span className="text-[9px] text-cyan-400 font-mono">Live</span>
+                          </div>
+                          <div className="h-28 w-full bg-black/60 rounded-xl border border-white/10 overflow-hidden flex items-center justify-center relative">
+                            <div className="text-center p-2">
+                              <Icon name={app.icon} size={28} className="mx-auto text-cyan-300/80 mb-1" />
+                              <div className="text-[10px] text-white/60 truncate">{wins[0].title}</div>
+                            </div>
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-cyan-500/20 to-transparent h-6" />
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 );
               })}
           </div>
