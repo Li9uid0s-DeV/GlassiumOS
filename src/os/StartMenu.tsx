@@ -602,8 +602,8 @@ export function StartMenu({ open, onClose }: Props) {
                 onClick={(e) => e.stopPropagation()}
                 className={`pointer-events-auto w-full max-w-[600px] max-h-[calc(100vh-72px)] rounded-xl overflow-hidden flex flex-col backdrop-blur-2xl border select-none transition-colors duration-200 ${
                   isLight
-                    ? 'bg-slate-50/92 border-slate-900/12 text-slate-900 shadow-[0_24px_60px_rgba(15,23,42,0.22)]'
-                    : 'bg-slate-900/88 border-white/12 text-white shadow-[0_24px_60px_rgba(0,0,0,0.75)]'
+                    ? 'bg-slate-50/50 border-slate-900/12 text-slate-900 shadow-[0_24px_60px_rgba(15,23,42,0.18)]'
+                    : 'bg-slate-900/45 border-white/12 text-white shadow-[0_24px_60px_rgba(0,0,0,0.65)]'
                 }`}
               >
                 {/* Top Section: Flat Windows 11 Search Box */}

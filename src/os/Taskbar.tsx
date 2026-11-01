@@ -407,10 +407,10 @@ export function Taskbar(_props?: TaskbarProps) {
          ============================================================== */}
       {!isXP && !isVista && !isWin10 && !isDeX && !isChromeOS && !isZorin && (
         <div
-          className={`fixed bottom-0 inset-x-0 h-12 w-screen z-[5000] backdrop-blur-2xl flex items-center justify-between px-3 select-none transition-colors duration-200 shadow-[0_-8px_32px_rgba(0,0,0,0.4)] ${
+          className={`fixed bottom-0 inset-x-0 h-12 w-screen z-[5000] backdrop-blur-2xl flex items-center justify-between px-3 select-none transition-colors duration-200 shadow-[0_-8px_32px_rgba(0,0,0,0.3)] ${
             isLight
-              ? 'bg-slate-100/90 text-slate-900 shadow-[0_-8px_32px_rgba(0,0,0,0.12)]'
-              : 'bg-slate-900/80 text-white'
+              ? 'bg-slate-100/45 text-slate-900 shadow-[0_-8px_32px_rgba(0,0,0,0.08)]'
+              : 'bg-slate-900/38 text-white'
           }`}
           style={{ position: 'fixed', bottom: 0, left: 0, right: 0, width: '100vw', borderRadius: 0 }}
         >

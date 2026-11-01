@@ -723,8 +723,8 @@ export function WindowFrame({ win, children }: Props) {
 
         {/* Content View */}
         <div
-          className={`flex-1 min-h-0 min-w-0 w-full h-full overflow-hidden relative select-none z-10 pointer-events-auto transition-colors duration-200 ${
-            isLight ? 'bg-slate-50/90 text-slate-900' : 'bg-zinc-950/75 text-white'
+          className={`flex-1 min-h-0 min-w-0 w-full h-full overflow-hidden relative select-none z-10 pointer-events-auto transition-colors duration-200 backdrop-blur-xl ${
+            isLight ? 'bg-slate-50/30 text-slate-900' : 'bg-zinc-950/35 text-white'
           }`}
           style={{ contain: 'layout style paint' }}
         >
