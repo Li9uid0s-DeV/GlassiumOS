@@ -14,7 +14,7 @@ interface Props {
 const DEFAULT_HOME = 'about:start';
 
 const SPEED_DIAL = [
-  { label: 'DuckDuckGo', url: 'https://duckduckgo.com', icon: 'Search', desc: 'Privacy-focused Web Search' },
+  { label: 'DuckDuckGo', url: 'https://html.duckduckgo.com/html/', icon: 'Search', desc: 'Privacy-focused Web Search' },
   { label: 'jsDelivr CDN', url: 'https://www.jsdelivr.com', icon: 'Server', desc: 'Open Source CDN & GitHub Viewer' },
   { label: 'GitHub', url: 'https://github.com', icon: 'GitBranch', desc: 'Developer Platform & Pages' },
   { label: 'Wikipedia', url: 'https://en.wikipedia.org', icon: 'FileText', desc: 'The Free Encyclopedia' },
@@ -40,7 +40,7 @@ function normalizeUrl(input: string): string {
   }
   if (/^https?:\/\//i.test(v)) return v;
   if (/^[\w-]+(\.[\w-]+)+/.test(v)) return 'https://' + v;
-  return 'https://duckduckgo.com/?q=' + encodeURIComponent(v);
+  return 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(v);
 }
 
 export function BrowserApp({ payload }: Props) {

@@ -354,7 +354,7 @@ export function Taskbar(_props?: TaskbarProps) {
          ============================================================== */}
       {(isDeX || isChromeOS || isZorin) && (
         <div
-          className="fixed bottom-0 inset-x-0 h-11 w-screen z-[5000] flex items-center justify-between px-3 select-none font-sans bg-slate-900/40 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] border-t border-white/10 text-white"
+          className="fixed bottom-0 inset-x-0 h-11 w-screen z-[5000] flex items-center justify-between px-3 select-none font-sans bg-slate-900/60 backdrop-blur-2xl shadow-[0_-8px_32px_rgba(0,0,0,0.45)] text-white"
         >
           <div className="flex items-center gap-2">
             <button
@@ -406,10 +406,10 @@ export function Taskbar(_props?: TaskbarProps) {
          ============================================================== */}
       {!isXP && !isVista && !isWin10 && !isDeX && !isChromeOS && !isZorin && (
         <div
-          className={`fixed bottom-0 inset-x-0 h-12 w-screen z-[5000] backdrop-blur-2xl border-t flex items-center justify-between px-3 select-none transition-colors duration-200 ${
+          className={`fixed bottom-0 inset-x-0 h-12 w-screen z-[5000] backdrop-blur-2xl flex items-center justify-between px-3 select-none transition-colors duration-200 shadow-[0_-8px_32px_rgba(0,0,0,0.4)] ${
             isLight
-              ? 'bg-slate-100/88 border-slate-900/12 text-slate-900'
-              : 'bg-slate-900/80 border-white/10 text-white'
+              ? 'bg-slate-100/90 text-slate-900 shadow-[0_-8px_32px_rgba(0,0,0,0.12)]'
+              : 'bg-slate-900/80 text-white'
           }`}
           style={{ position: 'fixed', bottom: 0, left: 0, right: 0, width: '100vw', borderRadius: 0 }}
         >

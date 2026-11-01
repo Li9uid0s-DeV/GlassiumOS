@@ -841,3 +841,4 @@ export const UI_STYLES: UIStyleInfo[] = [
 // Sleep Screen Customization Types
 export type SleepClockStyle = 'depth' | 'analog' | 'minimal' | 'vertical' | 'cyber';
 export type SleepBackground = 'aurora' | 'void' | 'matrix' | 'galaxy' | 'retro' | 'wallpaper';
+export type ClockPosition = 'center' | 'top' | 'bottom';

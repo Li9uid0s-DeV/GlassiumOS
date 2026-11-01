@@ -371,8 +371,8 @@ export function Desktop() {
          ======================================================== */}
       {shellMode === 'mac' && (
         <>
-          {/* Mac Top Global Bar */}
-          <div className="fixed top-0 inset-x-0 h-7 bg-black/40 backdrop-blur-xl border-b border-white/10 z-40 px-4 flex items-center justify-between text-xs text-white/90">
+          {/* Mac Top Global Bar (Zero Border Line) */}
+          <div className="fixed top-0 inset-x-0 h-7 bg-black/40 backdrop-blur-xl shadow-[0_4px_20px_rgba(0,0,0,0.35)] z-40 px-4 flex items-center justify-between text-xs text-white/90">
             <div className="flex items-center gap-4">
               <div className="cursor-pointer hover:opacity-80" onClick={() => openApp('settings')}>
                 <AppLogo size={16} />

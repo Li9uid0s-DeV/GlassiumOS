@@ -569,12 +569,27 @@ async function startServer() {
       targetUrl = 'https://' + targetUrl;
     }
 
+    // Auto-optimize DuckDuckGo queries and homepage to pure HTML version for iframe compatibility
+    if (
+      targetUrl === 'https://duckduckgo.com' ||
+      targetUrl === 'https://duckduckgo.com/' ||
+      targetUrl.includes('duckduckgo.com/?q=') ||
+      targetUrl.includes('duckduckgo.com?q=')
+    ) {
+      if (targetUrl === 'https://duckduckgo.com' || targetUrl === 'https://duckduckgo.com/') {
+        targetUrl = 'https://html.duckduckgo.com/html/';
+      } else {
+        targetUrl = targetUrl.replace(/https?:\/\/duckduckgo\.com\/?\?q=/i, 'https://html.duckduckgo.com/html/?q=');
+      }
+    }
+
     const fetchWithFallback = async (urlToFetch: string) => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 12000);
       try {
         const resp = await fetch(urlToFetch, {
           signal: controller.signal,
+          redirect: 'follow',
           headers: {
             'User-Agent':
               'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',

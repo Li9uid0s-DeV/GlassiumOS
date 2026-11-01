@@ -16,6 +16,7 @@ import {
   UI_STYLES,
   SleepClockStyle,
   SleepBackground,
+  ClockPosition,
 } from '../types';
 import { WALLPAPERS } from '../wallpapers';
 import { Icon } from '../Icon';
@@ -106,6 +107,9 @@ export function SettingsApp() {
     setSleepClockStyle,
     sleepBackground,
     setSleepBackground,
+    clockPosition,
+    setClockPosition,
+    temperature,
     taskbarAlign,
     setTaskbarAlign,
     blurAmount,
@@ -114,8 +118,16 @@ export function SettingsApp() {
     setCornerRadius,
     transparency,
     setTransparency,
+    glassCurvature,
+    setGlassCurvature,
     glassSpecular,
     setGlassSpecular,
+    glassWobble,
+    setGlassWobble,
+    glassDispersion,
+    setGlassDispersion,
+    glassNoise,
+    setGlassNoise,
     auroraColor,
     setAuroraColor,
     auroraSpeed,
@@ -579,6 +591,39 @@ export function SettingsApp() {
                       ))}
                     </div>
                   </div>
+
+                  {/* Clock Position Options (Top / Center / Bottom) */}
+                  <div className="sm:col-span-2 pt-3 border-t border-slate-500/15">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-xs font-semibold flex items-center gap-1.5">
+                        <Icon name="MoveVertical" size={13} className="text-cyan-400" />
+                        <span>時計の配置場所 (Clock Position)</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs opacity-75">
+                        <Icon name="Sun" size={12} className="text-amber-400" />
+                        <span>天気表示: {temperature}°C (気温のみ表示)</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {([
+                        { id: 'top' as ClockPosition, label: 'Top (上部)' },
+                        { id: 'center' as ClockPosition, label: 'Center (中央)' },
+                        { id: 'bottom' as ClockPosition, label: 'Bottom (下部)' },
+                      ]).map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            setClockPosition(p.id);
+                          }}
+                          className={subButtonClass(clockPosition === p.id)}
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -750,10 +795,13 @@ export function SettingsApp() {
                 </div>
               </div>
 
-              {/* Window Surface & Blur Controls */}
+              {/* Window Surface & Advanced Optical Glass Controls */}
               <div className={sectionClass}>
-                <div className={sectionTitleClass + ' mb-3'}>Window & Surface Geometry (ウィンドウ透過・角丸)</div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className={sectionTitleClass + ' mb-1'}>Advanced Optical Glass & Surface Geometry (詳細グラス・光学設定)</div>
+                <div className={sectionDescClass + ' mb-4'}>
+                  ぼかし、屈折率、色収差、表面ノイズ、液体ゆらぎを極細密に調整します
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                   <div>
                     <div className="flex justify-between text-xs mb-1.5">
                       <span className="opacity-80">Backdrop Blur (背景ぼかし)</span>
@@ -762,7 +810,7 @@ export function SettingsApp() {
                     <input
                       type="range"
                       min={4}
-                      max={40}
+                      max={60}
                       value={blurAmount}
                       onChange={(e) => setBlurAmount(Number(e.target.value))}
                       className="glass-slider"
@@ -777,7 +825,7 @@ export function SettingsApp() {
                     <input
                       type="range"
                       min={10}
-                      max={88}
+                      max={95}
                       value={transparency}
                       onChange={(e) => setTransparency(Number(e.target.value))}
                       className="glass-slider"
@@ -792,7 +840,7 @@ export function SettingsApp() {
                     <input
                       type="range"
                       min={0}
-                      max={24}
+                      max={36}
                       value={cornerRadius}
                       onChange={(e) => setCornerRadius(Number(e.target.value))}
                       className="glass-slider"
@@ -801,7 +849,22 @@ export function SettingsApp() {
 
                   <div>
                     <div className="flex justify-between text-xs mb-1.5">
-                      <span className="opacity-80">Surface Specular (エッジ輝度)</span>
+                      <span className="opacity-80">Lens Curvature / Refraction (レンズ屈折率)</span>
+                      <span className="font-mono os-accent-text">{glassCurvature}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={64}
+                      value={glassCurvature}
+                      onChange={(e) => setGlassCurvature(Number(e.target.value))}
+                      className="glass-slider"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs mb-1.5">
+                      <span className="opacity-80">Specular Edge Highlight (エッジ輝度)</span>
                       <span className="font-mono os-accent-text">{glassSpecular}%</span>
                     </div>
                     <input
@@ -810,6 +873,51 @@ export function SettingsApp() {
                       max={100}
                       value={glassSpecular}
                       onChange={(e) => setGlassSpecular(Number(e.target.value))}
+                      className="glass-slider"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs mb-1.5">
+                      <span className="opacity-80">Fluid Wobble / Resonance (流体ゆらぎ)</span>
+                      <span className="font-mono os-accent-text">{glassWobble}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={glassWobble}
+                      onChange={(e) => setGlassWobble(Number(e.target.value))}
+                      className="glass-slider"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs mb-1.5">
+                      <span className="opacity-80">Chromatic Aberration / Dispersion (色収差)</span>
+                      <span className="font-mono os-accent-text">{glassDispersion}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={20}
+                      value={glassDispersion}
+                      onChange={(e) => setGlassDispersion(Number(e.target.value))}
+                      className="glass-slider"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="flex justify-between text-xs mb-1.5">
+                      <span className="opacity-80">Frosted Glass Noise (すりガラス粒子)</span>
+                      <span className="font-mono os-accent-text">{glassNoise}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={50}
+                      value={glassNoise}
+                      onChange={(e) => setGlassNoise(Number(e.target.value))}
                       className="glass-slider"
                     />
                   </div>

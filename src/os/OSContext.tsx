@@ -32,9 +32,11 @@ import {
   UIStyle,
   SleepClockStyle,
   SleepBackground,
+  ClockPosition,
 } from './types';
 import { VirtualFolder, getInitialFileSystem, VirtualNode } from './fileSystem';
 import { WALLPAPERS } from './wallpapers';
+import { soundService } from './soundService';
 
 export interface DeskStickyNote {
   id: string;
@@ -118,6 +120,9 @@ export interface OSContextValue {
   setSleepClockStyle: (style: SleepClockStyle) => void;
   sleepBackground: SleepBackground;
   setSleepBackground: (bg: SleepBackground) => void;
+  clockPosition: ClockPosition;
+  setClockPosition: (pos: ClockPosition) => void;
+  temperature: number;
 
   // Fine-grain sliders & 3D Liquid Glass Physics
   blurAmount: number;
@@ -134,6 +139,10 @@ export interface OSContextValue {
   setGlassSpecular: (v: number) => void;
   glassWobble: number;
   setGlassWobble: (v: number) => void;
+  glassDispersion: number;
+  setGlassDispersion: (v: number) => void;
+  glassNoise: number;
+  setGlassNoise: (v: number) => void;
 
   // 2D Aurora Live Wallpaper Settings
   auroraColor: AuroraColor;
@@ -430,6 +439,16 @@ export function OSProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore
     }
+    // Automatically adapt shell layout per UI Style
+    if (style === 'macos') {
+      setShellMode('mac');
+    } else if (style === 'one-ui') {
+      setShellMode('dex');
+    } else if (style === 'material3') {
+      setShellMode('chromeos');
+    } else {
+      setShellMode('windows');
+    }
   }, []);
 
   const [sleepClockStyle, setSleepClockStyleState] = useState<SleepClockStyle>(() => {
@@ -455,6 +474,20 @@ export function OSProvider({ children }: { children: ReactNode }) {
       // ignore
     }
   }, []);
+
+  const [clockPosition, setClockPositionState] = useState<ClockPosition>(() => {
+    return loadPersisted<ClockPosition>('glassium-clock-pos', 'center');
+  });
+  const setClockPosition = useCallback((pos: ClockPosition) => {
+    setClockPositionState(pos);
+    try {
+      localStorage.setItem('glassium-clock-pos', pos);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const [temperature] = useState<number>(21);
 
   // Shell & Design Engines — Default to desktop 'windows' shell so all icons & taskbar are immediately accessible
   const [shellMode, setShellMode] = useState<ShellMode>(() => {
@@ -489,6 +522,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const [glassCurvature, setGlassCurvature] = useState<number>(persistedSettings.glassCurvature ?? 32);
   const [glassSpecular, setGlassSpecular] = useState<number>(persistedSettings.glassSpecular ?? 75);
   const [glassWobble, setGlassWobble] = useState<number>(persistedSettings.glassWobble ?? 75);
+  const [glassDispersion, setGlassDispersion] = useState<number>(persistedSettings.glassDispersion ?? 6);
+  const [glassNoise, setGlassNoise] = useState<number>(persistedSettings.glassNoise ?? 18);
 
   // Aurora Live Wallpaper Controls
   const [auroraColor, setAuroraColor] = useState<AuroraColor>(persistedSettings.auroraColor ?? 'cyan-violet');
@@ -726,6 +761,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
           glassCurvature,
           glassSpecular,
           glassWobble,
+          glassDispersion,
+          glassNoise,
           auroraColor,
           auroraSpeed,
           auroraIntensity,
@@ -764,6 +801,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
     glassCurvature,
     glassSpecular,
     glassWobble,
+    glassDispersion,
+    glassNoise,
     auroraColor,
     auroraSpeed,
     auroraIntensity,
@@ -823,53 +862,14 @@ export function OSProvider({ children }: { children: ReactNode }) {
     }
   }, [fileSystem]);
 
-  // Synthetic Audio feedback using Web Audio API scaled by volume & soundEnabled
+  // Stylish tactile audio feedback using soundService scaled by volume & soundEnabled
   const playSound = useCallback((type: 'open' | 'click' | 'lock' | 'notify') => {
     if (!soundEnabled || volume <= 0) return;
     try {
-      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-
-      const scale = Math.max(0.05, Math.min(1, volume / 100));
-      const now = ctx.currentTime;
-      if (type === 'click') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(800, now);
-        osc.frequency.exponentialRampToValueAtTime(400, now + 0.04);
-        gain.gain.setValueAtTime(0.08 * scale, now);
-        gain.gain.linearRampToValueAtTime(0.001, now + 0.04);
-        osc.start(now);
-        osc.stop(now + 0.04);
-      } else if (type === 'open') {
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(320, now);
-        osc.frequency.exponentialRampToValueAtTime(640, now + 0.12);
-        gain.gain.setValueAtTime(0.1 * scale, now);
-        gain.gain.linearRampToValueAtTime(0.001, now + 0.12);
-        osc.start(now);
-        osc.stop(now + 0.12);
-      } else if (type === 'lock') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(440, now);
-        osc.frequency.exponentialRampToValueAtTime(220, now + 0.25);
-        gain.gain.setValueAtTime(0.12 * scale, now);
-        gain.gain.linearRampToValueAtTime(0.001, now + 0.25);
-        osc.start(now);
-        osc.stop(now + 0.25);
-      } else if (type === 'notify') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(523.25, now); // C5
-        osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
-        gain.gain.setValueAtTime(0.08 * scale, now);
-        gain.gain.linearRampToValueAtTime(0.001, now + 0.2);
-        osc.start(now);
-        osc.stop(now + 0.2);
-      }
+      if (type === 'click') soundService.playClick();
+      else if (type === 'open') soundService.playOpen();
+      else if (type === 'lock') soundService.playLock();
+      else if (type === 'notify') soundService.playNotify();
     } catch {
       // AudioContext might be blocked until user gesture
     }
@@ -1689,6 +1689,9 @@ export function OSProvider({ children }: { children: ReactNode }) {
     setSleepClockStyle,
     sleepBackground,
     setSleepBackground,
+    clockPosition,
+    setClockPosition,
+    temperature,
     blurAmount,
     setBlurAmount,
     cornerRadius,
@@ -1703,6 +1706,10 @@ export function OSProvider({ children }: { children: ReactNode }) {
     setGlassSpecular,
     glassWobble,
     setGlassWobble,
+    glassDispersion,
+    setGlassDispersion,
+    glassNoise,
+    setGlassNoise,
     auroraColor,
     setAuroraColor,
     auroraSpeed,

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Icon } from './Icon';
 import { useOS, AuroraColor } from './OSContext';
-import { SleepClockStyle, SleepBackground } from './types';
+import { SleepClockStyle, SleepBackground, ClockPosition } from './types';
 
 interface LockScreenProps {
   locked: boolean;
@@ -12,11 +12,11 @@ interface LockScreenProps {
 }
 
 const SLEEP_AURORA_COLORS: Record<AuroraColor, [string, string, string]> = {
-  'cyan-violet': ['rgba(34, 211, 238, 0.35)', 'rgba(99, 102, 241, 0.3)', 'rgba(168, 85, 247, 0.28)'],
-  'emerald-sky': ['rgba(52, 211, 153, 0.35)', 'rgba(20, 184, 166, 0.3)', 'rgba(56, 189, 248, 0.28)'],
-  'rose-gold': ['rgba(251, 113, 133, 0.35)', 'rgba(245, 158, 11, 0.28)', 'rgba(217, 70, 239, 0.25)'],
-  'ocean-blue': ['rgba(56, 189, 248, 0.35)', 'rgba(37, 99, 235, 0.32)', 'rgba(6, 182, 212, 0.28)'],
-  'sunset-magenta': ['rgba(244, 114, 182, 0.35)', 'rgba(147, 51, 234, 0.32)', 'rgba(99, 102, 241, 0.28)'],
+  'cyan-violet': ['rgba(34, 211, 238, 0.38)', 'rgba(99, 102, 241, 0.32)', 'rgba(168, 85, 247, 0.28)'],
+  'emerald-sky': ['rgba(52, 211, 153, 0.38)', 'rgba(20, 184, 166, 0.32)', 'rgba(56, 189, 248, 0.28)'],
+  'rose-gold': ['rgba(251, 113, 133, 0.38)', 'rgba(245, 158, 11, 0.3)', 'rgba(217, 70, 239, 0.25)'],
+  'ocean-blue': ['rgba(56, 189, 248, 0.38)', 'rgba(37, 99, 235, 0.34)', 'rgba(6, 182, 212, 0.28)'],
+  'sunset-magenta': ['rgba(244, 114, 182, 0.38)', 'rgba(147, 51, 234, 0.34)', 'rgba(99, 102, 241, 0.28)'],
 };
 
 const CLOCK_OPTIONS: { id: SleepClockStyle; label: string; icon: string }[] = [
@@ -36,17 +36,23 @@ const BG_OPTIONS: { id: SleepBackground; label: string }[] = [
   { id: 'wallpaper', label: 'Desktop' },
 ];
 
+const POSITION_OPTIONS: { id: ClockPosition; label: string; icon: string }[] = [
+  { id: 'top', label: 'Top', icon: 'ArrowUp' },
+  { id: 'center', label: 'Center', icon: 'Minimize2' },
+  { id: 'bottom', label: 'Bottom', icon: 'ArrowDown' },
+];
+
 export function LockScreen({ locked, onUnlock, expectedPassword, userName }: LockScreenProps) {
   const {
     auroraColor,
     playSound,
-    openApp,
-    uiStyle,
-    shellMode,
     sleepClockStyle,
     setSleepClockStyle,
     sleepBackground,
     setSleepBackground,
+    clockPosition,
+    setClockPosition,
+    temperature,
   } = useOS();
 
   const [password, setPassword] = useState('');
@@ -74,7 +80,7 @@ export function LockScreen({ locked, onUnlock, expectedPassword, userName }: Loc
     }
   }, [locked, expectedPassword]);
 
-  // Dynamic Canvas Backgrounds (Aurora, Void, Matrix, Galaxy, Retro)
+  // Dynamic 60fps Canvas Backgrounds (Aurora, Matrix, Galaxy, Retro, Void)
   useEffect(() => {
     if (!locked || sleepBackground === 'wallpaper') return;
     const canvas = canvasRef.current;
@@ -87,26 +93,26 @@ export function LockScreen({ locked, onUnlock, expectedPassword, userName }: Loc
     let raf = 0;
     let t = 0;
 
-    // Aurora orbs
+    // Aurora orbs with fluid physics
     const orbs = Array.from({ length: 5 }, (_, i) => ({
       x: (w * (i + 1)) / 6,
-      y: h * (0.3 + (i % 3) * 0.2),
-      r: Math.min(w, h) * (0.28 + (i % 3) * 0.08),
-      vx: (i % 2 === 0 ? 1 : -1) * (0.25 + i * 0.05),
-      vy: (i % 2 === 0 ? -1 : 1) * (0.18 + i * 0.04),
+      y: h * (0.35 + (i % 3) * 0.18),
+      r: Math.min(w, h) * (0.32 + (i % 3) * 0.08),
+      vx: (i % 2 === 0 ? 1 : -1) * (0.28 + i * 0.05),
+      vy: (i % 2 === 0 ? -1 : 1) * (0.2 + i * 0.04),
     }));
 
-    // Matrix columns
+    // Matrix digital rain
     const matrixColumns = Math.floor(w / 20);
     const matrixDrops = Array.from({ length: matrixColumns }, () => Math.random() * -100);
 
-    // Galaxy / Void stars
-    const stars = Array.from({ length: 140 }, () => ({
+    // Galaxy & Void stars
+    const stars = Array.from({ length: 160 }, () => ({
       x: Math.random() * w,
       y: Math.random() * h,
       size: Math.random() * 2 + 0.6,
       alpha: Math.random() * 0.8 + 0.2,
-      speed: Math.random() * 0.005 + 0.002,
+      speed: Math.random() * 0.006 + 0.002,
     }));
 
     const onResize = () => {
@@ -131,8 +137,8 @@ export function LockScreen({ locked, onUnlock, expectedPassword, userName }: Loc
         ctx.save();
         ctx.globalCompositeOperation = 'screen';
         orbs.forEach((orb, idx) => {
-          orb.x += orb.vx + Math.sin(t + idx) * 0.3;
-          orb.y += orb.vy + Math.cos(t * 0.8 + idx) * 0.25;
+          orb.x += orb.vx + Math.sin(t + idx) * 0.35;
+          orb.y += orb.vy + Math.cos(t * 0.8 + idx) * 0.28;
           if (orb.x < -orb.r * 0.5) orb.x = w + orb.r * 0.5;
           if (orb.x > w + orb.r * 0.5) orb.x = -orb.r * 0.5;
           if (orb.y < -orb.r * 0.5) orb.y = h + orb.r * 0.5;
@@ -168,20 +174,19 @@ export function LockScreen({ locked, onUnlock, expectedPassword, userName }: Loc
         ctx.fillRect(0, 0, w, h);
         ctx.save();
         ctx.translate(w / 2, h / 2);
-        const spiralCount = 180;
+        const spiralCount = 200;
         for (let i = 0; i < spiralCount; i++) {
           const angle = i * 0.12 + t * 0.2;
-          const dist = i * 2.2;
+          const dist = i * 2.3;
           const sx = Math.cos(angle) * dist;
           const sy = Math.sin(angle) * dist * 0.5;
-          ctx.fillStyle = i % 2 === 0 ? 'rgba(56, 189, 248, 0.65)' : 'rgba(168, 85, 247, 0.65)';
+          ctx.fillStyle = i % 2 === 0 ? 'rgba(56, 189, 248, 0.7)' : 'rgba(168, 85, 247, 0.7)';
           ctx.beginPath();
-          ctx.arc(sx, sy, Math.max(1, (dist / w) * 4), 0, Math.PI * 2);
+          ctx.arc(sx, sy, Math.max(1, (dist / w) * 4.2), 0, Math.PI * 2);
           ctx.fill();
         }
         ctx.restore();
       } else if (sleepBackground === 'retro') {
-        // Synthwave sunset grid
         const bg = ctx.createLinearGradient(0, 0, 0, h);
         bg.addColorStop(0, '#090014');
         bg.addColorStop(0.5, '#2e0854');
@@ -190,7 +195,6 @@ export function LockScreen({ locked, onUnlock, expectedPassword, userName }: Loc
         ctx.fillStyle = bg;
         ctx.fillRect(0, 0, w, h);
 
-        // Perspective grid lines
         ctx.strokeStyle = 'rgba(236, 72, 153, 0.45)';
         ctx.lineWidth = 1.5;
         const horizon = h * 0.55;
@@ -251,6 +255,14 @@ export function LockScreen({ locked, onUnlock, expectedPassword, userName }: Loc
     }
   };
 
+  const cycleClockPosition = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    playSound('click');
+    const positions: ClockPosition[] = ['center', 'top', 'bottom'];
+    const nextIdx = (positions.indexOf(clockPosition) + 1) % positions.length;
+    setClockPosition(positions[nextIdx]);
+  };
+
   const hours = now.getHours();
   const minutes = now.getMinutes();
   const seconds = now.getSeconds();
@@ -264,12 +276,13 @@ export function LockScreen({ locked, onUnlock, expectedPassword, userName }: Loc
     weekday: 'short',
   });
 
-  const isMacLayout = uiStyle === 'macos' || shellMode === 'mac';
-  const isOneUILayout = uiStyle === 'one-ui';
-  const isMiuiLayout = uiStyle === 'miui';
-  const isTheAILayout = uiStyle === 'the-ai';
-  const isNyanLayout = uiStyle === 'nyan-cat';
-  const isMemeLayout = uiStyle === 'meme';
+  // Layout alignment classes based on clockPosition
+  const positionContainerClass =
+    clockPosition === 'top'
+      ? 'justify-start pt-12 sm:pt-16 pb-auto'
+      : clockPosition === 'bottom'
+      ? 'justify-end pb-14 sm:pb-20 pt-auto'
+      : 'justify-center my-auto';
 
   return (
     <AnimatePresence>
@@ -277,12 +290,12 @@ export function LockScreen({ locked, onUnlock, expectedPassword, userName }: Loc
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0, scale: 1.02, filter: 'blur(16px)' }}
+          exit={{ opacity: 0, scale: 1.02, filter: 'blur(18px)' }}
           transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
           onClick={() => {
             if (!expectedPassword && !showPasswordInput && !showCustomizer) handleQuickUnlock();
           }}
-          className={`fixed inset-0 z-[99999] flex flex-col justify-between p-6 sm:p-10 select-none overflow-hidden font-sans ${
+          className={`fixed inset-0 z-[99999] flex flex-col justify-between p-6 sm:p-10 select-none overflow-hidden font-sans cursor-pointer ${
             sleepBackground === 'wallpaper' ? 'bg-black/60 backdrop-blur-2xl' : ''
           }`}
         >
@@ -291,40 +304,55 @@ export function LockScreen({ locked, onUnlock, expectedPassword, userName }: Loc
           )}
 
           {/* ========================================================
-              TOP BAR (Zero Border Line Glass Pill)
+              MINIMAL CONTROLS (Zero Border Line Subtraction)
+              Only: Date, Temperature, and Layout Switch Button
              ======================================================== */}
           <div
             onClick={(e) => e.stopPropagation()}
-            className="relative z-10 flex items-center justify-between max-w-4xl w-full mx-auto"
+            className="relative z-20 flex items-center justify-between max-w-4xl w-full mx-auto pointer-events-auto"
           >
-            <div className="px-4 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-xl shadow-[0_8px_24px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.18)] flex items-center gap-2 text-xs text-white/90">
-              <Icon name="Moon" size={13} className="text-cyan-300" />
-              <span>{isTheAILayout ? 'NEURAL STANDBY' : 'スリープ中'}</span>
-            </div>
-
-            {/* Lock / Padlock Status Indicator */}
-            {isMacLayout && (
-              <div className="flex items-center gap-1.5 text-xs text-white/70">
-                <Icon name="Lock" size={13} />
-                <span>Locked</span>
-              </div>
-            )}
-
-            <div className="flex items-center gap-2">
-              <div className="px-4 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-xl shadow-[0_8px_24px_rgba(0,0,0,0.3),inset_0_1px_0_rgba(255,255,255,0.18)] text-xs text-white/90 font-medium">
+            {/* Pure Date & Temperature (NO extra labels or weather pills) */}
+            <div className="flex items-center gap-3">
+              <div className="px-4 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-2xl shadow-[0_8px_24px_rgba(0,0,0,0.3)] text-xs text-white/90 font-medium">
                 {dateStr}
               </div>
+              <div className="px-3.5 py-1.5 rounded-full bg-white/[0.08] backdrop-blur-2xl shadow-[0_8px_24px_rgba(0,0,0,0.3)] flex items-center gap-1.5 text-xs text-white/90 font-medium">
+                <Icon name="Sun" size={13} className="text-amber-300" />
+                <span>{temperature}°C</span>
+              </div>
+            </div>
 
-              {/* Quick Clock / Background Settings Button */}
+            {/* Layout & Position Button (Quick cycle & customize) */}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={cycleClockPosition}
+                className="px-3 py-1.5 rounded-full bg-white/[0.08] hover:bg-white/[0.16] backdrop-blur-2xl shadow-[0_8px_24px_rgba(0,0,0,0.3)] text-xs text-white/80 hover:text-white transition flex items-center gap-1.5"
+                title="時計の位置を変更 (Top / Center / Bottom)"
+              >
+                <Icon
+                  name={
+                    clockPosition === 'top'
+                      ? 'ArrowUp'
+                      : clockPosition === 'bottom'
+                      ? 'ArrowDown'
+                      : 'Minimize2'
+                  }
+                  size={12}
+                  className="text-cyan-300"
+                />
+                <span className="capitalize">{clockPosition}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => setShowCustomizer(!showCustomizer)}
-                className={`p-2 rounded-full backdrop-blur-xl transition ${
+                className={`p-2 rounded-full backdrop-blur-2xl transition ${
                   showCustomizer
                     ? 'bg-cyan-500 text-black shadow-lg shadow-cyan-500/25'
                     : 'bg-white/[0.08] text-white/80 hover:bg-white/[0.16] shadow-[0_8px_24px_rgba(0,0,0,0.3)]'
                 }`}
-                title="時計の見た目・背景を変更"
+                title="時計スタイル・背景"
               >
                 <Icon name="SlidersHorizontal" size={14} />
               </button>
@@ -332,7 +360,7 @@ export function LockScreen({ locked, onUnlock, expectedPassword, userName }: Loc
           </div>
 
           {/* ========================================================
-              QUICK CUSTOMIZATION POPUP TRAY (Zero Border Line)
+              QUICK CUSTOMIZATION TRAY (Zero Border Line Glass)
              ======================================================== */}
           <AnimatePresence>
             {showCustomizer && (
@@ -341,13 +369,44 @@ export function LockScreen({ locked, onUnlock, expectedPassword, userName }: Loc
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
                 onClick={(e) => e.stopPropagation()}
-                className="relative z-30 max-w-xl w-full mx-auto p-4 rounded-3xl bg-slate-900/90 backdrop-blur-2xl shadow-[0_24px_60px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.16)] flex flex-col gap-3 my-2"
+                className="relative z-30 max-w-xl w-full mx-auto p-4 rounded-3xl bg-slate-900/90 backdrop-blur-2xl shadow-[0_24px_60px_rgba(0,0,0,0.6)] flex flex-col gap-3 my-2"
               >
+                {/* Clock Position choices */}
+                <div>
+                  <div className="text-[11px] font-bold text-white/70 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <Icon name="MoveVertical" size={12} className="text-cyan-400" />
+                    <span>時計の位置 (Clock Position)</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {POSITION_OPTIONS.map((p) => {
+                      const active = clockPosition === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            setClockPosition(p.id);
+                          }}
+                          className={`py-2 px-2 rounded-xl text-xs font-medium transition flex items-center justify-center gap-1.5 ${
+                            active
+                              ? 'bg-cyan-500 text-black font-semibold shadow-md'
+                              : 'bg-white/[0.06] text-white/70 hover:bg-white/10'
+                          }`}
+                        >
+                          <Icon name={p.icon} size={13} />
+                          <span>{p.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 {/* Clock style choices */}
                 <div>
                   <div className="text-[11px] font-bold text-white/70 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
                     <Icon name="Clock" size={12} className="text-cyan-400" />
-                    <span>時計の見た目 (Clock Style)</span>
+                    <span>時計スタイル (Clock Style)</span>
                   </div>
                   <div className="grid grid-cols-5 gap-1.5">
                     {CLOCK_OPTIONS.map((c) => {
@@ -408,21 +467,20 @@ export function LockScreen({ locked, onUnlock, expectedPassword, userName }: Loc
           </AnimatePresence>
 
           {/* ========================================================
-              CENTER: ADAPTIVE LIQUID GLASS CLOCK WIDGET
+              CLOCK DISPLAY (Adaptive per clockPosition)
              ======================================================== */}
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`relative z-10 flex flex-col items-center justify-center my-auto transition-all ${
-              isOneUILayout ? 'pt-8 pb-16' : ''
-            }`}
+            className={`relative z-10 flex flex-col items-center transition-all duration-300 pointer-events-auto ${positionContainerClass}`}
           >
-            {/* 1. ANALOG LIQUID CLOCK */}
+            {/* 1. ANALOG CLOCK */}
             {sleepClockStyle === 'analog' ? (
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 onClick={handleQuickUnlock}
-                className="relative w-56 h-56 rounded-full bg-slate-900/60 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5),inset_0_1.5px_0_rgba(255,255,255,0.22)] flex items-center justify-center cursor-pointer group"
+                className="relative w-56 h-56 rounded-full bg-slate-900/60 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex items-center justify-center cursor-pointer group"
+                style={{ filter: 'url(#glass-distortion)' }}
               >
                 {/* Hour marks */}
                 {Array.from({ length: 12 }, (_, i) => {
@@ -442,7 +500,6 @@ export function LockScreen({ locked, onUnlock, expectedPassword, userName }: Loc
                   );
                 })}
 
-                {/* Clock Hands */}
                 {/* Hour Hand */}
                 <div
                   className="absolute w-1.5 h-16 rounded-full bg-white origin-bottom shadow-lg"
@@ -452,124 +509,87 @@ export function LockScreen({ locked, onUnlock, expectedPassword, userName }: Loc
                 />
                 {/* Minute Hand */}
                 <div
-                  className="absolute w-1 h-22 rounded-full bg-cyan-300 origin-bottom shadow-md"
+                  className="absolute w-1 h-22 rounded-full bg-cyan-300 origin-bottom shadow-lg"
                   style={{
-                    transform: `translateY(-50%) rotate(${minutes * 6}deg)`,
+                    transform: `translateY(-50%) rotate(${(minutes + seconds / 60) * 6}deg)`,
                   }}
                 />
                 {/* Second Hand */}
                 <div
-                  className="absolute w-0.5 h-24 rounded-full bg-rose-400 origin-bottom shadow-sm"
+                  className="absolute w-0.5 h-24 rounded-full bg-rose-400 origin-bottom shadow-md"
                   style={{
-                    transform: `translateY(-50%) rotate(${seconds * 6}deg)`,
+                    transform: `translateY(-40%) rotate(${seconds * 6}deg)`,
                   }}
                 />
-                {/* Center Pivot Pin */}
-                <div className="w-3.5 h-3.5 rounded-full bg-white z-10 shadow-md ring-2 ring-cyan-400" />
-                <div className="absolute bottom-10 text-[10px] font-mono tracking-widest text-white/50">
+                <div className="absolute w-3.5 h-3.5 rounded-full bg-white shadow" />
+              </motion.div>
+            ) : sleepClockStyle === 'minimal' ? (
+              /* 2. MINIMAL CLOCK */
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                onClick={handleQuickUnlock}
+                className="cursor-pointer text-center"
+              >
+                <div className="text-7xl sm:text-9xl font-light tracking-tight text-white leading-none tabular-nums drop-shadow-[0_12px_32px_rgba(0,0,0,0.5)]">
                   {timeStr}
                 </div>
               </motion.div>
             ) : sleepClockStyle === 'vertical' ? (
-              /* 2. VERTICAL TWO-ROW STACKED CLOCK */
+              /* 3. VERTICAL CLOCK */
               <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
                 onClick={handleQuickUnlock}
-                className="px-14 py-8 rounded-[44px] bg-slate-900/60 backdrop-blur-2xl shadow-[0_24px_60px_rgba(0,0,0,0.5),inset_0_1.5px_0_rgba(255,255,255,0.22)] cursor-pointer text-center"
+                className="cursor-pointer text-center flex flex-col items-center leading-none"
               >
-                <div className="text-7xl sm:text-8xl font-black tracking-tight text-white leading-none">
+                <div className="text-6xl sm:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70 tabular-nums">
                   {hoursStr}
                 </div>
-                <div className="text-7xl sm:text-8xl font-black tracking-tight text-cyan-300 leading-none mt-1">
+                <div className="text-6xl sm:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-cyan-300 to-cyan-500 tabular-nums">
                   {minsStr}
                 </div>
               </motion.div>
-            ) : sleepClockStyle === 'minimal' ? (
-              /* 3. MINIMAL SLEEK CLOCK */
-              <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                onClick={handleQuickUnlock}
-                className="cursor-pointer text-center px-8 py-4"
-              >
-                <div className="text-7xl sm:text-9xl font-extralight tracking-tight text-white/95 tabular-nums drop-shadow-[0_12px_36px_rgba(0,0,0,0.6)]">
-                  {timeStr}
-                </div>
-                <div className="text-sm font-light text-white/60 tracking-widest uppercase mt-2">
-                  {dateStr}
-                </div>
-              </motion.div>
             ) : sleepClockStyle === 'cyber' ? (
-              /* 4. CYBER TELEMETRY HUD CLOCK */
+              /* 4. CYBER CLOCK */
               <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
                 onClick={handleQuickUnlock}
-                className="px-10 py-7 rounded-2xl bg-black/75 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.7),inset_0_1px_0_rgba(16,185,129,0.4)] text-center cursor-pointer font-mono"
+                className="px-8 sm:px-12 py-6 rounded-3xl bg-slate-950/70 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.6)] font-mono text-center cursor-pointer"
+                style={{ filter: 'url(#glass-distortion)' }}
               >
-                <div className="text-[10px] text-emerald-400 tracking-widest flex items-center justify-between pb-2 mb-2 border-b border-emerald-500/20">
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    CORE ACTIVE
-                  </span>
-                  <span>FPS: 60 · UTC+{Math.round(-new Date().getTimezoneOffset() / 60)}</span>
-                </div>
-                <div className="text-6xl sm:text-8xl font-bold tracking-tight text-emerald-300 tabular-nums leading-none">
-                  {timeStr}<span className="text-3xl sm:text-4xl opacity-50">:{secStr}</span>
-                </div>
-                <div className="mt-3 text-[11px] text-white/50 flex items-center justify-center gap-3">
-                  <span>HEX: 0x{Date.now().toString(16).slice(-6).toUpperCase()}</span>
-                  <span>·</span>
-                  <span>NODE: ONLINE</span>
+                <div className="text-5xl sm:text-7xl font-bold tracking-widest text-cyan-400 tabular-nums">
+                  {timeStr}:{secStr}
                 </div>
               </motion.div>
             ) : (
-              /* 5. DEFAULT 3D DEPTH LIQUID GLASS CLOCK */
+              /* 5. 3D DEPTH LIQUID GLASS CLOCK (Default) */
               <motion.div
-                initial={{ scale: 0.9, opacity: 0 }}
+                initial={{ scale: 0.92, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: 'spring', stiffness: 240, damping: 24 }}
                 onClick={handleQuickUnlock}
-                className={`px-10 sm:px-16 py-8 sm:py-10 rounded-[44px] backdrop-blur-2xl shadow-[0_24px_64px_rgba(0,0,0,0.5),inset_0_1.5px_0_rgba(255,255,255,0.22)] cursor-pointer text-center ${
-                  isMiuiLayout
-                    ? 'bg-orange-500/10 shadow-[0_24px_64px_rgba(0,0,0,0.5),0_0_30px_rgba(249,115,22,0.15)]'
-                    : isTheAILayout
-                    ? 'bg-emerald-950/40 shadow-[0_24px_64px_rgba(0,0,0,0.5),0_0_30px_rgba(16,185,129,0.15)]'
-                    : isNyanLayout
-                    ? 'bg-pink-500/15 shadow-[0_24px_64px_rgba(0,0,0,0.5),0_0_30px_rgba(236,72,153,0.2)]'
-                    : isMemeLayout
-                    ? 'bg-amber-500/15 shadow-[0_24px_64px_rgba(0,0,0,0.5),0_0_30px_rgba(234,179,8,0.2)]'
-                    : 'bg-slate-900/60'
-                }`}
+                className="px-10 sm:px-16 py-8 sm:py-10 rounded-[44px] bg-slate-900/60 backdrop-blur-2xl shadow-[0_24px_64px_rgba(0,0,0,0.5)] cursor-pointer text-center"
+                style={{ filter: 'url(#glass-distortion)' }}
               >
-                {isMemeLayout && (
-                  <div className="text-[11px] font-bold text-amber-300 tracking-widest uppercase mb-1">
-                    MUCH SLEEP · VERY TIME
-                  </div>
-                )}
                 <div className="text-7xl sm:text-[116px] font-extrabold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white via-white/95 to-cyan-200/80 leading-none tabular-nums drop-shadow-[0_12px_32px_rgba(0,0,0,0.5)]">
                   {timeStr}
                 </div>
-                {isTheAILayout && (
-                  <div className="text-[10px] text-emerald-400 font-mono tracking-widest mt-2">
-                    GLASSIUM NEURAL OS READY
-                  </div>
-                )}
               </motion.div>
             )}
 
-            {/* Password input when enabled */}
+            {/* Password input when required */}
             {showPasswordInput && (
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-7 flex flex-col items-center gap-2.5"
+                className="mt-6 flex flex-col items-center gap-2.5"
               >
                 {userName && <div className="text-xs text-white/80 font-medium">{userName}</div>}
                 <form onSubmit={handleSubmit} className="flex items-center gap-2.5">
                   <div
-                    className={`flex items-center gap-2.5 rounded-full px-5 py-2.5 bg-slate-900/80 backdrop-blur-xl shadow-[0_10px_25px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.16)] transition ${
+                    className={`flex items-center gap-2.5 rounded-full px-5 py-2.5 bg-slate-900/80 backdrop-blur-xl shadow-[0_10px_25px_rgba(0,0,0,0.4)] transition ${
                       error ? 'ring-2 ring-rose-400' : ''
                     }`}
                   >
@@ -595,66 +615,8 @@ export function LockScreen({ locked, onUnlock, expectedPassword, userName }: Loc
             )}
           </div>
 
-          {/* ========================================================
-              BOTTOM BAR: ADAPTIVE WAKE CONTROLS (Zero Border Line)
-             ======================================================== */}
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="relative z-10 flex items-center justify-between max-w-4xl w-full mx-auto"
-          >
-            {/* Left Action Button (Adaptive per UI style) */}
-            {isOneUILayout ? (
-              <button
-                type="button"
-                onClick={() => {
-                  playSound('open');
-                  onUnlock();
-                  setTimeout(() => openApp('calculator'), 100);
-                }}
-                className="w-12 h-12 rounded-2xl bg-white/[0.08] backdrop-blur-xl shadow-[0_8px_24px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.18)] flex items-center justify-center text-white/90 hover:scale-105 transition"
-                title="Calculator Shortcut"
-              >
-                <Icon name="Calculator" size={18} />
-              </button>
-            ) : isTheAILayout ? (
-              <div className="text-[10px] font-mono text-emerald-400/70">SYS: STANDBY</div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  playSound('open');
-                  onUnlock();
-                  setTimeout(() => openApp('weather'), 100);
-                }}
-                className="w-12 h-12 rounded-2xl bg-white/[0.08] backdrop-blur-xl shadow-[0_8px_24px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.18)] flex items-center justify-center text-white/80 hover:scale-105 transition"
-                title="Weather"
-              >
-                <Icon name="CloudSun" size={18} />
-              </button>
-            )}
-
-            {/* Central Tap / Swipe to Unlock Pill */}
-            <button
-              onClick={handleQuickUnlock}
-              className="px-8 py-3.5 rounded-full bg-white/[0.1] hover:bg-white/[0.18] backdrop-blur-2xl shadow-[0_12px_32px_rgba(0,0,0,0.4),inset_0_1px_0_rgba(255,255,255,0.22)] flex items-center gap-2.5 text-xs font-semibold text-white transition active:scale-95"
-            >
-              <span>{isTheAILayout ? 'TAP TO INITIALIZE' : 'タップしてスリープ解除'}</span>
-              <Icon name="ChevronRight" size={14} className="text-cyan-300" />
-            </button>
-
-            {/* Right Action Button (AI Assistant) */}
-            <button
-              onClick={() => {
-                playSound('open');
-                onUnlock();
-                setTimeout(() => openApp('ai'), 150);
-              }}
-              className="w-12 h-12 rounded-2xl bg-white/[0.08] backdrop-blur-xl shadow-[0_8px_24px_rgba(0,0,0,0.35),inset_0_1px_0_rgba(255,255,255,0.18)] flex items-center justify-center text-cyan-300 hover:scale-105 transition"
-              title="AI アシスタント"
-            >
-              <Icon name="Bot" size={18} />
-            </button>
-          </div>
+          {/* Empty bottom spacer to maintain balance */}
+          <div className="h-6 pointer-events-none" />
         </motion.div>
       )}
     </AnimatePresence>
