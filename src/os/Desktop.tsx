@@ -216,7 +216,7 @@ export function Desktop() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [draggingNote, setDraggingNote] = useState<{ id: string; x: number; y: number } | null>(null);
   const [showWhatsNewModal, setShowWhatsNewModal] = useState<boolean>(() => {
-    const dismissed = localStorage.getItem('glassium_v5.0_whats_new_dismissed');
+    const dismissed = localStorage.getItem('glassium_v5.0_u1_whats_new_dismissed');
     return !dismissed;
   });
 
@@ -355,9 +355,8 @@ export function Desktop() {
     { id: 'weather', label: 'Weather', icon: 'weather' },
     { id: 'clock', label: 'Clock', icon: 'clock' },
     { id: 'ai', label: 'AI Assistant', icon: 'ai' },
-    { id: 'studio', label: 'Studio IDE', icon: 'studio' },
-    { id: 'paint', label: 'Creative Hub', icon: 'Palette' },
-    { id: 'dictionary', label: 'Reference', icon: 'BookOpen' },
+    { id: 'studio', label: 'Glassium Studio', icon: 'studio' },
+    { id: 'paint', label: 'Spect Studio', icon: 'paint' },
     { id: 'taskmanager', label: 'Task Manager', icon: 'taskmanager' },
     { id: 'appstore', label: 'App Store', icon: 'appstore' },
     { id: 'recycle', label: 'Trash', icon: 'recycle' },
@@ -418,7 +417,7 @@ export function Desktop() {
               <div className="cursor-pointer hover:opacity-80" onClick={() => openApp('settings')}>
                 <AppLogo size={16} />
               </div>
-              <span className="font-bold tracking-tight">GlassiumOS 5</span>
+              <span className="font-bold tracking-tight">GlassiumOS 5 u1</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('explorer')}>Files</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('settings')}>Settings</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => setShellMode('windows')}>View</span>
@@ -1674,7 +1673,7 @@ export function Desktop() {
         )}
       </AnimatePresence>
 
-      {/* What's New Release Notes Modal (GlassiumOS 5.0) */}
+      {/* What's New Release Notes Modal (GlassiumOS 5 u1) */}
       <AnimatePresence>
         {showWhatsNewModal && (
           <motion.div
@@ -1683,7 +1682,7 @@ export function Desktop() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-6"
             onClick={() => {
-              localStorage.setItem('glassium_v5.0_whats_new_dismissed', 'true');
+              localStorage.setItem('glassium_v5.0_u1_whats_new_dismissed', 'true');
               setShowWhatsNewModal(false);
             }}
           >
@@ -1700,13 +1699,13 @@ export function Desktop() {
                 <div className="flex items-center gap-3">
                   <AppLogo size={26} />
                   <div>
-                    <h2 className="text-lg font-bold tracking-tight">GlassiumOS 5 更新内容</h2>
-                    <p className="text-xs text-white/50 font-mono">GlassiumOS 5 Release Notes</p>
+                    <h2 className="text-lg font-bold tracking-tight">GlassiumOS 5 u1 更新内容</h2>
+                    <p className="text-xs text-white/50 font-mono">GlassiumOS 5 u1 · GlasispectUI Release Notes</p>
                   </div>
                 </div>
                 <button
                   onClick={() => {
-                    localStorage.setItem('glassium_v5.0_whats_new_dismissed', 'true');
+                    localStorage.setItem('glassium_v5.0_u1_whats_new_dismissed', 'true');
                     setShowWhatsNewModal(false);
                   }}
                   className="p-1.5 text-white/60 hover:text-white transition"
@@ -1718,33 +1717,33 @@ export function Desktop() {
               {/* Release Notes Content List */}
               <div className="flex-1 overflow-y-auto pr-1 text-xs divide-y divide-white/10">
                 <div className="py-3.5 first:pt-0 flex flex-col gap-1">
-                  <div className="font-semibold text-white">1. GlassiumOS 5 インターフェースと新ロゴ</div>
+                  <div className="font-semibold text-white">1. GlasispectUI ＆ 2世代前デフォルト Live2D 壁紙（全5色）の復刻</div>
                   <p className="text-white/65 leading-relaxed">
-                    余白とシンプルな直線のみを用いたミニマルなUIと新しいプリズムロゴを採用しました。設定アプリの「個人設定 &gt; UIスタイル」から、従来の Windows 11 モードや Windows 10 / 8 / Ubuntu モードへいつでも切り替え可能です。
+                    UI名称を「GlasispectUI」へ刷新し、既存の2Dライブ壁紙を残したまま、2世代前のデフォルトだったLive2D壁紙（Amethyst &amp; Cyan Silk / Abyssal Deep Ocean / Polar Emerald Aurora / Neon Cyber Dusk / Crimson Rose Nebula）を復刻しました。また「Glassium Studio」「Spect Studio」への名称変更とアイコン修正、ブラウザの404エラー修正を適用しました。
                   </p>
                 </div>
 
                 <div className="py-3.5 flex flex-col gap-1">
-                  <div className="font-semibold text-white">2. タスクバー直結の OS レベル AI 統合</div>
+                  <div className="font-semibold text-white">2. 電卓・ファイルアプリ・Terminal の大幅機能強化</div>
                   <p className="text-white/65 leading-relaxed">
-                    タスクバーの AI 入力バーから直接質問や計算、OS 設定の変更（ダークモード切替、壁紙変更、アプリ起動など）を実行できます。通信エラーが発生しないマルチフォールバック構成を採用しています。
+                    電卓に画面端マグネット吸着「Liquid Glass ミニウィジェット」、単位や文字を自動除去して計算する「SpectClip」、変数ストック「スマート・タグ保存」、Editorグラフ出力、AI「コンテキスト数式シミュレーター」を搭載。ファイルアプリにはホバー/クリックで浮かび上がる「空間レイヤー表示（スペクト・プレビュー）」、「流動的スマート・ドロップ・ゾーン」、「スマート・タグ・バインダー」、AI「セマンティック・サーチ＆一括アクション」を追加しました。
                   </p>
                 </div>
 
                 <div className="py-3.5 flex flex-col gap-1">
-                  <div className="font-semibold text-white">3. 機能別アプリケーションの統合</div>
+                  <div className="font-semibold text-white">3. 3DMaze（全50階層ローグライク）＆ Slope 物理演算アップデート</div>
                   <p className="text-white/65 leading-relaxed">
-                    関連するツールをコアアプリ内のタブへ統合しました。電卓（単位変換・BMI・収支）、時計（ポモドーロ）、カレンダー（カンバン・習慣・付箋）、Studio（JSON・正規表現・Base64・パスワード）、エディタ（文字数・差分解析）、音楽（ドラムパッド・周波数）、ゲーム（マインスイーパー・ナンプレ・タイピング等）、タスクマネージャー（システム診断）から利用できます。
+                    Slopeのコース外落下重力と当たり判定を改善。3DMazeはThree.js（深度ベースフォグ・16×16チャンク生成）による全50階層・5属性エリア（土➔クリスタル➔Void➔ネオン➔インフェルノ）、木/銀/金/XP/ボス/アイテムチェスト、4段階の難易度、デイリーチャレンジRTAに対応しました。
                   </p>
                 </div>
               </div>
 
               {/* Modal Footer */}
               <div className="pt-3 border-t border-white/10 flex items-center justify-between">
-                <span className="text-[11px] text-white/40 font-mono">GlassiumOS 5</span>
+                <span className="text-[11px] text-white/40 font-mono">GlassiumOS 5 u1 · GlasispectUI</span>
                 <button
                   onClick={() => {
-                    localStorage.setItem('glassium_v5.0_whats_new_dismissed', 'true');
+                    localStorage.setItem('glassium_v5.0_u1_whats_new_dismissed', 'true');
                     setShowWhatsNewModal(false);
                   }}
                   className="px-4 py-1.5 bg-white text-black font-semibold text-xs hover:bg-slate-200 transition"

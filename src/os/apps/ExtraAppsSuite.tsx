@@ -13,7 +13,7 @@ export interface ExtraAppMeta {
 }
 
 export const EXTRA_APPS_LIST: ExtraAppMeta[] = [
-  { id: 'paint', name: 'Creative & Paint Studio', nameJa: 'ペイント・カラー制作', icon: 'Palette', category: 'utilities', parentApp: 'paint', description: 'キャンバス描画・カラーピッカー・QRコード作成を統合した制作ツール。' },
+  { id: 'paint', name: 'Spect Studio', nameJa: 'Spect Studio (お絵かき・制作)', icon: 'paint', category: 'utilities', parentApp: 'paint', description: 'GlasispectUI キャンバス描画・カラーピッカー・QRコード作成を統合した制作ツール。' },
   { id: 'colorpicker', name: 'Color Mixer', nameJa: 'カラーピッカー', icon: 'Palette', category: 'utilities', parentApp: 'paint', description: 'RGB数値調整とHEXカラーコード出力。' },
   { id: 'qrcode', name: 'QR Generator', nameJa: 'QRコード作成', icon: 'Grid3x3', category: 'utilities', parentApp: 'paint', description: 'URLやテキストからQRマトリクスを生成。' },
   { id: 'pomodoro', name: 'Pomodoro Timer', nameJa: 'ポモドーロタイマー', icon: 'Clock', category: 'utilities', parentApp: 'clock', description: '25分集中と5分休憩のサイクルタイマー。' },

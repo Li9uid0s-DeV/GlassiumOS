@@ -55,6 +55,50 @@ const SYSTEM_CARDS: SystemCard[] = [
   { id: 'aicomponents', title: 'AI Assistant Settings', desc: 'GlassiumOS 5 AI integration, response style, and connection check', icon: 'Sparkles' },
 ];
 
+const RESTORED_DEFAULT_LIVE2D_PALETTES: {
+  id: AuroraColor;
+  label: string;
+  desc: string;
+  cssGradient: string;
+  accentWave: string;
+}[] = [
+  {
+    id: 'amethyst-cyan-silk',
+    label: 'Amethyst & Cyan Silk',
+    desc: '2世代前デフォルト復刻: アメジスト＆シアンの流体シルクオーロラ',
+    cssGradient: 'linear-gradient(135deg, #030712 0%, #0e7490 48%, #4c1d95 100%)',
+    accentWave: '#38bdf8',
+  },
+  {
+    id: 'abyssal-deep-ocean',
+    label: 'Abyssal Deep Ocean',
+    desc: '2世代前デフォルト復刻: 深海アビスブルーとアクア発光シルク',
+    cssGradient: 'linear-gradient(135deg, #010916 0%, #062845 50%, #0284c7 100%)',
+    accentWave: '#0ea5e9',
+  },
+  {
+    id: 'polar-emerald-aurora',
+    label: 'Polar Emerald Aurora',
+    desc: '2世代前デフォルト復刻: 極地エメラルドとスカイブルーのオーロラ帯',
+    cssGradient: 'linear-gradient(135deg, #011f18 0%, #059669 50%, #0369a1 100%)',
+    accentWave: '#10b981',
+  },
+  {
+    id: 'neon-cyber-dusk',
+    label: 'Neon Cyber Dusk',
+    desc: '2世代前デフォルト復刻: サイバーマゼンタ＆ネオンシアンの黄昏',
+    cssGradient: 'linear-gradient(135deg, #090418 0%, #701a75 50%, #06b6d4 100%)',
+    accentWave: '#e879f9',
+  },
+  {
+    id: 'crimson-rose-nebula',
+    label: 'Crimson Rose Nebula',
+    desc: '2世代前デフォルト復刻: クリムゾンローズ星雲とアンバーシルク',
+    cssGradient: 'linear-gradient(135deg, #1a0612 0%, #9f1239 50%, #d97706 100%)',
+    accentWave: '#f43f5e',
+  },
+];
+
 const AURORA_PALETTES: {
   id: AuroraColor;
   label: string;
@@ -253,8 +297,8 @@ interface ShellModeOption {
 const SHELL_MODES: ShellModeOption[] = [
   {
     id: 'windows',
-    label: 'GlassiumOS 5 (標準)',
-    desc: '直線と余白によるミニマルUI・タスクバーAIオムニバー統合',
+    label: 'GlasispectUI (GlassiumOS 5 u1 標準)',
+    desc: '直線と余白による GlasispectUI ミニマルデザイン・タスクバーAIオムニバー統合',
     mockupType: 'gl5',
   },
   {
@@ -885,8 +929,8 @@ export function SettingsApp() {
             isLight ? 'border-slate-300' : 'border-white/[0.08]'
           }`}
         >
-          <span>GlassiumOS 5</span>
-          <span>Build 5.0</span>
+          <span>GlassiumOS 5 u1</span>
+          <span>GlasispectUI</span>
         </div>
       </div>
 
@@ -1088,16 +1132,85 @@ export function SettingsApp() {
                     )}
                   </div>
 
-                  {/* 3. Current 2D Live Wallpapers (10 Presets) */}
+                  {/* 3. Restored 2-Versions-Ago Default Live2D Wallpapers (5 Colors) + Current 10 Presets */}
                   <div className={`pt-5 border-t space-y-4 ${isLight ? 'border-slate-300' : 'border-white/10'}`}>
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="text-xs font-bold">現行 2D ライブ壁紙コレクション (Current 10 Live Wallpapers)</h3>
+                        <h3 className="text-xs font-bold">
+                          復刻デフォルト Live2D 壁紙 (Restored Default Live2D — 5 Signature Colors)
+                        </h3>
                         <p className="text-[11px] opacity-60">
-                          オーロラリボン、桜吹雪、サイバーグリッド、星座パルスなどのリアルタイムアニメーション背景
+                          2つ前のバージョンのデフォルトだった Live2D シルクオーロラ壁紙（全5色）
                         </p>
                       </div>
                       <ToggleSwitch checked={auroraParticles} onChange={setAuroraParticles} />
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {RESTORED_DEFAULT_LIVE2D_PALETTES.map((p) => {
+                        const selected = wallpaper === 'live2d' && !selectedCustomId && auroraColor === p.id;
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              playSound('click');
+                              setSelectedCustomId(null);
+                              setWallpaper('live2d');
+                              setAuroraColor(p.id);
+                            }}
+                            style={{ background: p.cssGradient }}
+                            className={`p-3 text-left transition relative overflow-hidden h-24 flex flex-col justify-between ${
+                              selected
+                                ? 'border-t-2 border-t-[var(--os-accent)] ring-2 ring-[var(--os-accent)]'
+                                : 'opacity-90 hover:opacity-100'
+                            }`}
+                          >
+                            <svg
+                              viewBox="0 0 200 60"
+                              className="pointer-events-none absolute inset-x-0 bottom-0 w-full h-14 opacity-55"
+                              preserveAspectRatio="none"
+                            >
+                              <circle cx="155" cy="20" r="14" fill={p.accentWave} fillOpacity="0.45" />
+                              <path
+                                d="M0,32 Q50,6 100,28 T200,16 L200,60 L0,60 Z"
+                                fill={p.accentWave}
+                                fillOpacity="0.45"
+                              />
+                            </svg>
+
+                            <div className="relative z-10 flex items-center justify-between">
+                              <span
+                                style={{ color: '#ffffff', textShadow: '0 1px 3px rgba(0,0,0,0.85)' }}
+                                className="text-xs font-bold"
+                              >
+                                {p.label}
+                              </span>
+                              {selected && (
+                                <span
+                                  style={{ backgroundColor: 'rgba(0,0,0,0.6)', color: '#ffffff' }}
+                                  className="p-0.5 rounded-full"
+                                >
+                                  <Icon name="CheckCircle2" size={16} />
+                                </span>
+                              )}
+                            </div>
+                            <span
+                              style={{ color: 'rgba(255,255,255,0.88)', textShadow: '0 1px 3px rgba(0,0,0,0.85)' }}
+                              className="relative z-10 text-[10px] line-clamp-1"
+                            >
+                              {p.desc}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className={`pt-4 border-t ${isLight ? 'border-slate-300/70' : 'border-white/[0.08]'}`}>
+                      <h3 className="text-xs font-bold">現行 2D ライブ壁紙コレクション (Current 10 Live Wallpapers)</h3>
+                      <p className="text-[11px] opacity-60 mb-3">
+                        既存の 2D ライブ壁紙コレクションもすべてそのまま利用可能です
+                      </p>
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

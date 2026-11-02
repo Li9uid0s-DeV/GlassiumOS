@@ -90,6 +90,9 @@ const ICON_MAP: Record<string, FluentIconType> = {
   'retro-snake': 'game',
   'cosmic-maze': 'game',
   'glassium-studio': 'pentool',
+  studio: 'pentool',
+  paint: 'palette',
+  'spect-studio': 'palette',
 
   // Lucide icon name mappings
   Globe: 'browser',

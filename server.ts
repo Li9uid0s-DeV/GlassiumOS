@@ -633,10 +633,42 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       const contentType = upstream.headers.get('content-type') || 'text/html; charset=utf-8';
       res.setHeader('Access-Control-Allow-Origin', '*');
 
+      if (upstream.status === 404 && (targetUrl.hostname.includes('github.io') || targetUrl.hostname.includes('github.com'))) {
+        const safeTarget = escapeHtml(targetUrl.href);
+        res.status(200).setHeader('Content-Type', 'text/html; charset=utf-8').send(`
+          <!DOCTYPE html>
+          <html lang="ja">
+            <head>
+              <meta charset="utf-8" />
+              <style>
+                body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #090d16; color: #f8fafc; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+                .box { max-width: 560px; padding: 32px; background: rgba(15,23,42,0.85); border-top: 2px solid #06b6d4; }
+                h2 { margin: 0 0 8px; font-size: 18px; color: #38bdf8; }
+                p { margin: 0 0 14px; font-size: 13px; line-height: 1.6; color: #cbd5e1; }
+                .url { font-family: monospace; font-size: 11px; padding: 8px 10px; background: rgba(0,0,0,0.45); color: #67e8f9; word-break: break-all; margin-bottom: 16px; }
+                a.btn { display: inline-block; padding: 8px 16px; background: #06b6d4; color: #000; font-weight: 700; font-size: 12px; text-decoration: none; margin-right: 8px; }
+              </style>
+            </head>
+            <body>
+              <div class="box">
+                <h2>GitHub Pages URL Redirect / Smart Recovery</h2>
+                <p>指定された GitHub Pages URL は移動または変更されています。GlasispectUI ブラウザのスマートモードまたは検索からアクセスできます。</p>
+                <div class="url">${safeTarget}</div>
+                <a class="btn" href="/api/proxy?url=${encodeURIComponent('https://html.duckduckgo.com/html/?q=' + encodeURIComponent(targetUrl.hostname + ' ' + targetUrl.pathname))}">Web検索で新しいURLを探す</a>
+              </div>
+            </body>
+          </html>
+        `);
+        return;
+      }
+
       if (contentType.includes('text/html')) {
         let html = await upstream.text();
         const origin = `${targetUrl.protocol}//${targetUrl.host}`;
-        const basePath = targetUrl.href.substring(0, targetUrl.href.lastIndexOf('/') + 1);
+        const pathDir = targetUrl.pathname.endsWith('/')
+          ? targetUrl.pathname
+          : targetUrl.pathname.substring(0, targetUrl.pathname.lastIndexOf('/') + 1) || '/';
+        const basePath = `${origin}${pathDir}`;
 
         const baseAndNavScript = `
           <base href="${escapeHtml(basePath)}" />

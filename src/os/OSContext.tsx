@@ -60,6 +60,11 @@ export type Wallpaper =
 
 export type Theme = 'dark' | 'light';
 export type AuroraColor =
+  | 'amethyst-cyan-silk'
+  | 'abyssal-deep-ocean'
+  | 'polar-emerald-aurora'
+  | 'neon-cyber-dusk'
+  | 'crimson-rose-nebula'
   | 'cyan-violet'
   | 'emerald-sky'
   | 'rose-gold'
@@ -105,6 +110,7 @@ export interface OSContextValue {
   getTopWindowId: () => string | null;
 
   fileSystem: VirtualFolder;
+  setFileSystem: React.Dispatch<React.SetStateAction<VirtualFolder>>;
   saveFile: (path: string[], name: string, content: string) => void;
   createFolder: (path: string[], folderName: string) => void;
   deleteNode: (path: string[], nodeName: string) => void;
@@ -316,9 +322,9 @@ const APP_DEFAULTS: Record<AppId, { title: string; icon: string; width: number; 
   weather: { title: 'Weather', icon: 'CloudSun', width: 840, height: 580 },
   clock: { title: 'Clock', icon: 'Clock', width: 780, height: 540 },
   ai: { title: 'AI Assistant', icon: 'Sparkles', width: 860, height: 600 },
-  studio: { title: 'Glassium Studio', icon: 'Code2', width: 900, height: 620 },
+  studio: { title: 'Glassium Studio', icon: 'studio', width: 900, height: 620 },
   retrocade: { title: 'RetroCade', icon: 'Gamepad2', width: 880, height: 600 },
-  paint: { title: 'Paint Studio (お絵かき)', icon: 'Palette', width: 820, height: 560 },
+  paint: { title: 'Spect Studio (お絵かき)', icon: 'paint', width: 820, height: 560 },
   pomodoro: { title: 'Pomodoro Timer (集中タイマー)', icon: 'Clock', width: 520, height: 440 },
   unitconverter: { title: 'Unit Converter (単位変換)', icon: 'SlidersHorizontal', width: 620, height: 480 },
   colorpicker: { title: 'Color Studio (カラーピッカー)', icon: 'Palette', width: 560, height: 460 },
@@ -361,7 +367,7 @@ const LS_APPS_KEY = 'glassium-os-v4.0-installed-apps';
 const LS_THEMES_KEY = 'glassium-os-v4.0-installed-themes';
 const LS_CURRENT_THEME_KEY = 'glassium-os-v4.0-current-theme';
 const LS_TASKS_KEY = 'glassium-os-v4.0-calendar-tasks';
-const LS_FS_KEY = 'glassium-os-v4.0-filesystem';
+const LS_FS_KEY = 'glassium-os-v5.0-u1-filesystem';
 const LS_ICON_POS_KEY = 'glassium-os-v4.0-icon-positions';
 const LS_DESK_NOTES_KEY = 'glassium-os-v4.0-desk-notes';
 const LS_DESKTOPS_KEY = 'glassium-os-v4.0-desktops';
@@ -380,6 +386,7 @@ export const DEFAULT_DESKTOP_ICON_ORDER = [
   'clock',
   'ai',
   'studio',
+  'paint',
   'retrocade',
   'taskmanager',
   'appstore',
@@ -588,8 +595,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const [glassDispersion, setGlassDispersion] = useState<number>(persistedSettings.glassDispersion ?? 6);
   const [glassNoise, setGlassNoise] = useState<number>(persistedSettings.glassNoise ?? 18);
 
-  // Aurora Live Wallpaper Controls
-  const [auroraColor, setAuroraColor] = useState<AuroraColor>(persistedSettings.auroraColor ?? 'cyan-violet');
+  // Aurora Live Wallpaper Controls (Default to 2-versions-ago default 'amethyst-cyan-silk')
+  const [auroraColor, setAuroraColor] = useState<AuroraColor>(persistedSettings.auroraColor ?? 'amethyst-cyan-silk');
   const [auroraSpeed, setAuroraSpeed] = useState<number>(persistedSettings.auroraSpeed ?? 1.0);
   const [auroraIntensity, setAuroraIntensity] = useState<number>(persistedSettings.auroraIntensity ?? 78);
   const [auroraParticles, setAuroraParticles] = useState<boolean>(persistedSettings.auroraParticles ?? true);
@@ -686,8 +693,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => [
     {
       id: 'notif-welcome',
-      title: 'GlassiumOS 5',
-      message: 'GlassiumOS 5 desktop environment is ready.',
+      title: 'GlassiumOS 5 u1',
+      message: 'GlassiumOS 5 u1 (GlasispectUI) desktop environment is ready.',
       time: 'Just now',
       app: 'System',
       icon: 'Shield',
@@ -696,8 +703,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
     },
     {
       id: 'notif-driver',
-      title: '2.5D Glass Compositor',
-      message: 'Translucent glass layers and live aurora are active.',
+      title: 'GlasispectUI Compositor',
+      message: 'Translucent liquid glass layers and Live2D silk aurora are active.',
       time: '1 min ago',
       app: 'Settings',
       icon: 'Monitor',
@@ -1729,6 +1736,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     restoreWindow,
     getTopWindowId,
     fileSystem,
+    setFileSystem,
     saveFile,
     createFolder,
     deleteNode,

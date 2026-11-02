@@ -352,7 +352,7 @@ export const STORE_CATALOG: StoreApp[] = [
     version: '4.7.0',
     builtInAppId: 'ai',
   },
-  { id: 'paint', name: 'Paint Studio (お絵かき)', description: 'Freehand digital canvas with brushes, color palette, and PNG export.', category: 'utilities', icon: 'Palette', author: 'Glassium Creative', rating: 4.9, size: '1.4 MB', version: '4.7.0', builtInAppId: 'paint' },
+  { id: 'paint', name: 'Spect Studio (お絵かき)', description: 'GlasispectUI digital canvas with brushes, layers, color palette, and PNG export.', category: 'utilities', icon: 'Palette', author: 'Glasispect Creative', rating: 4.9, size: '1.4 MB', version: '5.0 u1', builtInAppId: 'paint' },
   { id: 'pomodoro', name: 'Pomodoro Timer (集中タイマー)', description: '25/5 focus and break timer for deep productivity.', category: 'utilities', icon: 'Clock', author: 'Glassium Core', rating: 4.9, size: '920 KB', version: '4.7.0', builtInAppId: 'pomodoro' },
   { id: 'unitconverter', name: 'Unit Converter (単位変換)', description: 'Convert length, weight, temperature, and digital storage.', category: 'utilities', icon: 'SlidersHorizontal', author: 'Glassium Tools', rating: 4.8, size: '880 KB', version: '4.7.0', builtInAppId: 'unitconverter' },
   { id: 'colorpicker', name: 'Color Studio (カラーピッカー)', description: 'RGB/HSL mixer, HEX generator, and color palettes.', category: 'utilities', icon: 'Palette', author: 'Glassium Creative', rating: 4.9, size: '1.1 MB', version: '4.7.0', builtInAppId: 'colorpicker' },
@@ -741,13 +741,13 @@ export interface UIStyleInfo {
 export const UI_STYLES: UIStyleInfo[] = [
   {
     id: 'glassium',
-    name: 'Glassium',
-    sub: 'Zero Border Line',
+    name: 'GlasispectUI',
+    sub: 'Zero Border Line · GlassiumOS 5 u1',
     category: 'authentic',
     accent: '#06b6d4',
-    badge: 'Standard',
+    badge: 'GlassiumOS 5 u1',
     previewGradient: 'linear-gradient(135deg, rgba(6,182,212,0.8), rgba(99,102,241,0.8))',
-    description: '枠線を一切排除したZero Border Lineコンセプト。光沢反射と滑らかな液体ガラス透過サーフェス。',
+    description: 'GlassiumOS 5 u1 標準の GlasispectUI。枠線を排したZero Border Lineと液体ガラス屈折サーフェス。',
   },
   {
     id: 'macos',

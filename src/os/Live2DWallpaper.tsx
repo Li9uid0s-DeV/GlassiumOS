@@ -9,6 +9,32 @@ interface Live2DWallpaperProps {
 }
 
 const PALETTES: Record<AuroraColor, { bg: [string, string, string]; waves: string[]; particles: string }> = {
+  // Restored 2-Versions-Ago Default Live2D Wallpaper (5 Signature Colors)
+  'amethyst-cyan-silk': {
+    bg: ['#030712', '#0f172a', '#2e1065'],
+    waves: ['rgba(56, 189, 248, 0.38)', 'rgba(168, 85, 247, 0.34)', 'rgba(236, 72, 153, 0.24)'],
+    particles: 'rgba(186, 230, 253, 0.85)',
+  },
+  'abyssal-deep-ocean': {
+    bg: ['#010916', '#062845', '#0c4a6e'],
+    waves: ['rgba(14, 165, 233, 0.38)', 'rgba(6, 182, 212, 0.32)', 'rgba(37, 99, 235, 0.28)'],
+    particles: 'rgba(125, 211, 252, 0.85)',
+  },
+  'polar-emerald-aurora': {
+    bg: ['#011f18', '#064e3b', '#0f172a'],
+    waves: ['rgba(16, 185, 129, 0.38)', 'rgba(52, 211, 153, 0.32)', 'rgba(56, 189, 248, 0.28)'],
+    particles: 'rgba(167, 243, 208, 0.85)',
+  },
+  'neon-cyber-dusk': {
+    bg: ['#090418', '#2e0854', '#4a044e'],
+    waves: ['rgba(217, 70, 239, 0.38)', 'rgba(6, 182, 212, 0.34)', 'rgba(244, 63, 94, 0.28)'],
+    particles: 'rgba(245, 208, 254, 0.88)',
+  },
+  'crimson-rose-nebula': {
+    bg: ['#1a0612', '#3b0a24', '#27121b'],
+    waves: ['rgba(244, 63, 94, 0.38)', 'rgba(251, 113, 133, 0.32)', 'rgba(251, 146, 60, 0.26)'],
+    particles: 'rgba(254, 205, 211, 0.85)',
+  },
   'cyan-violet': {
     bg: ['#020617', '#0f172a', '#1e1b4b'],
     waves: ['rgba(56, 189, 248, 0.30)', 'rgba(139, 92, 246, 0.26)', 'rgba(236, 72, 153, 0.18)'],
@@ -115,7 +141,7 @@ export const Live2DWallpaper: React.FC<Live2DWallpaperProps> = ({
     liteMode,
   } = useOS();
 
-  const activeColor = propAuroraColor ?? ctxAuroraColor ?? 'cyan-violet';
+  const activeColor = propAuroraColor ?? ctxAuroraColor ?? 'amethyst-cyan-silk';
   const isLite = lite || lowPerformance || liteMode;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const mouseRef = useRef<{ x: number; y: number }>({ x: 0.5, y: 0.5 });
@@ -361,7 +387,18 @@ export const Live2DWallpaper: React.FC<Live2DWallpaperProps> = ({
       // RESTORED CLASSIC SCENE 5: Classic Aurora Bokeh Orbs & Shooting Stars
       // & RESTORED CLASSIC SCENE 6: Liquid Plasma Orbs
       // =========================================================================
-      if (activeColor === 'classic-aurora-orbs' || activeColor === 'classic-plasma-nebula') {
+      const isRestoredDefaultSilk =
+        activeColor === 'amethyst-cyan-silk' ||
+        activeColor === 'abyssal-deep-ocean' ||
+        activeColor === 'polar-emerald-aurora' ||
+        activeColor === 'neon-cyber-dusk' ||
+        activeColor === 'crimson-rose-nebula';
+
+      if (
+        isRestoredDefaultSilk ||
+        activeColor === 'classic-aurora-orbs' ||
+        activeColor === 'classic-plasma-nebula'
+      ) {
         ctx.save();
         ctx.globalCompositeOperation = 'screen';
         bokehOrbs.forEach((orb, idx) => {

@@ -12,6 +12,11 @@ interface LockScreenProps {
 }
 
 const SLEEP_AURORA_COLORS: Record<AuroraColor, [string, string, string]> = {
+  'amethyst-cyan-silk': ['rgba(56, 189, 248, 0.42)', 'rgba(168, 85, 247, 0.38)', 'rgba(236, 72, 153, 0.30)'],
+  'abyssal-deep-ocean': ['rgba(14, 165, 233, 0.42)', 'rgba(6, 182, 212, 0.36)', 'rgba(37, 99, 235, 0.32)'],
+  'polar-emerald-aurora': ['rgba(16, 185, 129, 0.42)', 'rgba(52, 211, 153, 0.36)', 'rgba(56, 189, 248, 0.30)'],
+  'neon-cyber-dusk': ['rgba(217, 70, 239, 0.42)', 'rgba(6, 182, 212, 0.36)', 'rgba(244, 63, 94, 0.32)'],
+  'crimson-rose-nebula': ['rgba(244, 63, 94, 0.42)', 'rgba(251, 113, 133, 0.36)', 'rgba(251, 146, 60, 0.30)'],
   'cyan-violet': ['rgba(34, 211, 238, 0.38)', 'rgba(99, 102, 241, 0.32)', 'rgba(168, 85, 247, 0.28)'],
   'emerald-sky': ['rgba(52, 211, 153, 0.38)', 'rgba(20, 184, 166, 0.32)', 'rgba(56, 189, 248, 0.28)'],
   'rose-gold': ['rgba(251, 113, 133, 0.38)', 'rgba(245, 158, 11, 0.3)', 'rgba(217, 70, 239, 0.25)'],

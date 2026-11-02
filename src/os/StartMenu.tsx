@@ -43,9 +43,8 @@ const PINNED: PinnedEntry[] = [
   { uid: 'pin-weather', appId: 'weather', label: 'Weather', icon: 'weather' },
   { uid: 'pin-clock', appId: 'clock', label: 'Clock', icon: 'clock' },
   { uid: 'pin-ai', appId: 'ai', label: 'AI Assistant', icon: 'ai' },
-  { uid: 'pin-studio', appId: 'studio', label: 'Studio IDE', icon: 'studio' },
-  { uid: 'pin-paint', appId: 'paint', label: 'Creative Hub', icon: 'Palette' },
-  { uid: 'pin-dictionary', appId: 'dictionary', label: 'Reference Hub', icon: 'BookOpen' },
+  { uid: 'pin-studio', appId: 'studio', label: 'Glassium Studio', icon: 'studio' },
+  { uid: 'pin-paint', appId: 'paint', label: 'Spect Studio', icon: 'paint' },
   { uid: 'pin-taskmanager', appId: 'taskmanager', label: 'Task Manager', icon: 'taskmanager' },
   { uid: 'pin-appstore', appId: 'appstore', label: 'App Store', icon: 'appstore' },
   { uid: 'pin-retrocade', appId: 'retrocade', label: 'RetroCade', icon: 'Gamepad2' },
@@ -59,8 +58,8 @@ const CONSOLIDATED_TOOL_SHORTCUTS: { appId: AppId; label: string; parentLabel: s
   { appId: 'kanban', label: 'カンバンボード', parentLabel: 'Calendar', icon: 'LayoutGrid' },
   { appId: 'habit', label: '習慣トラッカー', parentLabel: 'Calendar', icon: 'CheckCircle2' },
   { appId: 'whiteboard', label: 'アイデアメモ', parentLabel: 'Calendar', icon: 'PenTool' },
-  { appId: 'jsonformat', label: 'JSON整形・正規表現', parentLabel: 'Studio IDE', icon: 'Code2' },
-  { appId: 'passgen', label: 'パスワード生成', parentLabel: 'Studio IDE', icon: 'Key' },
+  { appId: 'jsonformat', label: 'JSON整形・正規表現', parentLabel: 'Glassium Studio', icon: 'Code2' },
+  { appId: 'passgen', label: 'パスワード生成', parentLabel: 'Glassium Studio', icon: 'Key' },
   { appId: 'wordcount', label: '文字数・テキスト差分', parentLabel: 'Editor', icon: 'FileText' },
   { appId: 'drumpad', label: 'ドラムパッド・周波数', parentLabel: 'Music', icon: 'Volume2' },
   { appId: 'sysinfo', label: 'システム診断', parentLabel: 'Task Manager', icon: 'Cpu' },
@@ -89,13 +88,13 @@ const RECOMMENDED_ITEMS: {
     appId: 'notepad',
     payload: {
       fileName: 'GlassiumOS_Notes.md',
-      content: '# GlassiumOS 5\n\nMinimal Refractive Glass & Integrated AI Desktop Environment.\n',
+      content: '# GlassiumOS 5 u1 (GlasispectUI)\n\nMinimal Refractive Glass & Integrated AI Desktop Environment.\n',
     },
   },
   {
     id: 'rec-game',
-    title: 'Arcade & 3D Games',
-    subtitle: 'よく使うアプリケーション',
+    title: '3DMaze (50F Roguelike) & Slope',
+    subtitle: '3D ダンジョン RTA ＆ 物理ランナー',
     icon: 'game',
     appId: 'game',
   },
@@ -756,10 +755,29 @@ export function StartMenu({ open, onClose }: Props) {
                       {userInitial}
                     </div>
                     <span className="font-medium">{userName}</span>
-                    <span className="text-[10px] font-mono opacity-45">GlassiumOS 5</span>
+                    <span className="text-[10px] font-mono opacity-45">GlassiumOS 5 u1 · GlasispectUI</span>
                   </button>
 
                   <div className="flex items-center gap-4">
+                    <button
+                      type="button"
+                      onClick={() => { openApp('game', { payload: { gameId: 'maze' } }); onClose(); }}
+                      className="text-[10px] font-mono text-cyan-300 hover:text-cyan-200 transition flex items-center gap-1"
+                      title="3DMaze デイリーチャレンジ最高記録"
+                    >
+                      <Icon name="Compass" size={12} fluent={false} />
+                      <span>
+                        {(() => {
+                          try {
+                            const rec = JSON.parse(localStorage.getItem('glassium_3dmaze_daily_best') || 'null');
+                            if (rec && rec.floor) return `3DMaze Best: ${rec.floor}F (${rec.timeStr || '--:--'})`;
+                          } catch {
+                            // ignore
+                          }
+                          return '3DMaze Daily RTA';
+                        })()}
+                      </span>
+                    </button>
                     <button
                       type="button"
                       onClick={() => { openApp('settings'); onClose(); }}

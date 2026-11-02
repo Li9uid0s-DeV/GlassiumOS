@@ -176,6 +176,9 @@ export const WindowFrame: React.FC<Props> = ({ win, children }) => {
           else if (e.clientY >= vh - 60 - CORNER) detectedZone = 'bottom-right';
           else detectedZone = 'right';
         }
+        if (win.appId === 'calculator' && ( detectedZone === 'left' || detectedZone === 'right')) {
+          detectedZone = null;
+        }
         setSnapPreview(detectedZone);
 
         const maxY = window.innerHeight - 56;
@@ -239,6 +242,24 @@ export const WindowFrame: React.FC<Props> = ({ win, children }) => {
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
         rafId = null;
+      }
+      if (dragging && win.appId === 'calculator') {
+        const vw = window.innerWidth;
+        if (liveRectRef.current.x <= 36) {
+          updateWindowRect(win.id, { x: 10, y: Math.max(48, liveRectRef.current.y), width: 320, height: 460 });
+          window.dispatchEvent(new CustomEvent('glasispect-calc-edge-dock', { detail: { side: 'left', docked: true } }));
+          setDragging(false);
+          setResizing(null);
+          setSnapPreview(null);
+          return;
+        } else if (liveRectRef.current.x + liveRectRef.current.width >= vw - 36) {
+          updateWindowRect(win.id, { x: vw - 330, y: Math.max(48, liveRectRef.current.y), width: 320, height: 460 });
+          window.dispatchEvent(new CustomEvent('glasispect-calc-edge-dock', { detail: { side: 'right', docked: true } }));
+          setDragging(false);
+          setResizing(null);
+          setSnapPreview(null);
+          return;
+        }
       }
       if (dragging && snapPreview) {
         applySnapLayout(snapPreview);
