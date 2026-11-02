@@ -25,6 +25,6 @@ export default defineConfig({
     port: 3000,
   },
   optimizeDeps: {
-    exclude: ['lucide-react'],
+    include: ['lucide-react', 'three', 'framer-motion'],
   },
 });

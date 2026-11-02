@@ -9,17 +9,16 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>
 );
 
-// Register GlassiumOS Service Worker Proxy for browser CORS bypass
+// Unregister any stale service workers so asset/module requests are never intercepted
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('/sw-proxy.js', { scope: '/' })
-      .then((reg) => {
-        console.log('[GlassiumOS] Service Worker Proxy registered successfully:', reg.scope);
-      })
-      .catch((err) => {
-        console.warn('[GlassiumOS] Service Worker registration failed:', err);
-      });
-  });
+  navigator.serviceWorker
+    .getRegistrations()
+    .then((registrations) => {
+      for (const reg of registrations) {
+        reg.unregister().catch(() => {});
+      }
+    })
+    .catch(() => {});
 }
+
 

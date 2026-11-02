@@ -362,15 +362,15 @@ const INITIAL_TASKS: CalendarTask[] = [
   { id: 'task-3', title: 'Prepare Release Documentation', date: '2026-08-28', time: '11:00', category: 'personal', completed: false, priority: 'low' },
 ];
 
-const LS_KEY = 'glassium-os-v4.0-settings';
-const LS_APPS_KEY = 'glassium-os-v4.0-installed-apps';
-const LS_THEMES_KEY = 'glassium-os-v4.0-installed-themes';
-const LS_CURRENT_THEME_KEY = 'glassium-os-v4.0-current-theme';
-const LS_TASKS_KEY = 'glassium-os-v4.0-calendar-tasks';
+const LS_KEY = 'glassium-os-v5.0-u1-settings';
+const LS_APPS_KEY = 'glassium-os-v5.0-u1-installed-apps';
+const LS_THEMES_KEY = 'glassium-os-v5.0-u1-installed-themes';
+const LS_CURRENT_THEME_KEY = 'glassium-os-v5.0-u1-current-theme';
+const LS_TASKS_KEY = 'glassium-os-v5.0-u1-calendar-tasks';
 const LS_FS_KEY = 'glassium-os-v5.0-u1-filesystem';
-const LS_ICON_POS_KEY = 'glassium-os-v4.0-icon-positions';
-const LS_DESK_NOTES_KEY = 'glassium-os-v4.0-desk-notes';
-const LS_DESKTOPS_KEY = 'glassium-os-v4.0-desktops';
+const LS_ICON_POS_KEY = 'glassium-os-v5.0-u1-icon-positions';
+const LS_DESK_NOTES_KEY = 'glassium-os-v5.0-u1-desk-notes';
+const LS_DESKTOPS_KEY = 'glassium-os-v5.0-u1-desktops';
 
 export const DEFAULT_DESKTOP_ICON_ORDER = [
   'browser',
@@ -414,7 +414,12 @@ export function computeDefaultIconPositions(
 function loadPersisted<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed !== null && parsed !== undefined) {
+        return parsed;
+      }
+    }
   } catch {
     // Ignore parse error
   }
@@ -430,33 +435,42 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const idCounter = useRef(0);
 
   // Virtual Desktops ("デスク機能")
-  const [desktops, setDesktops] = useState<VirtualDesktop[]>(() =>
-    loadPersisted<VirtualDesktop[]>(LS_DESKTOPS_KEY, [
+  const [desktops, setDesktops] = useState<VirtualDesktop[]>(() => {
+    const loaded = loadPersisted<VirtualDesktop[]>(LS_DESKTOPS_KEY, [
       { id: 'desk-1', name: 'デスクトップ 1' },
       { id: 'desk-2', name: 'デスクトップ 2' },
-    ])
-  );
+    ]);
+    return Array.isArray(loaded) && loaded.length > 0
+      ? loaded
+      : [
+          { id: 'desk-1', name: 'デスクトップ 1' },
+          { id: 'desk-2', name: 'デスクトップ 2' },
+        ];
+  });
   const [activeDesktopId, setActiveDesktopId] = useState<string>('desk-1');
   const [taskViewOpen, setTaskViewOpen] = useState<boolean>(false);
 
-  const [desktopIconSize, setDesktopIconSizeState] = useState<DesktopIconSize>(
-    (persistedSettings.desktopIconSize as DesktopIconSize) ?? 'medium'
-  );
+  const [desktopIconSize, setDesktopIconSizeState] = useState<DesktopIconSize>(() => {
+    const candidate = persistedSettings.desktopIconSize as DesktopIconSize;
+    return candidate && DESKTOP_ICON_SIZE_PRESETS[candidate] ? candidate : 'medium';
+  });
   const [gridSnapEnabled, setGridSnapEnabled] = useState<boolean>(
     persistedSettings.gridSnapEnabled ?? true
   );
 
   // Grid-Snapped Desktop Icon Positions
   const [desktopIconPositions, setDesktopIconPositions] = useState<Record<string, { x: number; y: number }>>(() => {
-    const initialSize = (persistedSettings.desktopIconSize as DesktopIconSize) ?? 'medium';
+    const rawSize = persistedSettings.desktopIconSize as DesktopIconSize;
+    const initialSize = rawSize && DESKTOP_ICON_SIZE_PRESETS[rawSize] ? rawSize : 'medium';
     const preset = DESKTOP_ICON_SIZE_PRESETS[initialSize] ?? DESKTOP_ICON_SIZE_PRESETS.medium;
     const defaults = computeDefaultIconPositions(initialSize);
     const saved = loadPersisted<Record<string, { x: number; y: number }>>(LS_ICON_POS_KEY, {});
-    const merged = { ...defaults, ...saved };
+    const merged = { ...defaults, ...(saved && typeof saved === 'object' ? saved : {}) };
     // Ensure all initial positions are aligned to grid slots
     const snapped: Record<string, { x: number; y: number }> = {};
     const occupied = new Set<string>();
     Object.entries(merged).forEach(([key, pos]) => {
+      if (!pos || typeof pos.x !== 'number' || typeof pos.y !== 'number') return;
       let col = Math.max(0, Math.round((pos.x - 16) / preset.cellW));
       let row = Math.max(0, Math.round((pos.y - 16) / preset.cellH));
       while (occupied.has(`${col},${row}`)) {
@@ -476,9 +490,10 @@ export function OSProvider({ children }: { children: ReactNode }) {
   });
 
   // Desk Sticky Notes ("デスク付箋")
-  const [deskNotes, setDeskNotes] = useState<DeskStickyNote[]>(() =>
-    loadPersisted<DeskStickyNote[]>(LS_DESK_NOTES_KEY, [])
-  );
+  const [deskNotes, setDeskNotes] = useState<DeskStickyNote[]>(() => {
+    const loaded = loadPersisted<DeskStickyNote[]>(LS_DESK_NOTES_KEY, []);
+    return Array.isArray(loaded) ? loaded : [];
+  });
 
   const [fileSystem, setFileSystem] = useState<VirtualFolder>(() =>
     loadPersisted<VirtualFolder>(LS_FS_KEY, getInitialFileSystem())

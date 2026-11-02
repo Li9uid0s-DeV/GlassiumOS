@@ -256,7 +256,7 @@ export function Desktop() {
     }
   };
 
-  const iconPreset = DESKTOP_ICON_SIZE_PRESETS[desktopIconSize];
+  const iconPreset = DESKTOP_ICON_SIZE_PRESETS[desktopIconSize] ?? DESKTOP_ICON_SIZE_PRESETS.medium;
   const useDarkDesktopText = isWallpaperBright;
 
   const handleIconPointerDown = (
