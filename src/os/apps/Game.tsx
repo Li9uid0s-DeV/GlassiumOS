@@ -1181,19 +1181,189 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
     setStairsGridPos({ r: stairsR, c: stairsC });
 
     const stairsPos = gridToWorld(stairsR, stairsC);
-    const stairsPortal = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.9, 0.9, 2.6, 16),
-      new THREE.MeshBasicMaterial({ color: 0x00f2ff, wireframe: true })
+    const stairsPortal = new THREE.Group();
+    const portalOuterCylinder = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.95, 0.95, 2.6, 18, 1, true),
+      new THREE.MeshBasicMaterial({ color: 0x00f2ff, wireframe: true, transparent: true, opacity: 0.75 })
     );
+    const portalInnerCore = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.55, 0.55, 2.5, 16),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.32 })
+    );
+    const portalBaseRing = new THREE.Mesh(
+      new THREE.TorusGeometry(1.05, 0.08, 10, 28),
+      new THREE.MeshStandardMaterial({ color: 0x00f2ff, emissive: 0x00f2ff, emissiveIntensity: 1.2 })
+    );
+    portalBaseRing.rotation.x = Math.PI / 2;
+    portalBaseRing.position.y = -1.2;
+    const portalTopRing = portalBaseRing.clone();
+    portalTopRing.position.y = 1.2;
+    stairsPortal.add(portalOuterCylinder, portalInnerCore, portalBaseRing, portalTopRing);
     stairsPortal.position.set(stairsPos.x, 1.3, stairsPos.z);
     scene.add(stairsPortal);
+
+    // Ambient Floating Dungeon Mana Motes (3D Particle Field)
+    const moteCount = 90;
+    const motePositions = new Float32Array(moteCount * 3);
+    for (let i = 0; i < moteCount; i++) {
+      motePositions[i * 3] = (Math.random() - 0.5) * gridSize * cellSize;
+      motePositions[i * 3 + 1] = 0.2 + Math.random() * 2.6;
+      motePositions[i * 3 + 2] = (Math.random() - 0.5) * gridSize * cellSize;
+    }
+    const moteGeo = new THREE.BufferGeometry();
+    moteGeo.setAttribute('position', new THREE.BufferAttribute(motePositions, 3));
+    const moteMat = new THREE.PointsMaterial({
+      color: activeFloor >= 41 ? 0xff6b00 : activeFloor >= 31 ? 0xf472b6 : activeFloor >= 21 ? 0xc084fc : 0x38bdf8,
+      size: 0.14,
+      transparent: true,
+      opacity: 0.75,
+    });
+    const ambientMotes = new THREE.Points(moteGeo, moteMat);
+    scene.add(ambientMotes);
+
+    // 3D VFX System: Particles, Slash Arcs & Expanding Shockwave Rings
+    interface VfxParticle {
+      mesh: THREE.Mesh;
+      vx: number;
+      vy: number;
+      vz: number;
+      gravity: number;
+      life: number;
+      maxLife: number;
+      spinX: number;
+      spinY: number;
+      scaleDecay: boolean;
+    }
+    interface VfxShockwave {
+      mesh: THREE.Mesh;
+      life: number;
+      maxLife: number;
+      startScale: number;
+      endScale: number;
+      riseY: number;
+    }
+    const vfxParticles: VfxParticle[] = [];
+    const vfxShockwaves: VfxShockwave[] = [];
+    const sharedSparkGeo = new THREE.OctahedronGeometry(0.12, 0);
+    const sharedCubeSparkGeo = new THREE.BoxGeometry(0.14, 0.14, 0.14);
+
+    const spawnParticleBurst = (
+      origin: THREE.Vector3,
+      colorHex: number,
+      count: number,
+      speed = 0.14,
+      upwardBias = 0.08,
+      lifeFrames = 26,
+      useCubes = false
+    ) => {
+      for (let i = 0; i < count; i++) {
+        const mat = new THREE.MeshBasicMaterial({
+          color: i % 3 === 0 ? 0xffffff : colorHex,
+          transparent: true,
+          opacity: 1,
+        });
+        const pMesh = new THREE.Mesh(useCubes ? sharedCubeSparkGeo : sharedSparkGeo, mat);
+        pMesh.position.copy(origin);
+        pMesh.position.x += (Math.random() - 0.5) * 0.4;
+        pMesh.position.y += (Math.random() - 0.5) * 0.4;
+        pMesh.position.z += (Math.random() - 0.5) * 0.4;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = (Math.random() - 0.3) * Math.PI;
+        const spd = speed * (0.45 + Math.random() * 0.85);
+        scene.add(pMesh);
+        vfxParticles.push({
+          mesh: pMesh,
+          vx: Math.cos(theta) * Math.cos(phi) * spd,
+          vy: Math.sin(phi) * spd + upwardBias,
+          vz: Math.sin(theta) * Math.cos(phi) * spd,
+          gravity: 0.0045,
+          life: lifeFrames + Math.floor(Math.random() * 10),
+          maxLife: lifeFrames + 10,
+          spinX: (Math.random() - 0.5) * 0.35,
+          spinY: (Math.random() - 0.5) * 0.35,
+          scaleDecay: true,
+        });
+      }
+    };
+
+    const spawnShockwaveRing = (
+      origin: THREE.Vector3,
+      colorHex: number,
+      startScale = 0.4,
+      endScale = 3.2,
+      lifeFrames = 20,
+      tiltFlat = true,
+      riseY = 0.01
+    ) => {
+      const ringGeo = new THREE.RingGeometry(0.45, 0.65, 24);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: colorHex,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.95,
+      });
+      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      ringMesh.position.copy(origin);
+      if (tiltFlat) {
+        ringMesh.rotation.x = -Math.PI / 2;
+      }
+      ringMesh.scale.setScalar(startScale);
+      scene.add(ringMesh);
+      vfxShockwaves.push({
+        mesh: ringMesh,
+        life: lifeFrames,
+        maxLife: lifeFrames,
+        startScale,
+        endScale,
+        riseY,
+      });
+    };
+
+    // First-Person 3D Sword Viewmodel attached to Camera
+    const weaponViewGroup = new THREE.Group();
+    const bladeMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      emissive: 0x00f2ff,
+      emissiveIntensity: 0.9,
+      metalness: 0.85,
+      roughness: 0.15,
+    });
+    const bladeCoreMesh = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.78, 0.09), bladeMat);
+    bladeCoreMesh.position.y = 0.42;
+    const bladeTipMesh = new THREE.Mesh(new THREE.ConeGeometry(0.055, 0.22, 4), bladeMat);
+    bladeTipMesh.position.y = 0.91;
+    bladeTipMesh.rotation.y = Math.PI / 4;
+    const guardMat = new THREE.MeshStandardMaterial({
+      color: 0xfacc15,
+      emissive: 0xb45309,
+      emissiveIntensity: 0.4,
+      metalness: 0.9,
+      roughness: 0.2,
+    });
+    const crossGuardMesh = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.05, 0.14), guardMat);
+    crossGuardMesh.position.y = 0.02;
+    const gripMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.028, 0.032, 0.24, 8),
+      new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 })
+    );
+    gripMesh.position.y = -0.12;
+    const pommelMesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.05, 0), guardMat);
+    pommelMesh.position.y = -0.26;
+    weaponViewGroup.add(bladeCoreMesh, bladeTipMesh, crossGuardMesh, gripMesh, pommelMesh);
+    weaponViewGroup.position.set(0.42, -0.34, -0.68);
+    weaponViewGroup.rotation.set(0.25, -0.35, 0.18);
+    camera.add(weaponViewGroup);
+
+    let weaponSwingTimer = 0;
+    let cameraShakeTimer = 0;
+    let cameraShakeIntensity = 0;
 
     // Interactive Floor Objects: Chests, Traps (Pitfalls, Warps, Glitch Pits, Magma Pools), Fuel Crystals
     interface FloorInteractable {
       id: string;
       r: number;
       c: number;
-      mesh: THREE.Mesh;
+      mesh: THREE.Object3D;
       kind: 'wood_chest' | 'silver_chest' | 'gold_chest' | 'xp_chest' | 'item_chest' | 'pitfall' | 'warp' | 'glitch_pit' | 'magma' | 'fuel_crystal';
       used: boolean;
     }
@@ -1208,6 +1378,44 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
         }
       }
       return [3, 3];
+    };
+
+    // Helper to build a multi-part 3D Treasure Chest
+    const buildChestModel = (colorHex: number): THREE.Group => {
+      const chestGroup = new THREE.Group();
+      const bodyMat = new THREE.MeshStandardMaterial({
+        color: colorHex,
+        emissive: colorHex,
+        emissiveIntensity: 0.35,
+        roughness: 0.35,
+        metalness: 0.6,
+      });
+      const trimMat = new THREE.MeshStandardMaterial({
+        color: 0xfef08a,
+        emissive: 0xfacc15,
+        emissiveIntensity: 0.55,
+        metalness: 0.9,
+        roughness: 0.2,
+      });
+      const baseBox = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.46, 0.66), bodyMat);
+      baseBox.position.y = 0.23;
+      const lidCylinder = new THREE.Mesh(new THREE.CylinderGeometry(0.33, 0.33, 0.88, 12), bodyMat);
+      lidCylinder.rotation.z = Math.PI / 2;
+      lidCylinder.position.y = 0.46;
+      const strapLeft = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.52, 0.7), trimMat);
+      strapLeft.position.set(-0.28, 0.38, 0);
+      const strapRight = strapLeft.clone();
+      strapRight.position.x = 0.28;
+      const lockPlate = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.72), trimMat);
+      lockPlate.position.set(0, 0.42, 0);
+      const auraRing = new THREE.Mesh(
+        new THREE.RingGeometry(0.52, 0.66, 20),
+        new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide, transparent: true, opacity: 0.65 })
+      );
+      auraRing.rotation.x = -Math.PI / 2;
+      auraRing.position.y = 0.03;
+      chestGroup.add(baseBox, lidCylinder, strapLeft, strapRight, lockPlate, auraRing);
+      return chestGroup;
     };
 
     // Spawn 3 Chests per floor (Sword Chest, Item Chest, XP Chest)
@@ -1230,13 +1438,10 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
           : ckind === 'item_chest'
           ? 0x10b981
           : 0x38bdf8;
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.9, 0.75, 0.9),
-        new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.45 })
-      );
-      mesh.position.set(pos.x, 0.4, pos.z);
-      scene.add(mesh);
-      interactables.push({ id: `chest-${idx}`, r, c, mesh, kind: ckind, used: false });
+      const chestGroup = buildChestModel(color);
+      chestGroup.position.set(pos.x, 0.05, pos.z);
+      scene.add(chestGroup);
+      interactables.push({ id: `chest-${idx}`, r, c, mesh: chestGroup, kind: ckind, used: false });
     });
 
     // Spawn Pitfalls (from 6F+) & Warp Tiles
@@ -1277,13 +1482,20 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
       for (let i = 0; i < 3; i++) {
         const [r, c] = pickFreeCell();
         const pos = gridToWorld(r, c);
-        const mesh = new THREE.Mesh(
-          new THREE.OctahedronGeometry(0.55),
-          new THREE.MeshBasicMaterial({ color: 0xf59e0b })
+        const crystalGroup = new THREE.Group();
+        const coreCrystal = new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.48, 0),
+          new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 0.9 })
         );
-        mesh.position.set(pos.x, 0.8, pos.z);
-        scene.add(mesh);
-        interactables.push({ id: `fuel-${i}`, r, c, mesh, kind: 'fuel_crystal', used: false });
+        const crystalRing = new THREE.Mesh(
+          new THREE.TorusGeometry(0.62, 0.04, 8, 20),
+          new THREE.MeshBasicMaterial({ color: 0xfde047 })
+        );
+        crystalRing.rotation.x = Math.PI / 3;
+        crystalGroup.add(coreCrystal, crystalRing);
+        crystalGroup.position.set(pos.x, 0.85, pos.z);
+        scene.add(crystalGroup);
+        interactables.push({ id: `fuel-${i}`, r, c, mesh: crystalGroup, kind: 'fuel_crystal', used: false });
       }
     }
 
@@ -1323,11 +1535,504 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
 
     setMinimapGrid(grid.map((row) => [...row]));
 
+    // =============================================================
+    // Procedural Multi-Part 3D Character Builder for Enemies & Bosses
+    // =============================================================
+    type EnemyArchetype =
+      | 'golem'
+      | 'wisp'
+      | 'stalker'
+      | 'phantom'
+      | 'shield_ifrit'
+      | 'burning_soul'
+      | 'boss';
+
+    interface EnemyModelParts {
+      root: THREE.Group;
+      bodyGroup: THREE.Group;
+      headGroup: THREE.Group;
+      leftArm: THREE.Group;
+      rightArm: THREE.Group;
+      leftLeg: THREE.Group;
+      rightLeg: THREE.Group;
+      coreMesh: THREE.Mesh;
+      orbitRing1?: THREE.Object3D;
+      orbitRing2?: THREE.Object3D;
+      shieldLeft?: THREE.Group;
+      shieldRight?: THREE.Group;
+      hpBarGroup: THREE.Group;
+      hpBarFill: THREE.Mesh;
+      hitMaterials: THREE.MeshStandardMaterial[];
+      baseEmissiveColors: number[];
+    }
+
+    const buildEnemyCharacterModel = (
+      archetype: EnemyArchetype,
+      primaryColor: number,
+      isFinalBossFlag = false,
+      isMajorBossFlag = false
+    ): EnemyModelParts => {
+      const root = new THREE.Group();
+      const bodyGroup = new THREE.Group();
+      const headGroup = new THREE.Group();
+      const leftArm = new THREE.Group();
+      const rightArm = new THREE.Group();
+      const leftLeg = new THREE.Group();
+      const rightLeg = new THREE.Group();
+      const hitMaterials: THREE.MeshStandardMaterial[] = [];
+      const baseEmissiveColors: number[] = [];
+
+      const registerMat = (mat: THREE.MeshStandardMaterial, emissiveHex: number) => {
+        hitMaterials.push(mat);
+        baseEmissiveColors.push(emissiveHex);
+        return mat;
+      };
+
+      const armorMat = registerMat(
+        new THREE.MeshStandardMaterial({
+          color: primaryColor,
+          emissive: primaryColor,
+          emissiveIntensity: 0.32,
+          roughness: 0.35,
+          metalness: 0.65,
+        }),
+        primaryColor
+      );
+
+      const darkMetalMat = registerMat(
+        new THREE.MeshStandardMaterial({
+          color: 0x1e293b,
+          emissive: primaryColor,
+          emissiveIntensity: 0.15,
+          roughness: 0.45,
+          metalness: 0.8,
+        }),
+        primaryColor
+      );
+
+      const coreGlowColor = isFinalBossFlag ? 0xfef08a : 0xffffff;
+      const coreMat = registerMat(
+        new THREE.MeshStandardMaterial({
+          color: coreGlowColor,
+          emissive: primaryColor,
+          emissiveIntensity: 1.15,
+          roughness: 0.1,
+          metalness: 0.2,
+        }),
+        primaryColor
+      );
+
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+      let coreMesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.24, 0), coreMat);
+      let orbitRing1: THREE.Object3D | undefined;
+      let orbitRing2: THREE.Object3D | undefined;
+      let shieldLeft: THREE.Group | undefined;
+      let shieldRight: THREE.Group | undefined;
+
+      if (archetype === 'golem') {
+        // Heavy Stone & Emerald Construct
+        const torso = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.86, 0.62), darkMetalMat);
+        torso.position.y = 1.05;
+        const chestPlate = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.56, 0.68), armorMat);
+        chestPlate.position.y = 1.12;
+        coreMesh.position.set(0, 1.12, 0.36);
+
+        // Head with Visor & Stone Horns
+        headGroup.position.set(0, 1.66, 0);
+        const helm = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.44, 0.5), armorMat);
+        const visor = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.1, 0.53), eyeMat);
+        visor.position.y = 0.04;
+        const hornL = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.32, 5), darkMetalMat);
+        hornL.position.set(-0.28, 0.24, 0);
+        hornL.rotation.z = 0.35;
+        const hornR = hornL.clone();
+        hornR.position.x = 0.28;
+        hornR.rotation.z = -0.35;
+        headGroup.add(helm, visor, hornL, hornR);
+
+        // Articulated Crusher Arms
+        leftArm.position.set(-0.68, 1.35, 0);
+        const pauldronL = new THREE.Mesh(new THREE.DodecahedronGeometry(0.28, 0), armorMat);
+        const forearmL = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.75, 0.34), darkMetalMat);
+        forearmL.position.set(0, -0.42, 0.08);
+        const fistL = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.32, 0.42), coreMat);
+        fistL.position.set(0, -0.82, 0.14);
+        leftArm.add(pauldronL, forearmL, fistL);
+
+        rightArm.position.set(0.68, 1.35, 0);
+        rightArm.add(pauldronL.clone(), forearmL.clone(), fistL.clone());
+
+        // Pillar Legs
+        leftLeg.position.set(-0.26, 0.6, 0);
+        const legMeshL = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.6, 0.38), armorMat);
+        legMeshL.position.y = -0.3;
+        leftLeg.add(legMeshL);
+
+        rightLeg.position.set(0.26, 0.6, 0);
+        const legMeshR = legMeshL.clone();
+        rightLeg.add(legMeshR);
+
+        bodyGroup.add(torso, chestPlate, coreMesh, headGroup, leftArm, rightArm, leftLeg, rightLeg);
+      } else if (archetype === 'wisp') {
+        // Levitating Crystal Seraph with Orbiting Shard Rings
+        const prismBody = new THREE.Mesh(new THREE.OctahedronGeometry(0.52, 0), armorMat);
+        prismBody.position.y = 1.25;
+        prismBody.scale.set(0.9, 1.35, 0.9);
+        coreMesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.28, 1), coreMat);
+        coreMesh.position.set(0, 1.25, 0);
+
+        headGroup.position.set(0, 1.92, 0);
+        const crown = new THREE.Mesh(new THREE.ConeGeometry(0.24, 0.48, 6), coreMat);
+        const eyeGem = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), eyeMat);
+        eyeGem.position.set(0, -0.1, 0.22);
+        headGroup.add(crown, eyeGem);
+
+        // Crystal Wing-Blades
+        leftArm.position.set(-0.58, 1.35, 0);
+        const wingL1 = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.85, 4), coreMat);
+        wingL1.rotation.z = 0.75;
+        wingL1.position.set(-0.25, 0.1, 0);
+        const wingL2 = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.65, 4), armorMat);
+        wingL2.rotation.z = 1.15;
+        wingL2.position.set(-0.32, -0.22, 0);
+        leftArm.add(wingL1, wingL2);
+
+        rightArm.position.set(0.58, 1.35, 0);
+        const wingR1 = wingL1.clone();
+        wingR1.rotation.z = -0.75;
+        wingR1.position.x = 0.25;
+        const wingR2 = wingL2.clone();
+        wingR2.rotation.z = -1.15;
+        wingR2.position.x = 0.32;
+        rightArm.add(wingR1, wingR2);
+
+        // Orbiting Crystal Rings
+        const ring1 = new THREE.Group();
+        ring1.position.y = 1.25;
+        for (let k = 0; k < 6; k++) {
+          const ang = (k / 6) * Math.PI * 2;
+          const shard = new THREE.Mesh(new THREE.OctahedronGeometry(0.12, 0), coreMat);
+          shard.position.set(Math.cos(ang) * 0.82, 0, Math.sin(ang) * 0.82);
+          ring1.add(shard);
+        }
+        orbitRing1 = ring1;
+
+        const ring2 = new THREE.Mesh(
+          new THREE.TorusGeometry(0.68, 0.03, 8, 24),
+          new THREE.MeshBasicMaterial({ color: 0x67e8f9 })
+        );
+        ring2.position.y = 1.25;
+        ring2.rotation.x = Math.PI / 3;
+        orbitRing2 = ring2;
+
+        bodyGroup.add(prismBody, coreMesh, headGroup, leftArm, rightArm, ring1, ring2);
+      } else if (archetype === 'stalker') {
+        // Hooded Void Reaper with Twin Scythes
+        const cloakTorso = new THREE.Mesh(new THREE.ConeGeometry(0.58, 1.35, 7), darkMetalMat);
+        cloakTorso.position.y = 0.95;
+        const ribArmor = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.24, 0.68, 6), armorMat);
+        ribArmor.position.y = 1.22;
+        coreMesh.position.set(0, 1.24, 0.32);
+
+        headGroup.position.set(0, 1.76, 0.05);
+        const hood = new THREE.Mesh(new THREE.DodecahedronGeometry(0.3, 0), darkMetalMat);
+        const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 0.06), eyeMat);
+        eyeL.position.set(-0.1, 0.02, 0.27);
+        eyeL.rotation.z = -0.2;
+        const eyeR = eyeL.clone();
+        eyeR.position.x = 0.1;
+        eyeR.rotation.z = 0.2;
+        const hornL = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.42, 5), coreMat);
+        hornL.position.set(-0.22, 0.28, -0.05);
+        hornL.rotation.set(-0.3, 0, 0.4);
+        const hornR = hornL.clone();
+        hornR.position.x = 0.22;
+        hornR.rotation.z = -0.4;
+        headGroup.add(hood, eyeL, eyeR, hornL, hornR);
+
+        // Twin Void Scythe Arms
+        const buildScytheArm = (isLeft: boolean) => {
+          const s = isLeft ? -1 : 1;
+          const armGrp = new THREE.Group();
+          armGrp.position.set(s * 0.52, 1.42, 0);
+          const upper = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 0.55, 6), armorMat);
+          upper.position.set(s * 0.12, -0.2, 0.15);
+          upper.rotation.x = -0.5;
+          const blade = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.78, 4), coreMat);
+          blade.position.set(s * 0.14, -0.38, 0.52);
+          blade.rotation.x = Math.PI / 2 + 0.35;
+          armGrp.add(upper, blade);
+          return armGrp;
+        };
+        const scL = buildScytheArm(true);
+        const scR = buildScytheArm(false);
+        leftArm.copy(scL);
+        scL.children.forEach((c) => leftArm.add(c.clone()));
+        rightArm.copy(scR);
+        scR.children.forEach((c) => rightArm.add(c.clone()));
+
+        const voidHalo = new THREE.Mesh(
+          new THREE.TorusGeometry(0.55, 0.035, 8, 20),
+          new THREE.MeshBasicMaterial({ color: 0xd8b4fe, wireframe: true })
+        );
+        voidHalo.position.set(0, 1.45, -0.25);
+        orbitRing1 = voidHalo;
+
+        bodyGroup.add(cloakTorso, ribArmor, coreMesh, headGroup, leftArm, rightArm, voidHalo);
+      } else if (archetype === 'phantom') {
+        // Cybernetic Glitch Assassin with Wireframe Data Shell & Twin Plasma Katanas
+        const chassis = new THREE.Mesh(new THREE.OctahedronGeometry(0.48, 0), darkMetalMat);
+        chassis.position.y = 1.22;
+        chassis.scale.set(0.95, 1.3, 0.7);
+        const wireShell = new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.62, 1),
+          new THREE.MeshBasicMaterial({ color: 0xf472b6, wireframe: true })
+        );
+        wireShell.position.y = 1.22;
+        orbitRing1 = wireShell;
+        coreMesh.position.set(0, 1.22, 0.34);
+
+        headGroup.position.set(0, 1.82, 0);
+        const cyberHead = new THREE.Mesh(new THREE.OctahedronGeometry(0.26, 0), armorMat);
+        const cyberVisor = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.08, 0.28), eyeMat);
+        cyberVisor.position.set(0, 0.02, 0.12);
+        const dataHalo = new THREE.Mesh(
+          new THREE.RingGeometry(0.32, 0.42, 6),
+          new THREE.MeshBasicMaterial({ color: 0x00f2ff, side: THREE.DoubleSide })
+        );
+        dataHalo.rotation.x = Math.PI / 2;
+        dataHalo.position.y = 0.26;
+        headGroup.add(cyberHead, cyberVisor, dataHalo);
+
+        // Twin Plasma Katanas
+        const buildKatanaArm = (isLeft: boolean) => {
+          const s = isLeft ? -1 : 1;
+          const grp = new THREE.Group();
+          grp.position.set(s * 0.56, 1.38, 0);
+          const shoulder = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.24, 0.24), armorMat);
+          const katana = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.88, 0.1), coreMat);
+          katana.position.set(0, -0.25, 0.42);
+          katana.rotation.x = Math.PI / 3;
+          grp.add(shoulder, katana);
+          return grp;
+        };
+        const kL = buildKatanaArm(true);
+        const kR = buildKatanaArm(false);
+        leftArm.position.copy(kL.position);
+        kL.children.forEach((c) => leftArm.add(c.clone()));
+        rightArm.position.copy(kR.position);
+        kR.children.forEach((c) => rightArm.add(c.clone()));
+
+        bodyGroup.add(chassis, wireShell, coreMesh, headGroup, leftArm, rightArm);
+      } else if (archetype === 'shield_ifrit') {
+        // Armored Magma Demon with Animated Twin Frontal Tower Shields
+        const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.36, 0.95, 8), darkMetalMat);
+        torso.position.y = 1.08;
+        const breastplate = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.55, 0.58), armorMat);
+        breastplate.position.y = 1.18;
+        coreMesh.position.set(0, 1.18, 0.34);
+
+        headGroup.position.set(0, 1.74, 0);
+        const skull = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.42, 0.46), armorMat);
+        const visor = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.09, 0.49), eyeMat);
+        visor.position.y = 0.03;
+        const hornL = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.48, 6), coreMat);
+        hornL.position.set(-0.28, 0.3, 0);
+        hornL.rotation.z = 0.45;
+        const hornR = hornL.clone();
+        hornR.position.x = 0.28;
+        hornR.rotation.z = -0.45;
+        headGroup.add(skull, visor, hornL, hornR);
+
+        leftArm.position.set(-0.62, 1.32, 0);
+        const armL = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.68, 0.28), armorMat);
+        armL.position.y = -0.28;
+        leftArm.add(armL);
+
+        rightArm.position.set(0.62, 1.32, 0);
+        rightArm.add(armL.clone());
+
+        leftLeg.position.set(-0.24, 0.6, 0);
+        const legL = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.6, 0.32), darkMetalMat);
+        legL.position.y = -0.3;
+        leftLeg.add(legL);
+        rightLeg.position.set(0.24, 0.6, 0);
+        rightLeg.add(legL.clone());
+
+        // Deployable Frontal Magma Tower Shields
+        const shieldMat = registerMat(
+          new THREE.MeshStandardMaterial({
+            color: 0xf97316,
+            emissive: 0xff4500,
+            emissiveIntensity: 0.75,
+            metalness: 0.85,
+            roughness: 0.2,
+          }),
+          0xff4500
+        );
+        const shieldTrimMat = new THREE.MeshBasicMaterial({ color: 0xfef08a, wireframe: true });
+
+        shieldLeft = new THREE.Group();
+        const panelL = new THREE.Mesh(new THREE.BoxGeometry(0.56, 1.35, 0.12), shieldMat);
+        const frameL = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.4, 0.15), shieldTrimMat);
+        shieldLeft.add(panelL, frameL);
+        shieldLeft.position.set(-0.3, 1.08, 0.62);
+
+        shieldRight = new THREE.Group();
+        shieldRight.add(panelL.clone(), frameL.clone());
+        shieldRight.position.set(0.3, 1.08, 0.62);
+
+        bodyGroup.add(torso, breastplate, coreMesh, headGroup, leftArm, rightArm, leftLeg, rightLeg, shieldLeft, shieldRight);
+      } else if (archetype === 'burning_soul') {
+        // Unstable Volatile Bomb-Construct with Pulsing Core & Gyroscopic Hazard Cages
+        coreMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(0.46, 1), coreMat);
+        coreMesh.position.set(0, 1.22, 0);
+
+        headGroup.position.set(0, 1.82, 0);
+        const flameCrown = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.45, 5), armorMat);
+        const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.07, 8, 8), eyeMat);
+        eyeL.position.set(-0.11, -0.1, 0.24);
+        const eyeR = eyeL.clone();
+        eyeR.position.x = 0.11;
+        headGroup.add(flameCrown, eyeL, eyeR);
+
+        const cage1 = new THREE.Group();
+        cage1.position.y = 1.22;
+        const ringMesh1 = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.055, 8, 20), darkMetalMat);
+        cage1.add(ringMesh1);
+        for (let k = 0; k < 8; k++) {
+          const ang = (k / 8) * Math.PI * 2;
+          const spike = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.28, 4), armorMat);
+          spike.position.set(Math.cos(ang) * 0.84, Math.sin(ang) * 0.84, 0);
+          spike.rotation.z = ang - Math.PI / 2;
+          cage1.add(spike);
+        }
+        orbitRing1 = cage1;
+
+        const cage2 = new THREE.Mesh(
+          new THREE.TorusGeometry(0.86, 0.04, 8, 24),
+          new THREE.MeshBasicMaterial({ color: 0xfef08a, wireframe: true })
+        );
+        cage2.position.y = 1.22;
+        cage2.rotation.y = Math.PI / 2;
+        orbitRing2 = cage2;
+
+        bodyGroup.add(coreMesh, headGroup, cage1, cage2);
+      } else {
+        // BOSS: Mid-Boss / Major Boss / 50F Final Boss Colossal Mecha-Overlord
+        const bossScale = isFinalBossFlag ? 1.38 : isMajorBossFlag ? 1.22 : 1.08;
+        bodyGroup.scale.setScalar(bossScale);
+
+        const upperTorso = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.46, 1.15, 8), darkMetalMat);
+        upperTorso.position.y = 1.28;
+        const chestArmor = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.72, 0.78), armorMat);
+        chestArmor.position.y = 1.36;
+        coreMesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.36, 1), coreMat);
+        coreMesh.position.set(0, 1.35, 0.45);
+
+        headGroup.position.set(0, 2.08, 0);
+        const bossHelm = new THREE.Mesh(new THREE.DodecahedronGeometry(0.38, 0), armorMat);
+        const bossVisor = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.12, 0.46), eyeMat);
+        bossVisor.position.set(0, 0.04, 0.18);
+        const crownCenter = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.55, 4), coreMat);
+        crownCenter.position.set(0, 0.42, 0);
+        const hornL = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.65, 6), coreMat);
+        hornL.position.set(-0.38, 0.34, 0);
+        hornL.rotation.z = 0.52;
+        const hornR = hornL.clone();
+        hornR.position.x = 0.38;
+        hornR.rotation.z = -0.52;
+        headGroup.add(bossHelm, bossVisor, crownCenter, hornL, hornR);
+
+        // 4 Articulated Boss Weapon Arms (Upper Great-Blades + Lower Plasma Claws)
+        const buildBossArmSide = (isLeft: boolean) => {
+          const s = isLeft ? -1 : 1;
+          const armGrp = new THREE.Group();
+          armGrp.position.set(s * 0.85, 1.56, 0);
+          const pauldron = new THREE.Mesh(new THREE.OctahedronGeometry(0.34, 0), armorMat);
+          const upperBlade = new THREE.Mesh(new THREE.ConeGeometry(0.18, 1.15, 4), coreMat);
+          upperBlade.position.set(s * 0.18, -0.35, 0.52);
+          upperBlade.rotation.x = Math.PI / 2 + 0.25;
+          const lowerClaw = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.65, 0.28), darkMetalMat);
+          lowerClaw.position.set(s * 0.28, -0.55, 0.15);
+          armGrp.add(pauldron, upperBlade, lowerClaw);
+          return armGrp;
+        };
+        const bArmL = buildBossArmSide(true);
+        const bArmR = buildBossArmSide(false);
+        leftArm.position.copy(bArmL.position);
+        bArmL.children.forEach((c) => leftArm.add(c.clone()));
+        rightArm.position.copy(bArmR.position);
+        bArmR.children.forEach((c) => rightArm.add(c.clone()));
+
+        const reactorRing1 = new THREE.Mesh(
+          new THREE.TorusGeometry(1.15, 0.055, 10, 28),
+          coreMat
+        );
+        reactorRing1.position.y = 1.35;
+        reactorRing1.rotation.x = Math.PI / 3;
+        orbitRing1 = reactorRing1;
+
+        const reactorRing2 = new THREE.Mesh(
+          new THREE.TorusGeometry(1.35, 0.04, 8, 28),
+          new THREE.MeshBasicMaterial({ color: 0xfef08a, wireframe: true })
+        );
+        reactorRing2.position.y = 1.35;
+        reactorRing2.rotation.y = Math.PI / 3;
+        orbitRing2 = reactorRing2;
+
+        bodyGroup.add(upperTorso, chestArmor, coreMesh, headGroup, leftArm, rightArm, reactorRing1, reactorRing2);
+      }
+
+      // Floating 3D Health Bar above Enemy/Boss
+      const hpBarGroup = new THREE.Group();
+      const barWidth = archetype === 'boss' ? 1.6 : 1.05;
+      const hpBg = new THREE.Mesh(
+        new THREE.PlaneGeometry(barWidth, 0.13),
+        new THREE.MeshBasicMaterial({ color: 0x090d16, side: THREE.DoubleSide })
+      );
+      const hpBarFill = new THREE.Mesh(
+        new THREE.PlaneGeometry(barWidth - 0.04, 0.09),
+        new THREE.MeshBasicMaterial({
+          color: archetype === 'boss' ? 0xf43f5e : 0x10b981,
+          side: THREE.DoubleSide,
+        })
+      );
+      hpBarFill.position.z = 0.01;
+      hpBarGroup.add(hpBg, hpBarFill);
+      hpBarGroup.position.y = archetype === 'boss' ? 3.15 : 2.38;
+
+      root.add(bodyGroup, hpBarGroup);
+
+      return {
+        root,
+        bodyGroup,
+        headGroup,
+        leftArm,
+        rightArm,
+        leftLeg,
+        rightLeg,
+        coreMesh,
+        orbitRing1,
+        orbitRing2,
+        shieldLeft,
+        shieldRight,
+        hpBarGroup,
+        hpBarFill,
+        hitMaterials,
+        baseEmissiveColors,
+      };
+    };
+
     // Spawn Enemies & Bosses (X5F Mid-Boss, X0F Major Boss, 50F Final Boss)
     interface MazeEnemy {
       id: string;
       name: string;
-      mesh: THREE.Mesh;
+      archetype: EnemyArchetype;
+      mesh: THREE.Group;
+      parts: EnemyModelParts;
+      colorHex: number;
       hp: number;
       maxHp: number;
       atk: number;
@@ -1336,6 +2041,9 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
       specialType: 'normal' | 'shield_ifrit' | 'burning_soul';
       shieldActive: boolean;
       alive: boolean;
+      walkPhase: number;
+      hitFlashTimer: number;
+      attackAnimTimer: number;
     }
     const enemies: MazeEnemy[] = [];
 
@@ -1360,18 +2068,18 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
         : `【中ボス】${areaTheme.name}・ガーディアン (F${activeFloor})`;
       const bossHp = Math.round((220 + activeFloor * 55) * (isFinalBoss ? 2.2 : isMajorBoss ? 1.5 : 1.1) * diffMult);
       const bossColor = isFinalBoss ? 0xff2200 : isMajorBoss ? 0xf59e0b : 0xa855f7;
-      const bossMesh = new THREE.Mesh(
-        new THREE.OctahedronGeometry(1.25, 1),
-        new THREE.MeshStandardMaterial({ color: bossColor, emissive: bossColor, emissiveIntensity: 0.7, wireframe: false })
-      );
+      const bossParts = buildEnemyCharacterModel('boss', bossColor, isFinalBoss, isMajorBoss);
       const bPos = gridToWorld(stairsR - 1, stairsC - 1);
-      bossMesh.position.set(bPos.x, 1.3, bPos.z);
-      scene.add(bossMesh);
+      bossParts.root.position.set(bPos.x, 0, bPos.z);
+      scene.add(bossParts.root);
 
       enemies.push({
         id: `boss-${activeFloor}`,
         name: bossName,
-        mesh: bossMesh,
+        archetype: 'boss',
+        mesh: bossParts.root,
+        parts: bossParts,
+        colorHex: bossColor,
         hp: bossHp,
         maxHp: bossHp,
         atk: Math.round((16 + activeFloor * 2.2) * diffMult),
@@ -1380,6 +2088,9 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
         specialType: 'normal',
         shieldActive: false,
         alive: true,
+        walkPhase: 0,
+        hitFlashTimer: 0,
+        attackAnimTimer: 0,
       });
       setCurrentFloorBossAlive(true);
       setCurrentFloorBossName(bossName);
@@ -1395,45 +2106,52 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
       const [er, ec] = pickFreeCell();
       const ePos = gridToWorld(er, ec);
       let specialType: MazeEnemy['specialType'] = 'normal';
+      let archetype: EnemyArchetype = 'golem';
       let eName = `${areaTheme.name} Sentinel`;
       let eColor = 0x38bdf8;
 
       if (activeFloor >= 41) {
         if (i % 2 === 0) {
           specialType = 'shield_ifrit';
+          archetype = 'shield_ifrit';
           eName = 'シールド・イフリート';
           eColor = 0xf97316;
         } else {
           specialType = 'burning_soul';
+          archetype = 'burning_soul';
           eName = 'バーニング・ソウル (自爆-60s)';
           eColor = 0xef4444;
         }
       } else if (activeFloor >= 31) {
+        archetype = 'phantom';
         eName = 'グリッチ・ファントム';
         eColor = 0xec4899;
       } else if (activeFloor >= 21) {
+        archetype = 'stalker';
         eName = 'ヴォイド・ストーカー';
         eColor = 0xa855f7;
       } else if (activeFloor >= 11) {
+        archetype = 'wisp';
         eName = 'クリスタル・ウィスプ';
         eColor = 0x06b6d4;
       } else {
+        archetype = 'golem';
         eName = 'アース・ゴーレム';
         eColor = 0x10b981;
       }
 
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.95, 1.5, 0.95),
-        new THREE.MeshStandardMaterial({ color: eColor, emissive: eColor, emissiveIntensity: 0.45 })
-      );
-      mesh.position.set(ePos.x, 0.8, ePos.z);
-      scene.add(mesh);
+      const parts = buildEnemyCharacterModel(archetype, eColor);
+      parts.root.position.set(ePos.x, 0, ePos.z);
+      scene.add(parts.root);
 
       const eHp = Math.round((50 + activeFloor * 18) * diffMult);
       enemies.push({
         id: `enemy-${i}`,
         name: eName,
-        mesh,
+        archetype,
+        mesh: parts.root,
+        parts,
+        colorHex: eColor,
         hp: eHp,
         maxHp: eHp,
         atk: Math.round((9 + activeFloor * 1.6) * diffMult),
@@ -1442,6 +2160,9 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
         specialType,
         shieldActive: false,
         alive: true,
+        walkPhase: Math.random() * Math.PI * 2,
+        hitFlashTimer: 0,
+        attackAnimTimer: 0,
       });
     }
 
@@ -1470,6 +2191,17 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
 
     const handleEnemyDefeated = (en: MazeEnemy) => {
       en.alive = false;
+      const deathOrigin = en.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+      spawnParticleBurst(deathOrigin, en.colorHex, en.isBoss ? 58 : 32, en.isBoss ? 0.22 : 0.16, 0.1, 34, true);
+      spawnShockwaveRing(
+        new THREE.Vector3(en.mesh.position.x, 0.12, en.mesh.position.z),
+        en.colorHex,
+        0.5,
+        en.isBoss ? 5.2 : 2.8,
+        24,
+        true,
+        0.02
+      );
       scene.remove(en.mesh);
       playSound('levelup');
 
@@ -1512,24 +2244,74 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
       }
     };
 
+    // Helper to get weapon glow color by rarity
+    const getRarityColorHex = (rarity: WeaponRarity): number => {
+      switch (rarity) {
+        case 'OG':
+          return 0xf43f5e;
+        case 'Mythic':
+          return 0xfacc15;
+        case 'Epic':
+          return 0xa855f7;
+        case 'Rare':
+          return 0x38bdf8;
+        case 'Uncommon':
+          return 0x10b981;
+        default:
+          return 0xe2e8f0;
+      }
+    };
+
     // Register Attack, Active Skill & Neon Paint actions
     mazeActionsRef.current.attack = () => {
       playSound('attack');
       const st = mazeStateRef.current;
+      const wpnColor = getRarityColorHex(st.weapon.rarity);
+      weaponSwingTimer = 14;
+
+      // Spawn 3D Slash Energy Wave in front of player
+      const forwardDir = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+      const slashOrigin = new THREE.Vector3(posX, 1.1, posZ).addScaledVector(forwardDir, 1.25);
+      spawnShockwaveRing(slashOrigin, wpnColor, 0.35, 1.65, 12, true, 0);
+
       const boostMult = st.chronoBoostSec > 0 ? 1.6 : 1.0;
       const totalDmg = Math.round((st.weapon.damage + st.atk) * boostMult);
 
       let hitTarget: MazeEnemy | null = null;
       for (const en of enemies) {
         if (!en.alive) continue;
-        const dist = camera.position.distanceTo(en.mesh.position);
-        if (dist <= st.weapon.range + 1.8) {
+        const dxE = en.mesh.position.x - posX;
+        const dzE = en.mesh.position.z - posZ;
+        const dist = Math.hypot(dxE, dzE);
+        if (dist <= st.weapon.range + 1.85) {
+          const hitPos = en.mesh.position.clone().add(new THREE.Vector3(0, 1.25, 0));
           if (en.specialType === 'shield_ifrit' && en.shieldActive) {
-            setCombatLog('🛡️ シールド・イフリートが正面ガード中！ 攻撃直後の隙を狙え！');
+            spawnParticleBurst(hitPos, 0xfacc15, 14, 0.14, 0.05, 18, false);
+            spawnShockwaveRing(hitPos, 0xf97316, 0.3, 1.4, 12, false, 0);
+            cameraShakeTimer = 6;
+            cameraShakeIntensity = 0.04;
+            setCombatLog('🛡️ シールド・イフリートが正面ガード中！ 盾が開いた隙を狙え！');
             return;
           }
           en.hp -= totalDmg;
+          en.hitFlashTimer = 10;
+          // Knockback jolt away from player
+          if (dist > 0.1) {
+            const kbX = en.mesh.position.x + (dxE / dist) * 0.28;
+            const kbZ = en.mesh.position.z + (dzE / dist) * 0.28;
+            if (!collidesAt(kbX, kbZ)) {
+              en.mesh.position.set(kbX, 0, kbZ);
+            }
+          }
+          spawnParticleBurst(hitPos, wpnColor, 18, 0.16, 0.07, 22, false);
+          cameraShakeTimer = 5;
+          cameraShakeIntensity = 0.035;
           hitTarget = en;
+
+          // Update floating 3D HP bar
+          const hpRatio = Math.max(0.001, en.hp / en.maxHp);
+          en.parts.hpBarFill.scale.x = hpRatio;
+
           if (en.isBoss) {
             setCurrentFloorBossHpPct(Math.max(0, Math.round((en.hp / en.maxHp) * 100)));
           }
@@ -1555,11 +2337,36 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
       }
       playSound('boost');
       setSkillCooldown(wpn.cooldownSec || 15);
+      weaponSwingTimer = 18;
+      cameraShakeTimer = 14;
+      cameraShakeIntensity = 0.07;
+
+      const skillColor = getRarityColorHex(wpn.rarity);
+      const playerFloorOrigin = new THREE.Vector3(posX, 0.15, posZ);
+      spawnShockwaveRing(playerFloorOrigin, skillColor, 0.5, 8.5, 28, true, 0.02);
+      spawnShockwaveRing(new THREE.Vector3(posX, 0.8, posZ), 0xffffff, 0.4, 6.2, 22, true, 0.04);
+      spawnParticleBurst(new THREE.Vector3(posX, 1.1, posZ), skillColor, 42, 0.22, 0.12, 32, true);
+
       const skillDmg = Math.round((wpn.damage + mazeStateRef.current.atk) * 2.4);
 
       enemies.forEach((en) => {
         if (!en.alive) return;
         en.hp -= skillDmg;
+        en.hitFlashTimer = 14;
+        const enOrigin = en.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+        spawnParticleBurst(enOrigin, skillColor, 22, 0.18, 0.09, 26, false);
+        spawnShockwaveRing(
+          new THREE.Vector3(en.mesh.position.x, 0.15, en.mesh.position.z),
+          skillColor,
+          0.3,
+          2.6,
+          20,
+          true,
+          0.03
+        );
+        const hpRatio = Math.max(0.001, en.hp / en.maxHp);
+        en.parts.hpBarFill.scale.x = hpRatio;
+
         if (en.isBoss) {
           setCurrentFloorBossHpPct(Math.max(0, Math.round((en.hp / en.maxHp) * 100)));
         }
@@ -1585,6 +2392,7 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
       marker.rotation.x = -Math.PI / 2;
       marker.position.set(posX, 0.07, posZ);
       scene.add(marker);
+      spawnShockwaveRing(new THREE.Vector3(posX, 0.08, posZ), 0x00f2ff, 0.3, 1.4, 15, true, 0);
     };
 
     const collidesAt = (testX: number, testZ: number): boolean => {
@@ -1637,6 +2445,7 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
       }
 
       // Independent X and Z axis wall sliding so player never gets stuck
+      const isPlayerMoving = dx !== 0 || dz !== 0;
       if (dx !== 0 && !collidesAt(posX + dx, posZ)) {
         posX += dx;
       }
@@ -1644,9 +2453,82 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
         posZ += dz;
       }
 
-      camera.position.set(posX, 1.15, posZ);
+      // Camera Position + Head-bob + Camera Shake
+      const headBobY = isPlayerMoving ? Math.sin(ticks * 0.22) * 0.035 : Math.sin(ticks * 0.05) * 0.008;
+      let shakeX = 0;
+      let shakeY = 0;
+      if (cameraShakeTimer > 0) {
+        cameraShakeTimer--;
+        shakeX = (Math.random() - 0.5) * cameraShakeIntensity;
+        shakeY = (Math.random() - 0.5) * cameraShakeIntensity;
+      }
+      camera.position.set(posX + shakeX, 1.15 + headBobY + shakeY, posZ);
       camera.rotation.order = 'YXZ';
       camera.rotation.y = yaw;
+
+      // Animate First-Person 3D Sword Viewmodel
+      const wpnRarityColor = getRarityColorHex(st.weapon.rarity);
+      bladeMat.color.setHex(wpnRarityColor);
+      bladeMat.emissive.setHex(wpnRarityColor);
+      if (weaponSwingTimer > 0) {
+        weaponSwingTimer--;
+        const swingProg = 1 - weaponSwingTimer / 14;
+        const swingArc = Math.sin(swingProg * Math.PI);
+        weaponViewGroup.position.set(0.42 - swingArc * 0.38, -0.34 + swingArc * 0.12, -0.68 - swingArc * 0.25);
+        weaponViewGroup.rotation.set(0.25 - swingArc * 1.35, -0.35 + swingArc * 0.95, 0.18 + swingArc * 0.85);
+      } else {
+        const idleSwayX = isPlayerMoving ? Math.cos(ticks * 0.18) * 0.025 : Math.cos(ticks * 0.04) * 0.008;
+        const idleSwayY = isPlayerMoving ? Math.abs(Math.sin(ticks * 0.18)) * 0.03 : Math.sin(ticks * 0.04) * 0.01;
+        weaponViewGroup.position.set(0.42 + idleSwayX, -0.34 - idleSwayY, -0.68);
+        weaponViewGroup.rotation.set(0.25, -0.35, 0.18);
+      }
+
+      // Animate Ambient Dungeon Mana Motes
+      const motePosAttr = moteGeo.getAttribute('position') as THREE.BufferAttribute;
+      for (let i = 0; i < moteCount; i++) {
+        let my = motePosAttr.getY(i) + 0.005;
+        if (my > 2.85) my = 0.15;
+        motePosAttr.setY(i, my);
+      }
+      motePosAttr.needsUpdate = true;
+
+      // Update Active 3D VFX Particles & Shockwave Rings
+      for (let i = vfxParticles.length - 1; i >= 0; i--) {
+        const p = vfxParticles[i];
+        p.life--;
+        p.mesh.position.x += p.vx;
+        p.mesh.position.y += p.vy;
+        p.mesh.position.z += p.vz;
+        p.vy -= p.gravity;
+        p.mesh.rotation.x += p.spinX;
+        p.mesh.rotation.y += p.spinY;
+        const ratio = Math.max(0, p.life / p.maxLife);
+        if (p.scaleDecay) {
+          p.mesh.scale.setScalar(0.2 + ratio * 0.9);
+        }
+        (p.mesh.material as THREE.MeshBasicMaterial).opacity = ratio;
+        if (p.life <= 0) {
+          scene.remove(p.mesh);
+          (p.mesh.material as THREE.Material).dispose();
+          vfxParticles.splice(i, 1);
+        }
+      }
+
+      for (let i = vfxShockwaves.length - 1; i >= 0; i--) {
+        const sw = vfxShockwaves[i];
+        sw.life--;
+        const progress = 1 - sw.life / sw.maxLife;
+        const curScale = sw.startScale + (sw.endScale - sw.startScale) * progress;
+        sw.mesh.scale.setScalar(curScale);
+        sw.mesh.position.y += sw.riseY;
+        (sw.mesh.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - progress);
+        if (sw.life <= 0) {
+          scene.remove(sw.mesh);
+          sw.mesh.geometry.dispose();
+          (sw.mesh.material as THREE.Material).dispose();
+          vfxShockwaves.splice(i, 1);
+        }
+      }
 
       // Update Void Torch Fuel Fog density dynamically
       if (activeFloor >= 21 && activeFloor <= 30) {
@@ -1662,8 +2544,23 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
         setPlayerGridPos({ r: curR, c: curC, yaw });
       }
 
-      // Animate Exit Stairs & Check Floor Advancement
-      stairsPortal.rotation.y += 0.03;
+      // Animate Exit Stairs Portal & Check Floor Advancement
+      portalOuterCylinder.rotation.y += 0.035;
+      portalInnerCore.rotation.y -= 0.05;
+      portalBaseRing.rotation.z += 0.04;
+      portalTopRing.rotation.z -= 0.04;
+      if (ticks % 18 === 0) {
+        spawnParticleBurst(
+          new THREE.Vector3(stairsPos.x, 0.3, stairsPos.z),
+          0x00f2ff,
+          2,
+          0.04,
+          0.06,
+          24,
+          false
+        );
+      }
+
       if (curR === stairsR && curC === stairsC) {
         const bossStillAlive = enemies.some((e) => e.isBoss && e.alive);
         if (bossStillAlive) {
@@ -1680,12 +2577,19 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
       // Check Interactables (Chests, Pitfalls, Warps, Fuel, Glitch Pits, Magma)
       for (const item of interactables) {
         if (item.used) continue;
-        if ( item.kind.includes('chest') || item.kind === 'fuel_crystal') {
-          item.mesh.rotation.y += 0.03;
+        if (item.kind.includes('chest') || item.kind === 'fuel_crystal') {
+          item.mesh.rotation.y += 0.028;
+          item.mesh.position.y =
+            item.kind === 'fuel_crystal'
+              ? 0.8 + Math.sin(ticks * 0.08) * 0.12
+              : 0.05 + Math.sin(ticks * 0.06) * 0.04;
         }
         if (item.r === curR && item.c === curC) {
           if (item.kind === 'magma') {
             if (ticks % 35 === 0) {
+              spawnParticleBurst(new THREE.Vector3(posX, 0.2, posZ), 0xff4500, 12, 0.1, 0.08, 20, false);
+              cameraShakeTimer = 6;
+              cameraShakeIntensity = 0.045;
               setMazeHp((h) => {
                 const next = h - 8;
                 if (next <= 0) {
@@ -1699,6 +2603,8 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
           }
 
           item.used = true;
+          spawnParticleBurst(item.mesh.position.clone().add(new THREE.Vector3(0, 0.5, 0)), 0xfacc15, 24, 0.15, 0.09, 26, true);
+          spawnShockwaveRing(new THREE.Vector3(item.mesh.position.x, 0.1, item.mesh.position.z), 0xfacc15, 0.3, 2.2, 18, true, 0.02);
           scene.remove(item.mesh);
 
           if (item.kind === 'wood_chest' || item.kind === 'silver_chest' || item.kind === 'gold_chest') {
@@ -1774,35 +2680,153 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
         }
       }
 
-      // Enemy AI & Combat Tick
+      // =============================================================
+      // Enemy AI, Skeletal/Hierarchical Animation & Combat Tick
+      // =============================================================
       enemies.forEach((en) => {
         if (!en.alive) return;
-        en.mesh.rotation.y += 0.025;
 
-        // Shield Ifrit toggles frontal shield every 90 ticks
+        const dxP = posX - en.mesh.position.x;
+        const dzP = posZ - en.mesh.position.z;
+        const dist = Math.hypot(dxP, dzP);
+
+        // Billboard 3D HP bar toward camera
+        en.parts.hpBarGroup.lookAt(camera.position.x, en.parts.hpBarGroup.getWorldPosition(new THREE.Vector3()).y, camera.position.z);
+
+        // Smoothly rotate character root to face the player
+        const targetAngle = Math.atan2(dxP, dzP);
+        let angleDiff = targetAngle - en.mesh.rotation.y;
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+        en.mesh.rotation.y += angleDiff * 0.12;
+
+        // Shield Ifrit toggles frontal shield every 90 ticks with animated shield panels
         if (en.specialType === 'shield_ifrit') {
           en.shieldActive = Math.floor(ticks / 90) % 2 === 0;
-          (en.mesh.material as THREE.MeshStandardMaterial).wireframe = en.shieldActive;
+          if (en.parts.shieldLeft && en.parts.shieldRight) {
+            const targetShieldX = en.shieldActive ? 0.28 : 0.78;
+            const targetShieldZ = en.shieldActive ? 0.64 : 0.15;
+            const targetShieldRotY = en.shieldActive ? 0 : 1.15;
+            en.parts.shieldLeft.position.x += (-targetShieldX - en.parts.shieldLeft.position.x) * 0.18;
+            en.parts.shieldLeft.position.z += (targetShieldZ - en.parts.shieldLeft.position.z) * 0.18;
+            en.parts.shieldLeft.rotation.y += (-targetShieldRotY - en.parts.shieldLeft.rotation.y) * 0.18;
+
+            en.parts.shieldRight.position.x += (targetShieldX - en.parts.shieldRight.position.x) * 0.18;
+            en.parts.shieldRight.position.z += (targetShieldZ - en.parts.shieldRight.position.z) * 0.18;
+            en.parts.shieldRight.rotation.y += (targetShieldRotY - en.parts.shieldRight.rotation.y) * 0.18;
+          }
         }
 
-        const dist = camera.position.distanceTo(en.mesh.position);
-        if (dist < 9.5 && dist > 1.35) {
-          // Move slightly toward player
-          const dirX = (posX - en.mesh.position.x) / dist;
-          const dirZ = (posZ - en.mesh.position.z) / dist;
-          en.mesh.position.x += dirX * 0.025;
-          en.mesh.position.z += dirZ * 0.025;
+        // Move toward player when in aggro range
+        const isMoving = dist < 10.5 && dist > 1.4;
+        if (isMoving) {
+          const stepSpeed = en.isBoss ? 0.022 : en.specialType === 'burning_soul' ? 0.034 : 0.026;
+          const nextX = en.mesh.position.x + (dxP / dist) * stepSpeed;
+          const nextZ = en.mesh.position.z + (dzP / dist) * stepSpeed;
+          if (!collidesAt(nextX, en.mesh.position.z)) en.mesh.position.x = nextX;
+          if (!collidesAt(en.mesh.position.x, nextZ)) en.mesh.position.z = nextZ;
+          en.walkPhase += 0.18;
+        } else {
+          en.walkPhase += 0.06;
         }
 
-        if (dist <= 1.7 && ticks % 45 === 0) {
+        // Procedural Limb & Body Animation
+        const p = en.parts;
+        const swing = Math.sin(en.walkPhase);
+        const bob = Math.abs(Math.cos(en.walkPhase));
+
+        // Core & Orbital Rings animation
+        p.coreMesh.rotation.y += 0.06;
+        p.coreMesh.rotation.x += 0.04;
+        const coreScale =
+          en.specialType === 'burning_soul'
+            ? 1.0 + Math.sin(ticks * 0.28) * 0.25
+            : 1.0 + Math.sin(ticks * 0.1) * 0.08;
+        p.coreMesh.scale.setScalar(coreScale);
+
+        if (p.orbitRing1) {
+          p.orbitRing1.rotation.y += en.specialType === 'burning_soul' ? 0.12 : 0.045;
+          p.orbitRing1.rotation.z += 0.03;
+        }
+        if (p.orbitRing2) {
+          p.orbitRing2.rotation.x -= 0.055;
+          p.orbitRing2.rotation.y -= 0.04;
+        }
+
+        // Archetype locomotion & attack animation
+        if (en.attackAnimTimer > 0) {
+          en.attackAnimTimer--;
+          const atkPhase = Math.sin((1 - en.attackAnimTimer / 18) * Math.PI);
+          p.leftArm.rotation.x = -1.45 * atkPhase;
+          p.rightArm.rotation.x = -1.45 * atkPhase;
+          p.bodyGroup.position.z = 0.32 * atkPhase;
+          p.bodyGroup.rotation.x = 0.25 * atkPhase;
+        } else {
+          p.bodyGroup.position.z *= 0.8;
+          if (en.archetype === 'wisp' || en.archetype === 'phantom' || en.archetype === 'burning_soul' || en.archetype === 'boss') {
+            // Hovering / Floating Archetypes
+            p.bodyGroup.position.y = Math.sin(en.walkPhase * 0.8) * 0.14;
+            p.bodyGroup.rotation.x = isMoving ? 0.14 : Math.sin(en.walkPhase * 0.4) * 0.04;
+            p.leftArm.rotation.x = swing * 0.35;
+            p.rightArm.rotation.x = -swing * 0.35;
+            p.leftArm.rotation.z = Math.sin(en.walkPhase * 0.5) * 0.12;
+            p.rightArm.rotation.z = -Math.sin(en.walkPhase * 0.5) * 0.12;
+            if (en.archetype === 'phantom' && ticks % 12 === 0) {
+              // Subtle cyber-glitch jitter
+              p.bodyGroup.position.x = (Math.random() - 0.5) * 0.14;
+            } else {
+              p.bodyGroup.position.x = 0;
+            }
+          } else {
+            // Bipedal Walking Archetypes (Golem, Stalker, Shield Ifrit)
+            const strideAmp = isMoving ? 0.65 : 0.12;
+            p.bodyGroup.position.y = isMoving ? bob * 0.09 : Math.sin(en.walkPhase) * 0.03;
+            p.bodyGroup.rotation.x = isMoving ? 0.08 : 0;
+            p.leftArm.rotation.x = swing * strideAmp;
+            p.rightArm.rotation.x = -swing * strideAmp;
+            p.leftLeg.rotation.x = -swing * strideAmp;
+            p.rightLeg.rotation.x = swing * strideAmp;
+          }
+        }
+
+        // Head look / breathing tilt
+        p.headGroup.rotation.y = Math.sin(en.walkPhase * 0.5) * 0.12;
+
+        // Hit-Flash Material Reaction
+        if (en.hitFlashTimer > 0) {
+          en.hitFlashTimer--;
+          const isFlashOn = en.hitFlashTimer > 0;
+          p.hitMaterials.forEach((mat, idx) => {
+            if (isFlashOn) {
+              mat.emissive.setHex(0xffffff);
+              mat.emissiveIntensity = 1.8;
+            } else {
+              mat.emissive.setHex(p.baseEmissiveColors[idx]);
+              mat.emissiveIntensity = 0.38;
+            }
+          });
+        }
+
+        // Enemy Melee Attack / Burning Soul Self-Destruct
+        if (dist <= 1.75 && ticks % 45 === 0) {
           if (en.specialType === 'burning_soul') {
-            // Burning Soul self-destructs and deducts 60s from timer
+            // Burning Soul self-destructs with massive explosion and deducts 60s from timer
             en.alive = false;
+            const boomOrigin = en.mesh.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+            spawnParticleBurst(boomOrigin, 0xef4444, 48, 0.24, 0.12, 34, true);
+            spawnShockwaveRing(new THREE.Vector3(en.mesh.position.x, 0.2, en.mesh.position.z), 0xef4444, 0.4, 4.8, 24, true, 0.02);
+            cameraShakeTimer = 14;
+            cameraShakeIntensity = 0.085;
             scene.remove(en.mesh);
             setFloorTimeLeft((t) => Math.max(5, t - 60));
             setCombatLog('💥 バーニング・ソウルが自爆！ 制限時間が -60秒 削られた！');
             return;
           }
+
+          en.attackAnimTimer = 18;
+          cameraShakeTimer = 8;
+          cameraShakeIntensity = en.isBoss ? 0.065 : 0.04;
+          spawnParticleBurst(new THREE.Vector3(posX, 1.0, posZ), 0xf43f5e, 12, 0.12, 0.04, 18, false);
 
           setMazeHp((h) => {
             const next = h - en.atk;
@@ -1830,6 +2854,8 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
       renderTarget.dispose();
       wallTex.dispose();
       floorTex.dispose();
+      moteGeo.dispose();
+      moteMat.dispose();
       if (renderer.domElement.parentNode) {
         renderer.domElement.parentNode.removeChild(renderer.domElement);
       }
