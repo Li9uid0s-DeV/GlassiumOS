@@ -22,6 +22,14 @@ const SLEEP_AURORA_COLORS: Record<AuroraColor, [string, string, string]> = {
   'sakura-silk': ['rgba(244, 114, 182, 0.38)', 'rgba(251, 113, 133, 0.34)', 'rgba(192, 132, 252, 0.28)'],
   'cyber-grid': ['rgba(6, 182, 212, 0.38)', 'rgba(217, 70, 239, 0.34)', 'rgba(59, 130, 246, 0.28)'],
   'starlight-pulse': ['rgba(129, 140, 248, 0.38)', 'rgba(56, 189, 248, 0.34)', 'rgba(192, 132, 252, 0.28)'],
+  'classic-aurora-orbs': ['rgba(56, 189, 248, 0.42)', 'rgba(168, 85, 247, 0.36)', 'rgba(236, 72, 153, 0.30)'],
+  'classic-synthwave-sun': ['rgba(244, 63, 94, 0.40)', 'rgba(217, 70, 239, 0.36)', 'rgba(6, 182, 212, 0.32)'],
+  'classic-deep-ocean': ['rgba(6, 182, 212, 0.40)', 'rgba(14, 165, 233, 0.35)', 'rgba(20, 184, 166, 0.30)'],
+  'classic-matrix-rain': ['rgba(16, 185, 129, 0.42)', 'rgba(52, 211, 153, 0.34)', 'rgba(6, 182, 212, 0.25)'],
+  'classic-galaxy-vortex': ['rgba(139, 92, 246, 0.42)', 'rgba(56, 189, 248, 0.36)', 'rgba(236, 72, 153, 0.30)'],
+  'classic-crystal-net': ['rgba(56, 189, 248, 0.40)', 'rgba(99, 102, 241, 0.35)', 'rgba(45, 212, 191, 0.30)'],
+  'classic-fireflies-forest': ['rgba(52, 211, 153, 0.38)', 'rgba(250, 204, 21, 0.34)', 'rgba(16, 185, 129, 0.30)'],
+  'classic-plasma-nebula': ['rgba(217, 70, 239, 0.40)', 'rgba(56, 189, 248, 0.38)', 'rgba(99, 102, 241, 0.34)'],
 };
 
 const CLOCK_OPTIONS: { id: SleepClockStyle; label: string; icon: string }[] = [

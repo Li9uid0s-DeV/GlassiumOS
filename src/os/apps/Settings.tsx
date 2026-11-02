@@ -12,6 +12,7 @@ import {
   DesktopIconSize,
   DESKTOP_ICON_SIZE_PRESETS,
   ACCENT_COLOR_PRESETS,
+  NebulaPreset,
 } from '../types';
 import { WALLPAPERS } from '../wallpapers';
 import { Icon } from '../Icon';
@@ -130,6 +131,115 @@ const AURORA_PALETTES: {
     desc: 'Connected starlight nodes and deep cosmos waves',
     cssGradient: 'linear-gradient(135deg, #02040a 0%, #1e1b4b 55%, #4f46e5 100%)',
     accentWave: '#a5b4fc',
+  },
+];
+
+const CLASSIC_LIVE2D_PALETTES: {
+  id: AuroraColor;
+  label: string;
+  desc: string;
+  cssGradient: string;
+  accentWave: string;
+}[] = [
+  {
+    id: 'classic-aurora-orbs',
+    label: 'Classic Aurora & Meteors',
+    desc: '旧バージョン復刻: 浮遊ボケ玉・オーロラカーテン・流れ星',
+    cssGradient: 'linear-gradient(135deg, #030712 0%, #1e1b4b 48%, #0284c7 100%)',
+    accentWave: '#38bdf8',
+  },
+  {
+    id: 'classic-synthwave-sun',
+    label: 'Retrowave Sunset Sun',
+    desc: '旧バージョン復刻: 80s シンセウェイヴ太陽とネオン地平線グリッド',
+    cssGradient: 'linear-gradient(135deg, #090014 0%, #701a75 50%, #f43f5e 100%)',
+    accentWave: '#f43f5e',
+  },
+  {
+    id: 'classic-deep-ocean',
+    label: 'Bioluminescent Deep Sea',
+    desc: '旧バージョン復刻: 海底に差し込む光の筋と発光バブル',
+    cssGradient: 'linear-gradient(135deg, #010a14 0%, #0369a1 52%, #0d9488 100%)',
+    accentWave: '#2dd4bf',
+  },
+  {
+    id: 'classic-matrix-rain',
+    label: 'Cyber Matrix Digital Rain',
+    desc: '旧バージョン復刻: サイバーネティック・デジタルコードレイン',
+    cssGradient: 'linear-gradient(135deg, #010804 0%, #064e3b 55%, #10b981 100%)',
+    accentWave: '#34d399',
+  },
+  {
+    id: 'classic-galaxy-vortex',
+    label: 'Spiral Galaxy Vortex',
+    desc: '旧バージョン復刻: 回転する銀河スパイラルと星雲コア',
+    cssGradient: 'linear-gradient(135deg, #020208 0%, #3b0764 52%, #2563eb 100%)',
+    accentWave: '#c084fc',
+  },
+  {
+    id: 'classic-crystal-net',
+    label: 'Liquid Crystal Network',
+    desc: '旧バージョン復刻: マウス連動クリスタル・ニューラルネットワーク',
+    cssGradient: 'linear-gradient(135deg, #030816 0%, #1e3a8a 52%, #06b6d4 100%)',
+    accentWave: '#38bdf8',
+  },
+  {
+    id: 'classic-fireflies-forest',
+    label: 'Enchanted Forest Fireflies',
+    desc: '旧バージョン復刻: 幻想的な夜の森と黄金色に明滅する蛍の光',
+    cssGradient: 'linear-gradient(135deg, #02100d 0%, #065f46 55%, #ca8a04 100%)',
+    accentWave: '#facc15',
+  },
+  {
+    id: 'classic-plasma-nebula',
+    label: 'Liquid Plasma Bokeh Orbs',
+    desc: '旧バージョン復刻: 多色発光プラズマオーブの流体ブレンド',
+    cssGradient: 'linear-gradient(135deg, #060314 0%, #581c87 50%, #db2777 100%)',
+    accentWave: '#e879f9',
+  },
+];
+
+const SPACE_3D_PRESETS: {
+  id: NebulaPreset;
+  label: string;
+  desc: string;
+  cssGradient: string;
+  ringColor: string;
+}[] = [
+  {
+    id: 'gargantua',
+    label: '3D Gargantua Singularity',
+    desc: '3D ブラックホール・黄金の相対論的降着円盤と環を持つ惑星',
+    cssGradient: 'linear-gradient(135deg, #000000 0%, #431407 52%, #d97706 100%)',
+    ringColor: '#f59e0b',
+  },
+  {
+    id: 'ultraviolet',
+    label: '3D Cosmic Ultraviolet',
+    desc: '3D ウルトラバイオレット・クエーサー降着円盤と深宇宙星雲',
+    cssGradient: 'linear-gradient(135deg, #030014 0%, #4c1d95 52%, #a855f7 100%)',
+    ringColor: '#c084fc',
+  },
+  {
+    id: 'indigo',
+    label: '3D Deep Indigo Horizon',
+    desc: '3D ディープインディゴ・蒼白く輝く事象の地平線',
+    cssGradient: 'linear-gradient(135deg, #020617 0%, #1e3a8a 52%, #3b82f6 100%)',
+    ringColor: '#60a5fa',
+  },
+  {
+    id: 'cyan-quasar',
+    label: '3D Cyan Quasar Jet',
+    desc: '3D シアンクエーサー・高エネルギーシアン光学リング',
+    cssGradient: 'linear-gradient(135deg, #020b18 0%, #155e75 52%, #06b6d4 100%)',
+    ringColor: '#22d3ee',
+  },
+  {
+    id: 'solar-flare',
+    label: '3D Solar Flare Corona',
+    desc: '3D ソーラーフレア・灼熱のコロナプラズマ円盤',
+    cssGradient: 'linear-gradient(135deg, #1a0505 0%, #7c2d12 52%, #ef4444 100%)',
+    ringColor: '#fb923c',
   },
 ];
 
@@ -504,6 +614,8 @@ export function SettingsApp() {
     setShellMode,
     designEngine,
     setDesignEngine,
+    nebulaPreset,
+    setNebulaPreset,
     lockScreenStyle,
     setLockScreenStyle,
     sleepClockStyle,
@@ -976,11 +1088,11 @@ export function SettingsApp() {
                     )}
                   </div>
 
-                  {/* 3. Live 2D Aurora & Interactive Wallpapers (10 Presets) */}
+                  {/* 3. Current 2D Live Wallpapers (10 Presets) */}
                   <div className={`pt-5 border-t space-y-4 ${isLight ? 'border-slate-300' : 'border-white/10'}`}>
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="text-xs font-bold">2D ライブ壁紙コレクション (10 Live Wallpapers)</h3>
+                        <h3 className="text-xs font-bold">現行 2D ライブ壁紙コレクション (Current 10 Live Wallpapers)</h3>
                         <p className="text-[11px] opacity-60">
                           オーロラリボン、桜吹雪、サイバーグリッド、星座パルスなどのリアルタイムアニメーション背景
                         </p>
@@ -1046,6 +1158,222 @@ export function SettingsApp() {
                           </button>
                         );
                       })}
+                    </div>
+
+                    {/* 3B. Restored Classic 2D Live Wallpapers (8 Previous-Version Live Wallpapers) */}
+                    <div className={`pt-4 border-t space-y-3 ${isLight ? 'border-slate-300/70' : 'border-white/[0.08]'}`}>
+                      <div>
+                        <h3 className="text-xs font-bold">
+                          旧バージョン復刻 2D ライブ壁紙 (Restored Classic 2D Live Wallpapers)
+                        </h3>
+                        <p className="text-[11px] opacity-60">
+                          前のバージョンまで搭載されていたボケ玉＆流れ星、レトロ太陽、深海、マトリックス、銀河渦、蛍の森などの2Dライブ壁紙
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {CLASSIC_LIVE2D_PALETTES.map((p) => {
+                          const selected = wallpaper === 'live2d' && !selectedCustomId && auroraColor === p.id;
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                playSound('click');
+                                setSelectedCustomId(null);
+                                setWallpaper('live2d');
+                                setAuroraColor(p.id);
+                              }}
+                              style={{ background: p.cssGradient }}
+                              className={`p-3 text-left transition relative overflow-hidden h-24 flex flex-col justify-between ${
+                                selected
+                                  ? 'border-t-2 border-t-[var(--os-accent)] ring-2 ring-[var(--os-accent)]'
+                                  : 'opacity-90 hover:opacity-100'
+                              }`}
+                            >
+                              {/* Decorative classic orb & wave preview */}
+                              <svg
+                                viewBox="0 0 200 60"
+                                className="pointer-events-none absolute inset-0 w-full h-full opacity-50"
+                                preserveAspectRatio="none"
+                              >
+                                <circle cx="155" cy="22" r="16" fill={p.accentWave} fillOpacity="0.45" />
+                                <circle cx="45" cy="36" r="10" fill="#ffffff" fillOpacity="0.25" />
+                                <path
+                                  d="M0,42 Q60,18 120,38 T200,24 L200,60 L0,60 Z"
+                                  fill={p.accentWave}
+                                  fillOpacity="0.35"
+                                />
+                              </svg>
+
+                              <div className="relative z-10 flex items-center justify-between">
+                                <span
+                                  style={{ color: '#ffffff', textShadow: '0 1px 3px rgba(0,0,0,0.85)' }}
+                                  className="text-xs font-bold"
+                                >
+                                  {p.label}
+                                </span>
+                                {selected && (
+                                  <span
+                                    style={{ backgroundColor: 'rgba(0,0,0,0.6)', color: '#ffffff' }}
+                                    className="p-0.5 rounded-full"
+                                  >
+                                    <Icon name="CheckCircle2" size={16} />
+                                  </span>
+                                )}
+                              </div>
+                              <span
+                                style={{ color: 'rgba(255,255,255,0.88)', textShadow: '0 1px 3px rgba(0,0,0,0.85)' }}
+                                className="relative z-10 text-[10px] line-clamp-1"
+                              >
+                                {p.desc}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 3C. Restored 3D Space Black Hole & WebGL Shader Live Wallpapers */}
+                    <div className={`pt-4 border-t space-y-3 ${isLight ? 'border-slate-300/70' : 'border-white/[0.08]'}`}>
+                      <div>
+                        <h3 className="text-xs font-bold">
+                          旧バージョン復刻 3D 宇宙ブラックホール ＆ WebGL シェーダーライブ壁紙
+                        </h3>
+                        <p className="text-[11px] opacity-60">
+                          Three.js レイマーチングによる 3D ブラックホール（全5プリセット）および Liquid Silk 3D シェーダー
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {SPACE_3D_PRESETS.map((sp) => {
+                          const selected = wallpaper === 'space' && !selectedCustomId && nebulaPreset === sp.id;
+                          return (
+                            <button
+                              key={sp.id}
+                              type="button"
+                              onClick={() => {
+                                playSound('click');
+                                setSelectedCustomId(null);
+                                setWallpaper('space');
+                                setNebulaPreset(sp.id);
+                              }}
+                              style={{ background: sp.cssGradient }}
+                              className={`p-3 text-left transition relative overflow-hidden h-24 flex flex-col justify-between ${
+                                selected
+                                  ? 'border-t-2 border-t-[var(--os-accent)] ring-2 ring-[var(--os-accent)]'
+                                  : 'opacity-90 hover:opacity-100'
+                              }`}
+                            >
+                              {/* Black Hole Singularity Accretion Disk Preview */}
+                              <svg
+                                viewBox="0 0 200 80"
+                                className="pointer-events-none absolute inset-0 w-full h-full opacity-70"
+                                preserveAspectRatio="xMidYMid slice"
+                              >
+                                <ellipse
+                                  cx="145"
+                                  cy="40"
+                                  rx="36"
+                                  ry="11"
+                                  fill="none"
+                                  stroke={sp.ringColor}
+                                  strokeWidth="4"
+                                  strokeOpacity="0.65"
+                                  transform="rotate(-14 145 40)"
+                                />
+                                <circle cx="145" cy="40" r="12" fill="#000000" stroke={sp.ringColor} strokeWidth="2" />
+                              </svg>
+
+                              <div className="relative z-10 flex items-center justify-between">
+                                <span
+                                  style={{ color: '#ffffff', textShadow: '0 1px 3px rgba(0,0,0,0.85)' }}
+                                  className="text-xs font-bold"
+                                >
+                                  {sp.label}
+                                </span>
+                                {selected && (
+                                  <span
+                                    style={{ backgroundColor: 'rgba(0,0,0,0.6)', color: '#ffffff' }}
+                                    className="p-0.5 rounded-full"
+                                  >
+                                    <Icon name="CheckCircle2" size={16} />
+                                  </span>
+                                )}
+                              </div>
+                              <span
+                                style={{ color: 'rgba(255,255,255,0.88)', textShadow: '0 1px 3px rgba(0,0,0,0.85)' }}
+                                className="relative z-10 text-[10px] line-clamp-1"
+                              >
+                                {sp.desc}
+                              </span>
+                            </button>
+                          );
+                        })}
+
+                        {/* WebGL Liquid Silk 3D Shader Card */}
+                        {(() => {
+                          const selected = wallpaper === 'shader' && !selectedCustomId;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                playSound('click');
+                                setSelectedCustomId(null);
+                                setWallpaper('shader');
+                              }}
+                              style={{
+                                background: 'linear-gradient(135deg, #090d16 0%, #311042 48%, #c2410c 100%)',
+                              }}
+                              className={`p-3 text-left transition relative overflow-hidden h-24 flex flex-col justify-between ${
+                                selected
+                                  ? 'border-t-2 border-t-[var(--os-accent)] ring-2 ring-[var(--os-accent)]'
+                                  : 'opacity-90 hover:opacity-100'
+                              }`}
+                            >
+                              <svg
+                                viewBox="0 0 200 80"
+                                className="pointer-events-none absolute inset-0 w-full h-full opacity-70"
+                                preserveAspectRatio="xMidYMid slice"
+                              >
+                                <circle
+                                  cx="145"
+                                  cy="40"
+                                  r="20"
+                                  fill="none"
+                                  stroke="#fb923c"
+                                  strokeWidth="3"
+                                  strokeOpacity="0.7"
+                                />
+                                <circle cx="145" cy="40" r="11" fill="#000000" stroke="#fde047" strokeWidth="1.5" />
+                              </svg>
+
+                              <div className="relative z-10 flex items-center justify-between">
+                                <span
+                                  style={{ color: '#ffffff', textShadow: '0 1px 3px rgba(0,0,0,0.85)' }}
+                                  className="text-xs font-bold"
+                                >
+                                  3D Liquid Silk Shader
+                                </span>
+                                {selected && (
+                                  <span
+                                    style={{ backgroundColor: 'rgba(0,0,0,0.6)', color: '#ffffff' }}
+                                    className="p-0.5 rounded-full"
+                                  >
+                                    <Icon name="CheckCircle2" size={16} />
+                                  </span>
+                                )}
+                              </div>
+                              <span
+                                style={{ color: 'rgba(255,255,255,0.88)', textShadow: '0 1px 3px rgba(0,0,0,0.85)' }}
+                                className="relative z-10 text-[10px] line-clamp-1"
+                              >
+                                WebGL 相対論的プラズマ＆フォトンリングシェーダー
+                              </span>
+                            </button>
+                          );
+                        })()}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 text-xs pt-2">

@@ -69,7 +69,15 @@ export type AuroraColor =
   | 'arctic-ice'
   | 'sakura-silk'
   | 'cyber-grid'
-  | 'starlight-pulse';
+  | 'starlight-pulse'
+  | 'classic-aurora-orbs'
+  | 'classic-synthwave-sun'
+  | 'classic-deep-ocean'
+  | 'classic-matrix-rain'
+  | 'classic-galaxy-vortex'
+  | 'classic-crystal-net'
+  | 'classic-fireflies-forest'
+  | 'classic-plasma-nebula';
 
 export interface CustomWallpaper {
   id: string;
