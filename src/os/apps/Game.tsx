@@ -4,6 +4,8 @@ import { Icon } from '../Icon';
 import { PuzzleGamesView } from './ExtraAppsSuite';
 import {
   QualityPreset,
+  ShaderMode,
+  SHADER_MODE_META,
   GraphicsSettings,
   CustomDungeonConfig,
   DEFAULT_CUSTOM_CONFIG,
@@ -592,9 +594,10 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
     }
   });
   const [graphicsSettings, setGraphicsSettings] = useState<GraphicsSettings>({
-    preset: 'ULTRA',
+    preset: 'HIGH',
     screenSpacePathTracing: true,
-    bloomIntensity: 0.85,
+    shaderMode: 'PTGI',
+    bloomIntensity: 0.9,
     fov: 75,
   });
   const [customConfig, setCustomConfig] = useState<CustomDungeonConfig>(DEFAULT_CUSTOM_CONFIG);
@@ -602,6 +605,7 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
   const [mazeDifficulty, setMazeDifficulty] = useState<MazeDifficulty>('NORMAL');
   const [isDailyChallenge, setIsDailyChallenge] = useState(false);
   const [mazeFloor, setMazeFloor] = useState(1);
+  const [mazeRunId, setMazeRunId] = useState(0);
   const [mazeHp, setMazeHp] = useState(120);
   const [mazeMaxHp, setMazeMaxHp] = useState(120);
   const [mazeAtk, setMazeAtk] = useState(18);
@@ -1184,6 +1188,7 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
     setMazeScreenState('PLAYING');
     setTitleSubModal('NONE');
     setMazeFloor(1);
+    setMazeRunId((id) => id + 1);
     const baseHp = diff === 'EASY' ? 160 : diff === 'NORMAL' ? 120 : diff === 'HARD' ? 100 : diff === 'LUNATIC' ? 80 : 140;
     setMazeHp(baseHp);
     setMazeMaxHp(baseHp);
@@ -1250,6 +1255,9 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
         ? `🏆 デイリーチャレンジ (RTA) 開始！ 初期装備「${startWpn.name}」で全50階層踏破を目指せ！`
         : `Glasia Dungeons [難易度: ${diff}] 1F/50F へ進入！ 壁の松明を頼りにランダム配置された出口階段を探せ！`
     );
+    setTimeout(() => {
+      containerRef.current?.focus();
+    }, 30);
   };
 
   // Use an item from the Item Bag
@@ -1716,9 +1724,10 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
     const rtHeight = Math.max(180, Math.round(height * presetCfg.pixelRatio));
 
     const scene = new THREE.Scene();
-    // Darker, richer abyssal background color
+    // Darker, richer abyssal background color + hardware exponential fog
     const darkBgColor = new THREE.Color(areaTheme.fogColorHex).multiplyScalar(0.32);
     scene.background = darkBgColor;
+    scene.fog = new THREE.FogExp2(darkBgColor, isVoidFloor ? 0.068 : 0.042);
 
     const camera = new THREE.PerspectiveCamera(gfx.fov || 75, width / height, 0.1, 75);
 
@@ -1726,10 +1735,10 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
     renderer.setSize(width, height);
     renderer.setPixelRatio(1);
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.05;
+    renderer.toneMappingExposure = 1.15;
     container.appendChild(renderer.domElement);
 
-    // GLSL Screen-Space Path Tracing & Depth Fog RenderTarget
+    // GLSL Screen-Space Path Tracing GI & Multi-Shader RenderTarget
     const renderTarget = new THREE.WebGLRenderTarget(rtWidth, rtHeight);
     renderTarget.texture.minFilter = THREE.NearestFilter;
     renderTarget.texture.magFilter = THREE.NearestFilter;
@@ -1750,7 +1759,8 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
       baseFogDensity,
       gfx.screenSpacePathTracing,
       presetCfg.ptSamples,
-      gfx.bloomIntensity * presetCfg.bloomStrength
+      gfx.bloomIntensity * presetCfg.bloomStrength,
+      gfx.shaderMode
     );
     postMaterial.uniforms.uResolution.value.set(rtWidth, rtHeight);
     const postQuad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), postMaterial);
@@ -1758,11 +1768,11 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
 
     // =============================================================
     // Lighting Rules:
-    // - Much darker ambient light (0.04 on Void, 0.08 on other floors)
+    // - Low ambient light so corridors away from torches stay dark & atmospheric
     // - Non-Void Floors: NO player light! Illumination comes ONLY from Wall Torches!
     // - Void Floors (21-30F): NO Wall Torches! Player holds a Handheld Torch in left hand!
     // =============================================================
-    const ambientLight = new THREE.AmbientLight(0x94a3b8, isVoidFloor ? 0.04 : 0.085);
+    const ambientLight = new THREE.AmbientLight(0x94a3b8, isVoidFloor ? 0.05 : 0.12);
     scene.add(ambientLight);
     scene.add(camera);
 
@@ -1955,8 +1965,11 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
 
     // =============================================================
     // Spawn Wall Torches Along Corridors (ONLY on Non-Void Floors!)
+    // Uses a dynamic pool of PointLights attached to the nearest wall sconces
+    // so every wall torch casts real 3D light without exceeding WebGL uniform limits.
     // =============================================================
     const wallTorches: WallTorchInstance[] = [];
+    const torchLightPool: THREE.PointLight[] = [];
     if (!isVoidFloor) {
       const torchFlameHex =
         areaTheme.id === 'gracia'
@@ -1970,9 +1983,9 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
 
       // Candidate corridor cells adjacent to a wall
       const torchCandidates: { r: number; c: number; dirR: number; dirC: number; rotY: number }[] = [];
-      for (let r = 2; r < gridSize - 2; r += 2) {
-        for (let c = 2; c < gridSize - 2; c += 2) {
-          if (grid[r][c] === 0) {
+      for (let r = 1; r < gridSize - 1; r++) {
+        for (let c = 1; c < gridSize - 1; c++) {
+          if (grid[r][c] === 0 && (r + c) % 2 === 0) {
             if (grid[r - 1][c] === 1) torchCandidates.push({ r, c, dirR: -1, dirC: 0, rotY: 0 });
             else if (grid[r + 1][c] === 1) torchCandidates.push({ r, c, dirR: 1, dirC: 0, rotY: Math.PI });
             else if (grid[r][c - 1] === 1) torchCandidates.push({ r, c, dirR: 0, dirC: -1, rotY: Math.PI / 2 });
@@ -1981,33 +1994,44 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
         }
       }
 
-      // Shuffle and place wall sconces; attach PointLights up to presetCfg.maxActiveTorchLights + always near start & goal
       torchCandidates.sort(() => Math.random() - 0.5);
-      const maxSconces = Math.min(torchCandidates.length, 32);
-      let activeLightsPlaced = 0;
+      const maxSconces = Math.min(torchCandidates.length, 38);
 
-      // Always place a wall torch right by the starting chamber (1,1)
-      const startTorch = buildWallTorchSconce(true, torchFlameHex, lightMult * 1.15);
-      const startPos = gridToWorld(1, 1);
-      startTorch.group.position.set(startPos.x, 1.75, startPos.z - cellSize * 0.42);
-      scene.add(startTorch.group);
-      wallTorches.push(startTorch);
-      activeLightsPlaced++;
+      // Guarantee wall sconces near the starting chamber (1,1) & (2,1) so the opening corridor is lit by wall torches
+      const startPos1 = gridToWorld(1, 1);
+      const startTorch1 = buildWallTorchSconce(false, torchFlameHex, lightMult * 1.2);
+      startTorch1.group.position.set(startPos1.x - cellSize * 0.42, 1.75, startPos1.z);
+      startTorch1.group.rotation.y = Math.PI / 2;
+      scene.add(startTorch1.group);
+      wallTorches.push(startTorch1);
+
+      const startPos2 = gridToWorld(2, 1);
+      const startTorch2 = buildWallTorchSconce(false, torchFlameHex, lightMult * 1.2);
+      startTorch2.group.position.set(startPos2.x - cellSize * 0.42, 1.75, startPos2.z);
+      startTorch2.group.rotation.y = Math.PI / 2;
+      scene.add(startTorch2.group);
+      wallTorches.push(startTorch2);
 
       for (let i = 0; i < maxSconces; i++) {
         const cand = torchCandidates[i];
-        const withLight = activeLightsPlaced < presetCfg.maxActiveTorchLights;
-        if (withLight) activeLightsPlaced++;
-        const sconce = buildWallTorchSconce(withLight, torchFlameHex, lightMult);
+        const sconce = buildWallTorchSconce(false, torchFlameHex, lightMult);
         const pos = gridToWorld(cand.r, cand.c);
         sconce.group.position.set(
-          pos.x + cand.dirC * (cellSize * 0.44),
+          pos.x + cand.dirC * (cellSize * 0.42),
           1.75,
-          pos.z + cand.dirR * (cellSize * 0.44)
+          pos.z + cand.dirR * (cellSize * 0.42)
         );
         sconce.group.rotation.y = cand.rotY;
         scene.add(sconce.group);
         wallTorches.push(sconce);
+      }
+
+      // Create dynamic pool of PointLights that attach to the closest Wall Torches
+      const poolSize = Math.min(presetCfg.maxActiveTorchLights, wallTorches.length);
+      for (let i = 0; i < poolSize; i++) {
+        const pLight = new THREE.PointLight(torchFlameHex, 2.55 * lightMult, 14.5 * lightMult, 1.45);
+        scene.add(pLight);
+        torchLightPool.push(pLight);
       }
     }
 
@@ -3508,7 +3532,7 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
       ticks++;
       const elapsedTime = ticks / 60;
 
-      // Update GLSL Shaders Time Uniforms (Post-Processing Path Tracer, Portal Vortex, Torches)
+      // Update GLSL Shaders Time Uniforms (Post-Processing Path Tracer / Standard Shader, Portal Vortex, Torches)
       postMaterial.uniforms.uTime.value = elapsedTime;
       portalVortexMat.uniforms.uTime.value = elapsedTime;
       if (voidHandheldFlameMat) {
@@ -3517,12 +3541,25 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
       for (let i = 0; i < wallTorches.length; i++) {
         const wt = wallTorches[i];
         wt.flameMat.uniforms.uTime.value = elapsedTime + wt.flickerSeed;
-        if (wt.pointLight) {
-          const flicker =
-            1.0 +
-            Math.sin(elapsedTime * 11.0 + wt.flickerSeed) * 0.14 +
-            Math.cos(elapsedTime * 19.0 + wt.flickerSeed * 2.1) * 0.08;
-          wt.pointLight.intensity = wt.baseIntensity * flicker;
+      }
+      // Dynamically bind the PointLight pool to the nearest wall torches so wall sconces illuminate corridors around the player
+      if (!isVoidFloor && torchLightPool.length > 0 && wallTorches.length > 0) {
+        const sortedTorches = [...wallTorches].sort((a, b) => {
+          const da = (a.group.position.x - posX) ** 2 + (a.group.position.z - posZ) ** 2;
+          const db = (b.group.position.x - posX) ** 2 + (b.group.position.z - posZ) ** 2;
+          return da - db;
+        });
+        for (let i = 0; i < torchLightPool.length; i++) {
+          const wt = sortedTorches[i];
+          const pl = torchLightPool[i];
+          if (wt && pl) {
+            pl.position.set(wt.group.position.x, wt.group.position.y + 0.25, wt.group.position.z);
+            const flicker =
+              1.0 +
+              Math.sin(elapsedTime * 11.0 + wt.flickerSeed) * 0.14 +
+              Math.cos(elapsedTime * 19.0 + wt.flickerSeed * 2.1) * 0.08;
+            pl.intensity = wt.baseIntensity * flicker;
+          }
         }
       }
 
@@ -4101,10 +4138,15 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
         }
       });
 
-      renderer.setRenderTarget(renderTarget);
-      renderer.render(scene, camera);
-      renderer.setRenderTarget(null);
-      renderer.render(postScene, postCamera);
+      if (gfx.shaderMode === 'OFF') {
+        renderer.setRenderTarget(null);
+        renderer.render(scene, camera);
+      } else {
+        renderer.setRenderTarget(renderTarget);
+        renderer.render(scene, camera);
+        renderer.setRenderTarget(null);
+        renderer.render(postScene, postCamera);
+      }
     };
 
     gameLoopRef.current = requestAnimationFrame(loop);
@@ -4221,7 +4263,7 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
     return () => {
       if (cleanup) cleanup();
     };
-  }, [mode, gameOver, mazeVictory, mazeFloor, gbRom, customRomName, graphicsSettings, customConfig]);
+  }, [mode, gameOver, mazeVictory, mazeFloor, mazeRunId, gbRom, customRomName, graphicsSettings, customConfig]);
 
   const initGameBoy = (container: HTMLDivElement, rom: string) => {
     const canvas = document.createElement('canvas');
@@ -4362,7 +4404,7 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
                 {activeAreaTheme.badge} {mazeFloor}F / 50F ({activeAreaTheme.name})
               </span>
               <span className="px-2 py-0.5 rounded bg-cyan-500/15 border border-cyan-400/30 text-cyan-300 text-[10px] font-bold">
-                {graphicsSettings.preset} · {graphicsSettings.screenSpacePathTracing ? 'PT:ON' : 'PT:OFF'}
+                {graphicsSettings.preset} · {SHADER_MODE_META[graphicsSettings.shaderMode].shortLabel}
               </span>
               <span className={`font-bold ${floorTimeLeft < 60 ? 'text-rose-400 animate-pulse' : 'text-amber-300'}`}>
                 ⏱ {timerMins}:{timerSecs < 10 ? '0' : ''}{timerSecs}
@@ -4394,17 +4436,21 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
       </div>
 
       {/* Main Game Viewport */}
-      <div className="relative flex-1 overflow-hidden min-h-0 min-w-0 flex items-center justify-center" ref={containerRef}>
+      <div
+        tabIndex={0}
+        className="relative flex-1 overflow-hidden min-h-0 min-w-0 flex items-center justify-center outline-none"
+        ref={containerRef}
+      >
         {/* =========================================================
             Glasia Dungeons AAA Title Screen & Sub-Modals (Play / Codex / Settings)
            ========================================================= */}
         {mode === 'maze' && mazeScreenState === 'TITLE' && (
-          <div className="absolute inset-0 z-30 flex flex-col items-center justify-between p-6 bg-gradient-to-b from-black/80 via-slate-950/65 to-black/90 backdrop-blur-[3px]">
+          <div className="absolute inset-0 z-30 flex flex-col items-center justify-between p-6 bg-gradient-to-b from-black/75 via-slate-950/55 to-black/85 backdrop-blur-[2px]">
             {/* Top Technical Badge Bar */}
-            <div className="w-full flex items-center justify-between text-[11px] font-mono text-white/70">
-              <div className="flex items-center gap-2">
+            <div className="w-full flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-white/70">
+              <div className="flex flex-wrap items-center gap-2">
                 <span className="px-2.5 py-1 rounded-full bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 font-bold">
-                  GLSL SCREEN-SPACE PATH TRACING: {graphicsSettings.screenSpacePathTracing ? 'ENABLED' : 'OFF'}
+                  GLSL SHADER: {SHADER_MODE_META[graphicsSettings.shaderMode].label}
                 </span>
                 <span className="px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/40 text-amber-300 font-bold">
                   QUALITY: {graphicsSettings.preset}
@@ -4420,7 +4466,7 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
               )}
             </div>
 
-            {/* Center Hero Title & 3 Main Action Buttons */}
+            {/* Center Hero Title & Action Buttons */}
             <div className="flex flex-col items-center text-center max-w-2xl my-auto">
               <div className="text-[11px] font-mono uppercase tracking-[0.45em] text-cyan-300/90 mb-2">
                 DARK FANTASY PROCEDURAL ABYSS ROGUELIKE
@@ -4429,32 +4475,66 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
                 Glasia Dungeons
               </h1>
               <p className="mt-3 text-xs sm:text-sm text-white/70 max-w-lg leading-relaxed">
-                松明の炎だけが照らす漆黒の50階層。毎回変化する広大な迷宮とゴール、通路に潜むスパイクや振り子ギロチン罠、4種×10レアリティの全120種属性武器を駆使して深淵の核を攻略せよ。
+                松明の炎だけが照らす漆黒の50階層。PTGI (スクリーンスペース・パストレーシングGI) と標準GLSLシェーダーを自在に切り替え、広大な迷宮と120種の属性武器で深淵を攻略せよ。
               </p>
 
-              {/* Main 3 Title Buttons: プレイ (Play) / 図鑑 (Codex) / 設定 (Settings) */}
-              <div className="mt-8 flex flex-col sm:flex-row items-center gap-3.5 w-full sm:w-auto">
+              {/* Main Title Buttons: Quick Play / Difficulty Select / Codex / Settings */}
+              <div className="mt-7 flex flex-wrap items-center justify-center gap-3 w-full">
                 <button
-                  onClick={() => setTitleSubModal('DIFFICULTY')}
-                  className="w-64 sm:w-48 py-4 px-6 rounded-2xl bg-gradient-to-r from-cyan-400 via-sky-400 to-amber-300 hover:brightness-110 text-slate-950 font-black text-base shadow-[0_0_30px_rgba(56,189,248,0.45)] transition transform active:scale-95 flex items-center justify-center gap-2"
+                  onClick={() => startNewMazeRun('NORMAL', false)}
+                  className="w-64 sm:w-52 py-4 px-6 rounded-2xl bg-gradient-to-r from-cyan-400 via-sky-400 to-amber-300 hover:brightness-110 text-slate-950 font-black text-base shadow-[0_0_30px_rgba(56,189,248,0.45)] transition transform active:scale-95 flex items-center justify-center gap-2"
                 >
                   <Icon name="Play" size={18} />
-                  <span>プレイ</span>
+                  <span>いますぐプレイ</span>
+                </button>
+                <button
+                  onClick={() => setTitleSubModal('DIFFICULTY')}
+                  className="w-64 sm:w-44 py-4 px-5 rounded-2xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/50 text-cyan-200 font-bold text-sm backdrop-blur-xl transition flex items-center justify-center gap-2"
+                >
+                  <Icon name="Compass" size={17} />
+                  <span>難易度選択</span>
                 </button>
                 <button
                   onClick={() => setTitleSubModal('CODEX')}
-                  className="w-64 sm:w-44 py-4 px-6 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/25 text-white font-bold text-sm backdrop-blur-xl transition flex items-center justify-center gap-2"
+                  className="w-64 sm:w-44 py-4 px-5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/25 text-white font-bold text-sm backdrop-blur-xl transition flex items-center justify-center gap-2"
                 >
                   <Icon name="BookOpen" size={17} />
                   <span>図鑑 ({discoveredWeapons.length}/120)</span>
                 </button>
                 <button
                   onClick={() => setTitleSubModal('SETTINGS')}
-                  className="w-64 sm:w-44 py-4 px-6 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/25 text-white font-bold text-sm backdrop-blur-xl transition flex items-center justify-center gap-2"
+                  className="w-64 sm:w-48 py-4 px-5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/25 text-white font-bold text-sm backdrop-blur-xl transition flex items-center justify-center gap-2"
                 >
                   <Icon name="Sliders" size={17} />
-                  <span>設定 (画質/PT)</span>
+                  <span>設定 (PTGI / 標準Shader)</span>
                 </button>
+              </div>
+
+              {/* Instant Shader Switcher Strip on Title Screen */}
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5 bg-black/55 border border-white/15 rounded-2xl px-3 py-2">
+                <span className="text-[10px] font-bold text-white/60 mr-1">シェーダー切替:</span>
+                {(['PTGI', 'STANDARD', 'CEL', 'CRT', 'OFF'] as ShaderMode[]).map((sm) => {
+                  const active = graphicsSettings.shaderMode === sm;
+                  return (
+                    <button
+                      key={sm}
+                      onClick={() =>
+                        setGraphicsSettings((g) => ({
+                          ...g,
+                          shaderMode: sm,
+                          screenSpacePathTracing: sm === 'PTGI',
+                        }))
+                      }
+                      className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition ${
+                        active
+                          ? 'bg-cyan-400 text-slate-950 shadow-[0_0_12px_rgba(34,211,238,0.45)]'
+                          : 'bg-white/5 text-white/70 hover:bg-white/15 hover:text-white'
+                      }`}
+                    >
+                      {SHADER_MODE_META[sm].shortLabel}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -4625,38 +4705,58 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
               </div>
             )}
 
-            {/* Sub-Modal 2: Settings (Screen-Space Path Tracing ON/OFF & Quality Presets) */}
+            {/* Sub-Modal 2: Settings (PTGI + Normal Shaders & Quality Presets) */}
             {titleSubModal === 'SETTINGS' && (
               <div className="absolute inset-0 z-40 bg-black/80 backdrop-blur-xl flex items-center justify-center p-4">
-                <div className="max-w-lg w-full bg-zinc-900/95 border border-white/20 rounded-3xl p-6 shadow-2xl flex flex-col gap-4">
+                <div className="max-w-lg w-full bg-zinc-900/95 border border-white/20 rounded-3xl p-6 shadow-2xl flex flex-col gap-4 max-h-[90%] overflow-y-auto">
                   <div className="flex items-center justify-between border-b border-white/10 pb-3">
                     <div>
-                      <h2 className="text-base font-black text-cyan-300">⚡ 設定 (グラフィックス & GLSL パストレーシング)</h2>
-                      <p className="text-[11px] text-white/60">スクリーンパストレーシングとクオリティプリセットをリアルタイム切り替え</p>
+                      <h2 className="text-base font-black text-cyan-300">⚡ 設定 (GLSL シェーダーモード & クオリティプリセット)</h2>
+                      <p className="text-[11px] text-white/60">PTGI (パストレーシングGI) と標準シェーダー・セルシェーダー・CRTをリアルタイム切り替え</p>
                     </div>
                     <button onClick={() => setTitleSubModal('NONE')} className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white">
                       <Icon name="X" size={16} />
                     </button>
                   </div>
 
-                  {/* Screen-Space Path Tracing Toggle */}
-                  <div className="p-3.5 rounded-2xl bg-black/50 border border-cyan-400/40 flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-black text-cyan-200">✨ スクリーンパストレーシング (Screen-Space Path Tracing GI)</div>
-                      <div className="text-[10px] text-white/60">GLSLシェーダーによる深度法線復元・間接バウンス照明・床面スペキュラ反射</div>
+                  {/* GLSL Shader Mode Selector (PTGI + Normal Shaders) */}
+                  <div>
+                    <div className="text-xs font-bold text-cyan-200 mb-2">✨ GLSL シェーダーモード選択 (PTGI / 標準シェーダー / 特殊シェーダー)</div>
+                    <div className="grid grid-cols-1 gap-2">
+                      {(['PTGI', 'STANDARD', 'CEL', 'CRT', 'OFF'] as ShaderMode[]).map((sm) => {
+                        const meta = SHADER_MODE_META[sm];
+                        const active = graphicsSettings.shaderMode === sm;
+                        return (
+                          <button
+                            key={sm}
+                            onClick={() =>
+                              setGraphicsSettings((g) => ({
+                                ...g,
+                                shaderMode: sm,
+                                screenSpacePathTracing: sm === 'PTGI',
+                              }))
+                            }
+                            className={`p-3 rounded-2xl border text-left transition flex items-center justify-between gap-3 ${
+                              active
+                                ? 'bg-cyan-500/20 border-cyan-400 text-cyan-100 shadow-[0_0_20px_rgba(34,211,238,0.25)]'
+                                : 'bg-black/45 border-white/15 text-white/70 hover:text-white hover:border-white/30'
+                            }`}
+                          >
+                            <div>
+                              <div className="text-xs font-black">{meta.label}</div>
+                              <div className="text-[10px] opacity-75 mt-0.5">{meta.desc}</div>
+                            </div>
+                            <span
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-black shrink-0 ${
+                                active ? 'bg-cyan-400 text-slate-950' : 'bg-white/10 text-white/60'
+                              }`}
+                            >
+                              {active ? '選択中' : '切替'}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
-                    <button
-                      onClick={() =>
-                        setGraphicsSettings((g) => ({ ...g, screenSpacePathTracing: !g.screenSpacePathTracing }))
-                      }
-                      className={`px-4 py-2 rounded-xl font-black text-xs transition ${
-                        graphicsSettings.screenSpacePathTracing
-                          ? 'bg-cyan-400 text-black shadow-[0_0_20px_rgba(34,211,238,0.5)]'
-                          : 'bg-white/10 text-white/60'
-                      }`}
-                    >
-                      {graphicsSettings.screenSpacePathTracing ? 'ON (有効)' : 'OFF (無効)'}
-                    </button>
                   </div>
 
                   {/* Quality Preset Selector */}
@@ -4970,39 +5070,50 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
                   </div>
                 )}
 
-                {/* Quick Graphics / Path Tracing / Codex Bar */}
-                <div className="mt-2 pt-2 border-t border-white/10 flex flex-wrap items-center gap-1">
-                  <button
-                    onClick={() =>
-                      setGraphicsSettings((g) => ({ ...g, screenSpacePathTracing: !g.screenSpacePathTracing }))
-                    }
-                    className={`px-2 py-0.5 rounded text-[9px] font-bold transition ${
-                      graphicsSettings.screenSpacePathTracing
-                        ? 'bg-cyan-400 text-black'
-                        : 'bg-black/40 text-white/60'
-                    }`}
-                  >
-                    ✨ PathTracing: {graphicsSettings.screenSpacePathTracing ? 'ON' : 'OFF'}
-                  </button>
-                  {(['LOW', 'MEDIUM', 'HIGH', 'ULTRA'] as QualityPreset[]).map((q) => (
+                {/* Quick Shader Mode (PTGI / Normal Shader / Cel / CRT / OFF) & Quality Bar */}
+                <div className="mt-2 pt-2 border-t border-white/10 flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1">
+                    {(['PTGI', 'STANDARD', 'CEL', 'CRT', 'OFF'] as ShaderMode[]).map((sm) => (
+                      <button
+                        key={sm}
+                        onClick={() =>
+                          setGraphicsSettings((g) => ({
+                            ...g,
+                            shaderMode: sm,
+                            screenSpacePathTracing: sm === 'PTGI',
+                          }))
+                        }
+                        className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition ${
+                          graphicsSettings.shaderMode === sm
+                            ? 'bg-cyan-400 text-black'
+                            : 'bg-black/40 text-white/65 hover:text-white'
+                        }`}
+                      >
+                        {SHADER_MODE_META[sm].shortLabel}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {(['LOW', 'MEDIUM', 'HIGH', 'ULTRA'] as QualityPreset[]).map((q) => (
+                      <button
+                        key={q}
+                        onClick={() => setGraphicsSettings((g) => ({ ...g, preset: q }))}
+                        className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition ${
+                          graphicsSettings.preset === q
+                            ? 'bg-amber-400 text-black'
+                            : 'bg-black/40 text-white/60 hover:text-white'
+                        }`}
+                      >
+                        {q}
+                      </button>
+                    ))}
                     <button
-                      key={q}
-                      onClick={() => setGraphicsSettings((g) => ({ ...g, preset: q }))}
-                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition ${
-                        graphicsSettings.preset === q
-                          ? 'bg-amber-400 text-black'
-                          : 'bg-black/40 text-white/60 hover:text-white'
-                      }`}
+                      onClick={() => setShowArchiveModal(true)}
+                      className="px-2 py-0.5 rounded text-[9px] bg-white/10 hover:bg-white/20 text-cyan-200 font-semibold ml-auto"
                     >
-                      {q}
+                      📖 図鑑
                     </button>
-                  ))}
-                  <button
-                    onClick={() => setShowArchiveModal(true)}
-                    className="px-2 py-0.5 rounded text-[9px] bg-white/10 hover:bg-white/20 text-cyan-200 font-semibold"
-                  >
-                    📖 図鑑
-                  </button>
+                  </div>
                 </div>
               </div>
 
