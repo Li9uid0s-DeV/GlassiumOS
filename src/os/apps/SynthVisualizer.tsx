@@ -421,63 +421,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     }
   }, []);
 
-  const startProceduralAudio = useCallback(
-    (track: MonochromeTrack) => {
-      stopAllAudio();
-      const ctx = initAudioContext();
-      if (!ctx || !filterNodeRef.current) return;
-
-      if (ctx.state === 'suspended') {
-        ctx.resume();
-      }
-
-      const { synthParams } = track;
-      const secondsPerBeat = 60 / synthParams.tempo;
-      let step = 0;
-
-      const playChordStep = () => {
-        if (!ctx || !filterNodeRef.current) return;
-        const chordIndex = Math.floor(step / 4) % synthParams.chords.length;
-        const currentChord = synthParams.chords[chordIndex] ?? [110, 130.81, 164.81];
-        const bassFreq = synthParams.bassFreqs[chordIndex] ?? 55;
-
-        const bassOsc = ctx.createOscillator();
-        bassOsc.type = 'sine';
-        bassOsc.frequency.setValueAtTime(bassFreq, ctx.currentTime);
-
-        const bassGain = ctx.createGain();
-        bassGain.gain.setValueAtTime(0.26, ctx.currentTime);
-        bassGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + secondsPerBeat * 3.8);
-
-        bassOsc.connect(bassGain);
-        bassGain.connect(filterNodeRef.current);
-        bassOsc.start();
-        bassOsc.stop(ctx.currentTime + secondsPerBeat * 4);
-
-        currentChord.forEach((freq, idx) => {
-          const osc = ctx.createOscillator();
-          osc.type = synthParams.leadType;
-          osc.frequency.setValueAtTime(freq * (vocalBoost ? 2.0 : 1.5), ctx.currentTime);
-
-          const chordGain = ctx.createGain();
-          chordGain.gain.setValueAtTime(0.08 / (idx + 1), ctx.currentTime);
-          chordGain.gain.exponentialRampToValueAtTime(0.005, ctx.currentTime + secondsPerBeat * 1.8);
-
-          osc.connect(chordGain);
-          chordGain.connect(filterNodeRef.current!);
-          osc.start();
-          osc.stop(ctx.currentTime + secondsPerBeat * 2);
-        });
-
-        step++;
-      };
-
-      playChordStep();
-      musicIntervalRef.current = window.setInterval(playChordStep, secondsPerBeat * 1000);
-    },
-    [initAudioContext, stopAllAudio, vocalBoost]
-  );
-
   // Fetch Synchronized Lyrics from /api/music/lyrics / GDStudio / LRCLIB
   const loadLyricsForTrack = useCallback(async (track: MonochromeTrack) => {
     setIsFetchingLyrics(true);
@@ -581,6 +524,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const startTrackPlayback = useCallback(
     (track: MonochromeTrack, startAtSec = 0) => {
       stopAllAudio();
+      initAudioContext();
       fullPlayheadRef.current = startAtSec;
 
       const resolvedUrl =
@@ -604,8 +548,9 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               ).padStart(2, '0')}): ${track.title} — ${track.artist}`
             );
           })
-          .catch(() => {
-            // Retry via server byte-proxy if redirect failed
+          .catch((err) => {
+            console.warn('Audio play error, retrying with proxy query:', err);
+            // If direct play had issues, retry with explicit proxy=1
             if (resolvedUrl.includes('/api/music/play') && !resolvedUrl.includes('proxy=1')) {
               const proxyUrl = `${resolvedUrl}&proxy=1`;
               audio.src = proxyUrl;
@@ -622,17 +567,17 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   );
                 })
                 .catch(() => {
-                  startProceduralAudio(track);
+                  setStatusBanner(`⚠️ 再生できませんでした: ${track.title} — ${track.artist}`);
+                  setIsPlaying(false);
                 });
             } else {
-              startProceduralAudio(track);
+              setStatusBanner(`⚠️ 再生できませんでした: ${track.title} — ${track.artist}`);
+              setIsPlaying(false);
             }
           });
-      } else {
-        startProceduralAudio(track);
       }
     },
-    [isMuted, playbackRate, startProceduralAudio, stopAllAudio, volume]
+    [initAudioContext, isMuted, playbackRate, stopAllAudio, volume]
   );
 
   const playTrack = useCallback(

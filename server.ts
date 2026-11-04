@@ -3,6 +3,7 @@ import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { Readable } from 'node:stream';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -942,19 +943,36 @@ Only output <os_action> if the user is asking to change an OS setting or open an
 
   app.get('/api/music/play', async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     const rawId = String(req.query.id || '');
     const title = String(req.query.title || '');
     const artist = String(req.query.artist || '');
-    const useProxy = req.query.proxy === '1';
 
     const resolved = await resolveExactGdStudioStream(rawId, title, artist);
-    if (!resolved || !resolved.url) {
-      res.status(404).send('Audio stream not found');
-      return;
+    let targetStreamUrl = resolved?.url;
+
+    // Fallback: If NetEase stream is not found, fetch official preview from iTunes Japan
+    if (!targetStreamUrl && (title || artist)) {
+      try {
+        const queryTerm = `${title} ${artist}`.trim();
+        const itRes = await fetch(
+          `https://itunes.apple.com/search?term=${encodeURIComponent(queryTerm)}&country=JP&entity=song&limit=3`,
+          { signal: AbortSignal.timeout(4500) }
+        );
+        if (itRes.ok) {
+          const itData = (await itRes.json()) as { results?: Array<{ previewUrl?: string }> };
+          const pUrl = itData?.results?.find((r) => r.previewUrl)?.previewUrl;
+          if (pUrl) {
+            targetStreamUrl = pUrl;
+          }
+        }
+      } catch {
+        // ignore
+      }
     }
 
-    if (!useProxy) {
-      res.redirect(302, resolved.url);
+    if (!targetStreamUrl) {
+      res.status(404).send('Audio stream not found');
       return;
     }
 
@@ -962,12 +980,13 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       const forwardHeaders: Record<string, string> = {
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        Referer: 'https://music.163.com/',
       };
       if (req.headers.range) {
         forwardHeaders.Range = String(req.headers.range);
       }
 
-      const upstream = await fetch(resolved.url, {
+      const upstream = await fetch(targetStreamUrl, {
         headers: forwardHeaders,
         redirect: 'follow',
         signal: AbortSignal.timeout(15000),
@@ -980,10 +999,19 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       const contentLength = upstream.headers.get('content-length');
       if (contentLength) res.setHeader('Content-Length', contentLength);
 
-      const ab = await upstream.arrayBuffer();
-      res.status(upstream.status).send(Buffer.from(ab));
-    } catch {
-      res.redirect(302, resolved.url);
+      res.status(upstream.status);
+
+      if (upstream.body && typeof Readable.fromWeb === 'function') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const nodeStream = Readable.fromWeb(upstream.body as any);
+        nodeStream.pipe(res);
+      } else {
+        const ab = await upstream.arrayBuffer();
+        res.send(Buffer.from(ab));
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Audio stream failed';
+      res.status(502).send(msg);
     }
   });
 
