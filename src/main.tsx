@@ -9,16 +9,13 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>
 );
 
-// Unregister any stale service workers so asset/module requests are never intercepted
+// Register Glasispect Service Worker Proxy (uses relative path './sw-proxy.js' for GitHub Pages & storage.googleapis.com compatibility)
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker
-    .getRegistrations()
-    .then((registrations) => {
-      for (const reg of registrations) {
-        reg.unregister().catch(() => {});
-      }
-    })
-    .catch(() => {});
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('./sw-proxy.js')
+      .catch(() => {
+        // Fallback if hosted in environment restricting ServiceWorker registration
+      });
+  });
 }
-
-

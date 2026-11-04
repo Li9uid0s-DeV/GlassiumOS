@@ -8,12 +8,7 @@ import { fileURLToPath, URL } from 'node:url';
 export default defineConfig({
   plugins: [react()],
 
-  base:
-    process.env.VITE_GH_PAGES === 'true'
-      ? '/GlassiumOS-V4.0/'
-      : process.env.NODE_ENV === 'production'
-      ? './'
-      : '/',
+  base: process.env.NODE_ENV === 'production' || process.env.VITE_GH_PAGES === 'true' ? './' : '/',
 
   resolve: {
     alias: {

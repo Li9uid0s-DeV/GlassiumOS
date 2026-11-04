@@ -1,9 +1,13 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { Icon } from '../Icon';
 import {
   ProxyEngine,
+  ProxyRelayNodeId,
+  PROXY_RELAY_SERVERS,
   encodeUltraviolet,
   encodeScramjet,
+  fetchHtmlViaProxyCascade,
+  generateGcsStandaloneLauncherHtml,
 } from '../proxyService';
 
 interface Props {
@@ -14,13 +18,13 @@ const DEFAULT_HOME = 'about:start';
 
 const SPEED_DIAL = [
   { label: 'Glasispect Search', url: 'about:search?q=GlassiumOS+5', icon: 'Search', desc: 'Instant Web & Wiki Search' },
+  { label: 'Monochrome.st Music', url: 'https://monochrome.st', icon: 'Music', desc: 'Lossless Music & SW Proxy' },
+  { label: 'storage.googleapis.com', url: 'about:gcs', icon: 'HardDrive', desc: 'Google Cloud Storage Gateway' },
   { label: 'GitHub Explorer', url: 'https://github.com', icon: 'GitBranch', desc: 'Zero-404 Repo & Pages Hub' },
   { label: 'Wikipedia', url: 'https://ja.wikipedia.org', icon: 'FileText', desc: 'Free Encyclopedia Reader' },
-  { label: 'DuckDuckGo', url: 'https://html.duckduckgo.com/html/', icon: 'Globe', desc: 'Privacy Proxy Search' },
-  { label: 'jsDelivr CDN', url: 'https://www.jsdelivr.com', icon: 'Server', desc: 'Open Source CDN & Packages' },
-  { label: 'MDN Web Docs', url: 'https://developer.mozilla.org', icon: 'BookOpen', desc: 'Web Technologies Docs' },
   { label: 'Hacker News', url: 'https://news.ycombinator.com', icon: 'Zap', desc: 'Tech & Engineering News' },
-  { label: 'Three.js Docs', url: 'https://threejs.org', icon: 'Sparkles', desc: '3D WebGL Engine' },
+  { label: 'MDN Web Docs', url: 'https://developer.mozilla.org', icon: 'BookOpen', desc: 'Web Technologies Docs' },
+  { label: 'jsDelivr CDN', url: 'https://www.jsdelivr.com', icon: 'Server', desc: 'Open Source CDN & Packages' },
 ];
 
 interface GitHubRepoItem {
@@ -42,7 +46,9 @@ interface WikiSearchResult {
 function normalizeUrl(input: string): string {
   const v = input.trim();
   if (!v || v === 'about:start' || v === 'about:blank' || v.startsWith('about:')) return v;
-  // Support jsdelivr:owner/repo or gh:owner/repo
+  if (/^gcs:\/\//i.test(v)) {
+    return 'https://storage.googleapis.com/' + v.replace(/^gcs:\/+/i, '');
+  }
   if (/^(jsdelivr|gh):/i.test(v)) {
     const repoPath = v.replace(/^(jsdelivr|gh):\/+/i, '').replace(/^(jsdelivr|gh):/i, '');
     const parts = repoPath.split('/');
@@ -52,12 +58,18 @@ function normalizeUrl(input: string): string {
       return `https://github.com/${owner}/${repo}`;
     }
   }
-  // Fix broken github.io 404 paths by routing to GitHub Explorer or clean URL
-  if (/^https?:\/\/[^/]+\.github\.io/i.test(v)) {
-    return v;
+  // If user pasted a Google search URL that was blocked or 404'd, extract q= parameter into smart search or proxy
+  if (/^https?:\/\/(www\.)?google\.[a-z.]+\/search\?/i.test(v)) {
+    try {
+      const u = new URL(v);
+      const q = u.searchParams.get('q');
+      if (q) return 'about:search?q=' + encodeURIComponent(q);
+    } catch {
+      // ignore
+    }
   }
   if (/^https?:\/\//i.test(v)) return v;
-  if (/^[\w-]+(\.[\w-]+)+/.test(v)) return 'https://' + v;
+  if (/^[\w-]+(\.[\w-]+)+(\/.*)?$/.test(v)) return 'https://' + v;
   return 'about:search?q=' + encodeURIComponent(v);
 }
 
@@ -69,13 +81,21 @@ export function BrowserApp({ payload }: Props) {
   const [loadedUrl, setLoadedUrl] = useState(initialUrl);
   const [inputVal, setInputVal] = useState(initialUrl === 'about:start' ? '' : initialUrl);
   const [engine, setEngine] = useState<ProxyEngine>(payload?.engine ?? 'scramjet');
+  const [relayNode, setRelayNode] = useState<ProxyRelayNodeId>('auto');
+  const [activeNodeLabel, setActiveNodeLabel] = useState<string>('SW + Multi-Node Ready');
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [history, setHistory] = useState<string[]>([initialUrl]);
   const [historyIdx, setHistoryIdx] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [latency, setLatency] = useState(12);
+  const [latency, setLatency] = useState(11);
   const [frameError, setFrameError] = useState(false);
   const [forceRawIframe, setForceRawIframe] = useState(false);
+  const [proxiedSrcDoc, setProxiedSrcDoc] = useState<string>('');
+
+  // storage.googleapis.com Gateway state
+  const [gcsBucketInput, setGcsBucketInput] = useState('https://storage.googleapis.com/tfjs-models/');
+  const [gcsCustomTargetUrl, setGcsCustomTargetUrl] = useState('https://monochrome.st');
+  const [gcsBlobSandboxUrl, setGcsBlobSandboxUrl] = useState<string | null>(null);
 
   // Built-in GitHub Explorer state (prevents GitHub / GitHub Pages 404 errors)
   const [ghQuery, setGhQuery] = useState('three.js webgl');
@@ -89,9 +109,9 @@ export function BrowserApp({ payload }: Props) {
   const [searchLoading, setSearchLoading] = useState(false);
 
   const [logs, setLogs] = useState<{ time: string; text: string; type: 'info' | 'proxy' | 'sec' }[]>([
-    { time: '00:00', text: '[Glasispect Proxy] Initialized AST Rewriter + GitHub Pages URL Resolver', type: 'info' },
-    { time: '00:01', text: '[UV] ServiceWorker tunnel scope active (/api/proxy)', type: 'sec' },
-    { time: '00:02', text: '[Zero-404] GitHub API & Wikipedia Smart Reader standing by', type: 'proxy' },
+    { time: '00:00', text: '[Glasispect SW Proxy] Service Worker + Multi-Node Relay Initialized', type: 'info' },
+    { time: '00:01', text: '[Zero-404] GitHub Pages & storage.googleapis.com srcDoc Rewriter Ready', type: 'sec' },
+    { time: '00:02', text: '[Nodes] AllOrigins / CodeTabs / CorsProxy / Jina Reader Online', type: 'proxy' },
   ]);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -103,26 +123,13 @@ export function BrowserApp({ payload }: Props) {
     return () => clearInterval(timer);
   }, []);
 
-  // Listen for navigation events posted from the proxy iframe
-  useEffect(() => {
-    const onMessage = (e: MessageEvent) => {
-      if (e.data && e.data.type === 'LIQUID_BROWSER_NAV' && typeof e.data.url === 'string') {
-        setAddress(e.data.url);
-        setInputVal(e.data.url);
-        setLoadedUrl(e.data.url);
-      }
-    };
-    window.addEventListener('message', onMessage);
-    return () => window.removeEventListener('message', onMessage);
+  const addLog = useCallback((text: string, type: 'info' | 'proxy' | 'sec' = 'proxy') => {
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setLogs((prev) => [...prev.slice(-24), { time, text, type }]);
   }, []);
 
-  const addLog = (text: string, type: 'info' | 'proxy' | 'sec' = 'proxy') => {
-    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    setLogs((prev) => [...prev.slice(-20), { time, text, type }]);
-  };
-
   // Fetch GitHub repositories when in GitHub mode
-  const searchGitHubRepos = async (q: string) => {
+  const searchGitHubRepos = useCallback(async (q: string) => {
     setGhLoading(true);
     setSelectedRepoReadme(null);
     try {
@@ -132,7 +139,6 @@ export function BrowserApp({ payload }: Props) {
         setGhRepos(data.items || []);
       }
     } catch {
-      // Fallback curated list if offline/rate-limited
       setGhRepos([
         {
           id: 1,
@@ -165,9 +171,9 @@ export function BrowserApp({ payload }: Props) {
     } finally {
       setGhLoading(false);
     }
-  };
+  }, []);
 
-  const openGitHubRepoDetail = async (fullName: string) => {
+  const openGitHubRepoDetail = useCallback(async (fullName: string) => {
     setGhLoading(true);
     try {
       const res = await fetch(`https://api.github.com/repos/${fullName}/readme`, {
@@ -196,10 +202,10 @@ export function BrowserApp({ payload }: Props) {
     } finally {
       setGhLoading(false);
     }
-  };
+  }, []);
 
   // Run Wikipedia / Web search when in about:search or wikipedia.org
-  const runSmartSearch = async (q: string) => {
+  const runSmartSearch = useCallback(async (q: string) => {
     const cleanQ = q.trim() || 'GlassiumOS';
     setSearchLoading(true);
     setWikiArticle(null);
@@ -235,43 +241,107 @@ export function BrowserApp({ payload }: Props) {
     } finally {
       setSearchLoading(false);
     }
-  };
+  }, []);
 
-  const navigateTo = (url: string) => {
-    const norm = normalizeUrl(url);
-    setIsLoading(true);
-    setFrameError(false);
-    setForceRawIframe(false);
-    setAddress(norm);
-    setInputVal(norm === 'about:start' ? '' : norm.replace(/^about:search\?q=/, ''));
-    setLoadedUrl(norm);
-
-    addLog(`[${engine.toUpperCase()}] Routing -> ${norm}`, 'proxy');
-
-    if (norm.includes('github.com') || norm.includes('github.io')) {
-      const matchRepo = norm.match(/github\.com\/([^/]+\/[^/?#]+)/i);
-      if (matchRepo && matchRepo[1]) {
-        openGitHubRepoDetail(matchRepo[1]);
-      } else {
-        searchGitHubRepos(ghQuery);
+  // Load any external URL through our Multi-Node Proxy Cascade & render into srcDoc (zero GitHub Pages 404!)
+  const loadProxiedWebpage = useCallback(
+    async (targetUrl: string, nodeToUse: ProxyRelayNodeId = relayNode) => {
+      if (!targetUrl || targetUrl === 'about:start' || targetUrl.startsWith('about:')) return;
+      setIsLoading(true);
+      setFrameError(false);
+      addLog(`[Proxy Cascade] Fetching ${targetUrl} via ${nodeToUse}...`, 'proxy');
+      const t0 = performance.now();
+      try {
+        const result = await fetchHtmlViaProxyCascade(targetUrl, nodeToUse);
+        setProxiedSrcDoc(result.html);
+        setActiveNodeLabel(result.usedNode);
+        setLatency(Math.max(8, Math.round(performance.now() - t0)));
+        addLog(`[200 OK] Rendered ${result.finalUrl} via ${result.usedNode}`, 'sec');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Relay connection error';
+        addLog(`[Fallback] ${msg}`, 'info');
+        setFrameError(true);
+      } finally {
+        setIsLoading(false);
       }
-    } else if (norm.startsWith('about:search?q=')) {
-      const q = decodeURIComponent(norm.replace('about:search?q=', ''));
-      runSmartSearch(q);
-    } else if (norm.includes('wikipedia.org')) {
-      runSmartSearch('Operating System');
+    },
+    [addLog, relayNode]
+  );
+
+  const navigateTo = useCallback(
+    (url: string, overrideForceRaw = false) => {
+      const norm = normalizeUrl(url);
+      setIsLoading(true);
+      setFrameError(false);
+      if (!overrideForceRaw) {
+        setForceRawIframe(false);
+      }
+      setAddress(norm);
+      setInputVal(norm === 'about:start' || norm === 'about:gcs' ? '' : norm.replace(/^about:search\?q=/, ''));
+      setLoadedUrl(norm);
+
+      addLog(`[${engine.toUpperCase()}] Routing -> ${norm}`, 'proxy');
+
+      const willUseGitHubHub = !overrideForceRaw && (norm.includes('github.com') || norm.includes('github.io'));
+      const willUseSmartSearch = !overrideForceRaw && (norm.startsWith('about:search?q=') || norm.includes('wikipedia.org'));
+
+      if (willUseGitHubHub) {
+        const matchRepo = norm.match(/github\.com\/([^/]+\/[^/?#]+)/i);
+        if (matchRepo && matchRepo[1]) {
+          openGitHubRepoDetail(matchRepo[1]);
+        } else {
+          searchGitHubRepos(ghQuery);
+        }
+        setIsLoading(false);
+      } else if (willUseSmartSearch) {
+        const q = norm.startsWith('about:search?q=')
+          ? decodeURIComponent(norm.replace('about:search?q=', ''))
+          : 'GlassiumOS';
+        runSmartSearch(q);
+        setIsLoading(false);
+      } else if (norm !== 'about:start' && norm !== 'about:gcs' && !norm.startsWith('about:')) {
+        loadProxiedWebpage(norm, relayNode);
+      } else {
+        setIsLoading(false);
+      }
+
+      setHistory((prev) => {
+        const next = prev.slice(0, historyIdx + 1);
+        return [...next, norm];
+      });
+      setHistoryIdx((prev) => prev + 1);
+    },
+    [
+      engine,
+      ghQuery,
+      historyIdx,
+      loadProxiedWebpage,
+      openGitHubRepoDetail,
+      relayNode,
+      runSmartSearch,
+      searchGitHubRepos,
+      addLog,
+    ]
+  );
+
+  // Listen for navigation events posted from the proxied srcDoc iframe
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.data && e.data.type === 'LIQUID_BROWSER_NAV' && typeof e.data.url === 'string') {
+        navigateTo(e.data.url, true);
+      }
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [navigateTo]);
+
+  // If payload URL was passed on mount (e.g. from Music app), load it
+  useEffect(() => {
+    if (payload?.url && payload.url !== 'about:start') {
+      navigateTo(payload.url, true);
     }
-
-    setHistory((prev) => {
-      const next = prev.slice(0, historyIdx + 1);
-      return [...next, norm];
-    });
-    setHistoryIdx((prev) => prev + 1);
-
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 300);
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payload?.url]);
 
   const goBack = () => {
     if (historyIdx > 0) {
@@ -279,9 +349,12 @@ export function BrowserApp({ payload }: Props) {
       setHistoryIdx(prevIdx);
       const url = history[prevIdx];
       setAddress(url);
-      setInputVal(url === 'about:start' ? '' : url.replace(/^about:search\?q=/, ''));
+      setInputVal(url === 'about:start' || url === 'about:gcs' ? '' : url.replace(/^about:search\?q=/, ''));
       setLoadedUrl(url);
       setFrameError(false);
+      if (url !== 'about:start' && url !== 'about:gcs' && !url.startsWith('about:')) {
+        loadProxiedWebpage(url, relayNode);
+      }
     }
   };
 
@@ -291,21 +364,44 @@ export function BrowserApp({ payload }: Props) {
       setHistoryIdx(nextIdx);
       const url = history[nextIdx];
       setAddress(url);
-      setInputVal(url === 'about:start' ? '' : url.replace(/^about:search\?q=/, ''));
+      setInputVal(url === 'about:start' || url === 'about:gcs' ? '' : url.replace(/^about:search\?q=/, ''));
       setLoadedUrl(url);
       setFrameError(false);
+      if (url !== 'about:start' && url !== 'about:gcs' && !url.startsWith('about:')) {
+        loadProxiedWebpage(url, relayNode);
+      }
     }
   };
 
   const refreshPage = () => {
-    setIsLoading(true);
-    setFrameError(false);
-    setTimeout(() => {
-      if (iframeRef.current && loadedUrl !== 'about:start' && !loadedUrl.startsWith('about:')) {
-        iframeRef.current.src = `/api/proxy?url=${encodeURIComponent(loadedUrl)}&_t=${Date.now()}`;
-      }
-      setIsLoading(false);
-    }, 300);
+    if (loadedUrl !== 'about:start' && loadedUrl !== 'about:gcs' && !loadedUrl.startsWith('about:')) {
+      loadProxiedWebpage(loadedUrl, relayNode);
+    } else if (loadedUrl.startsWith('about:search?q=')) {
+      runSmartSearch(decodeURIComponent(loadedUrl.replace('about:search?q=', '')));
+    }
+  };
+
+  const handleCreateGcsSandbox = (target: string) => {
+    const html = generateGcsStandaloneLauncherHtml(target);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    if (gcsBlobSandboxUrl) URL.revokeObjectURL(gcsBlobSandboxUrl);
+    const url = URL.createObjectURL(blob);
+    setGcsBlobSandboxUrl(url);
+    addLog(`[GCS Gateway] Generated storage.googleapis.com compatible sandbox for ${target}`, 'sec');
+  };
+
+  const handleDownloadGcsLauncher = (target: string) => {
+    const html = generateGcsStandaloneLauncherHtml(target);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'glassium-gcs-launcher.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    addLog(`[GCS Export] Downloaded glassium-gcs-launcher.html for storage.googleapis.com`, 'info');
   };
 
   const encodedProxyString = useMemo(() => {
@@ -315,16 +411,8 @@ export function BrowserApp({ payload }: Props) {
     return loadedUrl;
   }, [engine, loadedUrl]);
 
-  const resolvedIframeSrc = useMemo(() => {
-    if (!loadedUrl || loadedUrl === 'about:start' || loadedUrl === 'about:blank') return '';
-    if (loadedUrl.startsWith('about:search?q=')) {
-      const q = loadedUrl.replace('about:search?q=', '');
-      return `/api/proxy?url=${encodeURIComponent('https://html.duckduckgo.com/html/?q=' + q)}`;
-    }
-    return `/api/proxy?url=${encodeURIComponent(loadedUrl)}`;
-  }, [loadedUrl]);
-
   const isStartPage = loadedUrl === 'about:start';
+  const isGcsGatewayPage = loadedUrl === 'about:gcs';
   const isGitHubView = !forceRawIframe && (loadedUrl.includes('github.com') || loadedUrl.includes('github.io'));
   const isSmartSearchView = !forceRawIframe && (loadedUrl.startsWith('about:search?q=') || loadedUrl.includes('wikipedia.org'));
 
@@ -384,7 +472,7 @@ export function BrowserApp({ payload }: Props) {
             type="text"
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
-            placeholder="キーワード検索 または URL入力 (例: github.com, three.js, wikipedia.org)..."
+            placeholder="検索またはURL入力 (例: monochrome.st, storage.googleapis.com, news.ycombinator.com)..."
             className="flex-1 bg-transparent text-xs text-white placeholder-white/40 outline-none font-sans"
           />
           {inputVal && (
@@ -398,18 +486,39 @@ export function BrowserApp({ payload }: Props) {
           )}
           <button
             type="submit"
-            className="px-2 py-0.5 bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-300 text-[11px] font-semibold transition"
+            className="px-2.5 py-0.5 bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-300 text-[11px] font-semibold transition"
           >
             移動
           </button>
         </form>
+
+        {/* Proxy Relay Server Selector */}
+        <select
+          value={relayNode}
+          onChange={(e) => {
+            const nextNode = e.target.value as ProxyRelayNodeId;
+            setRelayNode(nextNode);
+            if (!isStartPage && !isGcsGatewayPage && !loadedUrl.startsWith('about:')) {
+              setForceRawIframe(true);
+              loadProxiedWebpage(loadedUrl, nextNode);
+            }
+          }}
+          className="hidden md:block bg-zinc-900 border border-white/15 text-cyan-300 text-[11px] px-2 py-1 outline-none cursor-pointer"
+          title="プロキシ中継サーバー切替"
+        >
+          {PROXY_RELAY_SERVERS.map((srv) => (
+            <option key={srv.id} value={srv.id} className="bg-zinc-900 text-white">
+              🌐 {srv.name}
+            </option>
+          ))}
+        </select>
 
         {/* Engine Switcher */}
         <div className="hidden sm:flex items-center gap-1 bg-white/[0.04] p-0.5 border border-white/[0.06]">
           <button
             onClick={() => {
               setEngine('scramjet');
-              addLog('[Engine] Switched to Scramjet v3 (Wasm AST Rewriter)', 'proxy');
+              addLog('[Engine] Switched to Scramjet v3 (SW + AST Rewriter)', 'proxy');
             }}
             className={`px-2 py-1 text-[11px] font-medium flex items-center gap-1 transition ${
               engine === 'scramjet' ? 'bg-cyan-500 text-black font-semibold' : 'text-white/60 hover:text-white'
@@ -439,19 +548,45 @@ export function BrowserApp({ payload }: Props) {
               ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
               : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
           }`}
+          title="プロキシ診断 & サーバー切替"
         >
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           <span>{latency}ms</span>
         </button>
       </div>
 
-      {/* Diagnostics Flyout */}
+      {/* Diagnostics & Proxy Server Selector Flyout */}
       {showDiagnostics && (
-        <div className="bg-zinc-900 border-b border-cyan-500/30 p-3 text-xs flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold text-cyan-300">GlasispectUI Proxy & GitHub Pages 404 Resolver</span>
-            <span className="text-[10px] font-mono text-emerald-400">{encodedProxyString.slice(0, 36)}</span>
+        <div className="bg-zinc-900 border-b border-cyan-500/30 p-3 text-xs flex flex-col gap-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="font-semibold text-cyan-300">
+              GlasispectUI Service Worker Proxy &amp; Multi-Node Relay ({activeNodeLabel})
+            </span>
+            <span className="text-[10px] font-mono text-emerald-400">{encodedProxyString.slice(0, 44)}</span>
           </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            {PROXY_RELAY_SERVERS.map((srv) => (
+              <button
+                key={srv.id}
+                onClick={() => {
+                  setRelayNode(srv.id);
+                  if (!isStartPage && !isGcsGatewayPage && !loadedUrl.startsWith('about:')) {
+                    setForceRawIframe(true);
+                    loadProxiedWebpage(loadedUrl, srv.id);
+                  }
+                }}
+                className={`px-2.5 py-1 text-[10px] font-mono border transition ${
+                  relayNode === srv.id
+                    ? 'bg-cyan-400 text-black border-cyan-300 font-bold'
+                    : 'bg-black/50 text-white/70 border-white/10 hover:text-white'
+                }`}
+              >
+                {srv.name}
+              </button>
+            ))}
+          </div>
+
           <div className="bg-black/60 p-2 font-mono text-[10px] text-white/70 max-h-20 overflow-y-auto space-y-1">
             {logs.map((log, idx) => (
               <div key={idx} className="flex gap-2">
@@ -475,12 +610,18 @@ export function BrowserApp({ payload }: Props) {
             <span>{b.label}</span>
           </button>
         ))}
-        {!isStartPage && (
+        {!isStartPage && !isGcsGatewayPage && (
           <button
-            onClick={() => setForceRawIframe((v) => !v)}
-            className="ml-auto px-2.5 py-0.5 text-[10px] font-mono bg-white/[0.06] hover:bg-white/15 text-cyan-300 transition shrink-0"
+            onClick={() => {
+              const nextRaw = !forceRawIframe;
+              setForceRawIframe(nextRaw);
+              if (nextRaw && !loadedUrl.startsWith('about:')) {
+                loadProxiedWebpage(loadedUrl, relayNode);
+              }
+            }}
+            className="ml-auto px-2.5 py-0.5 text-[10px] font-mono bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 transition shrink-0"
           >
-            {forceRawIframe ? 'スマートリーダー表示へ切替' : 'プロキシ直接フレーム表示へ切替'}
+            {forceRawIframe ? 'スマートリーダー表示へ切替' : 'SWプロキシ直接レンダリングへ切替'}
           </button>
         )}
       </div>
@@ -491,6 +632,122 @@ export function BrowserApp({ payload }: Props) {
           <div className="h-full w-full flex items-center justify-center bg-zinc-900 overflow-auto p-4">
             <img src={loadedUrl} alt={address} className="max-w-full max-h-full object-contain shadow-2xl" />
           </div>
+        ) : isGcsGatewayPage ? (
+          /* Google Cloud Storage (storage.googleapis.com) Gateway & Launcher */
+          <div className="h-full w-full overflow-y-auto p-6 md:p-8 bg-zinc-950 text-white space-y-6">
+            <div className="max-w-3xl mx-auto space-y-6">
+              <div className="border-b border-white/10 pb-4 flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="text-[11px] font-mono text-cyan-400 uppercase tracking-widest">
+                    GOOGLE CLOUD STORAGE GATEWAY &amp; SANDBOX LAUNCHER
+                  </div>
+                  <h2 className="text-xl font-bold mt-1">☁️ storage.googleapis.com ゲートウェイ &amp; ランチャー</h2>
+                  <p className="text-xs text-white/60 mt-1">
+                    storage.googleapis.com 上のバケットや静的HTMLアプリの直接展開、およびどこからでも開けるスタンドアロンHTMLランチャーを生成します。
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDownloadGcsLauncher(gcsCustomTargetUrl)}
+                  className="px-4 py-2 bg-cyan-500 hover:bg-cyan-400 text-black font-bold text-xs transition flex items-center gap-2"
+                >
+                  <Icon name="Download" size={14} />
+                  <span>GCS用スタンドアロンHTMLを保存</span>
+                </button>
+              </div>
+
+              {/* Section 1: Open any storage.googleapis.com URL or Bucket */}
+              <div className="p-5 bg-white/[0.03] border-t-2 border-cyan-400 space-y-3">
+                <div className="text-xs font-bold text-cyan-300">
+                  1. storage.googleapis.com のバケット / ファイルをプロキシ内で直接開く
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={gcsBucketInput}
+                    onChange={(e) => setGcsBucketInput(e.target.value)}
+                    placeholder="https://storage.googleapis.com/bucket-name/index.html または gcs://bucket-name"
+                    className="flex-1 bg-black/60 border border-white/15 px-3 py-2 text-xs text-white outline-none font-mono"
+                  />
+                  <button
+                    onClick={() => {
+                      setRelayNode('gcs-gateway');
+                      navigateTo(gcsBucketInput, true);
+                    }}
+                    className="px-4 py-2 bg-cyan-500 text-black font-bold text-xs shrink-0 hover:bg-cyan-400 transition"
+                  >
+                    GCSを開く
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {[
+                    { label: 'TensorFlow.js Models Bucket', url: 'https://storage.googleapis.com/tfjs-models/' },
+                    { label: 'Google Cloud Public Data', url: 'https://storage.googleapis.com/gcp-public-data-landsat/' },
+                    { label: 'Chromium Snapshots Bucket', url: 'https://storage.googleapis.com/chromium-browser-snapshots/' },
+                  ].map((sample) => (
+                    <button
+                      key={sample.url}
+                      onClick={() => {
+                        setGcsBucketInput(sample.url);
+                        setRelayNode('gcs-gateway');
+                        navigateTo(sample.url, true);
+                      }}
+                      className="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-[11px] text-cyan-200 font-mono transition"
+                    >
+                      📂 {sample.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Section 2: Launch any website inside a GCS-compatible Blob / Sandbox */}
+              <div className="p-5 bg-white/[0.03] border-t-2 border-amber-400 space-y-3">
+                <div className="text-xs font-bold text-amber-300">
+                  2. 任意のWebサイト (monochrome.st 等) を GCS 互換サンドボックスで生成・起動
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={gcsCustomTargetUrl}
+                    onChange={(e) => setGcsCustomTargetUrl(e.target.value)}
+                    placeholder="https://monochrome.st"
+                    className="flex-1 bg-black/60 border border-white/15 px-3 py-2 text-xs text-white outline-none font-mono"
+                  />
+                  <button
+                    onClick={() => handleCreateGcsSandbox(gcsCustomTargetUrl)}
+                    className="px-4 py-2 bg-amber-400 text-black font-bold text-xs shrink-0 hover:bg-amber-300 transition"
+                  >
+                    サンドボックス起動
+                  </button>
+                  <button
+                    onClick={() => navigateTo(gcsCustomTargetUrl, true)}
+                    className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs shrink-0 transition"
+                  >
+                    SWプロキシで開く
+                  </button>
+                </div>
+
+                {gcsBlobSandboxUrl && (
+                  <div className="mt-4 border border-white/15 bg-black h-80 flex flex-col">
+                    <div className="px-3 py-1.5 bg-zinc-900 border-b border-white/10 flex items-center justify-between text-[11px]">
+                      <span className="text-emerald-400 font-mono">✓ GCS Compatible Sandbox Active ({gcsCustomTargetUrl})</span>
+                      <button
+                        onClick={() => setGcsBlobSandboxUrl(null)}
+                        className="text-white/50 hover:text-white"
+                      >
+                        閉じる
+                      </button>
+                    </div>
+                    <iframe
+                      src={gcsBlobSandboxUrl}
+                      className="flex-1 w-full border-0 bg-white"
+                      title="gcs-sandbox"
+                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         ) : isStartPage ? (
           <div className="h-full w-full overflow-y-auto p-6 md:p-10 flex flex-col items-center justify-center bg-gradient-to-b from-zinc-950 via-zinc-900/60 to-black">
             <div className="w-full max-w-3xl space-y-8">
@@ -500,7 +757,7 @@ export function BrowserApp({ payload }: Props) {
                 </div>
                 <h1 className="text-2xl font-semibold tracking-tight text-white">Glasispect Web Browser</h1>
                 <p className="text-xs text-white/50">
-                  GitHub Pages 404 自動リカバリ ＆ スマート検索・プロキシブラウザ (GlassiumOS 5 u1)
+                  Service Worker マルチノード・プロキシ ＆ storage.googleapis.com ゲートウェイ搭載 (GitHub Pages 404 完全回避)
                 </p>
               </div>
 
@@ -516,7 +773,7 @@ export function BrowserApp({ payload }: Props) {
                   type="text"
                   value={inputVal}
                   onChange={(e) => setInputVal(e.target.value)}
-                  placeholder="Web検索、GitHubリポジトリ検索、またはURLを入力..."
+                  placeholder="Web検索、monochrome.st、storage.googleapis.com、または任意のURLを入力..."
                   className="w-full bg-transparent text-sm text-white placeholder-white/30 outline-none"
                   autoFocus
                 />
@@ -529,8 +786,9 @@ export function BrowserApp({ payload }: Props) {
               </form>
 
               <div className="space-y-3">
-                <div className="text-xs font-medium text-white/50 px-1">
-                  Speed Dial & Bookmarks
+                <div className="flex items-center justify-between text-xs font-medium text-white/50 px-1">
+                  <span>Speed Dial &amp; Proxy Gateways</span>
+                  <span className="text-[11px] font-mono text-cyan-400">Active Node: {activeNodeLabel}</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {SPEED_DIAL.map((item) => (
@@ -600,10 +858,13 @@ export function BrowserApp({ payload }: Props) {
                     <span>リポジトリ一覧に戻る</span>
                   </button>
                   <button
-                    onClick={() => setForceRawIframe(true)}
+                    onClick={() => {
+                      setForceRawIframe(true);
+                      loadProxiedWebpage(selectedRepoReadme.url, relayNode);
+                    }}
                     className="px-3 py-1 bg-cyan-500/20 text-cyan-300 text-xs"
                   >
-                    プロキシでオリジナルページを開く
+                    SWプロキシでオリジナルページを開く
                   </button>
                 </div>
                 <div className="p-5 bg-white/[0.03] border-t border-cyan-400/50 space-y-2">
@@ -648,10 +909,14 @@ export function BrowserApp({ payload }: Props) {
                 <p className="text-xs text-white/50">検索語句: {inputVal || 'GlassiumOS'}</p>
               </div>
               <button
-                onClick={() => setForceRawIframe(true)}
-                className="px-3 py-1.5 bg-white/10 hover:bg-white/15 text-xs"
+                onClick={() => {
+                  setForceRawIframe(true);
+                  const q = loadedUrl.replace(/^about:search\?q=/, '');
+                  loadProxiedWebpage(`https://html.duckduckgo.com/html/?q=${q}`, relayNode);
+                }}
+                className="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-300 text-xs font-semibold"
               >
-                DuckDuckGo プロキシ画面で開く
+                DuckDuckGo (SWプロキシ) で開く
               </button>
             </div>
 
@@ -683,44 +948,81 @@ export function BrowserApp({ payload }: Props) {
             )}
           </div>
         ) : (
-          /* Active Webpage Frame via Proxy */
-          <div className="h-full w-full relative bg-white">
-            <iframe
-              ref={iframeRef}
-              src={resolvedIframeSrc}
-              className="h-full w-full border-0 bg-white"
-              title="proxy-browser"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-              onError={() => setFrameError(true)}
-            />
-
-            {frameError && (
-              <div className="absolute inset-0 bg-zinc-950 flex flex-col items-center justify-center p-6 text-center space-y-4">
-                <div className="w-12 h-12 bg-rose-500/20 text-rose-400 flex items-center justify-center">
-                  <Icon name="Shield" size={24} />
-                </div>
-                <div>
-                  <h2 className="text-base font-bold text-white">スマートリーダーへ自動切替可能</h2>
-                  <p className="text-xs text-white/60 max-w-md mt-1">
-                    {loadedUrl} の表示中に接続エラーが発生しました。スマート検索モードで開くか再試行してください。
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => navigateTo('about:search?q=' + encodeURIComponent(loadedUrl))}
-                    className="px-4 py-2 bg-cyan-500 text-black font-semibold text-xs transition hover:bg-cyan-400"
-                  >
-                    スマート検索で開く
-                  </button>
-                  <button
-                    onClick={() => navigateTo('about:start')}
-                    className="px-4 py-2 bg-white/10 text-white text-xs hover:bg-white/20 transition"
-                  >
-                    スタートページへ戻る
-                  </button>
-                </div>
+          /* Active Webpage Frame rendered via Multi-Node Proxy Cascade srcDoc (Zero 404 on GitHub Pages!) */
+          <div className="h-full w-full relative bg-zinc-950 flex flex-col">
+            <div className="px-3 py-1 bg-zinc-900 border-b border-white/10 flex items-center justify-between text-[11px] font-mono text-white/60 shrink-0">
+              <span className="truncate">
+                🔒 Tunnel: <strong className="text-cyan-300">{activeNodeLabel}</strong> — {loadedUrl}
+              </span>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => loadProxiedWebpage(loadedUrl, 'jina-reader')}
+                  className="px-2 py-0.5 bg-white/5 hover:bg-white/15 text-amber-300"
+                >
+                  Cloud Reader変換
+                </button>
+                <button
+                  onClick={() => {
+                    setGcsCustomTargetUrl(loadedUrl);
+                    navigateTo('about:gcs');
+                  }}
+                  className="px-2 py-0.5 bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300"
+                >
+                  ☁️ GCSランチャー化
+                </button>
               </div>
-            )}
+            </div>
+
+            <div className="flex-1 relative bg-white">
+              {isLoading && (
+                <div className="absolute inset-0 z-20 bg-zinc-950/85 backdrop-blur-sm flex flex-col items-center justify-center gap-3 text-xs text-cyan-300 font-mono">
+                  <Icon name="RefreshCw" size={22} className="animate-spin text-cyan-400" />
+                  <span>Service Worker &amp; Multi-Node Proxy で取得中 ({loadedUrl})...</span>
+                </div>
+              )}
+
+              <iframe
+                ref={iframeRef}
+                srcDoc={proxiedSrcDoc}
+                className="h-full w-full border-0 bg-white"
+                title="proxy-browser"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+              />
+
+              {frameError && (
+                <div className="absolute inset-0 z-30 bg-zinc-950 flex flex-col items-center justify-center p-6 text-center space-y-4">
+                  <div className="w-12 h-12 bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                    <Icon name="Shield" size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-bold text-white">プロキシノード切替・スマートリーダー利用可能</h2>
+                    <p className="text-xs text-white/60 max-w-md mt-1">
+                      {loadedUrl} を別の中継サーバーまたはスマート検索モードで開けます。
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    <button
+                      onClick={() => loadProxiedWebpage(loadedUrl, 'jina-reader')}
+                      className="px-4 py-2 bg-cyan-500 text-black font-semibold text-xs transition hover:bg-cyan-400"
+                    >
+                      Cloud Reader ノードで開く
+                    </button>
+                    <button
+                      onClick={() => navigateTo('about:search?q=' + encodeURIComponent(loadedUrl))}
+                      className="px-4 py-2 bg-white/15 text-white font-semibold text-xs transition hover:bg-white/25"
+                    >
+                      スマート検索で開く
+                    </button>
+                    <button
+                      onClick={() => navigateTo('about:start')}
+                      className="px-4 py-2 bg-white/10 text-white text-xs hover:bg-white/20 transition"
+                    >
+                      スタートページへ戻る
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

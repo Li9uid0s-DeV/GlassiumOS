@@ -604,6 +604,20 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
 
   const [mazeDifficulty, setMazeDifficulty] = useState<MazeDifficulty>('NORMAL');
   const [isDailyChallenge, setIsDailyChallenge] = useState(false);
+  const [dailyBestFloor, setDailyBestFloor] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem('glasia_daily_best_floor') || '1') || 1;
+    } catch {
+      return 1;
+    }
+  });
+  const [dailyBestTimeSec, setDailyBestTimeSec] = useState<number>(() => {
+    try {
+      return Number(localStorage.getItem('glasia_daily_best_time') || '0') || 0;
+    } catch {
+      return 0;
+    }
+  });
   const [mazeFloor, setMazeFloor] = useState(1);
   const [mazeRunId, setMazeRunId] = useState(0);
   const [mazeHp, setMazeHp] = useState(120);
@@ -1068,6 +1082,24 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
       const mins = Math.floor(seconds / 60);
       const secs = seconds % 60;
       const formatted = `F${reachedFloor} (${mins}m${secs < 10 ? '0' : ''}${secs}s · ${mazeDifficulty})`;
+      setDailyBestFloor((prev) => {
+        const nextBest = Math.max(prev, reachedFloor);
+        try {
+          localStorage.setItem('glasia_daily_best_floor', String(nextBest));
+        } catch {
+          // ignore
+        }
+        return nextBest;
+      });
+      setDailyBestTimeSec((prev) => {
+        const nextSec = prev === 0 ? seconds : Math.min(prev, seconds);
+        try {
+          localStorage.setItem('glasia_daily_best_time', String(nextSec));
+        } catch {
+          // ignore
+        }
+        return nextSec;
+      });
       try {
         localStorage.setItem('glassium_3dmaze_daily_best', formatted);
       } catch {
@@ -4377,6 +4409,8 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
               key={t.id}
               onClick={() => {
                 setGameOver(false);
+                setMazeVictory(false);
+                setCauseOfDeath(null);
                 setMode(t.id);
               }}
               className={`flex items-center gap-1.5 border-b-2 py-2.5 font-medium transition-colors ${
