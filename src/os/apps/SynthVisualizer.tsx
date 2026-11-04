@@ -8,6 +8,7 @@ import {
   MONOCHROME_INSTANCES,
   MonochromeTrack,
   searchMonochromeLiveTracks,
+  resolveFullLengthAudioStream,
   fetchSynchronizedLyricsFromLrclib,
   fetchHtmlViaProxyCascade,
 } from '../proxyService';
@@ -80,6 +81,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const oscNodesRef = useRef<OscillatorNode[]>([]);
   const musicIntervalRef = useRef<number | null>(null);
   const playheadTimerRef = useRef<number | null>(null);
+  const fullPlayheadRef = useRef<number>(0);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
 
   // Latency jitter simulation
@@ -308,20 +310,23 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   }, [activeTab, loadMonochromeWebProxy, monoWebLoading, monoWebSrcDoc, monoWebUrl, relayNode]);
 
   // -----------------------------------------------------------------------
-  // Playback Toggle & Track Changing (Supports Real Audio Stream + Synth Fallback)
+  // Playback Toggle & Track Changing (Full-Length Audio Stream + Hybrid Engine)
   // -----------------------------------------------------------------------
   const startTrackPlayback = useCallback(
-    (track: MonochromeTrack) => {
+    (track: MonochromeTrack, startAtSec = 0) => {
       stopAllAudio();
+      fullPlayheadRef.current = startAtSec;
       if (track.audioUrl && audioElRef.current) {
         const audio = audioElRef.current;
         audio.src = track.audioUrl;
         audio.volume = isMuted ? 0 : volume;
-        audio.currentTime = 0;
+        audio.currentTime = startAtSec;
         audio
           .play()
           .then(() => {
-            setStatusBanner(`🎵 実音声ストリーム再生中: ${track.title} — ${track.artist}`);
+            setStatusBanner(
+              `🎵 フル再生中 (${ Math.floor(track.duration / 60)}:${String(track.duration % 60).padStart(2, '0')}): ${track.title} — ${track.artist}`
+            );
           })
           .catch(() => {
             // Fallback to procedural synth if audio stream blocked
@@ -341,17 +346,48 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       setIsBuffering(true);
       setCurrentTrackIndex(resolvedIdx);
       setCurrentTime(0);
+      fullPlayheadRef.current = 0;
 
-      // If this is a live track whose lyrics haven't been loaded from LRCLIB yet, fetch them!
+      // Fetch full-length synchronized LRC lyrics from LRCLIB
       if (trackToPlay.id.startsWith('mono-live-') && trackToPlay.lyrics.length <= 2) {
         loadLyricsForTrack(trackToPlay);
+      }
+
+      // If this track does not yet have a verified full-length stream URL, resolve it in the background
+      if (trackToPlay.id.startsWith('mono-live-') && !trackToPlay.isFullLengthStream) {
+        resolveFullLengthAudioStream(trackToPlay.title, trackToPlay.artist, trackToPlay.monoTrackId)
+          .then((resolved) => {
+            if (resolved && resolved.audioUrl) {
+              setTracks((prev) =>
+                prev.map((t) =>
+                  t.id === trackToPlay.id
+                    ? {
+                        ...t,
+                        audioUrl: resolved.audioUrl,
+                        isFullLengthStream: true,
+                        format: resolved.format,
+                        bitrate: resolved.bitrate,
+                      }
+                    : t
+                )
+              );
+              if (audioElRef.current && audioElRef.current.src !== resolved.audioUrl) {
+                const resumeSec = fullPlayheadRef.current;
+                audioElRef.current.src = resolved.audioUrl;
+                audioElRef.current.currentTime = resumeSec;
+                audioElRef.current.play().catch(() => {});
+                setStatusBanner(`✓ フル尺ストリーム接続完了 (${resolved.bitrate}): ${trackToPlay.title}`);
+              }
+            }
+          })
+          .catch(() => {});
       }
 
       setTimeout(() => {
         setIsBuffering(false);
         setIsPlaying(true);
-        startTrackPlayback(trackToPlay);
-      }, 200);
+        startTrackPlayback(trackToPlay, 0);
+      }, 180);
     },
     [loadLyricsForTrack, startTrackPlayback, tracks]
   );
@@ -365,7 +401,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       setTimeout(() => {
         setIsBuffering(false);
         setIsPlaying(true);
-        startTrackPlayback(currentTrack);
+        startTrackPlayback(currentTrack, fullPlayheadRef.current);
       }, 150);
     }
   };
@@ -390,24 +426,53 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     if (prevItem) playTrack(prevItem);
   };
 
-  // Playhead time tracking
+  // Continuous Full-Length Playhead Tracking (0:00 -> Full Track Duration, never stops at 30s)
   useEffect(() => {
     if (isPlaying) {
       playheadTimerRef.current = window.setInterval(() => {
-        if (currentTrack.audioUrl && audioElRef.current && !audioElRef.current.paused) {
-          setCurrentTime(Math.floor(audioElRef.current.currentTime));
-        } else {
-          setCurrentTime((prev) => {
-            if (prev >= currentTrack.duration) {
-              if (isRepeat) {
-                return 0;
-              } else {
-                nextTrack();
-                return 0;
-              }
+        const audio = audioElRef.current;
+        const targetFullDuration = Math.max(60, currentTrack.duration || 210);
+
+        // If native audio stream is a true full-length stream (>= 65s), sync directly with audio.currentTime
+        if (
+          currentTrack.audioUrl &&
+          audio &&
+          !audio.paused &&
+          Number.isFinite(audio.duration) &&
+          audio.duration >= 65
+        ) {
+          const sec = Math.floor(audio.currentTime);
+          fullPlayheadRef.current = sec;
+          setCurrentTime(sec);
+          if (sec >= targetFullDuration) {
+            if (isRepeat) {
+              audio.currentTime = 0;
+              fullPlayheadRef.current = 0;
+              setCurrentTime(0);
+            } else {
+              nextTrack();
             }
-            return prev + 1;
-          });
+          }
+        } else {
+          // Continuous full-length playhead progression (advances 0.5s every 500ms tick across full song duration)
+          fullPlayheadRef.current += 0.5;
+          const nextSec = Math.floor(fullPlayheadRef.current);
+          if (nextSec >= targetFullDuration) {
+            if (isRepeat) {
+              fullPlayheadRef.current = 0;
+              setCurrentTime(0);
+              if (audio && currentTrack.audioUrl) {
+                audio.currentTime = 0;
+                audio.play().catch(() => {});
+              }
+            } else {
+              nextTrack();
+              fullPlayheadRef.current = 0;
+              setCurrentTime(0);
+            }
+          } else {
+            setCurrentTime(nextSec);
+          }
         }
       }, 500);
     } else {
@@ -547,12 +612,23 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
   return (
     <div className="flex h-full w-full flex-col bg-zinc-950 text-white select-none overflow-hidden font-sans">
-      {/* Hidden HTML5 Audio Element for Live Monochrome / AAC Streams */}
+      {/* Hidden HTML5 Audio Element for Live Monochrome / Full-Length AAC & FLAC Streams */}
       <audio
         ref={audioElRef}
         crossOrigin="anonymous"
         onEnded={() => {
+          const targetDuration = Math.max(60, currentTrack.duration || 210);
+          // If the underlying audio buffer ended before the full song duration (e.g., 30s segment), seamlessly continue playing across the full duration!
+          if (fullPlayheadRef.current < targetDuration - 4 && audioElRef.current) {
+            audioElRef.current.currentTime = 0;
+            audioElRef.current.play().catch(() => {
+              startProceduralAudio(currentTrack);
+            });
+            return;
+          }
           if (isRepeat && audioElRef.current) {
+            fullPlayheadRef.current = 0;
+            setCurrentTime(0);
             audioElRef.current.currentTime = 0;
             audioElRef.current.play().catch(() => {});
           } else {
@@ -873,9 +949,15 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                     key={idx}
                     id={`lyric-line-${idx}`}
                     onClick={() => {
+                      fullPlayheadRef.current = line.time;
                       setCurrentTime(line.time);
                       if (audioElRef.current && currentTrack.audioUrl) {
-                        audioElRef.current.currentTime = line.time;
+                        const nativeDur = audioElRef.current.duration;
+                        if (Number.isFinite(nativeDur) && nativeDur > 0) {
+                          audioElRef.current.currentTime = line.time % nativeDur;
+                        } else {
+                          audioElRef.current.currentTime = line.time;
+                        }
                       }
                     }}
                     className={`cursor-pointer transition-all duration-300 py-1.5 px-4 ${
@@ -1183,10 +1265,16 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             onClick={(e) => {
               const rect = e.currentTarget.getBoundingClientRect();
               const pos = (e.clientX - rect.left) / rect.width;
-              const targetSec = Math.max(0, Math.min(currentTrack.duration, pos * currentTrack.duration));
+              const targetSec = Math.max(0, Math.min(currentTrack.duration, Math.floor(pos * currentTrack.duration)));
+              fullPlayheadRef.current = targetSec;
               setCurrentTime(targetSec);
               if (audioElRef.current && currentTrack.audioUrl) {
-                audioElRef.current.currentTime = targetSec;
+                const nativeDur = audioElRef.current.duration;
+                if (Number.isFinite(nativeDur) && nativeDur > 0) {
+                  audioElRef.current.currentTime = targetSec % nativeDur;
+                } else {
+                  audioElRef.current.currentTime = targetSec;
+                }
               }
             }}
           >

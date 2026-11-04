@@ -596,7 +596,7 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
   const [graphicsSettings, setGraphicsSettings] = useState<GraphicsSettings>({
     preset: 'HIGH',
     screenSpacePathTracing: true,
-    shaderMode: 'PTGI',
+    shaderMode: 'FULL_PT',
     bloomIntensity: 0.9,
     fov: 75,
   });
@@ -4547,7 +4547,7 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
               {/* Instant Shader Switcher Strip on Title Screen */}
               <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5 bg-black/55 border border-white/15 rounded-2xl px-3 py-2">
                 <span className="text-[10px] font-bold text-white/60 mr-1">シェーダー切替:</span>
-                {(['PTGI', 'STANDARD', 'CEL', 'CRT', 'OFF'] as ShaderMode[]).map((sm) => {
+                {(['FULL_PT', 'PTGI', 'STANDARD', 'CEL', 'CRT', 'OFF'] as ShaderMode[]).map((sm) => {
                   const active = graphicsSettings.shaderMode === sm;
                   return (
                     <button
@@ -4556,7 +4556,7 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
                         setGraphicsSettings((g) => ({
                           ...g,
                           shaderMode: sm,
-                          screenSpacePathTracing: sm === 'PTGI',
+                          screenSpacePathTracing: sm === 'FULL_PT' || sm === 'PTGI',
                         }))
                       }
                       className={`px-2.5 py-1 rounded-xl text-[10px] font-bold transition ${
@@ -4753,11 +4753,11 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
                     </button>
                   </div>
 
-                  {/* GLSL Shader Mode Selector (PTGI + Normal Shaders) */}
+                  {/* GLSL Shader Mode Selector (Full PT + PTGI + Normal Shaders) */}
                   <div>
-                    <div className="text-xs font-bold text-cyan-200 mb-2">✨ GLSL シェーダーモード選択 (PTGI / 標準シェーダー / 特殊シェーダー)</div>
+                    <div className="text-xs font-bold text-cyan-200 mb-2">✨ GLSL シェーダーモード選択 (フルパストレーシング / PTGI / 標準シェーダー / 特殊シェーダー)</div>
                     <div className="grid grid-cols-1 gap-2">
-                      {(['PTGI', 'STANDARD', 'CEL', 'CRT', 'OFF'] as ShaderMode[]).map((sm) => {
+                      {(['FULL_PT', 'PTGI', 'STANDARD', 'CEL', 'CRT', 'OFF'] as ShaderMode[]).map((sm) => {
                         const meta = SHADER_MODE_META[sm];
                         const active = graphicsSettings.shaderMode === sm;
                         return (
@@ -4767,7 +4767,7 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
                               setGraphicsSettings((g) => ({
                                 ...g,
                                 shaderMode: sm,
-                                screenSpacePathTracing: sm === 'PTGI',
+                                screenSpacePathTracing: sm === 'FULL_PT' || sm === 'PTGI',
                               }))
                             }
                             className={`p-3 rounded-2xl border text-left transition flex items-center justify-between gap-3 ${
@@ -5104,17 +5104,17 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
                   </div>
                 )}
 
-                {/* Quick Shader Mode (PTGI / Normal Shader / Cel / CRT / OFF) & Quality Bar */}
+                {/* Quick Shader Mode (FULL_PT / PTGI / Normal Shader / Cel / CRT / OFF) & Quality Bar */}
                 <div className="mt-2 pt-2 border-t border-white/10 flex flex-col gap-1.5">
                   <div className="flex flex-wrap items-center gap-1">
-                    {(['PTGI', 'STANDARD', 'CEL', 'CRT', 'OFF'] as ShaderMode[]).map((sm) => (
+                    {(['FULL_PT', 'PTGI', 'STANDARD', 'CEL', 'CRT', 'OFF'] as ShaderMode[]).map((sm) => (
                       <button
                         key={sm}
                         onClick={() =>
                           setGraphicsSettings((g) => ({
                             ...g,
                             shaderMode: sm,
-                            screenSpacePathTracing: sm === 'PTGI',
+                            screenSpacePathTracing: sm === 'FULL_PT' || sm === 'PTGI',
                           }))
                         }
                         className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition ${

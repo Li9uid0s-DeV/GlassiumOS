@@ -2,13 +2,18 @@ import * as THREE from 'three';
 
 export type QualityPreset = 'LOW' | 'MEDIUM' | 'HIGH' | 'ULTRA';
 
-// Shader modes: PTGI (Screen-Space Path Tracing GI), STANDARD (Normal PBR Post Shader), CEL (Toon/Cel Shader), CRT (Retro Dungeon Shader), OFF (Direct Render)
-export type ShaderMode = 'PTGI' | 'STANDARD' | 'CEL' | 'CRT' | 'OFF';
+// Shader modes: FULL_PT (Full Path Tracing above PTGI), PTGI (Screen-Space Path Tracing GI), STANDARD (Normal PBR Post Shader), CEL (Toon/Cel Shader), CRT (Retro Dungeon Shader), OFF (Direct Render)
+export type ShaderMode = 'FULL_PT' | 'PTGI' | 'STANDARD' | 'CEL' | 'CRT' | 'OFF';
 
 export const SHADER_MODE_META: Record<
   ShaderMode,
   { label: string; shortLabel: string; desc: string }
 > = {
+  FULL_PT: {
+    label: 'フルパストレーシング (Full Path Tracing)',
+    shortLabel: 'フルPT',
+    desc: 'GLSL多重バウンス完全パストレーシング・鏡面レイマーチング反射・ボリューメトリック松明ゴッドレイ',
+  },
   PTGI: {
     label: 'PTGI (スクリーンパストレーシングGI)',
     shortLabel: 'PTGI',
@@ -317,13 +322,16 @@ export function createProcedural64x64Textures(
 // =============================================================
 // 2. Multi-Mode GLSL Post-Processing Shader
 //    Supports:
-//    - Mode 0 (STANDARD): Normal PBR Relief + Bloom + ACES ToneMap
+//    - Mode 5 (FULL_PT): Full Path Tracing (Multi-Bounce GI + Ray-Marched Mirror/Glossy Reflections + Volumetric Torch God-Rays + RTAO)
 //    - Mode 1 (PTGI): Screen-Space Path Tracing GI + Bounce Light + AO + Glossy Floor Reflections
+//    - Mode 0 (STANDARD): Normal PBR Relief + Bloom + ACES ToneMap
 //    - Mode 2 (CEL): Stylized Cel/Toon Shading + Sobel Edge Outlines
 //    - Mode 3 (CRT): Retro Dungeon Dither + Scanlines + Chromatic Shift
 // =============================================================
 export function shaderModeToInt(mode: ShaderMode): number {
   switch (mode) {
+    case 'FULL_PT':
+      return 5.0;
     case 'PTGI':
       return 1.0;
     case 'CEL':
@@ -430,9 +438,89 @@ export function createScreenSpacePathTracingMaterial(
         vec3 normal = reconstructReliefNormal(vUv, texelSize);
 
         // =============================================================
+        // MODE 5: FULL_PT (Full Path Tracing — Multi-Bounce GI + Ray-Marched Reflections + Volumetric God-Rays)
+        // =============================================================
+        if (uShaderMode > 4.5) {
+          vec3 giBounce1 = vec3(0.0);
+          vec3 giBounce2 = vec3(0.0);
+          float rtao = 0.0;
+          vec3 rayRefl = vec3(0.0);
+          vec3 godRays = vec3(0.0);
+
+          float goldenAngle = 2.39996323;
+          float jitter = hash12(vUv * uResolution + fract(uTime * 11.73)) * 6.2831853;
+          float sampleCount = clamp(uSamples + 6.0, 8.0, 28.0);
+
+          for (int i = 0; i < 28; i++) {
+            float fi = float(i);
+            if (fi >= sampleCount) break;
+
+            float r = sqrt((fi + 0.5) / sampleCount);
+            float theta = (fi + 0.5) * goldenAngle + jitter;
+            vec2 dir = vec2(cos(theta), sin(theta));
+
+            // Primary stochastic path-tracing ray
+            float rayRadius = (0.014 + r * 0.115) / clamp(depth * 0.16, 0.45, 3.0);
+            vec2 hitUv1 = clamp(vUv + dir * rayRadius, 0.002, 0.998);
+            vec3 hitCol1 = texture2D(tDiffuse, hitUv1).rgb;
+            float hitDepth1 = getSafeDepth(hitUv1);
+            float depthDelta1 = depth - hitDepth1;
+
+            // Ray-Traced Ambient Occlusion (RTAO)
+            if (depthDelta1 > 0.03 && depthDelta1 < 1.9) {
+              rtao += smoothstep(1.9, 0.04, depthDelta1);
+            }
+
+            // 1st-Bounce Indirect Radiance
+            float luma1 = getLuma(hitCol1);
+            float weight1 = max(0.0, 1.0 - abs(depthDelta1) * 0.24);
+            vec3 bounce1 = hitCol1 * max(0.0, luma1 - 0.06) * weight1 * 2.45;
+            giBounce1 += bounce1;
+
+            // 2nd-Bounce Color Bleeding GI (secondary ray along orthogonal hemisphere direction)
+            vec2 dir2 = vec2(-dir.y, dir.x);
+            vec2 hitUv2 = clamp(hitUv1 + dir2 * (rayRadius * 0.65), 0.002, 0.998);
+            vec3 hitCol2 = texture2D(tDiffuse, hitUv2).rgb;
+            float luma2 = getLuma(hitCol2);
+            giBounce2 += (hitCol1 * 0.55 + hitCol2 * 0.85) * max(0.0, luma2 - 0.08) * weight1 * 1.65;
+
+            // Screen-Space Ray-Marched Specular & Wet Stone Reflections (Floor, Ceiling & Damp Walls)
+            vec2 reflectDir = normalize(normal.xy * 0.55 + dir * 0.45);
+            if (vUv.y < 0.54) {
+              reflectDir = vec2(dir.x * 0.22, abs(dir.y) + 0.35);
+            }
+            vec2 marchUv = clamp(vUv + reflectDir * (0.018 + r * 0.095), 0.002, 0.998);
+            vec3 marchCol = texture2D(tDiffuse, marchUv).rgb;
+            float fresnel = 0.28 + 0.72 * pow(clamp(1.0 - normal.z, 0.0, 1.0), 2.0);
+            rayRefl += marchCol * pow(max(0.0, getLuma(marchCol)), 1.35) * fresnel;
+
+            // Volumetric Torch & Portal Crepuscular God-Rays
+            vec2 shaftUv = clamp(mix(vUv, vec2(0.5, 0.48), r * 0.42) + dir * 0.025, 0.002, 0.998);
+            vec3 shaftCol = texture2D(tDiffuse, shaftUv).rgb;
+            float shaftBright = max(max(shaftCol.r, shaftCol.g), shaftCol.b);
+            if (shaftBright > 0.52) {
+              godRays += shaftCol * (shaftBright - 0.45) * (1.0 - r * 0.45);
+            }
+          }
+
+          float invS = 1.0 / max(1.0, sampleCount);
+          rtao = clamp(1.0 - (rtao * invS) * 0.64, 0.32, 1.0);
+          giBounce1 *= invS * 1.65;
+          giBounce2 *= invS * 1.15;
+          rayRefl *= invS * 0.48;
+          godRays *= invS * 0.55;
+
+          // Micro-facet normal relief lighting
+          float microSpec = pow(clamp(dot(normal, normalize(vec3(0.3, 0.55, 0.78))), 0.0, 1.0), 6.0) * 0.35;
+          float bevelLight = clamp(dot(normal, normalize(vec3(0.25, 0.48, 0.84))), 0.68, 1.42);
+
+          vec3 totalGi = (giBounce1 + giBounce2) * (color + vec3(0.26));
+          color = color * rtao * bevelLight + totalGi + rayRefl + godRays + vec3(microSpec * 0.85, microSpec * 0.7, microSpec * 0.5);
+        }
+        // =============================================================
         // MODE 1: PTGI (GLSL Screen-Space Path Tracing Global Illumination)
         // =============================================================
-        if (uShaderMode > 0.5 && uShaderMode < 1.5) {
+        else if (uShaderMode > 0.5 && uShaderMode < 1.5) {
           vec3 indirectLight = vec3(0.0);
           float occlusion = 0.0;
           vec3 glossySpec = vec3(0.0);
