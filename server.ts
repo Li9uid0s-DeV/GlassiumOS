@@ -492,7 +492,7 @@ async function getIntelligentLocalResponse(userPrompt: string): Promise<{ reply:
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   app.use(express.json({ limit: '2mb' }));
 
@@ -1521,7 +1521,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { middlewareMode: true, hmr: false },
       appType: 'spa',
     });
     app.use(vite.middlewares);
