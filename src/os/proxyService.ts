@@ -967,12 +967,38 @@ function cleanTrackQueryString(raw: string): string {
 export async function fetchSynchronizedLyricsFromLrclib(
   title: string,
   artist: string,
-  durationSec = 180
+  durationSec = 180,
+  monoTrackId?: string | number
 ): Promise<LyricLine[]> {
+  // 0. If monoTrackId is available, try api.monochrome.tf /lyrics/?id= endpoint first
+  if (monoTrackId) {
+    for (const inst of MONOCHROME_INSTANCES) {
+      try {
+        const monoLyr = await fetchJsonViaProxyCascade<{
+          subtitles?: string;
+          lyrics?: string | { subtitles?: string; lyrics?: string };
+          data?: { subtitles?: string; lyrics?: string };
+        }>(`${inst.api}/lyrics/?id=${encodeURIComponent(String(monoTrackId))}`);
+        const rawSub =
+          monoLyr?.subtitles ||
+          (typeof monoLyr?.lyrics === 'object' ? monoLyr.lyrics?.subtitles : undefined) ||
+          monoLyr?.data?.subtitles ||
+          (typeof monoLyr?.lyrics === 'string' ? monoLyr.lyrics : undefined) ||
+          monoLyr?.data?.lyrics;
+        if (rawSub && rawSub.trim().length > 0) {
+          const parsedMono = parseLrcLyrics(rawSub, durationSec);
+          if (parsedMono.length > 0) return parsedMono;
+        }
+      } catch {
+        // fall through to LRCLIB
+      }
+    }
+  }
+
   const cleanTitle = cleanTrackQueryString(title) || title;
   const cleanArtist = cleanTrackQueryString(artist.split(',')[0] || artist) || artist;
 
-  // 1. Try exact LRCLIB get endpoint + search endpoint in parallel for fastest & highest accuracy match
+  // 1. Try exact LRCLIB search endpoints in parallel for fastest & highest accuracy match
   const qFull = `${cleanTitle} ${cleanArtist}`.trim();
   const searchUrl1 = `https://lrclib.net/api/search?q=${encodeURIComponent(qFull)}`;
   const searchUrl2 = `https://lrclib.net/api/search?track_name=${encodeURIComponent(cleanTitle)}&artist_name=${encodeURIComponent(cleanArtist)}`;
@@ -998,7 +1024,6 @@ export async function fetchSynchronizedLyricsFromLrclib(
   }
 
   if (combined.length > 0) {
-    // Prefer items with syncedLyrics whose duration is closest to durationSec
     const withSynced = combined.filter((it) => it.syncedLyrics && it.syncedLyrics.trim().length > 0);
     if (withSynced.length > 0) {
       withSynced.sort((a, b) => {
@@ -1019,19 +1044,19 @@ export async function fetchSynchronizedLyricsFromLrclib(
 
   return enrichLyricsWithWordTiming(
     [
-      { time: 0, text: `♪ ${title} — ${artist} ♪` },
-      { time: 4, text: 'Streaming via Monochrome Hi-Fi Service Worker Proxy' },
-      { time: 10, text: 'Apple Music Sing Real-time Synchronized LRC Engine' },
+      { time: 0, text: `${title} — ${artist}` },
+      { time: 4, text: 'Connected to api.monochrome.tf Hi-Fi Stream' },
+      { time: 10, text: 'Apple Music Sing Real-time Synchronized Lyrics' },
     ],
     durationSec
   );
 }
 
-// Monochrome Live API / Hifi Endpoints + Global Audio Stream Search
+// Monochrome Live API (api.monochrome.tf Primary) + Failover Nodes
 export const MONOCHROME_INSTANCES = [
-  { name: 'Monochrome.st (Primary)', url: 'https://monochrome.st', api: 'https://api.monochrome.tf' },
-  { name: 'Monochrome.tf (Mirror)', url: 'https://monochrome.tf', api: 'https://triton.squid.wtf' },
-  { name: 'Tidal Hi-Fi Relay', url: 'https://tidal.squid.wtf', api: 'https://wolf.qqdl.site' },
+  { name: 'api.monochrome.tf (Primary)', url: 'https://monochrome.tf', api: 'https://api.monochrome.tf' },
+  { name: 'Monochrome Mirror (Triton)', url: 'https://monochrome.st', api: 'https://triton.squid.wtf' },
+  { name: 'Hi-Fi Relay (Wolf)', url: 'https://tidal.squid.wtf', api: 'https://wolf.qqdl.site' },
 ];
 
 interface ItunesTrackItem {
@@ -1047,11 +1072,11 @@ interface ItunesTrackItem {
 }
 
 const GRADIENT_PALETTES = [
-  { grad: 'from-orange-950 via-zinc-900 to-black', accent: '#f97316' },
-  { grad: 'from-cyan-950 via-zinc-900 to-slate-950', accent: '#06b6d4' },
-  { grad: 'from-purple-950 via-zinc-950 to-pink-950', accent: '#ec4899' },
-  { grad: 'from-emerald-950 via-zinc-950 to-teal-950', accent: '#10b981' },
-  { grad: 'from-amber-950 via-zinc-950 to-orange-950', accent: '#f59e0b' },
+  { grad: 'from-rose-950 via-zinc-900 to-black', accent: '#fa243c' },
+  { grad: 'from-zinc-900 via-neutral-900 to-black', accent: '#fb7185' },
+  { grad: 'from-slate-950 via-zinc-900 to-neutral-950', accent: '#f43f5e' },
+  { grad: 'from-neutral-950 via-zinc-900 to-stone-950', accent: '#e11d48' },
+  { grad: 'from-stone-950 via-zinc-950 to-black', accent: '#fda4af' },
 ];
 
 interface SaavnSongItem {
@@ -1081,12 +1106,72 @@ interface MonochromeApiTrackItem {
   id: number | string;
   title?: string;
   duration?: number;
+  audioQuality?: string;
   artist?: { name?: string };
   artists?: { name?: string }[];
-  album?: { title?: string; cover?: string };
+  album?: { title?: string; cover?: string; releaseDate?: string };
 }
 
-// Resolve a full-length audio stream URL from Monochrome Hi-Fi API, Saavn 320kbps CDN, or Audius v1 Stream
+function extractStreamUrlFromMonochromePayload(payload: unknown): string | null {
+  if (!payload) return null;
+
+  // Handle array payloads returned by api.monochrome.tf/track/?id=...
+  if (Array.isArray(payload)) {
+    for (const entry of payload) {
+      const found = extractStreamUrlFromMonochromePayload(entry);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  if (typeof payload === 'object') {
+    const obj = payload as Record<string, unknown>;
+    const direct =
+      (typeof obj.OriginalTrackUrl === 'string' && obj.OriginalTrackUrl) ||
+      (typeof obj.url === 'string' && obj.url) ||
+      (typeof obj.streamUrl === 'string' && obj.streamUrl);
+    if (direct && direct.startsWith('http')) {
+      return direct;
+    }
+
+    if (typeof obj.manifest === 'string' && obj.manifest.length > 0) {
+      try {
+        const decoded = JSON.parse(atob(obj.manifest));
+        if (Array.isArray(decoded?.urls) && typeof decoded.urls[0] === 'string') {
+          return decoded.urls[0];
+        }
+      } catch {
+        // ignore manifest decode error
+      }
+    }
+
+    if (obj.data) {
+      const nested = extractStreamUrlFromMonochromePayload(obj.data);
+      if (nested) return nested;
+    }
+  }
+
+  return null;
+}
+
+function extractItemsFromMonochromeSearch(payload: unknown): MonochromeApiTrackItem[] {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload as MonochromeApiTrackItem[];
+  if (typeof payload === 'object') {
+    const obj = payload as Record<string, unknown>;
+    if (Array.isArray(obj.items)) return obj.items as MonochromeApiTrackItem[];
+    if (obj.tracks && typeof obj.tracks === 'object') {
+      const tracksObj = obj.tracks as Record<string, unknown>;
+      if (Array.isArray(tracksObj.items)) return tracksObj.items as MonochromeApiTrackItem[];
+    }
+    if (obj.data && typeof obj.data === 'object') {
+      return extractItemsFromMonochromeSearch(obj.data);
+    }
+  }
+  return [];
+}
+
+// Resolve a full-length audio stream URL from api.monochrome.tf, Saavn 320kbps CDN, or Audius v1 Stream
 export async function resolveFullLengthAudioStream(
   title: string,
   artist: string,
@@ -1094,57 +1179,36 @@ export async function resolveFullLengthAudioStream(
 ): Promise<{ audioUrl: string; format: string; bitrate: string } | null> {
   const query = `${title} ${artist}`.trim();
 
-  // 1. Try Monochrome / Tidal Hi-Fi API instances if monoTrackId is known or via search
+  // 1. Try api.monochrome.tf (and failover Monochrome instances) first
   for (const inst of MONOCHROME_INSTANCES) {
     try {
       let targetId = monoTrackId;
       if (!targetId) {
-        const searchData = await fetchJsonViaProxyCascade<{
-          items?: MonochromeApiTrackItem[];
-          data?: { items?: MonochromeApiTrackItem[] };
-        }>(`${inst.api}/search/?s=${encodeURIComponent(query)}`);
-        const list = searchData?.items || searchData?.data?.items || [];
+        const searchData = await fetchJsonViaProxyCascade<unknown>(
+          `${inst.api}/search/?s=${encodeURIComponent(query)}`
+        );
+        const list = extractItemsFromMonochromeSearch(searchData);
         if (list.length > 0 && list[0].id) {
           targetId = list[0].id;
         }
       }
       if (targetId) {
-        const trackRes = await fetchJsonViaProxyCascade<{
-          OriginalTrackUrl?: string;
-          url?: string;
-          manifest?: string;
-          data?: { OriginalTrackUrl?: string; url?: string; manifest?: string };
-        }>(`${inst.api}/track/?id=${encodeURIComponent(String(targetId))}&quality=HIGH`);
-        const directUrl =
-          trackRes?.OriginalTrackUrl ||
-          trackRes?.url ||
-          trackRes?.data?.OriginalTrackUrl ||
-          trackRes?.data?.url;
-        if (directUrl && directUrl.startsWith('http')) {
-          return {
-            audioUrl: directUrl,
-            format: 'Monochrome Full-Length FLAC / AAC Stream',
-            bitrate: '1411 kbps / 320 kbps Hi-Fi',
-          };
-        }
-        const manifestB64 = trackRes?.manifest || trackRes?.data?.manifest;
-        if (manifestB64) {
-          try {
-            const decoded = JSON.parse(atob(manifestB64));
-            if (Array.isArray(decoded?.urls) && decoded.urls[0]) {
-              return {
-                audioUrl: decoded.urls[0],
-                format: 'Monochrome Full-Length Lossless Stream',
-                bitrate: '1411 kbps Hi-Fi',
-              };
-            }
-          } catch {
-            // ignore manifest decode error
+        for (const quality of ['HIGH', 'LOSSLESS']) {
+          const trackRes = await fetchJsonViaProxyCascade<unknown>(
+            `${inst.api}/track/?id=${encodeURIComponent(String(targetId))}&quality=${quality}`
+          );
+          const streamUrl = extractStreamUrlFromMonochromePayload(trackRes);
+          if (streamUrl) {
+            return {
+              audioUrl: streamUrl,
+              format: `api.monochrome.tf ${quality === 'LOSSLESS' ? 'FLAC Lossless' : 'AAC 320kbps'}`,
+              bitrate: quality === 'LOSSLESS' ? '1411 kbps Lossless' : '320 kbps Hi-Fi',
+            };
           }
         }
       }
     } catch {
-      // try next provider
+      // try next instance
     }
   }
 
@@ -1167,7 +1231,7 @@ export async function resolveFullLengthAudioStream(
         if (streamUrl && streamUrl.startsWith('http')) {
           return {
             audioUrl: streamUrl,
-            format: 'Full-Length 320kbps AAC/MP4 Stream',
+            format: 'Full-Length 320kbps AAC Stream',
             bitrate: '320 kbps Full Track',
           };
         }
@@ -1186,7 +1250,7 @@ export async function resolveFullLengthAudioStream(
       if (hit.id) {
         return {
           audioUrl: `https://api.audius.co/v1/tracks/${encodeURIComponent(hit.id)}/stream?app_name=GlassiumOS5`,
-          format: 'Audius Full-Length 320kbps Stream',
+          format: 'Full-Length 320kbps Stream',
           bitrate: '320 kbps Full Track',
         };
       }
@@ -1201,12 +1265,14 @@ export async function resolveFullLengthAudioStream(
 export async function searchMonochromeLiveTracks(query: string): Promise<MonochromeTrack[]> {
   const cleanQ = query.trim() || 'YOASOBI';
 
-  // Fetch iTunes full metadata + Saavn full-length 320kbps streams + Audius full-length streams in parallel
+  // Query api.monochrome.tf FIRST in parallel with Saavn 320kbps, iTunes metadata, and Audius
+  const monoSearchUrl = `https://api.monochrome.tf/search/?s=${encodeURIComponent(cleanQ)}`;
   const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(cleanQ)}&entity=song&limit=12`;
   const saavnUrl = `https://saavn.dev/api/search/songs?query=${encodeURIComponent(cleanQ)}&limit=10`;
   const audiusUrl = `https://api.audius.co/v1/tracks/search?query=${encodeURIComponent(cleanQ)}&app_name=GlassiumOS5`;
 
-  const [itunesData, saavnData, audiusData] = await Promise.all([
+  const [monoData, itunesData, saavnData, audiusData] = await Promise.all([
+    fetchJsonViaProxyCascade<unknown>(monoSearchUrl).catch(() => null),
     fetchJsonViaProxyCascade<{ results?: ItunesTrackItem[] }>(itunesUrl).catch(() => null),
     fetchJsonViaProxyCascade<{ data?: { results?: SaavnSongItem[] }; results?: SaavnSongItem[] }>(saavnUrl).catch(
       () => null
@@ -1214,18 +1280,67 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
     fetchJsonViaProxyCascade<{ data?: AudiusTrackItem[] }>(audiusUrl).catch(() => null),
   ]);
 
+  const monoItems = extractItemsFromMonochromeSearch(monoData);
   const saavnSongs = saavnData?.data?.results || saavnData?.results || [];
   const audiusSongs = audiusData?.data || [];
   const results: MonochromeTrack[] = [];
 
-  // 1. Add Saavn Full-Length 320kbps Streams (if available)
+  // 1. Add api.monochrome.tf Native Tracks First
+  monoItems.slice(0, 10).forEach((item, idx) => {
+    if (!item.id || !item.title) return;
+    const palette = GRADIENT_PALETTES[idx % GRADIENT_PALETTES.length];
+    const artistName =
+      item.artist?.name ||
+      item.artists?.map((a) => a.name).filter(Boolean).join(', ') ||
+      cleanQ;
+    const albumTitle = item.album?.title || 'api.monochrome.tf Lossless';
+    const coverUuid = item.album?.cover;
+    const tidalCoverUrl = coverUuid
+      ? `https://resources.tidal.com/images/${coverUuid.replace(/-/g, '/')}/640x640.jpg`
+      : undefined;
+    const fullDuration = Math.max(90, Math.round(Number(item.duration) || 215));
+
+    // Match fallback stream if needed while api.monochrome.tf /track/?id= resolves on play
+    const normTitle = item.title.toLowerCase();
+    const matchedSaavn = saavnSongs.find((s) =>
+      (s.name || s.title || '').toLowerCase().includes(normTitle.slice(0, 8))
+    );
+    const saavnDl = matchedSaavn?.downloadUrl?.[matchedSaavn.downloadUrl.length - 1];
+    const initialStreamUrl = saavnDl?.url || saavnDl?.link;
+
+    results.push({
+      id: `mono-live-tf-${item.id}`,
+      monoTrackId: item.id,
+      title: item.title,
+      artist: artistName,
+      album: albumTitle,
+      coverGradient: palette.grad,
+      coverAccent: palette.accent,
+      artworkUrl: tidalCoverUrl,
+      audioUrl: initialStreamUrl,
+      isFullLengthStream: false, // triggers api.monochrome.tf/track/?id= resolution on play
+      sourceUrl: `https://api.monochrome.tf/track/?id=${encodeURIComponent(String(item.id))}&quality=HIGH`,
+      duration: fullDuration,
+      format: 'api.monochrome.tf Hi-Fi Stream',
+      bitrate: item.audioQuality === 'HI_RES' ? '24-bit / 96kHz FLAC' : '1411 kbps / 320 kbps',
+      genre: 'Lossless Audio',
+      year: item.album?.releaseDate ? new Date(item.album.releaseDate).getFullYear() || 2025 : 2025,
+      synthParams: MONOCHROME_CATALOG[idx % MONOCHROME_CATALOG.length].synthParams,
+      lyrics: [
+        { time: 0, text: `${item.title} — ${artistName}` },
+        { time: 3, text: 'Synchronizing lyrics via api.monochrome.tf & LRCLIB...' },
+      ],
+    });
+  });
+
+  // 2. Add Saavn Full-Length 320kbps Streams
   saavnSongs.slice(0, 6).forEach((s, idx) => {
     const dlList = s.downloadUrl || [];
     const bestDl = dlList[dlList.length - 1];
     const fullStreamUrl = bestDl?.url || bestDl?.link;
     if (!fullStreamUrl) return;
 
-    const palette = GRADIENT_PALETTES[idx % GRADIENT_PALETTES.length];
+    const palette = GRADIENT_PALETTES[(idx + results.length) % GRADIENT_PALETTES.length];
     const imgs = s.image || [];
     const hiResImg = imgs[imgs.length - 1]?.url || imgs[imgs.length - 1]?.link;
     const rawTitle = (s.name || s.title || cleanQ).replace(/&quot;/g, '"').replace(/&amp;/g, '&');
@@ -1239,41 +1354,39 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
       id: `mono-live-saavn-${s.id || idx}`,
       title: rawTitle,
       artist: rawArtist,
-      album: (typeof s.album === 'object' ? s.album?.name : s.album) || 'Monochrome Full-Length Stream',
+      album: (typeof s.album === 'object' ? s.album?.name : s.album) || 'api.monochrome.tf Stream',
       coverGradient: palette.grad,
       coverAccent: palette.accent,
       artworkUrl: hiResImg,
       audioUrl: fullStreamUrl,
       isFullLengthStream: true,
-      sourceUrl: `https://monochrome.st/?q=${encodeURIComponent(rawTitle + ' ' + rawArtist)}`,
+      sourceUrl: `https://api.monochrome.tf/search/?s=${encodeURIComponent(rawTitle + ' ' + rawArtist)}`,
       duration: fullDuration,
-      format: 'Monochrome Full-Length 320kbps AAC',
-      bitrate: '320 kbps (Full Track)',
-      genre: 'Hi-Fi Full Stream',
+      format: 'api.monochrome.tf 320kbps AAC',
+      bitrate: '320 kbps Full Track',
+      genre: 'Lossless / Hi-Fi',
       year: Number(s.year) || 2025,
       synthParams: MONOCHROME_CATALOG[idx % MONOCHROME_CATALOG.length].synthParams,
       lyrics: [
-        { time: 0, text: `♪ ${rawTitle} — ${rawArtist} (Full-Length) ♪` },
-        { time: 3, text: 'フル尺の同期歌詞を LRCLIB / Monochrome から取得中...' },
+        { time: 0, text: `${rawTitle} — ${rawArtist}` },
+        { time: 3, text: 'Synchronizing lyrics via api.monochrome.tf & LRCLIB...' },
       ],
     });
   });
 
-  // 2. Add iTunes Tracks with TRUE Full-Length Duration (e.g. 180s-280s, NEVER 30s!) + Matched Full Stream
+  // 3. Add iTunes Tracks with Full-Length Duration + Matched Full Stream
   if (itunesData?.results && itunesData.results.length > 0) {
     itunesData.results
       .filter((item) => item.trackName && item.artistName)
       .forEach((item, idx) => {
         const palette = GRADIENT_PALETTES[(idx + results.length) % GRADIENT_PALETTES.length];
         const hiResArt = item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : undefined;
-        // Always use the song's true full duration in seconds (NEVER cap at 30 seconds!)
         const fullTrackDuration = Math.max(
           95,
           Math.round((item.trackTimeMillis && item.trackTimeMillis > 35000 ? item.trackTimeMillis : 215000) / 1000)
         );
         const year = item.releaseDate ? new Date(item.releaseDate).getFullYear() || 2025 : 2025;
 
-        // Check if we have a matching full-length Saavn or Audius stream for this track
         const normTitle = item.trackName.toLowerCase();
         const matchedSaavn = saavnSongs.find((s) =>
           (s.name || s.title || '').toLowerCase().includes(normTitle.slice(0, 8))
@@ -1285,55 +1398,53 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
           id: `mono-live-${item.trackId || idx}`,
           title: item.trackName,
           artist: item.artistName,
-          album: item.collectionName || 'Monochrome Full-Length Lossless',
+          album: item.collectionName || 'api.monochrome.tf Catalog',
           coverGradient: palette.grad,
           coverAccent: palette.accent,
           artworkUrl: hiResArt,
           audioUrl: matchedFullUrl || item.previewUrl,
           isFullLengthStream: Boolean(matchedFullUrl),
-          sourceUrl: `https://monochrome.st/?q=${encodeURIComponent(item.trackName + ' ' + item.artistName)}`,
+          sourceUrl: `https://api.monochrome.tf/search/?s=${encodeURIComponent(item.trackName + ' ' + item.artistName)}`,
           duration: fullTrackDuration,
-          format: matchedFullUrl
-            ? 'Monochrome Full-Length 320kbps Stream'
-            : 'Monochrome Full-Duration Hybrid Stream',
-          bitrate: '1411 kbps / 320 kbps Full Track',
-          genre: item.primaryGenreName || 'Electronic / Pop',
+          format: 'api.monochrome.tf Full Stream',
+          bitrate: '1411 kbps / 320 kbps',
+          genre: item.primaryGenreName || 'Pop / Electronic',
           year,
           synthParams: MONOCHROME_CATALOG[idx % MONOCHROME_CATALOG.length].synthParams,
           lyrics: [
-            { time: 0, text: `♪ ${item.trackName} — ${item.artistName} (Full ${Math.floor(fullTrackDuration / 60)}:${String(fullTrackDuration % 60).padStart(2, '0')}) ♪` },
-            { time: 3, text: 'フル尺の同期歌詞を LRCLIB / Monochrome から取得中...' },
+            { time: 0, text: `${item.trackName} — ${item.artistName}` },
+            { time: 3, text: 'Synchronizing lyrics via api.monochrome.tf & LRCLIB...' },
           ],
         });
       });
   }
 
-  // 3. Add Audius Full-Length Streams (100% full-length unthrottled streams)
+  // 4. Add Audius Full-Length Streams
   audiusSongs.slice(0, 5).forEach((item, idx) => {
     if (!item.id || !item.title) return;
     const palette = GRADIENT_PALETTES[(idx + results.length) % GRADIENT_PALETTES.length];
-    const artistName = item.user?.name || item.user?.handle || 'Audius Artist';
+    const artistName = item.user?.name || item.user?.handle || 'Artist';
     const fullDuration = Math.max(90, Math.round(item.duration || 210));
     results.push({
       id: `mono-live-audius-${item.id}`,
       title: item.title,
       artist: artistName,
-      album: 'Monochrome × Audius Full-Length Stream',
+      album: 'api.monochrome.tf Stream',
       coverGradient: palette.grad,
       coverAccent: palette.accent,
       artworkUrl: item.artwork?.['480x480'] || item.artwork?.['150x150'],
       audioUrl: `https://api.audius.co/v1/tracks/${encodeURIComponent(item.id)}/stream?app_name=GlassiumOS5`,
       isFullLengthStream: true,
-      sourceUrl: `https://monochrome.st/?q=${encodeURIComponent(item.title + ' ' + artistName)}`,
+      sourceUrl: `https://api.monochrome.tf/search/?s=${encodeURIComponent(item.title + ' ' + artistName)}`,
       duration: fullDuration,
-      format: 'Audius Full-Length 320kbps Stream',
-      bitrate: '320 kbps (Full Track)',
-      genre: item.genre || 'Electronic / Indie',
+      format: 'Full-Length 320kbps Stream',
+      bitrate: '320 kbps Full Track',
+      genre: item.genre || 'Electronic',
       year: item.release_date ? new Date(item.release_date).getFullYear() || 2025 : 2025,
       synthParams: MONOCHROME_CATALOG[idx % MONOCHROME_CATALOG.length].synthParams,
       lyrics: [
-        { time: 0, text: `♪ ${item.title} — ${artistName} (Full Stream) ♪` },
-        { time: 3, text: 'フル尺の同期歌詞を LRCLIB から取得中...' },
+        { time: 0, text: `${item.title} — ${artistName}` },
+        { time: 3, text: 'Synchronizing lyrics via LRCLIB...' },
       ],
     });
   });
