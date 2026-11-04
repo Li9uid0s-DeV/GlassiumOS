@@ -16,9 +16,18 @@ export interface ProxySession {
   logs: { time: string; engine: ProxyEngine; text: string }[];
 }
 
-export interface LyricLine {
-  time: number; // in seconds
+export interface LyricWord {
   text: string;
+  start: number; // in seconds (millisecond precision)
+  end: number;   // in seconds (millisecond precision)
+}
+
+export interface LyricLine {
+  time: number; // in seconds (millisecond precision)
+  endTime?: number;
+  text: string;
+  words?: LyricWord[];
+  isInterlude?: boolean;
 }
 
 export interface MonochromeTrack {
@@ -753,40 +762,188 @@ export async function fetchJsonViaProxyCascade<T = unknown>(targetUrl: string): 
 // -------------------------------------------------------------------------
 // Synchronized LRC Lyrics Parser & LRCLIB / Monochrome Live Music Fetcher
 // -------------------------------------------------------------------------
+// Split a lyric line into natural rhythmic tokens (supports both space-separated words and CJK/Japanese syllable groups)
+function buildTimedWordsForLine(
+  text: string,
+  lineStart: number,
+  lineEnd: number,
+  rawLineWithWordTags?: string
+): LyricWord[] {
+  const duration = Math.max(0.4, lineEnd - lineStart);
+
+  // 1. Check if Enhanced LRC word tags (<mm:ss.xx>word) exist
+  if (rawLineWithWordTags && /<\d{1,3}:\d{2}(?:\.\d{1,3})?>/.test(rawLineWithWordTags)) {
+    const wordTagRegex = /<(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?>([^<]*)/g;
+    const tagMatches = Array.from(rawLineWithWordTags.matchAll(wordTagRegex));
+    if (tagMatches.length > 0) {
+      const enhancedWords: LyricWord[] = [];
+      for (let i = 0; i < tagMatches.length; i++) {
+        const m = tagMatches[i];
+        const wText = m[4];
+        if (!wText || !wText.trim()) continue;
+        const mins = parseInt(m[1], 10);
+        const secs = parseInt(m[2], 10);
+        const ms = m[3] ? parseInt(m[3].padEnd(3, '0').slice(0, 3), 10) : 0;
+        const wStart = Math.round((mins * 60 + secs + ms / 1000) * 100) / 100;
+        enhancedWords.push({
+          text: wText,
+          start: wStart,
+          end: wStart + 0.35,
+        });
+      }
+      for (let i = 0; i < enhancedWords.length; i++) {
+        enhancedWords[i].end =
+          i + 1 < enhancedWords.length ? enhancedWords[i + 1].start : Math.max(enhancedWords[i].start + 0.25, lineEnd);
+      }
+      if (enhancedWords.length > 0) return enhancedWords;
+    }
+  }
+
+  // 2. Automatic Apple Music Sing syllable / word segmentation
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+
+  // Tokenize into words or CJK 1-2 character clusters for smooth syllable glow
+  const rawTokens: string[] = [];
+  const parts = trimmed.split(/(\s+)/);
+  for (const part of parts) {
+    if (!part) continue;
+    if (/^\s+$/.test(part)) {
+      if (rawTokens.length > 0) rawTokens[rawTokens.length - 1] += part;
+      continue;
+    }
+    // Check if mostly CJK characters without spaces
+    if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(part) && part.length > 2) {
+      let i = 0;
+      while (i < part.length) {
+        // Keep small kana (っ, ゃ, ゅ, ょ, ー, etc.) attached to preceding char
+        let step = 2;
+        if (i + step < part.length && /[ゃゅょっーぁぃぅぇぉャュョッー、。！？]/.test(part[i + step])) {
+          step++;
+        }
+        rawTokens.push(part.slice(i, i + step));
+        i += step;
+      }
+    } else {
+      rawTokens.push(part);
+    }
+  }
+
+  if (rawTokens.length === 0) return [];
+
+  // Allocate active singing window (88% of line interval so final syllable settles cleanly)
+  const activeSpan = Math.min(duration * 0.9, Math.max(0.5, duration - 0.18));
+  const totalWeight = rawTokens.reduce((acc, tok) => acc + Math.max(1, tok.trim().length), 0);
+
+  let cursor = lineStart;
+  return rawTokens.map((tok, idx) => {
+    const wWeight = Math.max(1, tok.trim().length) / totalWeight;
+    const span = activeSpan * wWeight;
+    const start = Math.round(cursor * 100) / 100;
+    const end =
+      idx === rawTokens.length - 1
+        ? Math.round((lineStart + activeSpan) * 100) / 100
+        : Math.round((cursor + span) * 100) / 100;
+    cursor += span;
+    return { text: tok, start, end };
+  });
+}
+
+export function enrichLyricsWithWordTiming(lines: LyricLine[], fallbackDuration = 180): LyricLine[] {
+  if (!lines || lines.length === 0) return [];
+  const sorted = [...lines].sort((a, b) => a.time - b.time);
+  const enriched: LyricLine[] = [];
+
+  // If first vocal starts after 4.5s, insert an Apple Music instrumental intro indicator (• • •)
+  if (sorted[0].time >= 4.5 && !sorted[0].isInterlude) {
+    enriched.push({
+      time: 0,
+      endTime: sorted[0].time,
+      text: '• • •',
+      isInterlude: true,
+    });
+  }
+
+  for (let i = 0; i < sorted.length; i++) {
+    const cur = sorted[i];
+    const nextTime = i + 1 < sorted.length ? sorted[i + 1].time : Math.max(cur.time + 5, fallbackDuration);
+    const naturalEnd = Math.min(nextTime, cur.time + 7.5);
+    const words =
+      cur.words && cur.words.length > 0
+        ? cur.words
+        : cur.isInterlude
+        ? []
+        : buildTimedWordsForLine(cur.text, cur.time, naturalEnd);
+
+    enriched.push({
+      ...cur,
+      endTime: naturalEnd,
+      words,
+    });
+
+    // If there is a long instrumental gap (>= 6.5s) before the next lyric line, insert an Apple Music interlude (• • •)
+    if (i + 1 < sorted.length && sorted[i + 1].time - naturalEnd >= 3.0 && sorted[i + 1].time - cur.time >= 7.5) {
+      enriched.push({
+        time: Math.round((cur.time + 4.2) * 100) / 100,
+        endTime: sorted[i + 1].time,
+        text: '• • •',
+        isInterlude: true,
+      });
+    }
+  }
+
+  return enriched;
+}
+
 export function parseLrcLyrics(lrcText: string, fallbackDuration = 180): LyricLine[] {
   if (!lrcText || !lrcText.trim()) return [];
   const lines = lrcText.split(/\r?\n/);
-  const parsed: LyricLine[] = [];
+  const parsed: { time: number; text: string; rawWithoutLineTag: string }[] = [];
   const timeRegex = /\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]/g;
+  const wordTagStripRegex = /<\d{1,3}:\d{2}(?:\.\d{1,3})?>/g;
 
   for (const rawLine of lines) {
     const matches = Array.from(rawLine.matchAll(timeRegex));
-    const cleanText = rawLine.replace(timeRegex, '').trim();
+    const withoutLineTag = rawLine.replace(timeRegex, '').trim();
+    const cleanText = withoutLineTag.replace(wordTagStripRegex, '').trim();
     if (matches.length > 0 && cleanText) {
       for (const m of matches) {
         const mins = parseInt(m[1], 10);
         const secs = parseInt(m[2], 10);
         const ms = m[3] ? parseInt(m[3].padEnd(3, '0').slice(0, 3), 10) : 0;
         parsed.push({
-          time: Math.round((mins * 60 + secs + ms / 1000) * 10) / 10,
+          time: Math.round((mins * 60 + secs + ms / 1000) * 100) / 100,
           text: cleanText,
+          rawWithoutLineTag: withoutLineTag,
         });
       }
     }
   }
 
   if (parsed.length > 0) {
-    return parsed.sort((a, b) => a.time - b.time);
+    parsed.sort((a, b) => a.time - b.time);
+    const baseLines: LyricLine[] = parsed.map((item, idx) => {
+      const nextT = idx + 1 < parsed.length ? parsed[idx + 1].time : Math.max(item.time + 5, fallbackDuration);
+      const endT = Math.min(nextT, item.time + 7.5);
+      return {
+        time: item.time,
+        endTime: endT,
+        text: item.text,
+        words: buildTimedWordsForLine(item.text, item.time, endT, item.rawWithoutLineTag),
+      };
+    });
+    return enrichLyricsWithWordTiming(baseLines, fallbackDuration);
   }
 
   // Plain lyrics fallback: distribute timestamps evenly across track duration
   const plainLines = lines.map((l) => l.trim()).filter((l) => l.length > 0);
   if (plainLines.length === 0) return [];
-  const step = Math.max(3, Math.floor((fallbackDuration - 8) / plainLines.length));
-  return plainLines.map((text, idx) => ({
-    time: idx * step,
+  const step = Math.max(3, (fallbackDuration - 8) / plainLines.length);
+  const fallbackBase: LyricLine[] = plainLines.map((text, idx) => ({
+    time: Math.round(idx * step * 100) / 100,
     text,
   }));
+  return enrichLyricsWithWordTiming(fallbackBase, fallbackDuration);
 }
 
 interface LrclibSearchItem {
@@ -799,32 +956,75 @@ interface LrclibSearchItem {
   plainLyrics?: string;
 }
 
+function cleanTrackQueryString(raw: string): string {
+  return raw
+    .replace(/\([^)]*(?:Official|Video|Audio|MV|Lyric|Remaster|feat\.|ft\.|Ver\.|Version)[^)]*\)/gi, '')
+    .replace(/\[[^\]]*(?:Official|Video|Audio|MV|Lyric|feat\.|ft\.)[^\]]*\]/gi, '')
+    .replace(/-\s*Single/gi, '')
+    .trim();
+}
+
 export async function fetchSynchronizedLyricsFromLrclib(
   title: string,
   artist: string,
   durationSec = 180
 ): Promise<LyricLine[]> {
-  const q = `${title} ${artist}`.trim();
-  const url = `https://lrclib.net/api/search?q=${encodeURIComponent(q)}`;
-  const items = await fetchJsonViaProxyCascade<LrclibSearchItem[]>(url);
+  const cleanTitle = cleanTrackQueryString(title) || title;
+  const cleanArtist = cleanTrackQueryString(artist.split(',')[0] || artist) || artist;
 
-  if (Array.isArray(items) && items.length > 0) {
-    const best = items.find((it) => it.syncedLyrics && it.syncedLyrics.trim().length > 0) || items[0];
-    if (best?.syncedLyrics) {
-      const synced = parseLrcLyrics(best.syncedLyrics, durationSec);
-      if (synced.length > 0) return synced;
+  // 1. Try exact LRCLIB get endpoint + search endpoint in parallel for fastest & highest accuracy match
+  const qFull = `${cleanTitle} ${cleanArtist}`.trim();
+  const searchUrl1 = `https://lrclib.net/api/search?q=${encodeURIComponent(qFull)}`;
+  const searchUrl2 = `https://lrclib.net/api/search?track_name=${encodeURIComponent(cleanTitle)}&artist_name=${encodeURIComponent(cleanArtist)}`;
+
+  const [items1, items2] = await Promise.all([
+    fetchJsonViaProxyCascade<LrclibSearchItem[]>(searchUrl1).catch(() => null),
+    fetchJsonViaProxyCascade<LrclibSearchItem[]>(searchUrl2).catch(() => null),
+  ]);
+
+  const combined: LrclibSearchItem[] = [
+    ...(Array.isArray(items2) ? items2 : []),
+    ...(Array.isArray(items1) ? items1 : []),
+  ];
+
+  // If still empty, try searching by cleanTitle alone
+  if (combined.length === 0) {
+    const titleOnlyItems = await fetchJsonViaProxyCascade<LrclibSearchItem[]>(
+      `https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitle)}`
+    ).catch(() => null);
+    if (Array.isArray(titleOnlyItems)) {
+      combined.push(...titleOnlyItems);
     }
-    if (best?.plainLyrics) {
-      const plain = parseLrcLyrics(best.plainLyrics, durationSec);
+  }
+
+  if (combined.length > 0) {
+    // Prefer items with syncedLyrics whose duration is closest to durationSec
+    const withSynced = combined.filter((it) => it.syncedLyrics && it.syncedLyrics.trim().length > 0);
+    if (withSynced.length > 0) {
+      withSynced.sort((a, b) => {
+        const diffA = Math.abs((a.duration || durationSec) - durationSec);
+        const diffB = Math.abs((b.duration || durationSec) - durationSec);
+        return diffA - diffB;
+      });
+      const bestSynced = parseLrcLyrics(withSynced[0].syncedLyrics!, durationSec);
+      if (bestSynced.length > 0) return bestSynced;
+    }
+
+    const withPlain = combined.find((it) => it.plainLyrics && it.plainLyrics.trim().length > 0);
+    if (withPlain?.plainLyrics) {
+      const plain = parseLrcLyrics(withPlain.plainLyrics, durationSec);
       if (plain.length > 0) return plain;
     }
   }
 
-  return [
-    { time: 0, text: `♪ ${title} — ${artist} ♪` },
-    { time: 4, text: 'Streaming via Monochrome Hi-Fi Service Worker Proxy' },
-    { time: 10, text: 'Synchronized LRC Engine Active — Enjoy the music!' },
-  ];
+  return enrichLyricsWithWordTiming(
+    [
+      { time: 0, text: `♪ ${title} — ${artist} ♪` },
+      { time: 4, text: 'Streaming via Monochrome Hi-Fi Service Worker Proxy' },
+      { time: 10, text: 'Apple Music Sing Real-time Synchronized LRC Engine' },
+    ],
+    durationSec
+  );
 }
 
 // Monochrome Live API / Hifi Endpoints + Global Audio Stream Search
