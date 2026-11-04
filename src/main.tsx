@@ -9,13 +9,15 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>
 );
 
-// Register Glasispect Service Worker Proxy (uses relative path './sw-proxy.js' for GitHub Pages & storage.googleapis.com compatibility)
+// Register Wisp + Ultraviolet (/uv/service/) & Scramjet (/scramjet/) Service Worker Proxy immediately
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker
-      .register('./sw-proxy.js')
-      .catch(() => {
-        // Fallback if hosted in environment restricting ServiceWorker registration
-      });
-  });
+  navigator.serviceWorker
+    .register('./sw-proxy.js', { updateViaCache: 'none' })
+    .then((reg) => {
+      reg.update().catch(() => {});
+    })
+    .catch(() => {
+      // Fallback handled by server-side /uv/service/* & /scramjet/* Wisp routes
+    });
 }
+

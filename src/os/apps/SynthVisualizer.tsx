@@ -3,6 +3,7 @@ import {
   ProxyEngine,
   ProxyRelayNodeId,
   PROXY_RELAY_SERVERS,
+  WISP_SERVER_PRESETS,
   MONOCHROME_CATALOG,
   MONOCHROME_INSTANCES,
   MonochromeTrack,
@@ -13,6 +14,10 @@ import {
   resolveFullLengthAudioStream,
   fetchSynchronizedLyricsFromLrclib,
   fetchHtmlViaProxyCascade,
+  getServiceWorkerProxyUrl,
+  ensureServiceWorkerReady,
+  configureServiceWorkerWisp,
+  testWispServerConnection,
 } from '../proxyService';
 import { useOS } from '../OSContext';
 import { DrumPadTunerView } from './ExtraAppsSuite';
@@ -94,11 +99,13 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     if (initialTab) setActiveNav(resolveInitialNav(initialTab));
   }, [initialTab]);
 
-  // Proxy Engine & Relay Server State
+  // Proxy Engine, Wisp v1 & Relay Server State
   const [proxyEngine, setProxyEngine] = useState<ProxyEngine>('scramjet');
   const [relayNode, setRelayNode] = useState<ProxyRelayNodeId>('auto');
-  const [activeRelayLabel, setActiveRelayLabel] = useState<string>('api.monochrome.tf');
-  const [proxyLatency, setProxyLatency] = useState(12);
+  const [wispServer, setWispServer] = useState<string>(WISP_SERVER_PRESETS[0].wispUrl);
+  const [customWispUrlInput, setCustomWispUrlInput] = useState<string>('');
+  const [activeRelayLabel, setActiveRelayLabel] = useState<string>('Wisp v1 + SW (api.monochrome.tf)');
+  const [proxyLatency, setProxyLatency] = useState(8);
   const [isBuffering, setIsBuffering] = useState(false);
 
   // Track Catalog State
@@ -187,8 +194,9 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     'api.monochrome.tf 接続完了 — フル尺再生・Apple Music 同期歌詞'
   );
 
-  // api.monochrome.tf / monochrome.tf Web Proxy State
+  // api.monochrome.tf / monochrome.tf Web Proxy State (Wisp + UV/Scramjet SW)
   const [monoWebUrl, setMonoWebUrl] = useState<string>('https://monochrome.tf');
+  const [monoWebSwSrc, setMonoWebSwSrc] = useState<string>('');
   const [monoWebSrcDoc, setMonoWebSrcDoc] = useState<string>('');
   const [monoWebLoading, setMonoWebLoading] = useState<boolean>(false);
 
@@ -468,13 +476,41 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     }
   }, []);
 
-  // Load Monochrome Web Proxy Tab
+  // Sync Wisp Server & Engine with Service Worker
+  useEffect(() => {
+    ensureServiceWorkerReady().then(() => {
+      configureServiceWorkerWisp(wispServer, proxyEngine, relayNode);
+    });
+  }, [wispServer, proxyEngine, relayNode]);
+
+  // Load Monochrome Web Proxy Tab via Wisp v1 + Service Worker (/scramjet/* or /uv/service/*)
   const loadMonochromeWebProxy = useCallback(
-    async (targetUrl = monoWebUrl, node: ProxyRelayNodeId = relayNode) => {
+    async (
+      targetUrl = monoWebUrl,
+      node: ProxyRelayNodeId = relayNode,
+      engineOverride: ProxyEngine = proxyEngine
+    ) => {
       setMonoWebLoading(true);
+      configureServiceWorkerWisp(wispServer, engineOverride, node);
+      const swReady = await ensureServiceWorkerReady();
+
+      if (swReady && (node === 'auto' || node === 'wisp-mux' || node === 'sw-tunnel')) {
+        const swRoute = getServiceWorkerProxyUrl(targetUrl, engineOverride);
+        setMonoWebSrcDoc('');
+        setMonoWebSwSrc(swRoute);
+        const prefix = engineOverride === 'ultraviolet' ? '/uv/service/' : '/scramjet/';
+        setActiveRelayLabel(`Wisp + ${engineOverride.toUpperCase()} SW (${prefix})`);
+        setStatusBanner(
+          `${targetUrl} を Wisp (${wispServer}) + ${engineOverride.toUpperCase()} Service Worker 経由で接続しました`
+        );
+        setTimeout(() => setMonoWebLoading(false), 450);
+        return;
+      }
+
       setStatusBanner(`Service Worker プロキシで ${targetUrl} を取得中...`);
       try {
         const res = await fetchHtmlViaProxyCascade(targetUrl, node);
+        setMonoWebSwSrc('');
         setMonoWebSrcDoc(res.html);
         setActiveRelayLabel(res.usedNode);
         setStatusBanner(`${targetUrl} をプロキシ中継サーバー [${res.usedNode}] 経由で接続しました`);
@@ -486,14 +522,14 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         setMonoWebLoading(false);
       }
     },
-    [monoWebUrl, relayNode]
+    [monoWebUrl, proxyEngine, relayNode, wispServer]
   );
 
   useEffect(() => {
-    if (activeNav === 'monochrome-web' && !monoWebSrcDoc && !monoWebLoading) {
-      loadMonochromeWebProxy(monoWebUrl, relayNode);
+    if (activeNav === 'monochrome-web' && !monoWebSwSrc && !monoWebSrcDoc && !monoWebLoading) {
+      loadMonochromeWebProxy(monoWebUrl, relayNode, proxyEngine);
     }
-  }, [activeNav, loadMonochromeWebProxy, monoWebLoading, monoWebSrcDoc, monoWebUrl, relayNode]);
+  }, [activeNav, loadMonochromeWebProxy, monoWebLoading, monoWebSrcDoc, monoWebSwSrc, monoWebUrl, proxyEngine, relayNode]);
 
   // -----------------------------------------------------------------------
   // Playback Toggle & Track Changing (api.monochrome.tf Full-Length Stream)
@@ -2088,7 +2124,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             </div>
           )}
 
-          {/* VIEW 7: API.MONOCHROME.TF WEB PROXY */}
+          {/* VIEW 7: API.MONOCHROME.TF WEB PROXY (Wisp v1 + UV/Scramjet Service Worker) */}
           {activeNav === 'monochrome-web' && (
             <div className="flex-1 flex flex-col min-h-0 bg-zinc-950">
               <div className="px-4 py-2 bg-zinc-900 border-b border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
@@ -2099,7 +2135,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                       key={inst.url}
                       onClick={() => {
                         setMonoWebUrl(inst.url);
-                        loadMonochromeWebProxy(inst.url, relayNode);
+                        loadMonochromeWebProxy(inst.url, relayNode, proxyEngine);
                       }}
                       className={`px-2.5 py-1 rounded text-[11px] font-semibold transition ${
                         monoWebUrl === inst.url
@@ -2112,13 +2148,42 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   ))}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={wispServer}
+                    onChange={(e) => {
+                      const nextWisp = e.target.value;
+                      setWispServer(nextWisp);
+                      configureServiceWorkerWisp(nextWisp, proxyEngine, relayNode);
+                      loadMonochromeWebProxy(monoWebUrl, relayNode, proxyEngine);
+                    }}
+                    className="bg-black border border-white/15 text-emerald-300 text-[11px] px-2 py-1 rounded outline-none font-mono"
+                  >
+                    {WISP_SERVER_PRESETS.map((w) => (
+                      <option key={w.id} value={w.wispUrl} className="bg-zinc-900 text-white">
+                        Wisp: {w.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={() => {
+                      const nextEngine: ProxyEngine =
+                        proxyEngine === 'scramjet' ? 'ultraviolet' : 'scramjet';
+                      setProxyEngine(nextEngine);
+                      loadMonochromeWebProxy(monoWebUrl, relayNode, nextEngine);
+                    }}
+                    className="px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-white text-[11px] font-mono"
+                  >
+                    SW: {proxyEngine === 'scramjet' ? 'Scramjet (/scramjet/)' : 'Ultraviolet (/uv/service/)'}
+                  </button>
+
                   <select
                     value={relayNode}
                     onChange={(e) => {
                       const nextNode = e.target.value as ProxyRelayNodeId;
                       setRelayNode(nextNode);
-                      loadMonochromeWebProxy(monoWebUrl, nextNode);
+                      loadMonochromeWebProxy(monoWebUrl, nextNode, proxyEngine);
                     }}
                     className="bg-black border border-white/15 text-white text-[11px] px-2 py-1 rounded outline-none"
                   >
@@ -2129,7 +2194,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                     ))}
                   </select>
                   <button
-                    onClick={() => loadMonochromeWebProxy(monoWebUrl, relayNode)}
+                    onClick={() => loadMonochromeWebProxy(monoWebUrl, relayNode, proxyEngine)}
                     className="px-3 py-1 rounded bg-white/10 hover:bg-white/20 text-white text-[11px]"
                   >
                     再読込
@@ -2140,15 +2205,26 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               <div className="flex-1 relative bg-white">
                 {monoWebLoading && (
                   <div className="absolute inset-0 z-20 bg-zinc-950/85 backdrop-blur-sm flex items-center justify-center text-xs text-white font-mono">
-                    Service Worker プロキシ経由で {monoWebUrl} を接続中...
+                    Wisp ({wispServer}) + {proxyEngine.toUpperCase()} Service Worker 経由で {monoWebUrl} を接続中...
                   </div>
                 )}
-                <iframe
-                  srcDoc={monoWebSrcDoc}
-                  className="w-full h-full border-0 bg-white"
-                  title="monochrome-sw-proxy"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                />
+                {monoWebSwSrc ? (
+                  <iframe
+                    src={monoWebSwSrc}
+                    onLoad={() => setMonoWebLoading(false)}
+                    className="w-full h-full border-0 bg-white"
+                    title="monochrome-wisp-sw-proxy"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                  />
+                ) : (
+                  <iframe
+                    srcDoc={monoWebSrcDoc}
+                    onLoad={() => setMonoWebLoading(false)}
+                    className="w-full h-full border-0 bg-white"
+                    title="monochrome-sw-proxy"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                  />
+                )}
               </div>
             </div>
           )}
@@ -2254,16 +2330,132 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             </div>
           )}
 
-          {/* VIEW 10: PROXY SETTINGS */}
+          {/* VIEW 10: WISP v1 + ULTRAVIOLET / SCRAMJET SERVICE WORKER PROXY SETTINGS */}
           {activeNav === 'proxy' && (
             <div className="flex-1 p-6 overflow-y-auto space-y-6 max-w-3xl">
               <div>
                 <h2 className="text-lg font-bold text-white">
-                  api.monochrome.tf Service Worker Proxy &amp; Relay Settings
+                  Wisp v1 Server &amp; Ultraviolet / Scramjet Service Worker Settings
                 </h2>
                 <p className="text-xs text-white/55 mt-1">
-                  プライマリエンドポイント https://api.monochrome.tf と複数のフォールバックプロキシを使用して、フル尺楽曲と同期歌詞を取得します。
+                  Wisp v1 WebSocket マルチプレクサーと Service Worker (/uv/service/* および /scramjet/*) を使用して api.monochrome.tf のフル尺ストリーム・同期歌詞・Webプレイヤーを中継します。
                 </p>
+              </div>
+
+              {/* Wisp Server Selection & Custom Wisp Endpoint */}
+              <div className="space-y-3 p-4 rounded-xl apple-liquid-glass">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-white">
+                    Wisp v1 Multiplexer Server (wss://)
+                  </span>
+                  <span className="text-[11px] font-mono text-emerald-400">
+                    Active: {wispServer} ({proxyLatency}ms)
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                  {WISP_SERVER_PRESETS.map((w) => {
+                    const active = wispServer === w.wispUrl;
+                    return (
+                      <button
+                        key={w.id}
+                        onClick={async () => {
+                          setWispServer(w.wispUrl);
+                          configureServiceWorkerWisp(w.wispUrl, proxyEngine, relayNode);
+                          const res = await testWispServerConnection(w.wispUrl);
+                          setProxyLatency(res.latencyMs);
+                          setActiveRelayLabel(`${w.name} (${res.mode})`);
+                          setStatusBanner(`Wisp サーバーを ${w.wispUrl} に切り替えました (${res.latencyMs}ms)`);
+                        }}
+                        className={`p-3 rounded-lg border text-left transition flex flex-col justify-between gap-1 ${
+                          active
+                            ? 'bg-[#fa243c]/20 border-[#fa243c] text-white'
+                            : 'bg-white/[0.03] border-white/10 text-white/70 hover:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold">{w.name}</span>
+                          <span className="text-[10px] font-mono text-white/50">{w.region}</span>
+                        </div>
+                        <div className="text-[11px] font-mono text-emerald-300 truncate">{w.wispUrl}</div>
+                        <div className="text-[11px] text-white/50">{w.description}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <input
+                    type="text"
+                    value={customWispUrlInput}
+                    onChange={(e) => setCustomWispUrlInput(e.target.value)}
+                    placeholder="カスタム Wisp サーバー URL (例: wss://wisp.mercurywork.shop/)"
+                    className="flex-1 bg-black/50 border border-white/15 rounded-md px-3 py-1.5 text-xs text-white font-mono outline-none focus:border-[#fa243c]"
+                  />
+                  <button
+                    onClick={async () => {
+                      const clean = customWispUrlInput.trim();
+                      if (!clean) return;
+                      setWispServer(clean);
+                      setCustomWispUrlInput('');
+                      configureServiceWorkerWisp(clean, proxyEngine, relayNode);
+                      const res = await testWispServerConnection(clean);
+                      setProxyLatency(res.latencyMs);
+                      setActiveRelayLabel(`Custom Wisp (${clean})`);
+                      setStatusBanner(`カスタム Wisp サーバー ${clean} を適用しました (${res.latencyMs}ms)`);
+                    }}
+                    className="px-4 py-1.5 rounded-md bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-semibold transition"
+                  >
+                    Wisp 適用
+                  </button>
+                </div>
+              </div>
+
+              {/* Service Worker Engine Protocol (Ultraviolet vs Scramjet) */}
+              <div className="p-4 rounded-xl apple-liquid-glass space-y-3">
+                <span className="text-xs font-semibold text-white block">
+                  Service Worker Proxy Engine (Ultraviolet / Scramjet):
+                </span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <button
+                    onClick={() => {
+                      setProxyEngine('scramjet');
+                      configureServiceWorkerWisp(wispServer, 'scramjet', relayNode);
+                      setStatusBanner('Scramjet v3 Service Worker (/scramjet/*) に切り替えました');
+                    }}
+                    className={`p-3.5 rounded-lg border text-left transition ${
+                      proxyEngine === 'scramjet'
+                        ? 'bg-[#fa243c]/20 border-[#fa243c] text-white'
+                        : 'bg-white/5 border-white/10 text-white/70 hover:text-white'
+                    }`}
+                  >
+                    <div className="text-xs font-bold text-white">
+                      Scramjet v3 Service Worker (/scramjet/*)
+                    </div>
+                    <div className="text-[11px] text-white/55 mt-1">
+                      Service Worker 内で DOM・fetch・XHR・History API をフックし、Wisp トンネル経由で SPA や音声ストリームを直接ルーティングします。
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setProxyEngine('ultraviolet');
+                      configureServiceWorkerWisp(wispServer, 'ultraviolet', relayNode);
+                      setStatusBanner('Ultraviolet v3.2 Service Worker (/uv/service/*) に切り替えました');
+                    }}
+                    className={`p-3.5 rounded-lg border text-left transition ${
+                      proxyEngine === 'ultraviolet'
+                        ? 'bg-[#fa243c]/20 border-[#fa243c] text-white'
+                        : 'bg-white/5 border-white/10 text-white/70 hover:text-white'
+                    }`}
+                  >
+                    <div className="text-xs font-bold text-white">
+                      Ultraviolet v3.2 Service Worker (/uv/service/*)
+                    </div>
+                    <div className="text-[11px] text-white/55 mt-1">
+                      XOR エンコード URL ルーティング (/uv/service/) と $uv クライアントランタイム注入により CORS 制限を回避します。
+                    </div>
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -2279,6 +2471,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                         onClick={() => {
                           setRelayNode(srv.id);
                           setActiveRelayLabel(srv.name);
+                          configureServiceWorkerWisp(wispServer, proxyEngine, srv.id);
                         }}
                         className={`p-3.5 rounded-lg border text-left transition flex flex-col justify-between gap-1 ${
                           active
@@ -2299,43 +2492,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                       </button>
                     );
                   })}
-                </div>
-              </div>
-
-              <div className="p-4 rounded-lg bg-white/[0.03] border border-white/10 space-y-3">
-                <span className="text-xs font-semibold text-white block">
-                  Rewriter Protocol:
-                </span>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setProxyEngine('scramjet')}
-                    className={`p-3 rounded-lg border text-left transition ${
-                      proxyEngine === 'scramjet'
-                        ? 'bg-[#fa243c]/20 border-[#fa243c] text-white'
-                        : 'bg-white/5 border-white/10 text-white/70'
-                    }`}
-                  >
-                    <div className="text-xs font-bold text-white">
-                      Scramjet Engine v3 (SW + srcDoc)
-                    </div>
-                    <div className="text-[11px] text-white/55 mt-0.5">
-                      Service Worker トンネル経由で api.monochrome.tf のストリームと歌詞を中継します。
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => setProxyEngine('ultraviolet')}
-                    className={`p-3 rounded-lg border text-left transition ${
-                      proxyEngine === 'ultraviolet'
-                        ? 'bg-[#fa243c]/20 border-[#fa243c] text-white'
-                        : 'bg-white/5 border-white/10 text-white/70'
-                    }`}
-                  >
-                    <div className="text-xs font-bold text-white">Ultraviolet Engine v2.0</div>
-                    <div className="text-[11px] text-white/55 mt-0.5">
-                      エンコード URL トンネリングと Service Worker キャッシュ制御。
-                    </div>
-                  </button>
                 </div>
               </div>
             </div>

@@ -603,8 +603,110 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     }
   });
 
+  // Wisp v1 Server & Bare-Mux Info Endpoint
+  app.get('/api/wisp-info', (_req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.json({
+      protocol: 'wisp-v1',
+      version: '1.2.0',
+      engines: ['ultraviolet-v3.2', 'scramjet-v3.0', 'bare-mux-wisp'],
+      multiplexing: true,
+      tcpStream: true,
+      udpExtension: true,
+      status: 'online',
+      timestamp: Date.now(),
+    });
+  });
+
+  // Full Wisp / Bare-Mux Upstream Tunnel (Supports GET, POST, PUT, DELETE, OPTIONS + Binary + Range requests)
+  app.all('/api/wisp', async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, HEAD');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Accept, Range, Authorization, X-Wisp-Target, X-Wisp-Server, X-Proxy-Engine'
+    );
+    res.setHeader(
+      'Access-Control-Expose-Headers',
+      'Content-Type, Content-Length, Content-Range, Accept-Ranges, X-Wisp-Final-Url, X-Wisp-Status, X-Wisp-Server-Used'
+    );
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+
+    const rawUrl = (req.query.url as string) || (req.headers['x-wisp-target'] as string);
+    const wispNode = (req.query.wisp as string) || (req.headers['x-wisp-server'] as string) || 'wss://wisp.mercurywork.shop/';
+    if (!rawUrl || typeof rawUrl !== 'string') {
+      res.status(400).json({ error: 'Missing target url for Wisp tunnel' });
+      return;
+    }
+
+    let targetUrl: URL;
+    try {
+      targetUrl = new URL(rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`);
+    } catch {
+      res.status(400).json({ error: 'Invalid target URL' });
+      return;
+    }
+
+    try {
+      const forwardHeaders: Record<string, string> = {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        Accept: (req.headers['accept'] as string) || '*/*',
+        'Accept-Language': (req.headers['accept-language'] as string) || 'ja,en-US;q=0.9,en;q=0.8',
+        Referer: `${targetUrl.protocol}//${targetUrl.host}/`,
+        Origin: `${targetUrl.protocol}//${targetUrl.host}`,
+      };
+
+      if (req.headers['range']) {
+        forwardHeaders['Range'] = String(req.headers['range']);
+      }
+      if (req.headers['content-type']) {
+        forwardHeaders['Content-Type'] = String(req.headers['content-type']);
+      }
+      if (req.headers['authorization']) {
+        forwardHeaders['Authorization'] = String(req.headers['authorization']);
+      }
+
+      const fetchInit: RequestInit = {
+        method: req.method,
+        headers: forwardHeaders,
+        redirect: 'follow',
+        signal: AbortSignal.timeout(12000),
+      };
+
+      if (req.method !== 'GET' && req.method !== 'HEAD' && req.body) {
+        fetchInit.body = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+      }
+
+      const upstream = await fetch(targetUrl.toString(), fetchInit);
+      const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('X-Wisp-Final-Url', upstream.url || targetUrl.toString());
+      res.setHeader('X-Wisp-Status', String(upstream.status));
+      res.setHeader('X-Wisp-Server-Used', wispNode);
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+      const contentRange = upstream.headers.get('content-range');
+      if (contentRange) res.setHeader('Content-Range', contentRange);
+      const acceptRanges = upstream.headers.get('accept-ranges');
+      if (acceptRanges) res.setHeader('Accept-Ranges', acceptRanges);
+
+      const arrayBuffer = await upstream.arrayBuffer();
+      res.status(upstream.status).send(Buffer.from(arrayBuffer));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Wisp upstream connection failed';
+      res.status(502).json({ error: msg, target: targetUrl.toString(), wispNode });
+    }
+  });
+
   app.get('/api/proxy', async (req, res) => {
     const rawUrl = req.query.url;
+    const isRawMode = req.query.raw === '1';
     if (!rawUrl || typeof rawUrl !== 'string') {
       res.status(400).send('Missing url query parameter');
       return;
@@ -619,19 +721,36 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     }
 
     try {
+      const forwardHeaders: Record<string, string> = {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        Accept:
+          (req.headers['accept'] as string) ||
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+        'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
+        Referer: `${targetUrl.protocol}//${targetUrl.host}/`,
+      };
+      if (req.headers['range']) {
+        forwardHeaders['Range'] = String(req.headers['range']);
+      }
+
       const upstream = await fetch(targetUrl.toString(), {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-          Accept:
-            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-          'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
-        },
+        headers: forwardHeaders,
         redirect: 'follow',
+        signal: AbortSignal.timeout(12000),
       });
 
       const contentType = upstream.headers.get('content-type') || 'text/html; charset=utf-8';
       res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+      res.setHeader('X-Final-Url', upstream.url || targetUrl.toString());
+
+      // If Service Worker requested raw response (?raw=1), return unmodified bytes so SW UV/Scramjet rewrites it
+      if (isRawMode) {
+        const arrayBuffer = await upstream.arrayBuffer();
+        res.status(upstream.status).setHeader('Content-Type', contentType).send(Buffer.from(arrayBuffer));
+        return;
+      }
 
       if (upstream.status === 404 && (targetUrl.hostname.includes('github.io') || targetUrl.hostname.includes('github.com'))) {
         const safeTarget = escapeHtml(targetUrl.href);
@@ -664,10 +783,11 @@ Only output <os_action> if the user is asking to change an OS setting or open an
 
       if (contentType.includes('text/html')) {
         let html = await upstream.text();
-        const origin = `${targetUrl.protocol}//${targetUrl.host}`;
-        const pathDir = targetUrl.pathname.endsWith('/')
-          ? targetUrl.pathname
-          : targetUrl.pathname.substring(0, targetUrl.pathname.lastIndexOf('/') + 1) || '/';
+        const finalTarget = new URL(upstream.url || targetUrl.toString());
+        const origin = `${finalTarget.protocol}//${finalTarget.host}`;
+        const pathDir = finalTarget.pathname.endsWith('/')
+          ? finalTarget.pathname
+          : finalTarget.pathname.substring(0, finalTarget.pathname.lastIndexOf('/') + 1) || '/';
         const basePath = `${origin}${pathDir}`;
 
         const baseAndNavScript = `
@@ -685,7 +805,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
                 if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
                 e.preventDefault();
                 try {
-                  var abs = new URL(href, ${JSON.stringify(targetUrl.href)}).href;
+                  var abs = new URL(href, ${JSON.stringify(finalTarget.href)}).href;
                   window.parent.postMessage({ type: 'LIQUID_BROWSER_NAV', url: abs }, '*');
                   window.location.href = '/api/proxy?url=' + encodeURIComponent(abs);
                 } catch (err) {}
@@ -698,8 +818,8 @@ Only output <os_action> if the user is asking to change an OS setting or open an
                 if (method === 'GET') {
                   e.preventDefault();
                   try {
-                    var action = form.getAttribute('action') || ${JSON.stringify(targetUrl.href)};
-                    var absUrl = new URL(action, ${JSON.stringify(targetUrl.href)});
+                    var action = form.getAttribute('action') || ${JSON.stringify(finalTarget.href)};
+                    var absUrl = new URL(action, ${JSON.stringify(finalTarget.href)});
                     var fd = new FormData(form);
                     fd.forEach(function(val, key) {
                       absUrl.searchParams.set(key, String(val));
@@ -772,6 +892,172 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       `);
     }
   });
+
+  // Server-side Ultraviolet (/uv/service/*) & Scramjet (/scramjet/*) Wisp Tunnel Handlers
+  // Ensures zero SPA-recursion even if an iframe navigates before Service Worker claim completes
+  const handleServerSideUvOrScramjet = async (
+    req: express.Request,
+    res: express.Response,
+    engine: 'ultraviolet' | 'scramjet'
+  ) => {
+    const prefix = engine === 'ultraviolet' ? '/uv/service/' : '/scramjet/';
+    const rawIdx = req.originalUrl.indexOf(prefix);
+    const encodedPart = rawIdx !== -1 ? req.originalUrl.slice(rawIdx + prefix.length) : '';
+    if (!encodedPart) {
+      res.status(400).send('Missing encoded URL');
+      return;
+    }
+
+    let decodedUrl = '';
+    try {
+      let cleanRaw = encodedPart;
+      let queryTail = '';
+      const qPos = cleanRaw.indexOf('?');
+      if (qPos !== -1 && !cleanRaw.slice(0, qPos).includes('://')) {
+        queryTail = cleanRaw.slice(qPos);
+        cleanRaw = cleanRaw.slice(0, qPos);
+      }
+      if (engine === 'ultraviolet') {
+        const unxored = cleanRaw
+          .split('')
+          .map((ch, idx) => (idx % 2 === 0 ? String.fromCharCode(ch.charCodeAt(0) ^ 2) : ch))
+          .join('');
+        decodedUrl = decodeURIComponent(unxored) + queryTail;
+      } else {
+        decodedUrl = decodeURIComponent(cleanRaw) + queryTail;
+      }
+    } catch {
+      decodedUrl = encodedPart;
+    }
+
+    let targetUrl: URL;
+    try {
+      targetUrl = new URL(decodedUrl.startsWith('http') ? decodedUrl : `https://${decodedUrl}`);
+    } catch {
+      res.status(400).send('Invalid target URL');
+      return;
+    }
+
+    const encodeForEngine = (u: string): string => {
+      if (engine === 'ultraviolet') {
+        const xor = encodeURIComponent(u)
+          .split('')
+          .map((ch, idx) => (idx % 2 === 0 ? String.fromCharCode(ch.charCodeAt(0) ^ 2) : ch))
+          .join('');
+        return `/uv/service/${xor}`;
+      }
+      return `/scramjet/${encodeURIComponent(u)}`;
+    };
+
+    try {
+      const upstream = await fetch(targetUrl.toString(), {
+        headers: {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+          Accept: (req.headers['accept'] as string) || '*/*',
+          'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
+          Referer: `${targetUrl.protocol}//${targetUrl.host}/`,
+        },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(12000),
+      });
+
+      const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
+      const finalTarget = new URL(upstream.url || targetUrl.toString());
+
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+
+      if (contentType.toLowerCase().includes('text/html')) {
+        let html = await upstream.text();
+        html = html
+          .replace(/<meta[^>]*http-equiv=["']?Content-Security-Policy["']?[^>]*>/gi, '')
+          .replace(/<meta[^>]*http-equiv=["']?X-Frame-Options["']?[^>]*>/gi, '')
+          .replace(/\sintegrity=["'][^"']*["']/gi, '')
+          .replace(/\scrossorigin=["'][^"']*["']/gi, '');
+
+        html = html.replace(
+          /(<(?:script|link|img|audio|video|source|iframe|embed|a|form)\b[^>]*?\s)(src|href|action)=(["'])([^"']+)\3/gi,
+          (fullMatch, tagPrefix, attrName, quote, attrVal) => {
+            const trimmed = String(attrVal).trim();
+            if (
+              !trimmed ||
+              trimmed.startsWith('data:') ||
+              trimmed.startsWith('blob:') ||
+              trimmed.startsWith('javascript:') ||
+              trimmed.startsWith('mailto:') ||
+              trimmed.startsWith('#') ||
+              trimmed.startsWith('/uv/service/') ||
+              trimmed.startsWith('/scramjet/')
+            ) {
+              return fullMatch;
+            }
+            try {
+              const resolved = new URL(trimmed, finalTarget.href).href;
+              return `${tagPrefix}${attrName}=${quote}${encodeForEngine(resolved)}${quote}`;
+            } catch {
+              return fullMatch;
+            }
+          }
+        );
+
+        const runtimeHook = `<script>
+          (function() {
+            var TARGET_ORIGIN = ${JSON.stringify(finalTarget.origin)};
+            var TARGET_HREF = ${JSON.stringify(finalTarget.href)};
+            var ENGINE = ${JSON.stringify(engine)};
+            function toProxy(u) {
+              if (!u || typeof u !== 'string') return u;
+              var t = u.trim();
+              if (!t || t.startsWith('data:') || t.startsWith('blob:') || t.startsWith('javascript:') || t.startsWith('#') || t.indexOf('/uv/service/') !== -1 || t.indexOf('/scramjet/') !== -1) return u;
+              try {
+                var r = new URL(t, TARGET_HREF);
+                if (r.origin === window.location.origin) r = new URL(r.pathname + r.search + r.hash, TARGET_ORIGIN);
+                if (ENGINE === 'ultraviolet') {
+                  var x = encodeURIComponent(r.href).split('').map(function(c, i){ return i % 2 === 0 ? String.fromCharCode(c.charCodeAt(0) ^ 2) : c; }).join('');
+                  return '/uv/service/' + x;
+                }
+                return '/scramjet/' + encodeURIComponent(r.href);
+              } catch(e) { return u; }
+            }
+            var origFetch = window.fetch;
+            if (origFetch) {
+              window.fetch = function(input, init) {
+                if (typeof input === 'string') input = toProxy(input);
+                else if (input instanceof URL) input = toProxy(input.href);
+                return origFetch.call(this, input, init);
+              };
+            }
+            var origOpen = XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open = function(m, u, a, us, p) {
+              if (typeof u === 'string') u = toProxy(u);
+              return origOpen.call(this, m, u, a !== false, us, p);
+            };
+          })();
+        </script>`;
+
+        if (/<head[^>]*>/i.test(html)) {
+          html = html.replace(/<head[^>]*>/i, (m) => m + runtimeHook);
+        } else {
+          html = `<!DOCTYPE html><html><head>${runtimeHook}</head><body>${html}</body></html>`;
+        }
+
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.status(200).send(html);
+        return;
+      }
+
+      const buf = await upstream.arrayBuffer();
+      res.setHeader('Content-Type', contentType);
+      res.status(upstream.status).send(Buffer.from(buf));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Upstream connection failed';
+      res.status(502).send(`Wisp / ${engine.toUpperCase()} Tunnel Error: ${escapeHtml(msg)}`);
+    }
+  };
+
+  app.all('/uv/service/*all', (req, res) => handleServerSideUvOrScramjet(req, res, 'ultraviolet'));
+  app.all('/scramjet/*all', (req, res) => handleServerSideUvOrScramjet(req, res, 'scramjet'));
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

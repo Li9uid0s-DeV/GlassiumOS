@@ -4,8 +4,13 @@ import {
   ProxyEngine,
   ProxyRelayNodeId,
   PROXY_RELAY_SERVERS,
+  WISP_SERVER_PRESETS,
   encodeUltraviolet,
   encodeScramjet,
+  getServiceWorkerProxyUrl,
+  ensureServiceWorkerReady,
+  configureServiceWorkerWisp,
+  testWispServerConnection,
   fetchHtmlViaProxyCascade,
   generateGcsStandaloneLauncherHtml,
 } from '../proxyService';
@@ -17,12 +22,12 @@ interface Props {
 const DEFAULT_HOME = 'about:start';
 
 const SPEED_DIAL = [
-  { label: 'Glasispect Search', url: 'about:search?q=GlassiumOS+5', icon: 'Search', desc: 'Instant Web & Wiki Search' },
-  { label: 'Monochrome.st Music', url: 'https://monochrome.st', icon: 'Music', desc: 'Lossless Music & SW Proxy' },
+  { label: 'Monochrome.tf Music', url: 'https://monochrome.tf', icon: 'Music', desc: 'Wisp + SW Proxy Lossless' },
+  { label: 'DuckDuckGo Web', url: 'https://html.duckduckgo.com/html/', icon: 'Search', desc: 'Full Web Search via SW' },
   { label: 'storage.googleapis.com', url: 'about:gcs', icon: 'HardDrive', desc: 'Google Cloud Storage Gateway' },
-  { label: 'GitHub Explorer', url: 'https://github.com', icon: 'GitBranch', desc: 'Zero-404 Repo & Pages Hub' },
-  { label: 'Wikipedia', url: 'https://ja.wikipedia.org', icon: 'FileText', desc: 'Free Encyclopedia Reader' },
+  { label: 'Wikipedia (SW)', url: 'https://ja.wikipedia.org', icon: 'FileText', desc: 'Encyclopedia via Wisp/SW' },
   { label: 'Hacker News', url: 'https://news.ycombinator.com', icon: 'Zap', desc: 'Tech & Engineering News' },
+  { label: 'GitHub Explorer', url: 'https://github.com', icon: 'GitBranch', desc: 'Zero-404 Repo & Pages Hub' },
   { label: 'MDN Web Docs', url: 'https://developer.mozilla.org', icon: 'BookOpen', desc: 'Web Technologies Docs' },
   { label: 'jsDelivr CDN', url: 'https://www.jsdelivr.com', icon: 'Server', desc: 'Open Source CDN & Packages' },
 ];
@@ -58,19 +63,18 @@ function normalizeUrl(input: string): string {
       return `https://github.com/${owner}/${repo}`;
     }
   }
-  // If user pasted a Google search URL that was blocked or 404'd, extract q= parameter into smart search or proxy
   if (/^https?:\/\/(www\.)?google\.[a-z.]+\/search\?/i.test(v)) {
     try {
       const u = new URL(v);
       const q = u.searchParams.get('q');
-      if (q) return 'about:search?q=' + encodeURIComponent(q);
+      if (q) return 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(q);
     } catch {
       // ignore
     }
   }
   if (/^https?:\/\//i.test(v)) return v;
   if (/^[\w-]+(\.[\w-]+)+(\/.*)?$/.test(v)) return 'https://' + v;
-  return 'about:search?q=' + encodeURIComponent(v);
+  return 'https://html.duckduckgo.com/html/?q=' + encodeURIComponent(v);
 }
 
 export function BrowserApp({ payload }: Props) {
@@ -82,19 +86,23 @@ export function BrowserApp({ payload }: Props) {
   const [inputVal, setInputVal] = useState(initialUrl === 'about:start' ? '' : initialUrl);
   const [engine, setEngine] = useState<ProxyEngine>(payload?.engine ?? 'scramjet');
   const [relayNode, setRelayNode] = useState<ProxyRelayNodeId>('auto');
-  const [activeNodeLabel, setActiveNodeLabel] = useState<string>('SW + Multi-Node Ready');
+  const [wispServer, setWispServer] = useState<string>(WISP_SERVER_PRESETS[0].wispUrl);
+  const [customWispInput, setCustomWispInput] = useState<string>('');
+  const [wispModeLabel, setWispModeLabel] = useState<string>('Wisp v1 Multiplex + SW Ready');
+  const [activeNodeLabel, setActiveNodeLabel] = useState<string>('Wisp v1 + Service Worker');
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [history, setHistory] = useState<string[]>([initialUrl]);
   const [historyIdx, setHistoryIdx] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const [latency, setLatency] = useState(11);
+  const [latency, setLatency] = useState(8);
   const [frameError, setFrameError] = useState(false);
-  const [forceRawIframe, setForceRawIframe] = useState(false);
+  const [forceRawIframe, setForceRawIframe] = useState(true);
+  const [swIframeSrc, setSwIframeSrc] = useState<string>('');
   const [proxiedSrcDoc, setProxiedSrcDoc] = useState<string>('');
 
   // storage.googleapis.com Gateway state
   const [gcsBucketInput, setGcsBucketInput] = useState('https://storage.googleapis.com/tfjs-models/');
-  const [gcsCustomTargetUrl, setGcsCustomTargetUrl] = useState('https://monochrome.st');
+  const [gcsCustomTargetUrl, setGcsCustomTargetUrl] = useState('https://monochrome.tf');
   const [gcsBlobSandboxUrl, setGcsBlobSandboxUrl] = useState<string | null>(null);
 
   // Built-in GitHub Explorer state (prevents GitHub / GitHub Pages 404 errors)
@@ -109,24 +117,42 @@ export function BrowserApp({ payload }: Props) {
   const [searchLoading, setSearchLoading] = useState(false);
 
   const [logs, setLogs] = useState<{ time: string; text: string; type: 'info' | 'proxy' | 'sec' }[]>([
-    { time: '00:00', text: '[Glasispect SW Proxy] Service Worker + Multi-Node Relay Initialized', type: 'info' },
-    { time: '00:01', text: '[Zero-404] GitHub Pages & storage.googleapis.com srcDoc Rewriter Ready', type: 'sec' },
-    { time: '00:02', text: '[Nodes] AllOrigins / CodeTabs / CorsProxy / Jina Reader Online', type: 'proxy' },
+    { time: '00:00', text: '[Wisp v1] Connected to Wisp Multiplexer (wss://wisp.mercurywork.shop/)', type: 'info' },
+    { time: '00:01', text: '[Service Worker] /uv/service/* & /scramjet/* Interceptors Active', type: 'sec' },
+    { time: '00:02', text: '[Runtime Hook] $uv & $scramjet fetch/XHR/History Rewriters Online', type: 'proxy' },
   ]);
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setLatency(Math.floor(9 + Math.random() * 7));
-    }, 4000);
-    return () => clearInterval(timer);
-  }, []);
 
   const addLog = useCallback((text: string, type: 'info' | 'proxy' | 'sec' = 'proxy') => {
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
     setLogs((prev) => [...prev.slice(-24), { time, text, type }]);
   }, []);
+
+  // Initialize & Sync Service Worker Wisp configuration
+  useEffect(() => {
+    ensureServiceWorkerReady().then((ready) => {
+      configureServiceWorkerWisp(wispServer, engine, relayNode);
+      if (ready) {
+        addLog(`[SW Active] ${engine.toUpperCase()} Service Worker bound to Wisp (${wispServer})`, 'sec');
+      }
+    });
+  }, [wispServer, engine, relayNode, addLog]);
+
+  const handleSelectWispServer = useCallback(
+    async (nextWispUrl: string) => {
+      const clean = nextWispUrl.trim();
+      if (!clean) return;
+      setWispServer(clean);
+      configureServiceWorkerWisp(clean, engine, relayNode);
+      addLog(`[Wisp] Testing Wisp v1 handshake -> ${clean}...`, 'info');
+      const res = await testWispServerConnection(clean);
+      setLatency(res.latencyMs);
+      setWispModeLabel(res.mode);
+      addLog(`[Wisp OK] ${clean} (${res.latencyMs}ms — ${res.mode})`, 'sec');
+    },
+    [engine, relayNode, addLog]
+  );
 
   // Fetch GitHub repositories when in GitHub mode
   const searchGitHubRepos = useCallback(async (q: string) => {
@@ -204,7 +230,7 @@ export function BrowserApp({ payload }: Props) {
     }
   }, []);
 
-  // Run Wikipedia / Web search when in about:search or wikipedia.org
+  // Run Wikipedia / Web search when in about:search
   const runSmartSearch = useCallback(async (q: string) => {
     const cleanQ = q.trim() || 'GlassiumOS';
     setSearchLoading(true);
@@ -243,16 +269,42 @@ export function BrowserApp({ payload }: Props) {
     }
   }, []);
 
-  // Load any external URL through our Multi-Node Proxy Cascade & render into srcDoc (zero GitHub Pages 404!)
+  // Load any external URL through real Service Worker (/uv/service/* or /scramjet/*) + Wisp v1
   const loadProxiedWebpage = useCallback(
-    async (targetUrl: string, nodeToUse: ProxyRelayNodeId = relayNode) => {
+    async (
+      targetUrl: string,
+      nodeToUse: ProxyRelayNodeId = relayNode,
+      engineToUse: ProxyEngine = engine
+    ) => {
       if (!targetUrl || targetUrl === 'about:start' || targetUrl.startsWith('about:')) return;
       setIsLoading(true);
       setFrameError(false);
-      addLog(`[Proxy Cascade] Fetching ${targetUrl} via ${nodeToUse}...`, 'proxy');
       const t0 = performance.now();
+
+      configureServiceWorkerWisp(wispServer, engineToUse, nodeToUse);
+      const swReady = await ensureServiceWorkerReady();
+
+      const useDirectServiceWorkerRoute =
+        swReady &&
+        (nodeToUse === 'auto' || nodeToUse === 'wisp-mux' || nodeToUse === 'sw-tunnel');
+
+      if (useDirectServiceWorkerRoute) {
+        const swRoute = getServiceWorkerProxyUrl(targetUrl, engineToUse);
+        setProxiedSrcDoc('');
+        setSwIframeSrc(swRoute);
+        const routePrefix = engineToUse === 'ultraviolet' ? '/uv/service/' : '/scramjet/';
+        setActiveNodeLabel(`Wisp (${wispServer}) + ${engineToUse.toUpperCase()} SW (${routePrefix})`);
+        setLatency(Math.max(5, Math.round(performance.now() - t0)));
+        addLog(`[SW Route] Navigating iframe -> ${swRoute} via ${wispServer}`, 'sec');
+        setTimeout(() => setIsLoading(false), 450);
+        return;
+      }
+
+      // Fallback or explicit Relay Node (e.g. Jina Reader, AllOrigins, CodeTabs, GCS)
+      addLog(`[Proxy Cascade] Fetching ${targetUrl} via ${nodeToUse}...`, 'proxy');
       try {
         const result = await fetchHtmlViaProxyCascade(targetUrl, nodeToUse);
+        setSwIframeSrc('');
         setProxiedSrcDoc(result.html);
         setActiveNodeLabel(result.usedNode);
         setLatency(Math.max(8, Math.round(performance.now() - t0)));
@@ -265,25 +317,23 @@ export function BrowserApp({ payload }: Props) {
         setIsLoading(false);
       }
     },
-    [addLog, relayNode]
+    [addLog, engine, relayNode, wispServer]
   );
 
   const navigateTo = useCallback(
-    (url: string, overrideForceRaw = false) => {
+    (url: string, overrideForceRaw = true) => {
       const norm = normalizeUrl(url);
       setIsLoading(true);
       setFrameError(false);
-      if (!overrideForceRaw) {
-        setForceRawIframe(false);
-      }
+      setForceRawIframe(overrideForceRaw);
       setAddress(norm);
       setInputVal(norm === 'about:start' || norm === 'about:gcs' ? '' : norm.replace(/^about:search\?q=/, ''));
       setLoadedUrl(norm);
 
-      addLog(`[${engine.toUpperCase()}] Routing -> ${norm}`, 'proxy');
+      addLog(`[${engine.toUpperCase()} + Wisp] Routing -> ${norm}`, 'proxy');
 
       const willUseGitHubHub = !overrideForceRaw && (norm.includes('github.com') || norm.includes('github.io'));
-      const willUseSmartSearch = !overrideForceRaw && (norm.startsWith('about:search?q=') || norm.includes('wikipedia.org'));
+      const willUseSmartSearch = norm.startsWith('about:search?q=');
 
       if (willUseGitHubHub) {
         const matchRepo = norm.match(/github\.com\/([^/]+\/[^/?#]+)/i);
@@ -294,13 +344,11 @@ export function BrowserApp({ payload }: Props) {
         }
         setIsLoading(false);
       } else if (willUseSmartSearch) {
-        const q = norm.startsWith('about:search?q=')
-          ? decodeURIComponent(norm.replace('about:search?q=', ''))
-          : 'GlassiumOS';
+        const q = decodeURIComponent(norm.replace('about:search?q=', '')) || 'GlassiumOS';
         runSmartSearch(q);
         setIsLoading(false);
       } else if (norm !== 'about:start' && norm !== 'about:gcs' && !norm.startsWith('about:')) {
-        loadProxiedWebpage(norm, relayNode);
+        loadProxiedWebpage(norm, relayNode, engine);
       } else {
         setIsLoading(false);
       }
@@ -324,11 +372,16 @@ export function BrowserApp({ payload }: Props) {
     ]
   );
 
-  // Listen for navigation events posted from the proxied srcDoc iframe
+  // Listen for navigation & URL sync events posted from the proxied Service Worker iframe
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
-      if (e.data && e.data.type === 'LIQUID_BROWSER_NAV' && typeof e.data.url === 'string') {
+      if (!e.data || typeof e.data !== 'object') return;
+      if (e.data.type === 'LIQUID_BROWSER_NAV' && typeof e.data.url === 'string') {
         navigateTo(e.data.url, true);
+      } else if (e.data.type === 'LIQUID_BROWSER_URL_SYNC' && typeof e.data.url === 'string') {
+        setAddress(e.data.url);
+        setInputVal(e.data.url);
+        setLoadedUrl(e.data.url);
       }
     };
     window.addEventListener('message', onMessage);
@@ -414,7 +467,7 @@ export function BrowserApp({ payload }: Props) {
   const isStartPage = loadedUrl === 'about:start';
   const isGcsGatewayPage = loadedUrl === 'about:gcs';
   const isGitHubView = !forceRawIframe && (loadedUrl.includes('github.com') || loadedUrl.includes('github.io'));
-  const isSmartSearchView = !forceRawIframe && (loadedUrl.startsWith('about:search?q=') || loadedUrl.includes('wikipedia.org'));
+  const isSmartSearchView = !forceRawIframe && loadedUrl.startsWith('about:search?q=');
 
   return (
     <div className="flex h-full w-full min-w-0 min-h-0 flex-col bg-zinc-950 text-white select-none">
@@ -457,7 +510,7 @@ export function BrowserApp({ payload }: Props) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            navigateTo(inputVal);
+            navigateTo(inputVal, true);
           }}
           className="flex-1 flex items-center gap-2 bg-white/[0.04] border-b border-white/15 px-3 py-1.5 focus-within:border-cyan-400 focus-within:bg-black/70 transition"
         >
@@ -472,7 +525,7 @@ export function BrowserApp({ payload }: Props) {
             type="text"
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
-            placeholder="検索またはURL入力 (例: monochrome.st, storage.googleapis.com, news.ycombinator.com)..."
+            placeholder="検索またはURL入力 (例: monochrome.tf, duckduckgo.com, ja.wikipedia.org)..."
             className="flex-1 bg-transparent text-xs text-white placeholder-white/40 outline-none font-sans"
           />
           {inputVal && (
@@ -492,7 +545,27 @@ export function BrowserApp({ payload }: Props) {
           </button>
         </form>
 
-        {/* Proxy Relay Server Selector */}
+        {/* Wisp Server Selector */}
+        <select
+          value={wispServer}
+          onChange={(e) => {
+            const nextWisp = e.target.value;
+            handleSelectWispServer(nextWisp);
+            if (!isStartPage && !isGcsGatewayPage && !loadedUrl.startsWith('about:')) {
+              loadProxiedWebpage(loadedUrl, relayNode, engine);
+            }
+          }}
+          className="hidden lg:block bg-zinc-900 border border-white/15 text-emerald-300 text-[11px] px-2 py-1 outline-none cursor-pointer font-mono"
+          title="Wisp v1 Multiplexer Server 切替"
+        >
+          {WISP_SERVER_PRESETS.map((w) => (
+            <option key={w.id} value={w.wispUrl} className="bg-zinc-900 text-white">
+              Wisp: {w.name}
+            </option>
+          ))}
+        </select>
+
+        {/* Proxy Relay Mode Selector */}
         <select
           value={relayNode}
           onChange={(e) => {
@@ -500,44 +573,52 @@ export function BrowserApp({ payload }: Props) {
             setRelayNode(nextNode);
             if (!isStartPage && !isGcsGatewayPage && !loadedUrl.startsWith('about:')) {
               setForceRawIframe(true);
-              loadProxiedWebpage(loadedUrl, nextNode);
+              loadProxiedWebpage(loadedUrl, nextNode, engine);
             }
           }}
           className="hidden md:block bg-zinc-900 border border-white/15 text-cyan-300 text-[11px] px-2 py-1 outline-none cursor-pointer"
-          title="プロキシ中継サーバー切替"
+          title="プロキシ中継モード切替"
         >
           {PROXY_RELAY_SERVERS.map((srv) => (
             <option key={srv.id} value={srv.id} className="bg-zinc-900 text-white">
-              🌐 {srv.name}
+              {srv.name}
             </option>
           ))}
         </select>
 
-        {/* Engine Switcher */}
+        {/* Ultraviolet / Scramjet Service Worker Switcher */}
         <div className="hidden sm:flex items-center gap-1 bg-white/[0.04] p-0.5 border border-white/[0.06]">
           <button
             onClick={() => {
               setEngine('scramjet');
-              addLog('[Engine] Switched to Scramjet v3 (SW + AST Rewriter)', 'proxy');
+              configureServiceWorkerWisp(wispServer, 'scramjet', relayNode);
+              addLog('[SW Engine] Switched to Scramjet v3 Service Worker (/scramjet/*)', 'proxy');
+              if (!isStartPage && !isGcsGatewayPage && !loadedUrl.startsWith('about:')) {
+                loadProxiedWebpage(loadedUrl, relayNode, 'scramjet');
+              }
             }}
             className={`px-2 py-1 text-[11px] font-medium flex items-center gap-1 transition ${
               engine === 'scramjet' ? 'bg-cyan-500 text-black font-semibold' : 'text-white/60 hover:text-white'
             }`}
           >
             <Icon name="Zap" size={12} />
-            <span>Scramjet</span>
+            <span>Scramjet SW</span>
           </button>
           <button
             onClick={() => {
               setEngine('ultraviolet');
-              addLog('[Engine] Switched to Ultraviolet v2.0', 'sec');
+              configureServiceWorkerWisp(wispServer, 'ultraviolet', relayNode);
+              addLog('[SW Engine] Switched to Ultraviolet v3 Service Worker (/uv/service/*)', 'sec');
+              if (!isStartPage && !isGcsGatewayPage && !loadedUrl.startsWith('about:')) {
+                loadProxiedWebpage(loadedUrl, relayNode, 'ultraviolet');
+              }
             }}
             className={`px-2 py-1 text-[11px] font-medium flex items-center gap-1 transition ${
-              engine === 'ultraviolet' ? 'bg-purple-600 text-white' : 'text-white/60 hover:text-white'
+              engine === 'ultraviolet' ? 'bg-purple-600 text-white font-semibold' : 'text-white/60 hover:text-white'
             }`}
           >
             <Icon name="Shield" size={12} />
-            <span>UV</span>
+            <span>Ultraviolet SW</span>
           </button>
         </div>
 
@@ -548,23 +629,72 @@ export function BrowserApp({ payload }: Props) {
               ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300'
               : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
           }`}
-          title="プロキシ診断 & サーバー切替"
+          title="Wisp サーバー & UV/Scramjet SW 設定"
         >
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span>{latency}ms</span>
+          <span>Wisp {latency}ms</span>
         </button>
       </div>
 
-      {/* Diagnostics & Proxy Server Selector Flyout */}
+      {/* Wisp Server & Ultraviolet / Scramjet Service Worker Configuration Flyout */}
       {showDiagnostics && (
-        <div className="bg-zinc-900 border-b border-cyan-500/30 p-3 text-xs flex flex-col gap-2.5">
+        <div className="bg-zinc-900 border-b border-cyan-500/30 p-3.5 text-xs flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <span className="font-semibold text-cyan-300">
-              GlasispectUI Service Worker Proxy &amp; Multi-Node Relay ({activeNodeLabel})
-            </span>
-            <span className="text-[10px] font-mono text-emerald-400">{encodedProxyString.slice(0, 44)}</span>
+            <div>
+              <span className="font-semibold text-cyan-300">
+                Wisp v1 Multiplexer + {engine === 'ultraviolet' ? 'Ultraviolet (/uv/service/*)' : 'Scramjet (/scramjet/*)'} Service Worker
+              </span>
+              <span className="ml-2 text-[10px] font-mono text-white/50">({wispModeLabel})</span>
+            </div>
+            <span className="text-[10px] font-mono text-emerald-400 truncate max-w-md">{encodedProxyString}</span>
           </div>
 
+          {/* Wisp Server Presets + Custom Wisp Server Input */}
+          <div className="space-y-1.5">
+            <div className="text-[11px] text-white/60 font-medium">Wisp Server (wss://) 選択・カスタム追加:</div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {WISP_SERVER_PRESETS.map((w) => (
+                <button
+                  key={w.id}
+                  onClick={() => {
+                    handleSelectWispServer(w.wispUrl);
+                    if (!isStartPage && !isGcsGatewayPage && !loadedUrl.startsWith('about:')) {
+                      loadProxiedWebpage(loadedUrl, relayNode, engine);
+                    }
+                  }}
+                  className={`px-2.5 py-1 text-[10px] font-mono border transition ${
+                    wispServer === w.wispUrl
+                      ? 'bg-emerald-400 text-black border-emerald-300 font-bold'
+                      : 'bg-black/50 text-white/70 border-white/10 hover:text-white'
+                  }`}
+                >
+                  {w.name} ({w.wispUrl})
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="text"
+                value={customWispInput}
+                onChange={(e) => setCustomWispInput(e.target.value)}
+                placeholder="カスタム Wisp サーバーを入力 (例: wss://wisp.mercurywork.shop/)"
+                className="flex-1 bg-black/60 border border-white/15 px-2.5 py-1 text-[11px] text-white font-mono outline-none"
+              />
+              <button
+                onClick={() => {
+                  if (customWispInput.trim()) {
+                    handleSelectWispServer(customWispInput.trim());
+                    setCustomWispInput('');
+                  }
+                }}
+                className="px-3 py-1 bg-emerald-500 text-black font-bold text-[11px] hover:bg-emerald-400 transition"
+              >
+                Wisp接続テスト &amp; 適用
+              </button>
+            </div>
+          </div>
+
+          {/* Relay Mode Buttons */}
           <div className="flex flex-wrap items-center gap-1.5">
             {PROXY_RELAY_SERVERS.map((srv) => (
               <button
@@ -573,7 +703,7 @@ export function BrowserApp({ payload }: Props) {
                   setRelayNode(srv.id);
                   if (!isStartPage && !isGcsGatewayPage && !loadedUrl.startsWith('about:')) {
                     setForceRawIframe(true);
-                    loadProxiedWebpage(loadedUrl, srv.id);
+                    loadProxiedWebpage(loadedUrl, srv.id, engine);
                   }
                 }}
                 className={`px-2.5 py-1 text-[10px] font-mono border transition ${
@@ -603,7 +733,7 @@ export function BrowserApp({ payload }: Props) {
         {SPEED_DIAL.map((b) => (
           <button
             key={b.url}
-            onClick={() => navigateTo(b.url)}
+            onClick={() => navigateTo(b.url, true)}
             className="px-2.5 py-1 text-[11px] flex items-center gap-1.5 whitespace-nowrap transition text-white/70 hover:bg-white/[0.06] hover:text-white"
           >
             <Icon name={b.icon} size={12} />
@@ -613,15 +743,13 @@ export function BrowserApp({ payload }: Props) {
         {!isStartPage && !isGcsGatewayPage && (
           <button
             onClick={() => {
-              const nextRaw = !forceRawIframe;
-              setForceRawIframe(nextRaw);
-              if (nextRaw && !loadedUrl.startsWith('about:')) {
-                loadProxiedWebpage(loadedUrl, relayNode);
-              }
+              const nextEngine: ProxyEngine = engine === 'scramjet' ? 'ultraviolet' : 'scramjet';
+              setEngine(nextEngine);
+              loadProxiedWebpage(loadedUrl, 'wisp-mux', nextEngine);
             }}
             className="ml-auto px-2.5 py-0.5 text-[10px] font-mono bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300 transition shrink-0"
           >
-            {forceRawIframe ? 'スマートリーダー表示へ切替' : 'SWプロキシ直接レンダリングへ切替'}
+            SW切替: {engine === 'scramjet' ? 'Scramjet -> Ultraviolet (/uv/service/)' : 'Ultraviolet -> Scramjet (/scramjet/)'}
           </button>
         )}
       </div>
@@ -641,7 +769,7 @@ export function BrowserApp({ payload }: Props) {
                   <div className="text-[11px] font-mono text-cyan-400 uppercase tracking-widest">
                     GOOGLE CLOUD STORAGE GATEWAY &amp; SANDBOX LAUNCHER
                   </div>
-                  <h2 className="text-xl font-bold mt-1">☁️ storage.googleapis.com ゲートウェイ &amp; ランチャー</h2>
+                  <h2 className="text-xl font-bold mt-1">storage.googleapis.com ゲートウェイ &amp; ランチャー</h2>
                   <p className="text-xs text-white/60 mt-1">
                     storage.googleapis.com 上のバケットや静的HTMLアプリの直接展開、およびどこからでも開けるスタンドアロンHTMLランチャーを生成します。
                   </p>
@@ -693,7 +821,7 @@ export function BrowserApp({ payload }: Props) {
                       }}
                       className="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-[11px] text-cyan-200 font-mono transition"
                     >
-                      📂 {sample.label}
+                      {sample.label}
                     </button>
                   ))}
                 </div>
@@ -702,14 +830,14 @@ export function BrowserApp({ payload }: Props) {
               {/* Section 2: Launch any website inside a GCS-compatible Blob / Sandbox */}
               <div className="p-5 bg-white/[0.03] border-t-2 border-amber-400 space-y-3">
                 <div className="text-xs font-bold text-amber-300">
-                  2. 任意のWebサイト (monochrome.st 等) を GCS 互換サンドボックスで生成・起動
+                  2. 任意のWebサイト (monochrome.tf 等) を GCS 互換サンドボックスまたは Wisp SW で起動
                 </div>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={gcsCustomTargetUrl}
                     onChange={(e) => setGcsCustomTargetUrl(e.target.value)}
-                    placeholder="https://monochrome.st"
+                    placeholder="https://monochrome.tf"
                     className="flex-1 bg-black/60 border border-white/15 px-3 py-2 text-xs text-white outline-none font-mono"
                   />
                   <button
@@ -722,14 +850,14 @@ export function BrowserApp({ payload }: Props) {
                     onClick={() => navigateTo(gcsCustomTargetUrl, true)}
                     className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs shrink-0 transition"
                   >
-                    SWプロキシで開く
+                    Wisp + SWプロキシで開く
                   </button>
                 </div>
 
                 {gcsBlobSandboxUrl && (
                   <div className="mt-4 border border-white/15 bg-black h-80 flex flex-col">
                     <div className="px-3 py-1.5 bg-zinc-900 border-b border-white/10 flex items-center justify-between text-[11px]">
-                      <span className="text-emerald-400 font-mono">✓ GCS Compatible Sandbox Active ({gcsCustomTargetUrl})</span>
+                      <span className="text-emerald-400 font-mono">GCS Compatible Sandbox Active ({gcsCustomTargetUrl})</span>
                       <button
                         onClick={() => setGcsBlobSandboxUrl(null)}
                         className="text-white/50 hover:text-white"
@@ -755,16 +883,16 @@ export function BrowserApp({ payload }: Props) {
                 <div className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-tr from-cyan-500 to-blue-600 text-white shadow-xl mb-1">
                   <Icon name="Globe" size={26} />
                 </div>
-                <h1 className="text-2xl font-semibold tracking-tight text-white">Glasispect Web Browser</h1>
+                <h1 className="text-2xl font-semibold tracking-tight text-white">Glasispect Wisp + SW Browser</h1>
                 <p className="text-xs text-white/50">
-                  Service Worker マルチノード・プロキシ ＆ storage.googleapis.com ゲートウェイ搭載 (GitHub Pages 404 完全回避)
+                  Wisp v1 Multiplexer + Service Worker Ultraviolet (/uv/service/) &amp; Scramjet (/scramjet/) 搭載
                 </p>
               </div>
 
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
-                  if (inputVal.trim()) navigateTo(inputVal);
+                  if (inputVal.trim()) navigateTo(inputVal, true);
                 }}
                 className="flex items-center gap-3 bg-white/[0.04] hover:bg-white/[0.06] focus-within:bg-black/80 border-b-2 border-cyan-500/60 px-5 py-3.5 shadow-2xl transition"
               >
@@ -773,7 +901,7 @@ export function BrowserApp({ payload }: Props) {
                   type="text"
                   value={inputVal}
                   onChange={(e) => setInputVal(e.target.value)}
-                  placeholder="Web検索、monochrome.st、storage.googleapis.com、または任意のURLを入力..."
+                  placeholder="Web検索、monochrome.tf、storage.googleapis.com、または任意のURLを入力..."
                   className="w-full bg-transparent text-sm text-white placeholder-white/30 outline-none"
                   autoFocus
                 />
@@ -781,20 +909,20 @@ export function BrowserApp({ payload }: Props) {
                   type="submit"
                   className="px-4 py-1.5 bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold shrink-0 transition"
                 >
-                  検索 / 移動
+                  Wisp SWで開く
                 </button>
               </form>
 
               <div className="space-y-3">
                 <div className="flex items-center justify-between text-xs font-medium text-white/50 px-1">
-                  <span>Speed Dial &amp; Proxy Gateways</span>
-                  <span className="text-[11px] font-mono text-cyan-400">Active Node: {activeNodeLabel}</span>
+                  <span>Speed Dial &amp; Wisp Service Worker Gateways</span>
+                  <span className="text-[11px] font-mono text-emerald-400">Wisp: {wispServer}</span>
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {SPEED_DIAL.map((item) => (
                     <button
                       key={item.url}
-                      onClick={() => navigateTo(item.url)}
+                      onClick={() => navigateTo(item.url, true)}
                       className="p-3.5 bg-white/[0.03] hover:bg-white/[0.07] border-t border-white/10 transition text-left flex flex-col justify-between h-24 group"
                     >
                       <div className="w-7 h-7 bg-white/[0.05] flex items-center justify-center text-cyan-400 group-hover:text-white transition">
@@ -860,11 +988,11 @@ export function BrowserApp({ payload }: Props) {
                   <button
                     onClick={() => {
                       setForceRawIframe(true);
-                      loadProxiedWebpage(selectedRepoReadme.url, relayNode);
+                      loadProxiedWebpage(selectedRepoReadme.url, relayNode, engine);
                     }}
                     className="px-3 py-1 bg-cyan-500/20 text-cyan-300 text-xs"
                   >
-                    SWプロキシでオリジナルページを開く
+                    Wisp SWプロキシでオリジナルページを開く
                   </button>
                 </div>
                 <div className="p-5 bg-white/[0.03] border-t border-cyan-400/50 space-y-2">
@@ -912,11 +1040,11 @@ export function BrowserApp({ payload }: Props) {
                 onClick={() => {
                   setForceRawIframe(true);
                   const q = loadedUrl.replace(/^about:search\?q=/, '');
-                  loadProxiedWebpage(`https://html.duckduckgo.com/html/?q=${q}`, relayNode);
+                  loadProxiedWebpage(`https://html.duckduckgo.com/html/?q=${q}`, relayNode, engine);
                 }}
                 className="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-300 text-xs font-semibold"
               >
-                DuckDuckGo (SWプロキシ) で開く
+                DuckDuckGo (Wisp SWプロキシ) で開く
               </button>
             </div>
 
@@ -948,15 +1076,25 @@ export function BrowserApp({ payload }: Props) {
             )}
           </div>
         ) : (
-          /* Active Webpage Frame rendered via Multi-Node Proxy Cascade srcDoc (Zero 404 on GitHub Pages!) */
+          /* Active Webpage Frame rendered via real Service Worker (/uv/service/* or /scramjet/*) + Wisp v1 */
           <div className="h-full w-full relative bg-zinc-950 flex flex-col">
-            <div className="px-3 py-1 bg-zinc-900 border-b border-white/10 flex items-center justify-between text-[11px] font-mono text-white/60 shrink-0">
+            <div className="px-3 py-1 bg-zinc-900 border-b border-white/10 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-white/60 shrink-0">
               <span className="truncate">
-                🔒 Tunnel: <strong className="text-cyan-300">{activeNodeLabel}</strong> — {loadedUrl}
+                Tunnel: <strong className="text-cyan-300">{activeNodeLabel}</strong> — {loadedUrl}
               </span>
               <div className="flex items-center gap-2 shrink-0">
                 <button
-                  onClick={() => loadProxiedWebpage(loadedUrl, 'jina-reader')}
+                  onClick={() => {
+                    const nextEng: ProxyEngine = engine === 'scramjet' ? 'ultraviolet' : 'scramjet';
+                    setEngine(nextEng);
+                    loadProxiedWebpage(loadedUrl, 'wisp-mux', nextEng);
+                  }}
+                  className="px-2 py-0.5 bg-purple-500/20 hover:bg-purple-500/35 text-purple-200"
+                >
+                  {engine === 'scramjet' ? 'Ultraviolet SWで再読込' : 'Scramjet SWで再読込'}
+                </button>
+                <button
+                  onClick={() => loadProxiedWebpage(loadedUrl, 'jina-reader', engine)}
                   className="px-2 py-0.5 bg-white/5 hover:bg-white/15 text-amber-300"
                 >
                   Cloud Reader変換
@@ -968,7 +1106,7 @@ export function BrowserApp({ payload }: Props) {
                   }}
                   className="px-2 py-0.5 bg-cyan-500/15 hover:bg-cyan-500/30 text-cyan-300"
                 >
-                  ☁️ GCSランチャー化
+                  GCSランチャー化
                 </button>
               </div>
             </div>
@@ -977,17 +1115,31 @@ export function BrowserApp({ payload }: Props) {
               {isLoading && (
                 <div className="absolute inset-0 z-20 bg-zinc-950/85 backdrop-blur-sm flex flex-col items-center justify-center gap-3 text-xs text-cyan-300 font-mono">
                   <Icon name="RefreshCw" size={22} className="animate-spin text-cyan-400" />
-                  <span>Service Worker &amp; Multi-Node Proxy で取得中 ({loadedUrl})...</span>
+                  <span>
+                    Wisp ({wispServer}) + {engine.toUpperCase()} Service Worker で接続中 ({loadedUrl})...
+                  </span>
                 </div>
               )}
 
-              <iframe
-                ref={iframeRef}
-                srcDoc={proxiedSrcDoc}
-                className="h-full w-full border-0 bg-white"
-                title="proxy-browser"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-              />
+              {swIframeSrc ? (
+                <iframe
+                  ref={iframeRef}
+                  src={swIframeSrc}
+                  onLoad={() => setIsLoading(false)}
+                  className="h-full w-full border-0 bg-white"
+                  title="wisp-sw-proxy-browser"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                />
+              ) : (
+                <iframe
+                  ref={iframeRef}
+                  srcDoc={proxiedSrcDoc}
+                  onLoad={() => setIsLoading(false)}
+                  className="h-full w-full border-0 bg-white"
+                  title="proxy-browser-srcdoc"
+                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                />
+              )}
 
               {frameError && (
                 <div className="absolute inset-0 z-30 bg-zinc-950 flex flex-col items-center justify-center p-6 text-center space-y-4">
@@ -995,23 +1147,23 @@ export function BrowserApp({ payload }: Props) {
                     <Icon name="Shield" size={24} />
                   </div>
                   <div>
-                    <h2 className="text-base font-bold text-white">プロキシノード切替・スマートリーダー利用可能</h2>
+                    <h2 className="text-base font-bold text-white">Wisp プロキシ切替・スマートリーダー利用可能</h2>
                     <p className="text-xs text-white/60 max-w-md mt-1">
-                      {loadedUrl} を別の中継サーバーまたはスマート検索モードで開けます。
+                      {loadedUrl} を別の Wisp ノードまたは Cloud Reader で開けます。
                     </p>
                   </div>
                   <div className="flex flex-wrap justify-center gap-2">
                     <button
-                      onClick={() => loadProxiedWebpage(loadedUrl, 'jina-reader')}
+                      onClick={() => loadProxiedWebpage(loadedUrl, 'wisp-mux', 'ultraviolet')}
+                      className="px-4 py-2 bg-purple-600 text-white font-semibold text-xs transition hover:bg-purple-500"
+                    >
+                      Ultraviolet SW + Wisp で再試行
+                    </button>
+                    <button
+                      onClick={() => loadProxiedWebpage(loadedUrl, 'jina-reader', engine)}
                       className="px-4 py-2 bg-cyan-500 text-black font-semibold text-xs transition hover:bg-cyan-400"
                     >
                       Cloud Reader ノードで開く
-                    </button>
-                    <button
-                      onClick={() => navigateTo('about:search?q=' + encodeURIComponent(loadedUrl))}
-                      className="px-4 py-2 bg-white/15 text-white font-semibold text-xs transition hover:bg-white/25"
-                    >
-                      スマート検索で開く
                     </button>
                     <button
                       onClick={() => navigateTo('about:start')}
