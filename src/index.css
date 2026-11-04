@@ -725,5 +725,111 @@ input[type='range'].glass-slider::-moz-range-thumb {
   border-radius: 9999px !important;
 }
 
+/* ============================================================
+   APPLE MUSIC TIME-SYNCED LYRICS (60FPS) & LIQUID GLASS UI
+   ============================================================ */
+
+.apple-liquid-glass {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.04) 50%,
+    rgba(255, 255, 255, 0.08) 100%
+  );
+  backdrop-filter: blur(36px) saturate(190%);
+  -webkit-backdrop-filter: blur(36px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.45),
+    inset 0 1px 1px rgba(255, 255, 255, 0.26),
+    inset 0 -1px 1px rgba(255, 255, 255, 0.05);
+}
+
+.apple-liquid-glass-bar {
+  background: linear-gradient(
+    180deg,
+    rgba(34, 34, 38, 0.78) 0%,
+    rgba(20, 20, 24, 0.84) 100%
+  );
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.38),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.apple-liquid-glass-pill {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.06) 100%
+  );
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+/* Lyric Line Optical Depth & Spring Cubic-Bezier Transition */
+.apple-lyric-line {
+  transform-origin: left center;
+  transition:
+    transform 0.56s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 0.25s ease;
+  will-change: transform, opacity, filter;
+}
+
+.apple-lyric-line.is-active {
+  transform: scale(1.05);
+  opacity: 1;
+  filter: blur(0px);
+}
+
+.apple-lyric-line.is-neighbor {
+  transform: scale(0.99);
+  opacity: 0.4;
+  filter: blur(1.2px);
+}
+
+.apple-lyric-line.is-inactive {
+  transform: scale(0.965);
+  opacity: 0.32;
+  filter: blur(1.5px);
+}
+
+.apple-lyric-line:hover {
+  opacity: 0.92 !important;
+  filter: blur(0px) !important;
+}
+
+/* Word-by-Word Karaoke Gradient Wipe (0% -> 100%) + Vertical Float */
+.apple-karaoke-word {
+  display: inline-block;
+  white-space: pre-wrap;
+  background-image: linear-gradient(
+    90deg,
+    #ffffff 0%,
+    #ffffff var(--word-progress, 0%),
+    rgba(255, 255, 255, 0.32) var(--word-progress, 0%),
+    rgba(255, 255, 255, 0.32) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  transform: translateY(var(--word-lift, 0px)) scale(var(--word-scale, 1));
+  filter: drop-shadow(0 0 var(--word-glow, 0px) rgba(255, 255, 255, 0.72));
+  transition:
+    transform 0.14s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.14s ease;
+  will-change: transform, background-image, filter;
+}
+
+
 
 

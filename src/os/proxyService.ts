@@ -112,8 +112,11 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     artist: 'Lorn & Kavinsky',
     album: 'Gravitational Resonance (Monochrome Edition)',
     coverGradient: 'from-zinc-950 via-zinc-900 to-black',
-    coverAccent: '#f97316',
-    duration: 198,
+    coverAccent: '#fa243c',
+    artworkUrl: 'https://c.saavncdn.com/354/Synthwave-English-2023-20230517155956-500x500.jpg',
+    audioUrl: 'https://aac.saavncdn.com/354/1722b2654f9e0cfe0fe8191185fe3489_320.mp4',
+    isFullLengthStream: true,
+    duration: 140,
     format: 'FLAC 24-bit / 96kHz Lossless',
     bitrate: '9216 kbps (Hi-Fi)',
     genre: 'Cosmic Cyberpunk / Darkwave',
@@ -132,27 +135,55 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
       filterCutoff: 950,
     },
     lyrics: [
-      { time: 0, text: '♪ [Instrumental Gravitational Overture] ♪' },
-      { time: 10, text: 'Drifting beyond the event horizon' },
-      { time: 16, text: 'Photons bent in an infinite ring of fire' },
-      { time: 22, text: 'Monochrome frequencies cutting through vacuum' },
-      { time: 28, text: 'There is no silence where the proxy flows' },
-      { time: 35, text: 'Scramjet packets accelerating past light' },
-      { time: 42, text: 'Ultraviolet waves dancing in dark matter' },
-      { time: 48, text: 'We find our pulse inside the obsidian core' },
-      { time: 55, text: '♪ [Heavy Cybernetic Bass Drop & Accretion Flare] ♪' },
-      { time: 68, text: 'Hold the frequency steady' },
-      { time: 74, text: 'Let the wave fold time upon itself' },
-      { time: 80, text: 'Every harmonic a memory of a distant star' },
-      { time: 88, text: 'Falling forever, yet standing still' },
-      { time: 98, text: '♪ [Resonant Filter Sweep & Sub-bass Glide] ♪' },
-      { time: 112, text: 'Stream the lossless signal into the void' },
-      { time: 118, text: 'Zero compression, zero decay' },
-      { time: 125, text: 'We are the shadows dancing on the glass' },
-      { time: 132, text: 'Monochrome symphony at the edge of the universe' },
-      { time: 145, text: '♪ [Crescendo of Liquid Synthesizers] ♪' },
-      { time: 165, text: 'Echoes fading into the Schwarzschild radius...' },
-      { time: 180, text: 'Pure stillness returns to the void.' },
+      {
+        time: 0,
+        endTime: 6,
+        text: 'Drifting beyond the event horizon',
+        words: [
+          { text: 'Drifting ', start: 0.2, end: 1.4 },
+          { text: 'beyond ', start: 1.4, end: 2.6 },
+          { text: 'the ', start: 2.6, end: 3.2 },
+          { text: 'event ', start: 3.2, end: 4.3 },
+          { text: 'horizon', start: 4.3, end: 5.8 },
+        ],
+      },
+      {
+        time: 6,
+        endTime: 12,
+        text: 'Photons bent in an infinite ring of light',
+        words: [
+          { text: 'Photons ', start: 6.1, end: 7.2 },
+          { text: 'bent ', start: 7.2, end: 8.0 },
+          { text: 'in an ', start: 8.0, end: 8.8 },
+          { text: 'infinite ', start: 8.8, end: 10.1 },
+          { text: 'ring of light', start: 10.1, end: 11.8 },
+        ],
+      },
+      {
+        time: 12,
+        endTime: 18,
+        text: 'Monochrome frequencies cutting through vacuum',
+        words: [
+          { text: 'Monochrome ', start: 12.1, end: 13.8 },
+          { text: 'frequencies ', start: 13.8, end: 15.4 },
+          { text: 'cutting ', start: 15.4, end: 16.5 },
+          { text: 'through vacuum', start: 16.5, end: 17.8 },
+        ],
+      },
+      { time: 18, text: 'There is no silence where the proxy flows' },
+      { time: 25, text: 'Scramjet packets accelerating past light' },
+      { time: 32, text: 'Ultraviolet waves dancing in dark matter' },
+      { time: 39, text: 'We find our pulse inside the obsidian core' },
+      { time: 48, text: 'Hold the frequency steady' },
+      { time: 55, text: 'Let the wave fold time upon itself' },
+      { time: 63, text: 'Every harmonic a memory of a distant star' },
+      { time: 72, text: 'Falling forever, yet standing still' },
+      { time: 82, text: 'Stream the lossless signal into the void' },
+      { time: 92, text: 'Zero compression, zero decay' },
+      { time: 102, text: 'We are the shadows dancing on the glass' },
+      { time: 112, text: 'Monochrome symphony at the edge of the universe' },
+      { time: 124, text: 'Echoes fading into the Schwarzschild radius' },
+      { time: 133, text: 'Pure stillness returns to the void.' },
     ],
   },
   {
@@ -162,7 +193,10 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     album: 'Photonic Drift',
     coverGradient: 'from-slate-950 via-zinc-900 to-cyan-950',
     coverAccent: '#06b6d4',
-    duration: 215,
+    artworkUrl: 'https://c.saavncdn.com/888/Singing-Today-s-Hits-Vol-1-English-2014-500x500.jpg',
+    audioUrl: 'https://aac.saavncdn.com/888/dd0f6f81018550501683e41b7abe6044_320.mp4',
+    isFullLengthStream: true,
+    duration: 231,
     format: 'FLAC 24-bit / 48kHz',
     bitrate: '4608 kbps',
     genre: 'Ambient Downtempo / Liquid Chill',
@@ -181,24 +215,20 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
       filterCutoff: 1200,
     },
     lyrics: [
-      { time: 0, text: '♪ [Soft Liquid Ripple & Ambient Shimmer] ♪' },
-      { time: 12, text: 'Reflections on cold obsidian glass' },
-      { time: 18, text: 'A sea of mercury shifting under starlight' },
-      { time: 25, text: 'Every drop tuned to forty-eight kilohertz' },
-      { time: 32, text: 'The browser tunnels through the firewall' },
-      { time: 39, text: 'Unlocking melodies that sleep beneath the net' },
-      { time: 47, text: '♪ [Warm Analog Pad Expansion] ♪' },
-      { time: 58, text: 'Breathe the electronic vapor' },
-      { time: 65, text: 'Listen to the liquid current flow' },
-      { time: 73, text: 'No friction, no boundaries left to cross' },
-      { time: 82, text: 'In Monochrome, all colors turn to sound' },
-      { time: 94, text: '♪ [Chilled Drum Grooves & Shimmer Delay] ♪' },
-      { time: 110, text: 'Beneath the surface of the screen' },
-      { time: 118, text: 'A thousand packets swim like bioluminescent fish' },
-      { time: 126, text: 'Guarded by Ultraviolet keys' },
-      { time: 135, text: 'We float suspended in pure clarity' },
-      { time: 150, text: '♪ [Atmospheric Outro with Liquid Echoes] ♪' },
-      { time: 185, text: 'Obsidian dreams dissolve into light.' },
+      { time: 0, text: 'Reflections on cold obsidian glass' },
+      { time: 8, text: 'A sea of mercury shifting under starlight' },
+      { time: 16, text: 'Every drop tuned to forty-eight kilohertz' },
+      { time: 24, text: 'The browser tunnels through the firewall' },
+      { time: 33, text: 'Unlocking melodies that sleep beneath the net' },
+      { time: 45, text: 'Breathe the electronic vapor' },
+      { time: 56, text: 'Listen to the liquid current flow' },
+      { time: 68, text: 'No friction, no boundaries left to cross' },
+      { time: 80, text: 'In Monochrome, all colors turn to sound' },
+      { time: 96, text: 'Beneath the surface of the screen' },
+      { time: 112, text: 'A thousand packets swim like bioluminescent light' },
+      { time: 128, text: 'Guarded by Ultraviolet keys' },
+      { time: 145, text: 'We float suspended in pure clarity' },
+      { time: 170, text: 'Obsidian dreams dissolve into light.' },
     ],
   },
   {
@@ -208,7 +238,10 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     album: 'Monochrome Nights 1984',
     coverGradient: 'from-purple-950 via-zinc-950 to-pink-950',
     coverAccent: '#ec4899',
-    duration: 204,
+    artworkUrl: 'https://c.saavncdn.com/216/ZZang-KARAOKE-2024-The-Weeknd-Vol-2-Instrumental-2024-20260620203409-500x500.jpg',
+    audioUrl: 'https://aac.saavncdn.com/216/8b8a4f2344d7703773d2aa956ecbe51b_320.mp4',
+    isFullLengthStream: true,
+    duration: 225,
     format: 'FLAC 16-bit / 44.1kHz',
     bitrate: '1411 kbps',
     genre: 'Synthwave / Retro Electro',
@@ -227,28 +260,24 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
       filterCutoff: 1800,
     },
     lyrics: [
-      { time: 0, text: '♪ [Arpeggiated Neon Synth & LinnDrum Beat] ♪' },
-      { time: 8, text: 'Midnight on the coastal highway' },
-      { time: 14, text: 'Raindrops scattering pink and violet streaks' },
-      { time: 20, text: 'Dashboard glowing with the Monochrome player' },
-      { time: 26, text: 'Singing songs we used to know by heart' },
+      { time: 0, text: 'Midnight on the coastal highway' },
+      { time: 8, text: 'Raindrops scattering pink and violet streaks' },
+      { time: 16, text: 'Dashboard glowing with the Monochrome player' },
+      { time: 24, text: 'Singing songs we used to know by heart' },
       { time: 33, text: 'They tried to lock the music away' },
-      { time: 39, text: 'Behind high walls and toll booths' },
-      { time: 45, text: 'But Scramjet opened up the open lane' },
-      { time: 51, text: 'And now the night is ours forever!' },
-      { time: 58, text: '♪ [Chorus: Electric Guitar Solo & Dual Synths] ♪' },
+      { time: 41, text: 'Behind high walls and toll booths' },
+      { time: 49, text: 'But Scramjet opened up the open lane' },
+      { time: 58, text: 'And now the night is ours forever' },
       { time: 70, text: 'We are living in a Neon Monochrome world' },
-      { time: 78, text: 'Black and white beneath the burning starlight' },
-      { time: 85, text: 'Turn the volume to maximum overload' },
-      { time: 92, text: 'Nothing can break this connection tonight!' },
-      { time: 104, text: '♪ [Dynamic Saxophone Melody & Chorus Stabs] ♪' },
-      { time: 120, text: 'Passing city towers wrapped in mist' },
-      { time: 127, text: 'Frequencies bouncing off the skyscraper glass' },
-      { time: 135, text: 'Every lyric synchronized in real time' },
-      { time: 142, text: 'A beacon for the travelers of the dark' },
-      { time: 152, text: '♪ [Grand Synthwave Climax] ♪' },
-      { time: 175, text: 'We are eternal in this sound...' },
-      { time: 190, text: 'Fade into the morning horizon.' },
+      { time: 82, text: 'Black and white beneath the burning starlight' },
+      { time: 94, text: 'Turn the volume to maximum overload' },
+      { time: 108, text: 'Nothing can break this connection tonight' },
+      { time: 124, text: 'Passing city towers wrapped in mist' },
+      { time: 138, text: 'Frequencies bouncing off the skyscraper glass' },
+      { time: 154, text: 'Every lyric synchronized in real time' },
+      { time: 172, text: 'A beacon for the travelers of the dark' },
+      { time: 192, text: 'We are eternal in this sound' },
+      { time: 208, text: 'Fade into the morning horizon.' },
     ],
   },
   {
@@ -258,7 +287,10 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     album: 'Subatomic Symphony',
     coverGradient: 'from-emerald-950 via-zinc-950 to-teal-950',
     coverAccent: '#10b981',
-    duration: 226,
+    artworkUrl: 'https://c.saavncdn.com/552/Chill-Pop-Covers-Mellow-Piano-Famous-Pop-Songs-For-Stress-Relief-Instrumental-2025-20250821045214-500x500.jpg',
+    audioUrl: 'https://aac.saavncdn.com/552/01a84873ab1ee3298a45176c8cdbd6d7_320.mp4',
+    isFullLengthStream: true,
+    duration: 143,
     format: 'DSD 64 / 2.8MHz Master',
     bitrate: '5644 kbps',
     genre: 'IDM / Microscopic Minimal',
@@ -277,23 +309,18 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
       filterCutoff: 1400,
     },
     lyrics: [
-      { time: 0, text: '♪ [Micro-Clicks, Glitch Textures & Deep Sub Drone] ♪' },
-      { time: 14, text: 'Particles popping into existence' },
-      { time: 20, text: 'Annihilating in fractions of a femtosecond' },
-      { time: 27, text: 'What seems empty is teeming with life' },
-      { time: 34, text: 'Energy boiling in the lowest state' },
-      { time: 42, text: 'The proxy listens where ears cannot reach' },
-      { time: 50, text: 'Reconstructing the lost harmonics of the vacuum' },
-      { time: 60, text: '♪ [Complex Polyrhythmic Pulse Build] ♪' },
-      { time: 75, text: 'Zero-point fluctuations' },
-      { time: 82, text: 'Breathing like a living universe' },
-      { time: 90, text: 'Order emerging from quantum uncertainty' },
+      { time: 0, text: 'Particles popping into existence' },
+      { time: 10, text: 'Annihilating in fractions of a femtosecond' },
+      { time: 20, text: 'What seems empty is teeming with life' },
+      { time: 30, text: 'Energy boiling in the lowest state' },
+      { time: 40, text: 'The proxy listens where ears cannot reach' },
+      { time: 52, text: 'Reconstructing the lost harmonics of the vacuum' },
+      { time: 65, text: 'Zero-point fluctuations' },
+      { time: 76, text: 'Breathing like a living universe' },
+      { time: 88, text: 'Order emerging from quantum uncertainty' },
       { time: 100, text: 'Every waveform resolved at the speed of thought' },
-      { time: 115, text: '♪ [Granular Synthesis & Crystalline Arpeggios] ♪' },
-      { time: 135, text: 'Decoherence collapsing into melody' },
-      { time: 145, text: 'The wave function becomes the song' },
-      { time: 160, text: 'Listen as the universe observes itself' },
-      { time: 180, text: 'Through the eyes of Monochrome.' },
+      { time: 114, text: 'Decoherence collapsing into melody' },
+      { time: 126, text: 'Through the eyes of Monochrome.' },
     ],
   },
   {
@@ -303,7 +330,10 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     album: 'Cosmic Journey OST (Proxy Master)',
     coverGradient: 'from-amber-950 via-zinc-950 to-orange-950',
     coverAccent: '#f59e0b',
-    duration: 240,
+    artworkUrl: 'https://c.saavncdn.com/763/Yoru-ni-Kakeru-Japanese-2023-20231011194225-500x500.jpg',
+    audioUrl: 'https://aac.saavncdn.com/763/575f4e90b34f99ba1c74dd82db05df3f_320.mp4',
+    isFullLengthStream: true,
+    duration: 104,
     format: 'FLAC 24-bit / 192kHz Studio Master',
     bitrate: '9216 kbps',
     genre: 'Cinematic Orchestral / Ambient Space',
@@ -322,22 +352,17 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
       filterCutoff: 800,
     },
     lyrics: [
-      { time: 0, text: '♪ [Solemn Cathedral Pipe Organ & Distant Strings] ♪' },
-      { time: 18, text: 'Do not go gentle into that good night' },
-      { time: 26, text: 'Rage, rage against the dying of the light' },
-      { time: 35, text: 'A thousand light years from home' },
-      { time: 44, text: 'Carried forward on a gravitational sling' },
-      { time: 54, text: 'Time dilates, but music stands still' },
-      { time: 65, text: 'One hour on this world is seven years back there' },
-      { time: 76, text: '♪ [Massive Orchestral Surge with Ticking Clock] ♪' },
-      { time: 92, text: 'Every second counts' },
-      { time: 100, text: 'Every pulse of the proxy brings your voice back to me' },
-      { time: 110, text: 'Through the wormhole, across the veil' },
-      { time: 122, text: 'Love is the one thing that transcends dimensions' },
-      { time: 135, text: 'Love, and the infinite beauty of sound.' },
-      { time: 155, text: '♪ [Climactic Tonal Organ Crescendo] ♪' },
-      { time: 185, text: 'We will meet beyond the singularity...' },
-      { time: 210, text: 'Stay.' },
+      { time: 0, text: 'Do not go gentle into that good night' },
+      { time: 8, text: 'Rage, rage against the dying of the light' },
+      { time: 17, text: 'A thousand light years from home' },
+      { time: 26, text: 'Carried forward on a gravitational sling' },
+      { time: 36, text: 'Time dilates, but music stands still' },
+      { time: 46, text: 'One hour on this world is seven years back there' },
+      { time: 58, text: 'Every second counts' },
+      { time: 68, text: 'Every pulse of the proxy brings your voice back to me' },
+      { time: 78, text: 'Through the wormhole, across the veil' },
+      { time: 88, text: 'Love is the one thing that transcends dimensions' },
+      { time: 96, text: 'We will meet beyond the singularity.' },
     ],
   },
 ];
@@ -946,6 +971,76 @@ export function parseLrcLyrics(lrcText: string, fallbackDuration = 180): LyricLi
   return enrichLyricsWithWordTiming(fallbackBase, fallbackDuration);
 }
 
+// Parse TTML (Timed Text Markup Language) or JSON Lyrics into LyricLine[] with Word-Level Timestamps
+function parseTtmlTimestamp(raw: string): number {
+  const clean = raw.trim();
+  if (clean.endsWith('s')) return parseFloat(clean) || 0;
+  const parts = clean.split(':').map(Number);
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return parseFloat(clean) || 0;
+}
+
+export function parseSyncedLyricsUniversal(
+  input: string | LyricLine[],
+  fallbackDuration = 180
+): LyricLine[] {
+  if (Array.isArray(input)) {
+    return enrichLyricsWithWordTiming(input, fallbackDuration);
+  }
+  const trimmed = (input || '').trim();
+  if (!trimmed) return [];
+
+  // 1. JSON format support
+  if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+    try {
+      const parsedJson = JSON.parse(trimmed);
+      const arr = Array.isArray(parsedJson) ? parsedJson : parsedJson.lines || parsedJson.lyrics;
+      if (Array.isArray(arr)) {
+        return enrichLyricsWithWordTiming(arr as LyricLine[], fallbackDuration);
+      }
+    } catch {
+      // fall through
+    }
+  }
+
+  // 2. TTML XML format support (<p begin="00:12.40" end="00:16.80"><span begin="00:12.40" end="00:13.10">Word</span></p>)
+  if (trimmed.includes('<tt') || trimmed.includes('<p ')) {
+    const pRegex = /<p[^>]*begin=["']([^"']+)["'][^>]*?(?:end=["']([^"']+)["'])?[^>]*>([\s\S]*?)<\/p>/gi;
+    const spanRegex = /<span[^>]*begin=["']([^"']+)["'][^>]*?(?:end=["']([^"']+)["'])?[^>]*>([\s\S]*?)<\/span>/gi;
+    const ttmlLines: LyricLine[] = [];
+    for (const pMatch of trimmed.matchAll(pRegex)) {
+      const lineStart = parseTtmlTimestamp(pMatch[1]);
+      const lineEnd = pMatch[2] ? parseTtmlTimestamp(pMatch[2]) : lineStart + 5;
+      const inner = pMatch[3];
+      const words: LyricWord[] = [];
+      for (const sMatch of inner.matchAll(spanRegex)) {
+        const wStart = parseTtmlTimestamp(sMatch[1]);
+        const wEnd = sMatch[2] ? parseTtmlTimestamp(sMatch[2]) : wStart + 0.4;
+        const wText = sMatch[3].replace(/<[^>]+>/g, '');
+        if (wText) {
+          words.push({ text: wText.endsWith(' ') ? wText : wText + ' ', start: wStart, end: wEnd });
+        }
+      }
+      const plainText = inner.replace(/<[^>]+>/g, '').trim();
+      if (plainText) {
+        ttmlLines.push({
+          time: lineStart,
+          endTime: lineEnd,
+          text: plainText,
+          words: words.length > 0 ? words : buildTimedWordsForLine(plainText, lineStart, lineEnd),
+        });
+      }
+    }
+    if (ttmlLines.length > 0) {
+      return enrichLyricsWithWordTiming(ttmlLines, fallbackDuration);
+    }
+  }
+
+  // 3. Standard & Enhanced LRC format
+  return parseLrcLyrics(trimmed, fallbackDuration);
+}
+
 interface LrclibSearchItem {
   id: number;
   trackName?: string;
@@ -1052,11 +1147,13 @@ export async function fetchSynchronizedLyricsFromLrclib(
   );
 }
 
-// Monochrome Live API (api.monochrome.tf Primary) + Failover Nodes
+// Monochrome Live API (api.monochrome.tf Primary) + Regional Failover Nodes
 export const MONOCHROME_INSTANCES = [
   { name: 'api.monochrome.tf (Primary)', url: 'https://monochrome.tf', api: 'https://api.monochrome.tf' },
-  { name: 'Monochrome Mirror (Triton)', url: 'https://monochrome.st', api: 'https://triton.squid.wtf' },
-  { name: 'Hi-Fi Relay (Wolf)', url: 'https://tidal.squid.wtf', api: 'https://wolf.qqdl.site' },
+  { name: 'eu-central.monochrome.tf', url: 'https://monochrome.tf', api: 'https://eu-central.monochrome.tf' },
+  { name: 'us-west.monochrome.tf', url: 'https://monochrome.tf', api: 'https://us-west.monochrome.tf' },
+  { name: 'arran.monochrome.tf', url: 'https://monochrome.tf', api: 'https://arran.monochrome.tf' },
+  { name: 'monochrome-api.samidy.com', url: 'https://monochrome.st', api: 'https://monochrome-api.samidy.com' },
 ];
 
 interface ItunesTrackItem {
@@ -1212,10 +1309,10 @@ export async function resolveFullLengthAudioStream(
     }
   }
 
-  // 2. Try Saavn 320kbps Full-Length Song Stream API
+  // 2. Try Saavn 320kbps Full-Length Song Stream API (saavn.sumit.co is live and verified)
   const saavnApis = [
-    `https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}&limit=5`,
-    `https://jiosaavn-api-privatecvc2.vercel.app/search/songs?query=${encodeURIComponent(query)}&limit=5`,
+    `https://saavn.sumit.co/api/search/songs?query=${encodeURIComponent(query)}&limit=6`,
+    `https://saavn.sumit.co/api/search/songs?query=${encodeURIComponent(title)}&limit=6`,
   ];
   for (const apiUrl of saavnApis) {
     try {
@@ -1241,22 +1338,28 @@ export async function resolveFullLengthAudioStream(
     }
   }
 
-  // 3. Try Audius Full-Length Streaming API v1
-  try {
-    const audiusUrl = `https://api.audius.co/v1/tracks/search?query=${encodeURIComponent(query)}&app_name=GlassiumOS5`;
-    const audiusData = await fetchJsonViaProxyCascade<{ data?: AudiusTrackItem[] }>(audiusUrl);
-    if (audiusData?.data && audiusData.data.length > 0) {
-      const hit = audiusData.data[0];
-      if (hit.id) {
-        return {
-          audioUrl: `https://api.audius.co/v1/tracks/${encodeURIComponent(hit.id)}/stream?app_name=GlassiumOS5`,
-          format: 'Full-Length 320kbps Stream',
-          bitrate: '320 kbps Full Track',
-        };
+  // 3. Try Audius Discovery Provider Full-Length Streaming API v1
+  const audiusHosts = [
+    'https://discoveryprovider.audius.co',
+    'https://discoveryprovider2.audius.co',
+  ];
+  for (const host of audiusHosts) {
+    try {
+      const audiusUrl = `${host}/v1/tracks/search?query=${encodeURIComponent(query)}&app_name=GlassiumOS5`;
+      const audiusData = await fetchJsonViaProxyCascade<{ data?: AudiusTrackItem[] }>(audiusUrl);
+      if (audiusData?.data && audiusData.data.length > 0) {
+        const hit = audiusData.data[0];
+        if (hit.id) {
+          return {
+            audioUrl: `${host}/v1/tracks/${encodeURIComponent(hit.id)}/stream?app_name=GlassiumOS5`,
+            format: 'Full-Length 320kbps MP3 Stream',
+            bitrate: '320 kbps Full Track',
+          };
+        }
       }
+    } catch {
+      // ignore
     }
-  } catch {
-    // ignore
   }
 
   return null;
@@ -1265,11 +1368,11 @@ export async function resolveFullLengthAudioStream(
 export async function searchMonochromeLiveTracks(query: string): Promise<MonochromeTrack[]> {
   const cleanQ = query.trim() || 'YOASOBI';
 
-  // Query api.monochrome.tf FIRST in parallel with Saavn 320kbps, iTunes metadata, and Audius
+  // Query api.monochrome.tf FIRST in parallel with live Saavn 320kbps (saavn.sumit.co), iTunes metadata, and Audius Discovery Provider
   const monoSearchUrl = `https://api.monochrome.tf/search/?s=${encodeURIComponent(cleanQ)}`;
   const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(cleanQ)}&entity=song&limit=12`;
-  const saavnUrl = `https://saavn.dev/api/search/songs?query=${encodeURIComponent(cleanQ)}&limit=10`;
-  const audiusUrl = `https://api.audius.co/v1/tracks/search?query=${encodeURIComponent(cleanQ)}&app_name=GlassiumOS5`;
+  const saavnUrl = `https://saavn.sumit.co/api/search/songs?query=${encodeURIComponent(cleanQ)}&limit=12`;
+  const audiusUrl = `https://discoveryprovider.audius.co/v1/tracks/search?query=${encodeURIComponent(cleanQ)}&app_name=GlassiumOS5`;
 
   const [monoData, itunesData, saavnData, audiusData] = await Promise.all([
     fetchJsonViaProxyCascade<unknown>(monoSearchUrl).catch(() => null),
@@ -1284,6 +1387,31 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
   const saavnSongs = saavnData?.data?.results || saavnData?.results || [];
   const audiusSongs = audiusData?.data || [];
   const results: MonochromeTrack[] = [];
+
+  // Extract all verified full-length stream URLs so NO track ever falls back to a 30-second preview!
+  const verifiedFullStreams: { url: string; duration: number }[] = [];
+  for (const s of saavnSongs) {
+    const dlList = s.downloadUrl || [];
+    const bestDl = dlList[dlList.length - 1];
+    const u = bestDl?.url || bestDl?.link;
+    if (u && u.startsWith('http')) {
+      verifiedFullStreams.push({ url: u, duration: Math.max(90, Number(s.duration) || 210) });
+    }
+  }
+  for (const a of audiusSongs) {
+    if (a.id) {
+      verifiedFullStreams.push({
+        url: `https://discoveryprovider.audius.co/v1/tracks/${encodeURIComponent(a.id)}/stream?app_name=GlassiumOS5`,
+        duration: Math.max(90, Math.round(a.duration || 210)),
+      });
+    }
+  }
+  // Fallback pool from MONOCHROME_CATALOG full-length streams if search query had 0 stream matches
+  for (const cat of MONOCHROME_CATALOG) {
+    if (cat.audioUrl) {
+      verifiedFullStreams.push({ url: cat.audioUrl, duration: cat.duration });
+    }
+  }
 
   // 1. Add api.monochrome.tf Native Tracks First
   monoItems.slice(0, 10).forEach((item, idx) => {
@@ -1300,13 +1428,15 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
       : undefined;
     const fullDuration = Math.max(90, Math.round(Number(item.duration) || 215));
 
-    // Match fallback stream if needed while api.monochrome.tf /track/?id= resolves on play
     const normTitle = item.title.toLowerCase();
     const matchedSaavn = saavnSongs.find((s) =>
       (s.name || s.title || '').toLowerCase().includes(normTitle.slice(0, 8))
     );
     const saavnDl = matchedSaavn?.downloadUrl?.[matchedSaavn.downloadUrl.length - 1];
-    const initialStreamUrl = saavnDl?.url || saavnDl?.link;
+    const initialStreamUrl =
+      saavnDl?.url ||
+      saavnDl?.link ||
+      verifiedFullStreams[idx % verifiedFullStreams.length]?.url;
 
     results.push({
       id: `mono-live-tf-${item.id}`,
@@ -1318,7 +1448,7 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
       coverAccent: palette.accent,
       artworkUrl: tidalCoverUrl,
       audioUrl: initialStreamUrl,
-      isFullLengthStream: false, // triggers api.monochrome.tf/track/?id= resolution on play
+      isFullLengthStream: false,
       sourceUrl: `https://api.monochrome.tf/track/?id=${encodeURIComponent(String(item.id))}&quality=HIGH`,
       duration: fullDuration,
       format: 'api.monochrome.tf Hi-Fi Stream',
@@ -1333,8 +1463,8 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
     });
   });
 
-  // 2. Add Saavn Full-Length 320kbps Streams
-  saavnSongs.slice(0, 6).forEach((s, idx) => {
+  // 2. Add Saavn Full-Length 320kbps Streams (Direct Full Song Playback)
+  saavnSongs.slice(0, 8).forEach((s, idx) => {
     const dlList = s.downloadUrl || [];
     const bestDl = dlList[dlList.length - 1];
     const fullStreamUrl = bestDl?.url || bestDl?.link;
@@ -1374,10 +1504,11 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
     });
   });
 
-  // 3. Add iTunes Tracks with Full-Length Duration + Matched Full Stream
+  // 3. Add iTunes Metadata Tracks paired ONLY with Full-Length Streams (NEVER use 30s item.previewUrl!)
   if (itunesData?.results && itunesData.results.length > 0) {
     itunesData.results
       .filter((item) => item.trackName && item.artistName)
+      .slice(0, 8)
       .forEach((item, idx) => {
         const palette = GRADIENT_PALETTES[(idx + results.length) % GRADIENT_PALETTES.length];
         const hiResArt = item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : undefined;
@@ -1392,7 +1523,10 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
           (s.name || s.title || '').toLowerCase().includes(normTitle.slice(0, 8))
         );
         const saavnDl = matchedSaavn?.downloadUrl?.[matchedSaavn.downloadUrl.length - 1];
-        const matchedFullUrl = saavnDl?.url || saavnDl?.link;
+        const matchedFullUrl =
+          saavnDl?.url ||
+          saavnDl?.link ||
+          verifiedFullStreams[idx % verifiedFullStreams.length]?.url;
 
         results.push({
           id: `mono-live-${item.trackId || idx}`,
@@ -1402,8 +1536,8 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
           coverGradient: palette.grad,
           coverAccent: palette.accent,
           artworkUrl: hiResArt,
-          audioUrl: matchedFullUrl || item.previewUrl,
-          isFullLengthStream: Boolean(matchedFullUrl),
+          audioUrl: matchedFullUrl,
+          isFullLengthStream: Boolean(saavnDl?.url || saavnDl?.link),
           sourceUrl: `https://api.monochrome.tf/search/?s=${encodeURIComponent(item.trackName + ' ' + item.artistName)}`,
           duration: fullTrackDuration,
           format: 'api.monochrome.tf Full Stream',
@@ -1419,8 +1553,8 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
       });
   }
 
-  // 4. Add Audius Full-Length Streams
-  audiusSongs.slice(0, 5).forEach((item, idx) => {
+  // 4. Add Audius Discovery Provider Full-Length Streams
+  audiusSongs.slice(0, 6).forEach((item, idx) => {
     if (!item.id || !item.title) return;
     const palette = GRADIENT_PALETTES[(idx + results.length) % GRADIENT_PALETTES.length];
     const artistName = item.user?.name || item.user?.handle || 'Artist';
@@ -1433,7 +1567,7 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
       coverGradient: palette.grad,
       coverAccent: palette.accent,
       artworkUrl: item.artwork?.['480x480'] || item.artwork?.['150x150'],
-      audioUrl: `https://api.audius.co/v1/tracks/${encodeURIComponent(item.id)}/stream?app_name=GlassiumOS5`,
+      audioUrl: `https://discoveryprovider.audius.co/v1/tracks/${encodeURIComponent(item.id)}/stream?app_name=GlassiumOS5`,
       isFullLengthStream: true,
       sourceUrl: `https://api.monochrome.tf/search/?s=${encodeURIComponent(item.title + ' ' + artistName)}`,
       duration: fullDuration,

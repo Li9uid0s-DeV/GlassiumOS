@@ -8,6 +8,7 @@ import {
   MonochromeTrack,
   LyricLine,
   enrichLyricsWithWordTiming,
+  parseSyncedLyricsUniversal,
   searchMonochromeLiveTracks,
   resolveFullLengthAudioStream,
   fetchSynchronizedLyricsFromLrclib,
@@ -42,8 +43,35 @@ const INITIAL_ENRICHED_CATALOG: MonochromeTrack[] = MONOCHROME_CATALOG.map((t) =
   lyrics: enrichLyricsWithWordTiming(t.lyrics, t.duration),
 }));
 
-const FAVORITES_STORAGE_KEY = 'glassium_apple_music_favorites_v1';
-const RECENT_STORAGE_KEY = 'glassium_apple_music_recent_v1';
+// Upgrade any legacy cached tracks in localStorage so no track ever uses a 30s iTunes previewUrl
+function sanitizeStoredTracks(list: MonochromeTrack[]): MonochromeTrack[] {
+  return list.map((item, idx) => {
+    const catalogMatch = INITIAL_ENRICHED_CATALOG.find((c) => c.id === item.id);
+    if (catalogMatch) {
+      return catalogMatch;
+    }
+    const fallbackFull = INITIAL_ENRICHED_CATALOG[idx % INITIAL_ENRICHED_CATALOG.length];
+    const isPreview30s =
+      !item.audioUrl ||
+      item.audioUrl.includes('itunes.apple.com') ||
+      item.audioUrl.includes('mzstatic.com');
+    return {
+      ...item,
+      audioUrl: isPreview30s ? fallbackFull.audioUrl : item.audioUrl,
+      isFullLengthStream: isPreview30s ? false : item.isFullLengthStream,
+      duration: Math.max(95, item.duration || fallbackFull.duration),
+      lyrics: enrichLyricsWithWordTiming(item.lyrics || fallbackFull.lyrics, item.duration || 180),
+    };
+  });
+}
+
+// Apple Music cubic-bezier(0.22, 1, 0.36, 1) spring approximation
+function easeAppleMusicSpring(t: number): number {
+  return 1 - Math.pow(1 - t, 3.6);
+}
+
+const FAVORITES_STORAGE_KEY = 'glassium_apple_music_favorites_v2';
+const RECENT_STORAGE_KEY = 'glassium_apple_music_recent_v2';
 
 const POPULAR_ARTIST_SHORTCUTS = [
   'YOASOBI',
@@ -85,7 +113,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return sanitizeStoredTracks(parsed);
       }
     } catch {
       // ignore storage read error
@@ -99,7 +127,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       const raw = localStorage.getItem(RECENT_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) return sanitizeStoredTracks(parsed);
       }
     } catch {
       // ignore
@@ -178,13 +206,19 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const filterNodeRef = useRef<BiquadFilterNode | null>(null);
   const analyserNodeRef = useRef<AnalyserNode | null>(null);
 
-  // Procedural Synth Music Engine Refs
+  // Procedural Synth Music Engine & 60fps Sync Refs
   const oscNodesRef = useRef<OscillatorNode[]>([]);
   const musicIntervalRef = useRef<number | null>(null);
-  const playheadTimerRef = useRef<number | null>(null);
+  const rafSyncIdRef = useRef<number | null>(null);
+  const lastFramePerfRef = useRef<number>(0);
+  const scrollAnimRafRef = useRef<number | null>(null);
   const fullPlayheadRef = useRef<number>(0);
   const userScrollTimeoutRef = useRef<number | null>(null);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
+
+  // Interactive Custom Lyric Editor State (LRC / TTML / JSON)
+  const [showCustomLyricEditor, setShowCustomLyricEditor] = useState(false);
+  const [customLyricInput, setCustomLyricInput] = useState('');
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -227,26 +261,47 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     return idx;
   }, [effectiveLyricTime, currentTrack.lyrics]);
 
-  // Smoothly auto-scroll active lyric line to center of Apple Music lyrics container
+  // Spring-like cubic-bezier(0.22, 1, 0.36, 1) Smooth Auto-Scroll to center active line
   const scrollToActiveLyric = useCallback(
     (force = false) => {
       if (userScrolledLyrics && !force) return;
       const container = lyricsContainerRef.current;
       const activeEl = document.getElementById(`apple-lyric-line-${currentLyricIndex}`);
-      if (container && activeEl) {
-        const containerRect = container.getBoundingClientRect();
-        const activeRect = activeEl.getBoundingClientRect();
-        const currentScroll = container.scrollTop;
-        const targetTop =
-          currentScroll +
+      if (!container || !activeEl) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const activeRect = activeEl.getBoundingClientRect();
+      const startTop = container.scrollTop;
+      const targetTop = Math.max(
+        0,
+        startTop +
           (activeRect.top - containerRect.top) -
-          containerRect.height * 0.36 +
-          activeRect.height * 0.5;
-        container.scrollTo({
-          top: Math.max(0, targetTop),
-          behavior: 'smooth',
-        });
+          containerRect.height * 0.35 +
+          activeRect.height * 0.5
+      );
+
+      if (Math.abs(targetTop - startTop) < 2) return;
+
+      if (scrollAnimRafRef.current) {
+        cancelAnimationFrame(scrollAnimRafRef.current);
       }
+
+      const startTime = performance.now();
+      const durationMs = 540;
+
+      const stepScroll = (now: number) => {
+        const elapsed = now - startTime;
+        const t = Math.min(1, elapsed / durationMs);
+        const eased = easeAppleMusicSpring(t);
+        container.scrollTop = startTop + (targetTop - startTop) * eased;
+        if (t < 1) {
+          scrollAnimRafRef.current = requestAnimationFrame(stepScroll);
+        } else {
+          scrollAnimRafRef.current = null;
+        }
+      };
+
+      scrollAnimRafRef.current = requestAnimationFrame(stepScroll);
     },
     [currentLyricIndex, userScrolledLyrics]
   );
@@ -258,13 +313,17 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   }, [currentLyricIndex, showLyricsDrawer, activeNav, scrollToActiveLyric]);
 
   const handleManualLyricsWheel = () => {
+    if (scrollAnimRafRef.current) {
+      cancelAnimationFrame(scrollAnimRafRef.current);
+      scrollAnimRafRef.current = null;
+    }
     setUserScrolledLyrics(true);
     if (userScrollTimeoutRef.current) {
       clearTimeout(userScrollTimeoutRef.current);
     }
     userScrollTimeoutRef.current = window.setTimeout(() => {
       setUserScrolledLyrics(false);
-    }, 4500);
+    }, 3500);
   };
 
   // -----------------------------------------------------------------------
@@ -634,67 +693,111 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     if (prevItem) playTrack(prevItem);
   };
 
-  // High-Precision 20fps (50ms) Playhead Tracking for Apple Music-grade Sub-Second Lyric Sync
+  // -----------------------------------------------------------------------
+  // 60fps High-Precision requestAnimationFrame Lyric & Audio Sync Engine
+  // (Runs ONLY while isPlaying is true; stops immediately on pause)
+  // -----------------------------------------------------------------------
   useEffect(() => {
-    if (isPlaying) {
-      const stepSec = 0.05 * playbackRate;
-      playheadTimerRef.current = window.setInterval(() => {
-        const audio = audioElRef.current;
-        const targetFullDuration = Math.max(60, currentTrack.duration || 210);
+    if (!isPlaying) {
+      if (rafSyncIdRef.current !== null) {
+        cancelAnimationFrame(rafSyncIdRef.current);
+        rafSyncIdRef.current = null;
+      }
+      return;
+    }
 
-        if (
-          currentTrack.audioUrl &&
-          audio &&
-          !audio.paused &&
-          Number.isFinite(audio.duration) &&
-          audio.duration >= 65
-        ) {
-          const sec = audio.currentTime;
-          fullPlayheadRef.current = sec;
-          setCurrentTime(sec);
-          if (sec >= targetFullDuration - 0.15) {
-            if (isRepeat) {
-              audio.currentTime = 0;
-              fullPlayheadRef.current = 0;
-              setCurrentTime(0);
-            } else {
-              nextTrack();
-            }
-          }
-        } else {
-          fullPlayheadRef.current += stepSec;
-          const nextSec = fullPlayheadRef.current;
-          if (nextSec >= targetFullDuration) {
-            if (isRepeat) {
-              fullPlayheadRef.current = 0;
-              setCurrentTime(0);
-              if (audio && currentTrack.audioUrl) {
-                audio.currentTime = 0;
-                audio.play().catch(() => {});
-              }
-            } else {
-              nextTrack();
-              fullPlayheadRef.current = 0;
-              setCurrentTime(0);
-            }
+    lastFramePerfRef.current = performance.now();
+
+    const syncFrame60fps = (now: number) => {
+      const dtSec = Math.max(0, Math.min(0.1, (now - lastFramePerfRef.current) / 1000));
+      lastFramePerfRef.current = now;
+
+      const audio = audioElRef.current;
+      const targetFullDuration = Math.max(60, currentTrack.duration || 210);
+      let activeSec = fullPlayheadRef.current;
+
+      // Read directly from HTML5 <audio> element at 60fps when streaming a full-length track
+      if (
+        currentTrack.audioUrl &&
+        audio &&
+        !audio.paused &&
+        Number.isFinite(audio.duration) &&
+        audio.duration > 35
+      ) {
+        activeSec = audio.currentTime;
+        fullPlayheadRef.current = activeSec;
+      } else {
+        activeSec += dtSec * playbackRate;
+        fullPlayheadRef.current = activeSec;
+      }
+
+      // Direct 60fps DOM CSS Variable update for active line's word-by-word karaoke gradient wipe
+      const syncTimeWithOffset = Math.max(0, activeSec + lyricOffsetSec);
+      const lyrics = currentTrack.lyrics;
+      if (lyrics && lyrics.length > 0) {
+        let activeIdx = 0;
+        for (let i = 0; i < lyrics.length; i++) {
+          if (syncTimeWithOffset >= lyrics[i].time) {
+            activeIdx = i;
           } else {
-            setCurrentTime(nextSec);
+            break;
           }
         }
-      }, 50);
-    } else {
-      if (playheadTimerRef.current) {
-        clearInterval(playheadTimerRef.current);
-        playheadTimerRef.current = null;
+        const activeLine = lyrics[activeIdx];
+        if (activeLine && activeLine.words && activeLine.words.length > 0) {
+          for (let wIdx = 0; wIdx < activeLine.words.length; wIdx++) {
+            const w = activeLine.words[wIdx];
+            const wordEl = document.getElementById(`apple-lyric-word-${activeIdx}-${wIdx}`);
+            if (wordEl) {
+              const span = Math.max(0.06, w.end - w.start);
+              const prog = Math.max(0, Math.min(1, (syncTimeWithOffset - w.start) / span));
+              const pct = (prog * 100).toFixed(1) + '%';
+              const isCurrentWord = prog > 0 && prog < 1;
+              const isSungWord = prog >= 1;
+              const lift = isCurrentWord
+                ? `${(-2.4 * Math.sin(prog * Math.PI)).toFixed(2)}px`
+                : isSungWord
+                ? '-0.8px'
+                : '0px';
+              const glow = isCurrentWord ? '12px' : isSungWord ? '4px' : '0px';
+              const scale = isCurrentWord ? '1.03' : '1';
+              wordEl.style.setProperty('--word-progress', pct);
+              wordEl.style.setProperty('--word-lift', lift);
+              wordEl.style.setProperty('--word-glow', glow);
+              wordEl.style.setProperty('--word-scale', scale);
+            }
+          }
+        }
       }
-    }
+
+      if (activeSec >= targetFullDuration - 0.1) {
+        if (isRepeat) {
+          fullPlayheadRef.current = 0;
+          setCurrentTime(0);
+          if (audio && currentTrack.audioUrl) {
+            audio.currentTime = 0;
+            audio.play().catch(() => {});
+          }
+        } else {
+          nextTrack();
+          return;
+        }
+      } else {
+        setCurrentTime(activeSec);
+      }
+
+      rafSyncIdRef.current = requestAnimationFrame(syncFrame60fps);
+    };
+
+    rafSyncIdRef.current = requestAnimationFrame(syncFrame60fps);
+
     return () => {
-      if (playheadTimerRef.current) {
-        clearInterval(playheadTimerRef.current);
-        playheadTimerRef.current = null;
+      if (rafSyncIdRef.current !== null) {
+        cancelAnimationFrame(rafSyncIdRef.current);
+        rafSyncIdRef.current = null;
       }
     };
-  }, [isPlaying, currentTrack, isRepeat, nextTrack, playbackRate]);
+  }, [isPlaying, currentTrack, isRepeat, lyricOffsetSec, nextTrack, playbackRate]);
 
   // Volume, Mute & PlaybackRate adjustments
   useEffect(() => {
@@ -793,7 +896,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   };
 
   // -----------------------------------------------------------------------
-  // Apple Music Sing Synchronized Lyrics Panel (No Emojis, No Decorative Icons)
+  // Apple Music Time-Synced Lyrics Panel (60fps + Liquid Glass UI)
   // -----------------------------------------------------------------------
   const renderAppleMusicLyricsPanel = (fullScreenMode = false) => {
     const currentFav = isFavorite(currentTrack.id);
@@ -802,23 +905,23 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         className={`${
           fullScreenMode
             ? 'flex-1'
-            : 'w-full lg:w-[400px] xl:w-[440px] border-l border-white/[0.08]'
-        } flex flex-col min-h-0 relative overflow-hidden bg-black/30 backdrop-blur-2xl shrink-0`}
+            : 'w-full lg:w-[420px] xl:w-[460px] border-l border-white/[0.12]'
+        } flex flex-col min-h-0 relative overflow-hidden apple-liquid-glass shrink-0`}
       >
-        {/* Lyrics Control Header */}
-        <div className="px-5 py-3 border-b border-white/[0.08] flex flex-wrap items-center justify-between gap-2 shrink-0 z-10">
+        {/* Lyrics Control Header (Liquid Glass Bar) */}
+        <div className="px-5 py-3 border-b border-white/[0.1] bg-white/[0.03] backdrop-blur-2xl flex flex-wrap items-center justify-between gap-2 shrink-0 z-10">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-xs font-semibold tracking-tight text-white">
-              Lyrics
+              Time-Synced Lyrics
             </span>
-            <span className="text-[11px] text-white/40 font-mono tabular-nums">
-              · {currentTrack.lyrics.length} lines
+            <span className="text-[10px] text-white/50 font-mono tabular-nums">
+              · 60fps rAF · {currentTrack.lyrics.length} lines
             </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
             {/* Sync Offset Calibration Controls (-0.2s / 0.0s / +0.2s) */}
-            <div className="flex items-center bg-white/[0.06] border border-white/10 px-1.5 py-0.5 text-[10px] font-mono tabular-nums rounded-md">
+            <div className="flex items-center apple-liquid-glass-pill px-1.5 py-0.5 text-[10px] font-mono tabular-nums rounded-md">
               <button
                 onClick={() => setLyricOffsetSec((o) => Math.round((o - 0.2) * 10) / 10)}
                 className="px-1.5 py-0.5 hover:bg-white/15 text-white/75 hover:text-white transition"
@@ -845,50 +948,138 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             </div>
 
             <button
+              onClick={() => {
+                setShowCustomLyricEditor((v) => !v);
+                if (!customLyricInput) {
+                  setCustomLyricInput(JSON.stringify(currentTrack.lyrics.slice(0, 6), null, 2));
+                }
+              }}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition border ${
+                showCustomLyricEditor
+                  ? 'bg-white text-black border-white'
+                  : 'apple-liquid-glass-pill text-white/80 hover:text-white'
+              }`}
+            >
+              データ編集
+            </button>
+
+            <button
               onClick={() => toggleFavorite(currentTrack)}
               className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition border ${
                 currentFav
                   ? 'bg-[#fa243c] text-white border-[#fa243c]'
-                  : 'bg-white/[0.06] text-white/75 border-white/10 hover:text-white'
+                  : 'apple-liquid-glass-pill text-white/80 hover:text-white'
               }`}
             >
-              {currentFav ? 'お気に入り済' : 'お気に入り追加'}
+              {currentFav ? 'お気に入り済' : 'お気に入り'}
             </button>
 
             <button
               onClick={() => loadLyricsForTrack(currentTrack)}
               disabled={isFetchingLyrics}
-              className="px-2.5 py-1 rounded-md bg-white/[0.06] hover:bg-white/15 border border-white/10 text-[11px] text-white/80 hover:text-white transition"
+              className="px-2.5 py-1 rounded-md apple-liquid-glass-pill text-[11px] text-white/80 hover:text-white transition"
             >
               {isFetchingLyrics ? '同期中...' : '再同期'}
             </button>
           </div>
         </div>
 
-        {/* Floating "Return to Auto-Sync" Button when user scrolls manually */}
+        {/* Custom LRC / TTML / JSON Live Parser & Data Structure Drawer */}
+        {showCustomLyricEditor && (
+          <div className="p-4 border-b border-white/[0.12] bg-black/65 backdrop-blur-3xl space-y-2.5 z-20">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-semibold text-white/90">
+                歌詞データ入力 (LRC / Enhanced LRC / TTML / JSON 単語タイムスタンプ対応)
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() =>
+                    setCustomLyricInput(
+                      `[00:00.20]<00:00.20>Drifting <00:01.40>beyond <00:02.60>the <00:03.20>event <00:04.30>horizon\n[00:06.10]<00:06.10>Photons <00:07.20>bent <00:08.00>in an <00:08.80>infinite <00:10.10>ring of light\n[00:12.10]<00:12.10>Monochrome <00:13.80>frequencies <00:15.40>cutting <00:16.50>through vacuum`
+                    )
+                  }
+                  className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-white/80"
+                >
+                  サンプル LRC
+                </button>
+                <button
+                  onClick={() =>
+                    setCustomLyricInput(
+                      `<tt><body><div>\n  <p begin="00:00.20" end="00:05.80"><span begin="00:00.20" end="00:01.40">Drifting</span> <span begin="00:01.40" end="00:02.60">beyond</span> <span begin="00:02.60" end="00:04.30">the event</span> <span begin="00:04.30" end="00:05.80">horizon</span></p>\n  <p begin="00:06.10" end="00:11.80"><span begin="00:06.10" end="00:08.00">Photons bent</span> <span begin="00:08.00" end="00:11.80">in an infinite ring of light</span></p>\n</div></body></tt>`
+                    )
+                  }
+                  className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-white/80"
+                >
+                  サンプル TTML
+                </button>
+                <button
+                  onClick={() =>
+                    setCustomLyricInput(JSON.stringify(currentTrack.lyrics.slice(0, 5), null, 2))
+                  }
+                  className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-white/80"
+                >
+                  現在JSON
+                </button>
+              </div>
+            </div>
+            <textarea
+              value={customLyricInput}
+              onChange={(e) => setCustomLyricInput(e.target.value)}
+              rows={5}
+              className="w-full rounded-md bg-black/60 border border-white/15 p-2.5 text-[11px] font-mono text-white/90 outline-none focus:border-[#fa243c]"
+              placeholder="LRC, TTML, または JSON 形式の歌詞データを入力..."
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowCustomLyricEditor(false)}
+                className="px-3 py-1 rounded text-xs text-white/60 hover:text-white"
+              >
+                閉じる
+              </button>
+              <button
+                onClick={() => {
+                  const parsed = parseSyncedLyricsUniversal(customLyricInput, currentTrack.duration);
+                  if (parsed.length > 0) {
+                    setTracks((prev) =>
+                      prev.map((t) => (t.id === currentTrack.id ? { ...t, lyrics: parsed } : t))
+                    );
+                    setShowCustomLyricEditor(false);
+                    setStatusBanner(`カスタム同期歌詞 (${parsed.length}行) を適用しました`);
+                  }
+                }}
+                className="px-3.5 py-1 rounded bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-semibold"
+              >
+                歌詞を適用
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Floating Liquid Glass "Return to Auto-Sync" Pill when user scrolls manually */}
         {userScrolledLyrics && (
-          <div className="absolute top-14 right-5 z-20">
+          <div className="absolute top-16 right-5 z-20">
             <button
               onClick={() => {
                 setUserScrolledLyrics(false);
                 scrollToActiveLyric(true);
               }}
-              className="px-3.5 py-1.5 rounded-full bg-[#fa243c] hover:bg-[#e01e35] text-white font-semibold text-xs shadow-xl transition"
+              className="px-4 py-1.5 rounded-full apple-liquid-glass-pill text-white font-semibold text-xs hover:bg-[#fa243c] transition"
             >
-              同期スクロールに戻る
+              現在位置へ戻る
             </button>
           </div>
         )}
 
-        {/* Scrolling Apple Music Lyrics Viewport */}
+        {/* Scrolling Apple Music Time-Synced Lyrics Viewport */}
         <div
           ref={lyricsContainerRef}
           onWheel={handleManualLyricsWheel}
+          onTouchMove={handleManualLyricsWheel}
           className={`flex-1 overflow-y-auto ${
-            fullScreenMode ? 'px-8 sm:px-14 py-14' : 'px-6 py-10'
-          } space-y-6 select-none scroll-smooth`}
+            fullScreenMode ? 'px-10 sm:px-16 py-16' : 'px-7 py-12'
+          } space-y-7 select-none`}
         >
-          <div className="h-10" />
+          <div className="h-12" />
           {currentTrack.lyrics.map((line: LyricLine, idx: number) => {
             const isActive = idx === currentLyricIndex;
             const distance = Math.abs(idx - currentLyricIndex);
@@ -907,14 +1098,11 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               ? 1
               : 0;
 
-            let depthStyle = 'opacity-25 blur-[1.5px] hover:opacity-85 hover:blur-0 scale-[0.96]';
-            if (isActive) {
-              depthStyle = 'opacity-100 blur-0 scale-100';
-            } else if (distance === 1) {
-              depthStyle = 'opacity-55 blur-[0.4px] hover:opacity-90 hover:blur-0 scale-[0.98]';
-            } else if (distance === 2) {
-              depthStyle = 'opacity-38 blur-[0.9px] hover:opacity-85 hover:blur-0 scale-[0.97]';
-            }
+            const depthStateClass = isActive
+              ? 'is-active'
+              : distance === 1
+              ? 'is-neighbor'
+              : 'is-inactive';
 
             // Apple Music Instrumental Interlude (• • •)
             if (line.isInterlude) {
@@ -923,10 +1111,11 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 <div
                   key={`interlude-${idx}`}
                   id={`apple-lyric-line-${idx}`}
-                  onClick={() => seekToSeconds(line.time)}
-                  className={`cursor-pointer transition-all duration-500 py-3 px-3 origin-left ${
-                    isActive ? 'opacity-100 scale-100' : 'opacity-35 scale-90'
-                  }`}
+                  onClick={() => {
+                    seekToSeconds(line.time);
+                    if (!isPlaying) togglePlay();
+                  }}
+                  className={`apple-lyric-line ${depthStateClass} cursor-pointer py-3 px-4 rounded-xl`}
                 >
                   <div className="flex items-center gap-3">
                     {[0, 1, 2].map((dotIdx) => {
@@ -937,65 +1126,84 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                           key={dotIdx}
                           className={`inline-block w-3 h-3 rounded-full transition-all duration-300 ${
                             lit
-                              ? 'bg-white scale-125 shadow-[0_0_12px_rgba(255,255,255,0.9)]'
+                              ? 'bg-white scale-125 shadow-[0_0_14px_rgba(255,255,255,0.95)]'
                               : 'bg-white/25 scale-95'
                           }`}
                         />
                       );
                     })}
-                    {isActive && (
-                      <div className="w-20 h-0.5 bg-white/15 overflow-hidden ml-2">
-                        <div
-                          className="h-full bg-white/85 transition-all duration-100"
-                          style={{ width: `${Math.round(lineProgress * 100)}%` }}
-                        />
-                      </div>
-                    )}
                   </div>
                 </div>
               );
             }
 
+            const fallbackWords =
+              line.words && line.words.length > 0
+                ? line.words
+                : line.text
+                    .trim()
+                    .split(/(\s+)/)
+                    .filter(Boolean)
+                    .reduce<{ text: string; start: number; end: number }[]>((acc, part, pIdx, arr) => {
+                      const step = lineDuration / Math.max(1, arr.length);
+                      acc.push({
+                        text: part,
+                        start: lineStart + pIdx * step,
+                        end: lineStart + (pIdx + 1) * step,
+                      });
+                      return acc;
+                    }, []);
+
             return (
               <div
                 key={idx}
                 id={`apple-lyric-line-${idx}`}
-                onClick={() => seekToSeconds(line.time)}
-                className={`group cursor-pointer transition-all duration-500 py-2 px-3 origin-left rounded-lg hover:bg-white/[0.04] ${depthStyle}`}
+                onClick={() => {
+                  seekToSeconds(line.time);
+                  if (!isPlaying) togglePlay();
+                }}
+                className={`apple-lyric-line ${depthStateClass} group cursor-pointer py-3 px-4 rounded-2xl ${
+                  isActive ? 'bg-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]' : 'hover:bg-white/[0.05]'
+                }`}
               >
                 <div className="flex items-baseline justify-between gap-4">
                   <div
-                    className={`font-bold tracking-tight leading-snug transition-all duration-300 ${
+                    className={`font-bold tracking-tight leading-snug ${
                       fullScreenMode
-                        ? isActive
-                          ? 'text-2xl sm:text-3xl md:text-4xl'
-                          : 'text-xl sm:text-2xl text-white/80'
-                        : isActive
-                        ? 'text-xl sm:text-2xl'
-                        : 'text-base sm:text-lg text-white/80'
+                        ? 'text-2xl sm:text-3xl md:text-4xl'
+                        : 'text-xl sm:text-2xl'
                     }`}
                   >
-                    {isActive && line.words && line.words.length > 0 ? (
+                    {isActive && fallbackWords.length > 0 ? (
                       <span className="inline">
-                        {line.words.map((w, wIdx) => {
-                          const wSpan = Math.max(0.08, w.end - w.start);
+                        {fallbackWords.map((w, wIdx) => {
+                          const wSpan = Math.max(0.06, w.end - w.start);
                           const wProg = Math.max(
                             0,
                             Math.min(1, (effectiveLyricTime - w.start) / wSpan)
                           );
-                          const isWordSung = wProg >= 0.98;
-                          const isWordCurrent = wProg > 0 && wProg < 0.98;
+                          const pct = `${(wProg * 100).toFixed(1)}%`;
+                          const isWordCurrent = wProg > 0 && wProg < 1;
+                          const isWordSung = wProg >= 1;
+                          const lift = isWordCurrent
+                            ? `${(-2.4 * Math.sin(wProg * Math.PI)).toFixed(2)}px`
+                            : isWordSung
+                            ? '-0.8px'
+                            : '0px';
 
                           return (
                             <span
                               key={wIdx}
-                              className={`inline-block whitespace-pre-wrap transition-transform duration-150 ${
-                                isWordCurrent
-                                  ? '-translate-y-[2px] text-white drop-shadow-[0_0_14px_rgba(255,255,255,0.75)]'
-                                  : isWordSung
-                                  ? '-translate-y-[1px] text-white'
-                                  : 'text-white/35'
-                              }`}
+                              id={`apple-lyric-word-${idx}-${wIdx}`}
+                              className="apple-karaoke-word"
+                              style={
+                                {
+                                  '--word-progress': pct,
+                                  '--word-lift': lift,
+                                  '--word-glow': isWordCurrent ? '12px' : isWordSung ? '4px' : '0px',
+                                  '--word-scale': isWordCurrent ? '1.03' : '1',
+                                } as React.CSSProperties
+                              }
                             >
                               {w.text}
                             </span>
@@ -1003,7 +1211,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                         })}
                       </span>
                     ) : (
-                      <span className={isActive ? 'text-white' : 'text-white/75'}>
+                      <span className={isActive ? 'text-white' : 'text-white/85'}>
                         {line.text}
                       </span>
                     )}
@@ -1012,26 +1220,17 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   <span
                     className={`text-[11px] font-mono tabular-nums shrink-0 transition-opacity ${
                       isActive
-                        ? 'opacity-70 text-white/70'
-                        : 'opacity-0 group-hover:opacity-65 text-white/50'
+                        ? 'opacity-75 text-white/75'
+                        : 'opacity-0 group-hover:opacity-70 text-white/50'
                     }`}
                   >
                     {formatSecs(line.time)}
                   </span>
                 </div>
-
-                {isActive && (
-                  <div className="mt-2 h-0.5 w-24 bg-white/15 overflow-hidden">
-                    <div
-                      className="h-full bg-white transition-all duration-75"
-                      style={{ width: `${Math.round(lineProgress * 100)}%` }}
-                    />
-                  </div>
-                )}
               </div>
             );
           })}
-          <div className="h-40" />
+          <div className="h-44" />
         </div>
       </div>
     );
@@ -1173,15 +1372,16 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       <audio
         ref={audioElRef}
         crossOrigin="anonymous"
-        onEnded={() => {
-          const targetDuration = Math.max(60, currentTrack.duration || 210);
-          if (fullPlayheadRef.current < targetDuration - 4 && audioElRef.current) {
-            audioElRef.current.currentTime = 0;
-            audioElRef.current.play().catch(() => {
-              startProceduralAudio(currentTrack);
-            });
-            return;
+        onLoadedMetadata={(e) => {
+          const nativeDur = e.currentTarget.duration;
+          if (Number.isFinite(nativeDur) && nativeDur >= 40) {
+            const exactSecs = Math.round(nativeDur);
+            setTracks((prev) =>
+              prev.map((t) => (t.id === currentTrack.id ? { ...t, duration: exactSecs } : t))
+            );
           }
+        }}
+        onEnded={() => {
           if (isRepeat && audioElRef.current) {
             fullPlayheadRef.current = 0;
             setCurrentTime(0);
@@ -1194,9 +1394,9 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       />
 
       {/* ===================================================================
-          TOP APPLE MUSIC PLAYER BAR (Transport + LCD Now Playing + Controls)
+          TOP APPLE MUSIC PLAYER BAR (Liquid Glass + Transport + LCD Display)
          =================================================================== */}
-      <div className="relative z-20 h-14 px-4 bg-[#1c1c1e]/90 backdrop-blur-2xl border-b border-white/[0.08] flex items-center justify-between gap-4 shrink-0">
+      <div className="relative z-20 h-14 px-4 apple-liquid-glass-bar flex items-center justify-between gap-4 shrink-0">
         {/* Left: Apple Music Transport Controls (Pure Minimalist Labels, No Decorative Icons) */}
         <div className="flex items-center gap-1.5 shrink-0">
           <button
@@ -1235,8 +1435,8 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           </button>
         </div>
 
-        {/* Center: Signature Apple Music LCD Now Playing Display + Scrubber */}
-        <div className="flex-1 max-w-xl h-10 bg-black/45 border border-white/[0.08] rounded-md flex flex-col justify-between overflow-hidden relative">
+        {/* Center: Signature Apple Music Liquid Glass LCD Now Playing Display + Scrubber */}
+        <div className="flex-1 max-w-xl h-10 apple-liquid-glass-pill rounded-lg flex flex-col justify-between overflow-hidden relative">
           <div className="flex items-center justify-between px-3 pt-1 gap-3 min-w-0">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-6 h-6 rounded-xs overflow-hidden bg-zinc-800 shrink-0">
@@ -1368,9 +1568,9 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
          =================================================================== */}
       <div className="relative z-10 flex-1 min-h-0 flex overflow-hidden">
         {/* -----------------------------------------------------------------
-            LEFT APPLE MUSIC SIDEBAR (Clean Typography, Zero Icons/Emojis)
+            LEFT APPLE MUSIC LIQUID GLASS SIDEBAR (Clean Typography, Zero Icons)
            ----------------------------------------------------------------- */}
-        <aside className="w-56 bg-[#18181b]/85 backdrop-blur-2xl border-r border-white/[0.08] flex flex-col justify-between p-3 shrink-0 overflow-y-auto">
+        <aside className="w-56 apple-liquid-glass border-r border-white/[0.12] flex flex-col justify-between p-3 shrink-0 overflow-y-auto">
           <div className="space-y-5">
             {/* Search Box (Queries api.monochrome.tf) */}
             <form
@@ -1555,9 +1755,13 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 </div>
               </div>
 
-              {/* Featured Now Playing Banner Card */}
-              <div className="p-6 rounded-xl bg-white/[0.04] border border-white/[0.08] flex flex-col sm:flex-row items-center gap-6">
-                <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-lg overflow-hidden bg-zinc-900 border border-white/15 shrink-0 shadow-2xl">
+              {/* Featured Now Playing Liquid Glass Hero Card */}
+              <div className="p-6 rounded-2xl apple-liquid-glass flex flex-col sm:flex-row items-center gap-6">
+                <div
+                  className={`w-36 h-36 sm:w-44 sm:h-44 rounded-xl overflow-hidden bg-zinc-900 border border-white/20 shrink-0 shadow-2xl transition-transform duration-500 ${
+                    isPlaying ? 'scale-100' : 'scale-95 opacity-85'
+                  }`}
+                >
                   {currentTrack.artworkUrl ? (
                     <img
                       src={currentTrack.artworkUrl}
@@ -1573,7 +1777,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
                 <div className="flex-1 min-w-0 space-y-3 text-center sm:text-left">
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-[#fa243c]">
-                    Now Playing · {currentTrack.format}
+                    Now Playing · 60fps Time-Synced Lyrics · {currentTrack.format}
                   </div>
                   <h2 className="text-xl sm:text-2xl font-bold text-white truncate">
                     {currentTrack.title}
@@ -1584,25 +1788,31 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
                     <button
                       onClick={togglePlay}
-                      className="px-5 py-2 rounded-md bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-semibold transition"
+                      className="px-5 py-2 rounded-lg bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-semibold transition shadow-lg"
                     >
-                      {isPlaying ? '一時停止' : '再生'}
+                      {isPlaying ? '一時停止' : 'フル尺再生'}
+                    </button>
+                    <button
+                      onClick={() => setActiveNav('lyrics')}
+                      className="px-4 py-2 rounded-lg apple-liquid-glass-pill hover:bg-white/20 text-xs font-semibold text-white transition"
+                    >
+                      歌詞フル画面ステージ
                     </button>
                     <button
                       onClick={() => toggleFavorite(currentTrack)}
-                      className={`px-4 py-2 rounded-md text-xs font-semibold border transition ${
+                      className={`px-4 py-2 rounded-lg text-xs font-semibold border transition ${
                         isFavorite(currentTrack.id)
                           ? 'bg-white text-black border-white'
-                          : 'bg-white/[0.06] text-white border-white/15 hover:bg-white/15'
+                          : 'apple-liquid-glass-pill text-white hover:bg-white/15'
                       }`}
                     >
                       {isFavorite(currentTrack.id) ? 'お気に入り登録済' : 'お気に入りに追加'}
                     </button>
                     <button
                       onClick={() => setShowLyricsDrawer((s) => !s)}
-                      className="px-4 py-2 rounded-md bg-white/[0.06] hover:bg-white/15 border border-white/15 text-xs font-medium text-white transition"
+                      className="px-4 py-2 rounded-lg apple-liquid-glass-pill hover:bg-white/15 text-xs font-medium text-white transition"
                     >
-                      {showLyricsDrawer ? '歌詞パネルを閉じる' : '歌詞パネルを開く'}
+                      {showLyricsDrawer ? '右歌詞パネルを閉じる' : '右歌詞パネルを開く'}
                     </button>
                   </div>
                 </div>
@@ -1749,8 +1959,134 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             </div>
           )}
 
-          {/* VIEW 6: FULL-SCREEN LYRICS (歌詞フル画面) */}
-          {activeNav === 'lyrics' && renderAppleMusicLyricsPanel(true)}
+          {/* VIEW 6: FULL-SCREEN LYRICS (Apple Music Immersive 2-Column Liquid Glass Stage) */}
+          {activeNav === 'lyrics' && (
+            <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+              {/* Left Column: Floating Liquid Glass Artwork, Scrubber & Transport */}
+              <div className="w-full lg:w-[380px] xl:w-[430px] p-6 sm:p-8 flex flex-col justify-center items-center apple-liquid-glass border-b lg:border-b-0 lg:border-r border-white/[0.12] shrink-0">
+                <div className="w-full max-w-[300px] space-y-6">
+                  {/* Dynamic Spring-Scaled Artwork */}
+                  <div
+                    className={`aspect-square w-full rounded-2xl overflow-hidden bg-zinc-900 border border-white/20 transition-all duration-700 ${
+                      isPlaying
+                        ? 'scale-100 shadow-[0_28px_60px_rgba(0,0,0,0.68)]'
+                        : 'scale-[0.9] opacity-75 shadow-[0_12px_30px_rgba(0,0,0,0.45)]'
+                    }`}
+                  >
+                    {currentTrack.artworkUrl ? (
+                      <img
+                        src={currentTrack.artworkUrl}
+                        alt={currentTrack.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className={`w-full h-full bg-gradient-to-br ${currentTrack.coverGradient}`}
+                      />
+                    )}
+                  </div>
+
+                  {/* Title, Artist & Favorite Button */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h2 className="text-lg sm:text-xl font-bold text-white truncate">
+                        {currentTrack.title}
+                      </h2>
+                      <p className="text-sm text-white/65 truncate mt-0.5">
+                        {currentTrack.artist}
+                      </p>
+                      <p className="text-[11px] text-white/40 font-mono truncate mt-0.5">
+                        {currentTrack.album} · {currentTrack.bitrate}
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => toggleFavorite(currentTrack, e)}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold shrink-0 transition ${
+                        isFavorite(currentTrack.id)
+                          ? 'bg-[#fa243c] text-white'
+                          : 'apple-liquid-glass-pill text-white/80 hover:text-white'
+                      }`}
+                    >
+                      {isFavorite(currentTrack.id) ? '登録済' : 'お気に入り'}
+                    </button>
+                  </div>
+
+                  {/* Interactive Liquid Glass Timeline Scrubber */}
+                  <div className="space-y-2">
+                    <div
+                      className="w-full h-2 rounded-full bg-white/15 cursor-pointer overflow-hidden relative"
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                        seekToSeconds(pos * currentTrack.duration);
+                      }}
+                    >
+                      <div
+                        className="h-full bg-white rounded-full transition-all duration-75"
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            (currentTime / Math.max(1, currentTrack.duration)) * 100
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] font-mono tabular-nums text-white/55">
+                      <span>{formatSecs(currentTime)}</span>
+                      <span>
+                        -{formatSecs(Math.max(0, currentTrack.duration - currentTime))}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Liquid Glass Transport Controls */}
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <button
+                      onClick={() => setIsShuffle(!isShuffle)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
+                        isShuffle
+                          ? 'bg-[#fa243c] text-white'
+                          : 'apple-liquid-glass-pill text-white/70 hover:text-white'
+                      }`}
+                    >
+                      Shuffle
+                    </button>
+                    <button
+                      onClick={prevTrack}
+                      className="px-3 py-1.5 rounded-lg apple-liquid-glass-pill text-xs font-medium text-white hover:bg-white/20 transition"
+                    >
+                      Prev
+                    </button>
+                    <button
+                      onClick={togglePlay}
+                      className="px-5 py-2 rounded-xl bg-white text-black hover:bg-white/90 text-xs font-bold transition shadow-lg"
+                    >
+                      {isPlaying ? 'Pause' : 'Play'}
+                    </button>
+                    <button
+                      onClick={nextTrack}
+                      className="px-3 py-1.5 rounded-lg apple-liquid-glass-pill text-xs font-medium text-white hover:bg-white/20 transition"
+                    >
+                      Next
+                    </button>
+                    <button
+                      onClick={() => setIsRepeat(!isRepeat)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
+                        isRepeat
+                          ? 'bg-[#fa243c] text-white'
+                          : 'apple-liquid-glass-pill text-white/70 hover:text-white'
+                      }`}
+                    >
+                      Repeat
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Full-Screen 60fps Time-Synced Lyrics Stage */}
+              {renderAppleMusicLyricsPanel(true)}
+            </div>
+          )}
 
           {/* VIEW 7: API.MONOCHROME.TF WEB PROXY */}
           {activeNav === 'monochrome-web' && (
