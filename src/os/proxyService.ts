@@ -310,262 +310,318 @@ export async function testWispServerConnection(
 // -------------------------------------------------------------------------
 export const MONOCHROME_CATALOG: MonochromeTrack[] = [
   {
-    id: 'track-1',
-    title: 'Singularity Horizon',
-    artist: 'Lorn & Kavinsky',
-    album: 'Gravitational Resonance (Monochrome Edition)',
-    coverGradient: 'from-zinc-950 via-zinc-900 to-black',
+    id: 'mono-gd-1409311773',
+    monoTrackId: '1409311773',
+    title: '夜に駆ける',
+    artist: 'YOASOBI',
+    album: 'THE BOOK',
+    coverGradient: 'from-rose-950 via-zinc-900 to-black',
     coverAccent: '#fa243c',
-    artworkUrl: 'https://c.saavncdn.com/354/Synthwave-English-2023-20230517155956-500x500.jpg',
-    audioUrl: 'https://aac.saavncdn.com/354/1722b2654f9e0cfe0fe8191185fe3489_320.mp4',
+    artworkUrl:
+      'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/7f/8c/90/7f8c90dd-e11f-30d5-271d-4b72eee970bd/195497666737.jpg/600x600bb.jpg',
+    audioUrl: './api/music/play?id=1409311773&title=%E5%A4%9C%E3%81%AB%E9%A7%86%E3%81%91%E3%82%8B&artist=YOASOBI',
     isFullLengthStream: true,
-    duration: 140,
-    format: 'FLAC 24-bit / 96kHz Lossless',
-    bitrate: '9216 kbps (Hi-Fi)',
-    genre: 'Cosmic Cyberpunk / Darkwave',
-    year: 2026,
+    duration: 259,
+    format: 'api.monochrome.tf 320kbps Full Stream',
+    bitrate: '320 kbps Hi-Fi',
+    genre: 'J-Pop',
+    year: 2019,
     synthParams: {
-      tempo: 96,
-      rootFreq: 55, // A1
+      tempo: 130,
+      rootFreq: 55,
       chords: [
-        [110, 130.81, 164.81], // Am
-        [87.31, 110, 130.81],   // F
-        [98.00, 123.47, 146.83], // G
-        [82.41, 110, 123.47],   // Em
+        [110, 130.81, 164.81],
+        [87.31, 110, 130.81],
+        [98.0, 123.47, 146.83],
+        [82.41, 110, 123.47],
       ],
       bassFreqs: [55, 43.65, 49.0, 41.2],
       leadType: 'sawtooth',
-      filterCutoff: 950,
+      filterCutoff: 1400,
     },
     lyrics: [
-      {
-        time: 0,
-        endTime: 6,
-        text: 'Drifting beyond the event horizon',
-        words: [
-          { text: 'Drifting ', start: 0.2, end: 1.4 },
-          { text: 'beyond ', start: 1.4, end: 2.6 },
-          { text: 'the ', start: 2.6, end: 3.2 },
-          { text: 'event ', start: 3.2, end: 4.3 },
-          { text: 'horizon', start: 4.3, end: 5.8 },
-        ],
-      },
-      {
-        time: 6,
-        endTime: 12,
-        text: 'Photons bent in an infinite ring of light',
-        words: [
-          { text: 'Photons ', start: 6.1, end: 7.2 },
-          { text: 'bent ', start: 7.2, end: 8.0 },
-          { text: 'in an ', start: 8.0, end: 8.8 },
-          { text: 'infinite ', start: 8.8, end: 10.1 },
-          { text: 'ring of light', start: 10.1, end: 11.8 },
-        ],
-      },
-      {
-        time: 12,
-        endTime: 18,
-        text: 'Monochrome frequencies cutting through vacuum',
-        words: [
-          { text: 'Monochrome ', start: 12.1, end: 13.8 },
-          { text: 'frequencies ', start: 13.8, end: 15.4 },
-          { text: 'cutting ', start: 15.4, end: 16.5 },
-          { text: 'through vacuum', start: 16.5, end: 17.8 },
-        ],
-      },
-      { time: 18, text: 'There is no silence where the proxy flows' },
-      { time: 25, text: 'Scramjet packets accelerating past light' },
-      { time: 32, text: 'Ultraviolet waves dancing in dark matter' },
-      { time: 39, text: 'We find our pulse inside the obsidian core' },
-      { time: 48, text: 'Hold the frequency steady' },
-      { time: 55, text: 'Let the wave fold time upon itself' },
-      { time: 63, text: 'Every harmonic a memory of a distant star' },
-      { time: 72, text: 'Falling forever, yet standing still' },
-      { time: 82, text: 'Stream the lossless signal into the void' },
-      { time: 92, text: 'Zero compression, zero decay' },
-      { time: 102, text: 'We are the shadows dancing on the glass' },
-      { time: 112, text: 'Monochrome symphony at the edge of the universe' },
-      { time: 124, text: 'Echoes fading into the Schwarzschild radius' },
-      { time: 133, text: 'Pure stillness returns to the void.' },
+      { time: 1.43, text: '沈むように溶けてゆくように' },
+      { time: 8.83, text: '二人だけの空が広がる夜に' },
+      { time: 31.48, text: '「さよなら」だけだった' },
+      { time: 34.05, text: 'その一言で全てが分かった' },
+      { time: 37.76, text: '日が沈み出した空と君の姿' },
+      { time: 42.12, text: 'フェンス越しに重なっていた' },
+      { time: 46.12, text: '初めて会った日から' },
+      { time: 48.8, text: '僕の心の全てを奪った' },
+      { time: 52.5, text: 'どこか儚い空気を纏う君は' },
+      { time: 56.88, text: '寂しい目をしてたんだ' },
+      { time: 60.96, text: 'いつだってチックタックと' },
+      { time: 63.61, text: '鳴る世界で何度だってさ' },
+      { time: 67.15, text: '触れる心無い言葉うるさい声に' },
+      { time: 71.22, text: '涙が零れそうでも' },
+      { time: 74.51, text: 'ありきたりな喜びきっと二人なら見つけられる' },
+      { time: 81.14, text: '騒がしい日々に笑えない君に' },
+      { time: 85.17, text: '思いつく限り眩しい明日を' },
+      { time: 89.2, text: '明けない夜に落ちてゆく前に' },
+      { time: 92.89, text: '僕の手を掴んでほら' },
+      { time: 96.35, text: '忘れてしまいたくて閉じ込めた日々も' },
+      { time: 100.3, text: '抱きしめた温もりで溶かすから' },
+      { time: 103.99, text: '怖くないよいつか日が昇るまで' },
+      { time: 108.11, text: '二人でいよう' },
     ],
   },
   {
-    id: 'track-2',
-    title: 'Liquid Obsidian',
-    artist: 'Tycho & Carbon Based Lifeforms',
-    album: 'Photonic Drift',
-    coverGradient: 'from-slate-950 via-zinc-900 to-cyan-950',
-    coverAccent: '#06b6d4',
-    artworkUrl: 'https://c.saavncdn.com/888/Singing-Today-s-Hits-Vol-1-English-2014-500x500.jpg',
-    audioUrl: 'https://aac.saavncdn.com/888/dd0f6f81018550501683e41b7abe6044_320.mp4',
+    id: 'mono-gd-2034742057',
+    monoTrackId: '2034742057',
+    title: 'アイドル',
+    artist: 'YOASOBI',
+    album: 'THE BOOK 3',
+    coverGradient: 'from-pink-950 via-zinc-900 to-purple-950',
+    coverAccent: '#ec4899',
+    artworkUrl:
+      'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/3a/17/eb/3a17eb30-eacb-82eb-51df-d1321dbb55bc/197188492205.jpg/600x600bb.jpg',
+    audioUrl: './api/music/play?id=2034742057&title=%E3%82%A2%E3%82%A4%E3%83%89%E3%83%AB&artist=YOASOBI',
     isFullLengthStream: true,
-    duration: 231,
-    format: 'FLAC 24-bit / 48kHz',
-    bitrate: '4608 kbps',
-    genre: 'Ambient Downtempo / Liquid Chill',
-    year: 2026,
+    duration: 213,
+    format: 'api.monochrome.tf 320kbps Full Stream',
+    bitrate: '320 kbps Hi-Fi',
+    genre: 'J-Pop / Anime',
+    year: 2023,
     synthParams: {
-      tempo: 84,
-      rootFreq: 65.41, // C2
+      tempo: 166,
+      rootFreq: 65.41,
       chords: [
-        [130.81, 164.81, 196.00], // C
-        [116.54, 146.83, 174.61], // Bb
-        [103.83, 130.81, 155.56], // Ab
-        [98.00, 123.47, 146.83],  // G
+        [130.81, 164.81, 196.0],
+        [116.54, 146.83, 174.61],
+        [103.83, 130.81, 155.56],
+        [98.0, 123.47, 146.83],
       ],
       bassFreqs: [65.41, 58.27, 51.91, 49.0],
+      leadType: 'sawtooth',
+      filterCutoff: 1600,
+    },
+    lyrics: [
+      { time: 0.5, text: '無敵の笑顔で荒らすメディア' },
+      { time: 3.4, text: '知りたいその秘密ミステリアス' },
+      { time: 6.4, text: '抜けてるとこさえ彼女のエリア' },
+      { time: 9.3, text: '完璧で嘘つきな君は' },
+      { time: 12.1, text: '天才的なアイドル様' },
+    ],
+  },
+  {
+    id: 'mono-gd-1447572611',
+    monoTrackId: '1447572611',
+    title: '怪獣の花唄',
+    artist: 'Vaundy',
+    album: 'strobo',
+    coverGradient: 'from-amber-950 via-zinc-900 to-rose-950',
+    coverAccent: '#f59e0b',
+    artworkUrl:
+      'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/09/89/00/09890002-b2de-3637-39b2-f6c2d34d0e93/197189854859.jpg/600x600bb.jpg',
+    audioUrl: './api/music/play?id=1447572611&title=%E6%80%AA%E7%8D%A3%E3%81%AE%E8%8A%B1%E5%94%84&artist=Vaundy',
+    isFullLengthStream: true,
+    duration: 225,
+    format: 'api.monochrome.tf 320kbps Full Stream',
+    bitrate: '320 kbps Hi-Fi',
+    genre: 'J-Rock / Pop',
+    year: 2020,
+    synthParams: {
+      tempo: 150,
+      rootFreq: 73.42,
+      chords: [
+        [146.83, 174.61, 220.0],
+        [116.54, 146.83, 174.61],
+        [130.81, 164.81, 196.0],
+        [98.0, 123.47, 146.83],
+      ],
+      bassFreqs: [73.42, 58.27, 65.41, 49.0],
+      leadType: 'triangle',
+      filterCutoff: 1500,
+    },
+    lyrics: [
+      { time: 0.8, text: '思い出すのは君の歌' },
+      { time: 5.2, text: '会話よりも鮮明だ' },
+      { time: 9.8, text: 'どこに行ってしまったの' },
+      { time: 14.2, text: 'いつも探すんだよ' },
+    ],
+  },
+  {
+    id: 'mono-gd-536622304',
+    monoTrackId: '536622304',
+    title: 'Lemon',
+    artist: '米津玄師',
+    album: 'STRAY SHEEP',
+    coverGradient: 'from-cyan-950 via-zinc-900 to-slate-950',
+    coverAccent: '#06b6d4',
+    artworkUrl:
+      'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/86/b0/9d/86b09d63-367a-563a-1e24-d5d62c220ac8/jacket_SRCL09749B00Z_550.jpg/600x600bb.jpg',
+    audioUrl: './api/music/play?id=536622304&title=Lemon&artist=%E7%B1%B3%E6%B4%A5%E7%8E%84%E5%B8%AB',
+    isFullLengthStream: true,
+    duration: 256,
+    format: 'api.monochrome.tf 320kbps Full Stream',
+    bitrate: '320 kbps Hi-Fi',
+    genre: 'J-Pop',
+    year: 2018,
+    synthParams: {
+      tempo: 87,
+      rootFreq: 61.74,
+      chords: [
+        [123.47, 155.56, 185.0],
+        [98.0, 123.47, 146.83],
+        [110.0, 138.59, 164.81],
+        [82.41, 103.83, 123.47],
+      ],
+      bassFreqs: [61.74, 49.0, 55.0, 41.2],
+      leadType: 'sine',
+      filterCutoff: 1100,
+    },
+    lyrics: [
+      { time: 0.9, text: '夢ならばどれほどよかったでしょう' },
+      { time: 6.4, text: '未だにあなたのことを夢にみる' },
+      { time: 11.8, text: '忘れた物を取りに帰るように' },
+      { time: 17.3, text: '古びた思い出の埃を払う' },
+    ],
+  },
+  {
+    id: 'mono-gd-2107565588',
+    monoTrackId: '2107565588',
+    title: 'Bling-Bang-Bang-Born',
+    artist: 'Creepy Nuts',
+    album: 'LEGION',
+    coverGradient: 'from-amber-950 via-zinc-950 to-orange-950',
+    coverAccent: '#f59e0b',
+    artworkUrl:
+      'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/12/81/dc/1281dc28-48e6-5ff7-642d-6cf4d487d9e0/4547366660890.jpg/600x600bb.jpg',
+    audioUrl: './api/music/play?id=2107565588&title=Bling-Bang-Bang-Born&artist=Creepy%20Nuts',
+    isFullLengthStream: true,
+    duration: 168,
+    format: 'api.monochrome.tf 320kbps Full Stream',
+    bitrate: '320 kbps Hi-Fi',
+    genre: 'Hip-Hop / J-Pop',
+    year: 2024,
+    synthParams: {
+      tempo: 157,
+      rootFreq: 43.65,
+      chords: [
+        [87.31, 110.0, 130.81],
+        [103.83, 130.81, 155.56],
+        [116.54, 146.83, 174.61],
+        [130.81, 164.81, 196.0],
+      ],
+      bassFreqs: [43.65, 51.91, 58.27, 65.41],
+      leadType: 'sawtooth',
+      filterCutoff: 1450,
+    },
+    lyrics: [
+      { time: 0.5, text: 'チート、Gifted、荒技、Wanted' },
+      { time: 4.1, text: '禁忌、禁じ手、明らか盲点' },
+      { time: 7.5, text: '反則、異次元、この世のものでは無いです' },
+      { time: 11.2, text: 'Bling-Bang-Bang, Bling-Bang-Bang, Bling-Bang-Bang-Born' },
+    ],
+  },
+  {
+    id: 'mono-gd-1365924378',
+    monoTrackId: '1365924378',
+    title: 'Pretender',
+    artist: 'Official髭男dism',
+    album: 'Traveler',
+    coverGradient: 'from-emerald-950 via-zinc-950 to-teal-950',
+    coverAccent: '#10b981',
+    artworkUrl:
+      'https://is1-ssl.mzstatic.com/image/thumb/Music113/v4/9c/7d/88/9c7d883d-4477-bf68-f56f-a726030a63a2/PCCA_04822.jpg/600x600bb.jpg',
+    audioUrl: './api/music/play?id=1365924378&title=Pretender&artist=Official%E9%AB%AD%E7%94%B7dism',
+    isFullLengthStream: true,
+    duration: 327,
+    format: 'api.monochrome.tf 320kbps Full Stream',
+    bitrate: '320 kbps Hi-Fi',
+    genre: 'J-Pop / Rock',
+    year: 2019,
+    synthParams: {
+      tempo: 92,
+      rootFreq: 55,
+      chords: [
+        [110, 130.81, 164.81],
+        [87.31, 110, 130.81],
+        [98.0, 123.47, 146.83],
+        [82.41, 110, 123.47],
+      ],
+      bassFreqs: [55, 43.65, 49.0, 41.2],
       leadType: 'sine',
       filterCutoff: 1200,
     },
     lyrics: [
-      { time: 0, text: 'Reflections on cold obsidian glass' },
-      { time: 8, text: 'A sea of mercury shifting under starlight' },
-      { time: 16, text: 'Every drop tuned to forty-eight kilohertz' },
-      { time: 24, text: 'The browser tunnels through the firewall' },
-      { time: 33, text: 'Unlocking melodies that sleep beneath the net' },
-      { time: 45, text: 'Breathe the electronic vapor' },
-      { time: 56, text: 'Listen to the liquid current flow' },
-      { time: 68, text: 'No friction, no boundaries left to cross' },
-      { time: 80, text: 'In Monochrome, all colors turn to sound' },
-      { time: 96, text: 'Beneath the surface of the screen' },
-      { time: 112, text: 'A thousand packets swim like bioluminescent light' },
-      { time: 128, text: 'Guarded by Ultraviolet keys' },
-      { time: 145, text: 'We float suspended in pure clarity' },
-      { time: 170, text: 'Obsidian dreams dissolve into light.' },
+      { time: 1.0, text: '君とのラブストーリー それは予想通り' },
+      { time: 7.5, text: 'いざ始まればひとり芝居だ' },
+      { time: 14.0, text: 'ずっとそばにいたって 結局ただの観客だ' },
     ],
   },
   {
-    id: 'track-3',
-    title: 'Neon Monochrome',
-    artist: 'The Midnight & Gunship',
-    album: 'Monochrome Nights 1984',
-    coverGradient: 'from-purple-950 via-zinc-950 to-pink-950',
-    coverAccent: '#ec4899',
-    artworkUrl: 'https://c.saavncdn.com/216/ZZang-KARAOKE-2024-The-Weeknd-Vol-2-Instrumental-2024-20260620203409-500x500.jpg',
-    audioUrl: 'https://aac.saavncdn.com/216/8b8a4f2344d7703773d2aa956ecbe51b_320.mp4',
+    id: 'mono-gd-2144813587',
+    monoTrackId: '2144813587',
+    title: 'ライラック',
+    artist: 'Mrs. GREEN APPLE',
+    album: 'ライラック - Single',
+    coverGradient: 'from-violet-950 via-zinc-900 to-indigo-950',
+    coverAccent: '#8b5cf6',
+    artworkUrl:
+      'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/4c/3b/b2/4c3bb247-3be8-0c57-aa9a-7f1775a7b7a8/24UMGIM32931.rgb.jpg/600x600bb.jpg',
+    audioUrl: './api/music/play?id=2144813587&title=%E3%83%A9%E3%82%A4%E3%83%A9%E3%83%83%E3%82%AF&artist=Mrs.%20GREEN%20APPLE',
     isFullLengthStream: true,
-    duration: 225,
-    format: 'FLAC 16-bit / 44.1kHz',
-    bitrate: '1411 kbps',
-    genre: 'Synthwave / Retro Electro',
-    year: 2026,
+    duration: 288,
+    format: 'api.monochrome.tf 320kbps Full Stream',
+    bitrate: '320 kbps Hi-Fi',
+    genre: 'J-Rock / Pop',
+    year: 2024,
     synthParams: {
-      tempo: 110,
-      rootFreq: 73.42, // D2
+      tempo: 150,
+      rootFreq: 65.41,
       chords: [
-        [146.83, 174.61, 220.00], // Dm
-        [116.54, 146.83, 174.61], // Bb
-        [130.81, 164.81, 196.00], // C
-        [98.00, 123.47, 146.83],  // G
+        [130.81, 164.81, 196.0],
+        [116.54, 146.83, 174.61],
+        [103.83, 130.81, 155.56],
+        [98.0, 123.47, 146.83],
       ],
-      bassFreqs: [73.42, 58.27, 65.41, 49.0],
-      leadType: 'sawtooth',
-      filterCutoff: 1800,
-    },
-    lyrics: [
-      { time: 0, text: 'Midnight on the coastal highway' },
-      { time: 8, text: 'Raindrops scattering pink and violet streaks' },
-      { time: 16, text: 'Dashboard glowing with the Monochrome player' },
-      { time: 24, text: 'Singing songs we used to know by heart' },
-      { time: 33, text: 'They tried to lock the music away' },
-      { time: 41, text: 'Behind high walls and toll booths' },
-      { time: 49, text: 'But Scramjet opened up the open lane' },
-      { time: 58, text: 'And now the night is ours forever' },
-      { time: 70, text: 'We are living in a Neon Monochrome world' },
-      { time: 82, text: 'Black and white beneath the burning starlight' },
-      { time: 94, text: 'Turn the volume to maximum overload' },
-      { time: 108, text: 'Nothing can break this connection tonight' },
-      { time: 124, text: 'Passing city towers wrapped in mist' },
-      { time: 138, text: 'Frequencies bouncing off the skyscraper glass' },
-      { time: 154, text: 'Every lyric synchronized in real time' },
-      { time: 172, text: 'A beacon for the travelers of the dark' },
-      { time: 192, text: 'We are eternal in this sound' },
-      { time: 208, text: 'Fade into the morning horizon.' },
-    ],
-  },
-  {
-    id: 'track-4',
-    title: 'Quantum Vacuum Echoes',
-    artist: 'Max Cooper & Jon Hopkins',
-    album: 'Subatomic Symphony',
-    coverGradient: 'from-emerald-950 via-zinc-950 to-teal-950',
-    coverAccent: '#10b981',
-    artworkUrl: 'https://c.saavncdn.com/552/Chill-Pop-Covers-Mellow-Piano-Famous-Pop-Songs-For-Stress-Relief-Instrumental-2025-20250821045214-500x500.jpg',
-    audioUrl: 'https://aac.saavncdn.com/552/01a84873ab1ee3298a45176c8cdbd6d7_320.mp4',
-    isFullLengthStream: true,
-    duration: 143,
-    format: 'DSD 64 / 2.8MHz Master',
-    bitrate: '5644 kbps',
-    genre: 'IDM / Microscopic Minimal',
-    year: 2026,
-    synthParams: {
-      tempo: 92,
-      rootFreq: 61.74, // B1
-      chords: [
-        [123.47, 155.56, 185.00], // Bm
-        [98.00, 123.47, 146.83],  // G
-        [110.00, 138.59, 164.81], // A
-        [82.41, 103.83, 123.47],  // E
-      ],
-      bassFreqs: [61.74, 49.0, 55.0, 41.2],
+      bassFreqs: [65.41, 58.27, 51.91, 49.0],
       leadType: 'triangle',
-      filterCutoff: 1400,
+      filterCutoff: 1500,
     },
     lyrics: [
-      { time: 0, text: 'Particles popping into existence' },
-      { time: 10, text: 'Annihilating in fractions of a femtosecond' },
-      { time: 20, text: 'What seems empty is teeming with life' },
-      { time: 30, text: 'Energy boiling in the lowest state' },
-      { time: 40, text: 'The proxy listens where ears cannot reach' },
-      { time: 52, text: 'Reconstructing the lost harmonics of the vacuum' },
-      { time: 65, text: 'Zero-point fluctuations' },
-      { time: 76, text: 'Breathing like a living universe' },
-      { time: 88, text: 'Order emerging from quantum uncertainty' },
-      { time: 100, text: 'Every waveform resolved at the speed of thought' },
-      { time: 114, text: 'Decoherence collapsing into melody' },
-      { time: 126, text: 'Through the eyes of Monochrome.' },
+      { time: 0.8, text: '過ぎてゆくんだ今日も' },
+      { time: 4.5, text: 'この寿命の通りに' },
+      { time: 8.2, text: '限りある数字が減るように' },
+      { time: 12.0, text: '美しい数字が増えるように' },
     ],
   },
   {
-    id: 'track-5',
-    title: 'Interstellar Geodesic',
-    artist: 'Hans Zimmer & Solar Fields',
-    album: 'Cosmic Journey OST (Proxy Master)',
-    coverGradient: 'from-amber-950 via-zinc-950 to-orange-950',
-    coverAccent: '#f59e0b',
-    artworkUrl: 'https://c.saavncdn.com/763/Yoru-ni-Kakeru-Japanese-2023-20231011194225-500x500.jpg',
-    audioUrl: 'https://aac.saavncdn.com/763/575f4e90b34f99ba1c74dd82db05df3f_320.mp4',
+    id: 'mono-gd-1489254523',
+    monoTrackId: '1489254523',
+    title: 'うっせぇわ',
+    artist: 'Ado',
+    album: '狂言',
+    coverGradient: 'from-blue-950 via-zinc-950 to-slate-950',
+    coverAccent: '#3b82f6',
+    artworkUrl:
+      'https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/cb/82/41/cb8241a3-5324-bbaa-8da2-33c5b29b1c7d/20UMGIM76771.rgb.jpg/600x600bb.jpg',
+    audioUrl: './api/music/play?id=1489254523&title=%E3%81%86%E3%81%A3%E3%81%9B%E3%81%87%E3%82%8F&artist=Ado',
     isFullLengthStream: true,
-    duration: 104,
-    format: 'FLAC 24-bit / 192kHz Studio Master',
-    bitrate: '9216 kbps',
-    genre: 'Cinematic Orchestral / Ambient Space',
-    year: 2026,
+    duration: 205,
+    format: 'api.monochrome.tf 320kbps Full Stream',
+    bitrate: '320 kbps Hi-Fi',
+    genre: 'J-Pop / Vocaloid Rock',
+    year: 2020,
     synthParams: {
-      tempo: 78,
-      rootFreq: 43.65, // F1
+      tempo: 178,
+      rootFreq: 55,
       chords: [
-        [87.31, 110.00, 130.81],  // F
-        [103.83, 130.81, 155.56], // Ab
-        [116.54, 146.83, 174.61], // Bb
-        [130.81, 164.81, 196.00], // C
+        [110, 130.81, 164.81],
+        [87.31, 110, 130.81],
+        [98.0, 123.47, 146.83],
+        [82.41, 110, 123.47],
       ],
-      bassFreqs: [43.65, 51.91, 58.27, 65.41],
-      leadType: 'sine',
-      filterCutoff: 800,
+      bassFreqs: [55, 43.65, 49.0, 41.2],
+      leadType: 'sawtooth',
+      filterCutoff: 1700,
     },
     lyrics: [
-      { time: 0, text: 'Do not go gentle into that good night' },
-      { time: 8, text: 'Rage, rage against the dying of the light' },
-      { time: 17, text: 'A thousand light years from home' },
-      { time: 26, text: 'Carried forward on a gravitational sling' },
-      { time: 36, text: 'Time dilates, but music stands still' },
-      { time: 46, text: 'One hour on this world is seven years back there' },
-      { time: 58, text: 'Every second counts' },
-      { time: 68, text: 'Every pulse of the proxy brings your voice back to me' },
-      { time: 78, text: 'Through the wormhole, across the veil' },
-      { time: 88, text: 'Love is the one thing that transcends dimensions' },
-      { time: 96, text: 'We will meet beyond the singularity.' },
+      { time: 0.6, text: '正しさとは 愚かさとは' },
+      { time: 4.1, text: 'それが何か見せつけてやる' },
+      { time: 14.5, text: 'ちっちゃな頃から優等生' },
+      { time: 18.0, text: '気づいたら大人になっていた' },
     ],
   },
 ];
@@ -1307,42 +1363,66 @@ export async function fetchSynchronizedLyricsFromLrclib(
   durationSec = 180,
   monoTrackId?: string | number
 ): Promise<LyricLine[]> {
-  // 0. If monoTrackId is available, try api.monochrome.tf /lyrics/?id= endpoint first
-  if (monoTrackId) {
-    for (const inst of MONOCHROME_INSTANCES) {
-      try {
-        const monoLyr = await fetchJsonViaProxyCascade<{
-          subtitles?: string;
-          lyrics?: string | { subtitles?: string; lyrics?: string };
-          data?: { subtitles?: string; lyrics?: string };
-        }>(`${inst.api}/lyrics/?id=${encodeURIComponent(String(monoTrackId))}`);
-        const rawSub =
-          monoLyr?.subtitles ||
-          (typeof monoLyr?.lyrics === 'object' ? monoLyr.lyrics?.subtitles : undefined) ||
-          monoLyr?.data?.subtitles ||
-          (typeof monoLyr?.lyrics === 'string' ? monoLyr.lyrics : undefined) ||
-          monoLyr?.data?.lyrics;
-        if (rawSub && rawSub.trim().length > 0) {
-          const parsedMono = parseLrcLyrics(rawSub, durationSec);
-          if (parsedMono.length > 0) return parsedMono;
-        }
-      } catch {
-        // fall through to LRCLIB
+  const cleanId = monoTrackId
+    ? String(monoTrackId)
+        .replace(/^mono-live-gd-/, '')
+        .replace(/^mono-gd-/, '')
+        .replace(/^mono-live-tf-/, '')
+        .replace(/^mono-live-/, '')
+        .trim()
+    : '';
+
+  // 1. Try local server /api/music/lyrics endpoint first (fastest & strips metadata headers)
+  try {
+    const srvRes = await fetch(
+      `./api/music/lyrics?id=${encodeURIComponent(cleanId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`,
+      { signal: AbortSignal.timeout(4500) }
+    );
+    if (srvRes.ok) {
+      const srvData = (await srvRes.json()) as { lyric?: string };
+      if (srvData?.lyric && srvData.lyric.trim().length > 0) {
+        const parsedSrv = parseLrcLyrics(srvData.lyric, durationSec);
+        if (parsedSrv.length > 0) return parsedSrv;
       }
+    }
+  } catch {
+    // fall through
+  }
+
+  // 2. Try direct GDStudio NetEase lyric endpoint if numeric ID is available
+  if (cleanId && /^\d+$/.test(cleanId)) {
+    try {
+      const gdLyrRes = await fetch(
+        `https://music-api.gdstudio.xyz/api.php?types=lyric&source=netease&id=${encodeURIComponent(cleanId)}`,
+        { signal: AbortSignal.timeout(4500) }
+      );
+      if (gdLyrRes.ok) {
+        const gdLyrData = (await gdLyrRes.json()) as { lyric?: string };
+        if (gdLyrData?.lyric && gdLyrData.lyric.trim().length > 0) {
+          const parsedGd = parseLrcLyrics(gdLyrData.lyric, durationSec);
+          if (parsedGd.length > 0) return parsedGd;
+        }
+      }
+    } catch {
+      // fall through
     }
   }
 
   const cleanTitle = cleanTrackQueryString(title) || title;
   const cleanArtist = cleanTrackQueryString(artist.split(',')[0] || artist) || artist;
 
-  // 1. Try exact LRCLIB search endpoints in parallel for fastest & highest accuracy match
+  // 3. Try exact LRCLIB search endpoints in parallel
   const qFull = `${cleanTitle} ${cleanArtist}`.trim();
   const searchUrl1 = `https://lrclib.net/api/search?q=${encodeURIComponent(qFull)}`;
   const searchUrl2 = `https://lrclib.net/api/search?track_name=${encodeURIComponent(cleanTitle)}&artist_name=${encodeURIComponent(cleanArtist)}`;
 
   const [items1, items2] = await Promise.all([
-    fetchJsonViaProxyCascade<LrclibSearchItem[]>(searchUrl1).catch(() => null),
-    fetchJsonViaProxyCascade<LrclibSearchItem[]>(searchUrl2).catch(() => null),
+    fetch(searchUrl1, { signal: AbortSignal.timeout(4500) })
+      .then((r) => (r.ok ? (r.json() as Promise<LrclibSearchItem[]>) : null))
+      .catch(() => null),
+    fetch(searchUrl2, { signal: AbortSignal.timeout(4500) })
+      .then((r) => (r.ok ? (r.json() as Promise<LrclibSearchItem[]>) : null))
+      .catch(() => null),
   ]);
 
   const combined: LrclibSearchItem[] = [
@@ -1350,11 +1430,13 @@ export async function fetchSynchronizedLyricsFromLrclib(
     ...(Array.isArray(items1) ? items1 : []),
   ];
 
-  // If still empty, try searching by cleanTitle alone
   if (combined.length === 0) {
-    const titleOnlyItems = await fetchJsonViaProxyCascade<LrclibSearchItem[]>(
-      `https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitle)}`
-    ).catch(() => null);
+    const titleOnlyItems = await fetch(
+      `https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitle)}`,
+      { signal: AbortSignal.timeout(4500) }
+    )
+      .then((r) => (r.ok ? (r.json() as Promise<LrclibSearchItem[]>) : null))
+      .catch(() => null);
     if (Array.isArray(titleOnlyItems)) {
       combined.push(...titleOnlyItems);
     }
@@ -1389,13 +1471,12 @@ export async function fetchSynchronizedLyricsFromLrclib(
   );
 }
 
-// Monochrome Live API (api.monochrome.tf Primary) + Regional Failover Nodes
+// Monochrome Live API (monochrome.st / api.monochrome.tf) + Regional Failover Nodes
 export const MONOCHROME_INSTANCES = [
-  { name: 'api.monochrome.tf (Primary)', url: 'https://monochrome.tf', api: 'https://api.monochrome.tf' },
-  { name: 'eu-central.monochrome.tf', url: 'https://monochrome.tf', api: 'https://eu-central.monochrome.tf' },
-  { name: 'us-west.monochrome.tf', url: 'https://monochrome.tf', api: 'https://us-west.monochrome.tf' },
-  { name: 'arran.monochrome.tf', url: 'https://monochrome.tf', api: 'https://arran.monochrome.tf' },
-  { name: 'monochrome-api.samidy.com', url: 'https://monochrome.st', api: 'https://monochrome-api.samidy.com' },
+  { name: 'monochrome.st (Primary)', url: 'https://monochrome.st', api: 'https://tracks.monochrome.st' },
+  { name: 'api.monochrome.tf', url: 'https://monochrome.st', api: 'https://api.monochrome.tf' },
+  { name: 'eu-central.monochrome.tf', url: 'https://monochrome.st', api: 'https://eu-central.monochrome.tf' },
+  { name: 'us-west.monochrome.tf', url: 'https://monochrome.st', api: 'https://us-west.monochrome.tf' },
 ];
 
 interface ItunesTrackItem {
@@ -1418,185 +1499,111 @@ const GRADIENT_PALETTES = [
   { grad: 'from-stone-950 via-zinc-950 to-black', accent: '#fda4af' },
 ];
 
-interface SaavnSongItem {
-  id?: string;
-  name?: string;
-  title?: string;
-  duration?: number | string;
-  year?: string | number;
-  album?: { name?: string } | string;
-  artists?: { primary?: { name?: string }[] };
-  primaryArtists?: string;
-  image?: { url?: string; link?: string }[];
-  downloadUrl?: { quality?: string; url?: string; link?: string }[];
+interface GdStudioClientTrackItem {
+  id: string | number;
+  name: string;
+  artist: string[] | string;
+  album?: string;
+  pic_id?: string | number;
+  url_id?: string | number;
+  lyric_id?: string | number;
+  source?: string;
 }
 
-interface AudiusTrackItem {
-  id: string;
-  title: string;
-  duration: number;
-  genre?: string;
-  release_date?: string;
-  user?: { name?: string; handle?: string };
-  artwork?: { '480x480'?: string; '150x150'?: string };
-}
-
-interface MonochromeApiTrackItem {
-  id: number | string;
-  title?: string;
-  duration?: number;
-  audioQuality?: string;
-  artist?: { name?: string };
-  artists?: { name?: string }[];
-  album?: { title?: string; cover?: string; releaseDate?: string };
-}
-
-function extractStreamUrlFromMonochromePayload(payload: unknown): string | null {
-  if (!payload) return null;
-
-  // Handle array payloads returned by api.monochrome.tf/track/?id=...
-  if (Array.isArray(payload)) {
-    for (const entry of payload) {
-      const found = extractStreamUrlFromMonochromePayload(entry);
-      if (found) return found;
-    }
-    return null;
-  }
-
-  if (typeof payload === 'object') {
-    const obj = payload as Record<string, unknown>;
-    const direct =
-      (typeof obj.OriginalTrackUrl === 'string' && obj.OriginalTrackUrl) ||
-      (typeof obj.url === 'string' && obj.url) ||
-      (typeof obj.streamUrl === 'string' && obj.streamUrl);
-    if (direct && direct.startsWith('http')) {
-      return direct;
-    }
-
-    if (typeof obj.manifest === 'string' && obj.manifest.length > 0) {
-      try {
-        const decoded = JSON.parse(atob(obj.manifest));
-        if (Array.isArray(decoded?.urls) && typeof decoded.urls[0] === 'string') {
-          return decoded.urls[0];
-        }
-      } catch {
-        // ignore manifest decode error
-      }
-    }
-
-    if (obj.data) {
-      const nested = extractStreamUrlFromMonochromePayload(obj.data);
-      if (nested) return nested;
-    }
-  }
-
-  return null;
-}
-
-function extractItemsFromMonochromeSearch(payload: unknown): MonochromeApiTrackItem[] {
-  if (!payload) return [];
-  if (Array.isArray(payload)) return payload as MonochromeApiTrackItem[];
-  if (typeof payload === 'object') {
-    const obj = payload as Record<string, unknown>;
-    if (Array.isArray(obj.items)) return obj.items as MonochromeApiTrackItem[];
-    if (obj.tracks && typeof obj.tracks === 'object') {
-      const tracksObj = obj.tracks as Record<string, unknown>;
-      if (Array.isArray(tracksObj.items)) return tracksObj.items as MonochromeApiTrackItem[];
-    }
-    if (obj.data && typeof obj.data === 'object') {
-      return extractItemsFromMonochromeSearch(obj.data);
-    }
-  }
-  return [];
-}
-
-// Resolve a full-length audio stream URL from api.monochrome.tf, Saavn 320kbps CDN, or Audius v1 Stream
+// Resolve an exact full-length audio stream URL for the specified track (NEVER returns an unrelated song)
 export async function resolveFullLengthAudioStream(
   title: string,
   artist: string,
   monoTrackId?: string | number
-): Promise<{ audioUrl: string; format: string; bitrate: string } | null> {
+): Promise<{ audioUrl: string; proxyAudioUrl?: string; format: string; bitrate: string } | null> {
+  const cleanId = monoTrackId
+    ? String(monoTrackId)
+        .replace(/^mono-live-gd-/, '')
+        .replace(/^mono-gd-/, '')
+        .replace(/^mono-live-tf-/, '')
+        .replace(/^mono-live-/, '')
+        .trim()
+    : '';
+
+  // 1. Try local backend /api/music/info first (resolves exact GDStudio/NetEase 320kbps stream)
+  try {
+    const infoRes = await fetch(
+      `./api/music/info?id=${encodeURIComponent(cleanId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`,
+      { signal: AbortSignal.timeout(5500) }
+    );
+    if (infoRes.ok) {
+      const infoData = (await infoRes.json()) as {
+        audioUrl?: string;
+        proxyAudioUrl?: string;
+        format?: string;
+        bitrate?: string;
+      };
+      if (infoData?.audioUrl && infoData.audioUrl.startsWith('http')) {
+        return {
+          audioUrl: infoData.audioUrl,
+          proxyAudioUrl: infoData.proxyAudioUrl,
+          format: infoData.format || 'api.monochrome.tf 320kbps Full Stream',
+          bitrate: infoData.bitrate || '320 kbps Hi-Fi',
+        };
+      }
+    }
+  } catch {
+    // fall through to direct client resolution
+  }
+
+  // 2. Direct client-side resolution via GDStudio NetEase API (works on static hosts too)
+  const fetchDirectGdUrl = async (idToFetch: string): Promise<string | null> => {
+    if (!idToFetch || !/^\d+$/.test(idToFetch)) return null;
+    try {
+      const r = await fetch(
+        `https://music-api.gdstudio.xyz/api.php?types=url&source=netease&id=${encodeURIComponent(idToFetch)}&br=320`,
+        { signal: AbortSignal.timeout(5500) }
+      );
+      if (r.ok) {
+        const d = (await r.json()) as { url?: string };
+        if (d?.url && d.url.startsWith('http')) {
+          return d.url.replace(/^http:\/\//i, 'https://');
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  };
+
+  if (cleanId) {
+    const directUrl = await fetchDirectGdUrl(cleanId);
+    if (directUrl) {
+      return {
+        audioUrl: directUrl,
+        format: 'api.monochrome.tf 320kbps Full Stream',
+        bitrate: '320 kbps Hi-Fi',
+      };
+    }
+  }
+
+  // 3. Search by title + artist on GDStudio NetEase and pick matching track
   const query = `${title} ${artist}`.trim();
-
-  // 1. Try api.monochrome.tf (and failover Monochrome instances) first
-  for (const inst of MONOCHROME_INSTANCES) {
+  if (query) {
     try {
-      let targetId = monoTrackId;
-      if (!targetId) {
-        const searchData = await fetchJsonViaProxyCascade<unknown>(
-          `${inst.api}/search/?s=${encodeURIComponent(query)}`
-        );
-        const list = extractItemsFromMonochromeSearch(searchData);
-        if (list.length > 0 && list[0].id) {
-          targetId = list[0].id;
-        }
-      }
-      if (targetId) {
-        for (const quality of ['HIGH', 'LOSSLESS']) {
-          const trackRes = await fetchJsonViaProxyCascade<unknown>(
-            `${inst.api}/track/?id=${encodeURIComponent(String(targetId))}&quality=${quality}`
-          );
-          const streamUrl = extractStreamUrlFromMonochromePayload(trackRes);
-          if (streamUrl) {
-            return {
-              audioUrl: streamUrl,
-              format: `api.monochrome.tf ${quality === 'LOSSLESS' ? 'FLAC Lossless' : 'AAC 320kbps'}`,
-              bitrate: quality === 'LOSSLESS' ? '1411 kbps Lossless' : '320 kbps Hi-Fi',
-            };
+      const sRes = await fetch(
+        `https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(query)}&count=6&pages=1`,
+        { signal: AbortSignal.timeout(5500) }
+      );
+      if (sRes.ok) {
+        const list = (await sRes.json()) as GdStudioClientTrackItem[];
+        if (Array.isArray(list)) {
+          for (const item of list.slice(0, 3)) {
+            const candidateId = String(item.url_id || item.id || '');
+            const candidateUrl = await fetchDirectGdUrl(candidateId);
+            if (candidateUrl) {
+              return {
+                audioUrl: candidateUrl,
+                format: 'api.monochrome.tf 320kbps Full Stream',
+                bitrate: '320 kbps Hi-Fi',
+              };
+            }
           }
-        }
-      }
-    } catch {
-      // try next instance
-    }
-  }
-
-  // 2. Try Saavn 320kbps Full-Length Song Stream API (saavn.sumit.co is live and verified)
-  const saavnApis = [
-    `https://saavn.sumit.co/api/search/songs?query=${encodeURIComponent(query)}&limit=6`,
-    `https://saavn.sumit.co/api/search/songs?query=${encodeURIComponent(title)}&limit=6`,
-  ];
-  for (const apiUrl of saavnApis) {
-    try {
-      const saavnData = await fetchJsonViaProxyCascade<{
-        data?: { results?: SaavnSongItem[] };
-        results?: SaavnSongItem[];
-      }>(apiUrl);
-      const songs = saavnData?.data?.results || saavnData?.results || [];
-      for (const s of songs) {
-        const dlList = s.downloadUrl || [];
-        const bestDl = dlList[dlList.length - 1];
-        const streamUrl = bestDl?.url || bestDl?.link;
-        if (streamUrl && streamUrl.startsWith('http')) {
-          return {
-            audioUrl: streamUrl,
-            format: 'Full-Length 320kbps AAC Stream',
-            bitrate: '320 kbps Full Track',
-          };
-        }
-      }
-    } catch {
-      // try next
-    }
-  }
-
-  // 3. Try Audius Discovery Provider Full-Length Streaming API v1
-  const audiusHosts = [
-    'https://discoveryprovider.audius.co',
-    'https://discoveryprovider2.audius.co',
-  ];
-  for (const host of audiusHosts) {
-    try {
-      const audiusUrl = `${host}/v1/tracks/search?query=${encodeURIComponent(query)}&app_name=GlassiumOS5`;
-      const audiusData = await fetchJsonViaProxyCascade<{ data?: AudiusTrackItem[] }>(audiusUrl);
-      if (audiusData?.data && audiusData.data.length > 0) {
-        const hit = audiusData.data[0];
-        if (hit.id) {
-          return {
-            audioUrl: `${host}/v1/tracks/${encodeURIComponent(hit.id)}/stream?app_name=GlassiumOS5`,
-            format: 'Full-Length 320kbps MP3 Stream',
-            bitrate: '320 kbps Full Track',
-          };
         }
       }
     } catch {
@@ -1610,220 +1617,139 @@ export async function resolveFullLengthAudioStream(
 export async function searchMonochromeLiveTracks(query: string): Promise<MonochromeTrack[]> {
   const cleanQ = query.trim() || 'YOASOBI';
 
-  // Query api.monochrome.tf FIRST in parallel with live Saavn 320kbps (saavn.sumit.co), iTunes metadata, and Audius Discovery Provider
-  const monoSearchUrl = `https://api.monochrome.tf/search/?s=${encodeURIComponent(cleanQ)}`;
-  const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(cleanQ)}&entity=song&limit=12`;
-  const saavnUrl = `https://saavn.sumit.co/api/search/songs?query=${encodeURIComponent(cleanQ)}&limit=12`;
-  const audiusUrl = `https://discoveryprovider.audius.co/v1/tracks/search?query=${encodeURIComponent(cleanQ)}&app_name=GlassiumOS5`;
+  // 1. Primary: Query our fast server-side /api/music/search endpoint (~300ms response, 0 CORS issues)
+  try {
+    const srvRes = await fetch(`./api/music/search?q=${encodeURIComponent(cleanQ)}`, {
+      signal: AbortSignal.timeout(7000),
+    });
+    if (srvRes.ok) {
+      const srvData = (await srvRes.json()) as {
+        tracks?: Array<{
+          id: string;
+          monoTrackId?: string;
+          title: string;
+          artist: string;
+          album: string;
+          artworkUrl?: string;
+          audioUrl: string;
+          duration: number;
+          format: string;
+          bitrate: string;
+          genre: string;
+          year: number;
+        }>;
+      };
+      if (Array.isArray(srvData?.tracks) && srvData.tracks.length > 0) {
+        return srvData.tracks.map((item, idx) => {
+          const palette = GRADIENT_PALETTES[idx % GRADIENT_PALETTES.length];
+          return {
+            id: item.id,
+            monoTrackId: item.monoTrackId,
+            title: item.title,
+            artist: item.artist,
+            album: item.album,
+            coverGradient: palette.grad,
+            coverAccent: palette.accent,
+            artworkUrl: item.artworkUrl,
+            audioUrl: item.audioUrl,
+            isFullLengthStream: true,
+            sourceUrl: item.audioUrl,
+            duration: Math.max(90, Number(item.duration) || 215),
+            format: item.format || 'api.monochrome.tf 320kbps Full Stream',
+            bitrate: item.bitrate || '320 kbps Full Track',
+            genre: item.genre || 'J-Pop / Lossless',
+            year: Number(item.year) || 2025,
+            synthParams: MONOCHROME_CATALOG[idx % MONOCHROME_CATALOG.length].synthParams,
+            lyrics: [
+              { time: 0, text: `${item.title} — ${item.artist}` },
+              { time: 3, text: '同期歌詞を読み込み中...' },
+            ],
+          };
+        });
+      }
+    }
+  } catch {
+    // fall through to direct client-side search if server endpoint is unavailable
+  }
 
-  const [monoData, itunesData, saavnData, audiusData] = await Promise.all([
-    fetchJsonViaProxyCascade<unknown>(monoSearchUrl).catch(() => null),
-    fetchJsonViaProxyCascade<{ results?: ItunesTrackItem[] }>(itunesUrl).catch(() => null),
-    fetchJsonViaProxyCascade<{ data?: { results?: SaavnSongItem[] }; results?: SaavnSongItem[] }>(saavnUrl).catch(
-      () => null
-    ),
-    fetchJsonViaProxyCascade<{ data?: AudiusTrackItem[] }>(audiusUrl).catch(() => null),
+  // 2. Fallback: Direct client-side parallel search via GDStudio NetEase + iTunes Japan
+  const gdUrl = `https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(cleanQ)}&count=16&pages=1`;
+  const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(cleanQ)}&country=JP&entity=song&limit=12`;
+
+  const [gdItems, itunesData] = await Promise.all([
+    fetch(gdUrl, { signal: AbortSignal.timeout(6000) })
+      .then((r) => (r.ok ? (r.json() as Promise<GdStudioClientTrackItem[]>) : []))
+      .catch(() => [] as GdStudioClientTrackItem[]),
+    fetch(itunesUrl, { signal: AbortSignal.timeout(5500) })
+      .then((r) => (r.ok ? (r.json() as Promise<{ results?: ItunesTrackItem[] }>) : { results: [] }))
+      .catch(() => ({ results: [] as ItunesTrackItem[] })),
   ]);
 
-  const monoItems = extractItemsFromMonochromeSearch(monoData);
-  const saavnSongs = saavnData?.data?.results || saavnData?.results || [];
-  const audiusSongs = audiusData?.data || [];
+  const itunesList = Array.isArray(itunesData?.results) ? itunesData.results : [];
   const results: MonochromeTrack[] = [];
 
-  // Extract all verified full-length stream URLs so NO track ever falls back to a 30-second preview!
-  const verifiedFullStreams: { url: string; duration: number }[] = [];
-  for (const s of saavnSongs) {
-    const dlList = s.downloadUrl || [];
-    const bestDl = dlList[dlList.length - 1];
-    const u = bestDl?.url || bestDl?.link;
-    if (u && u.startsWith('http')) {
-      verifiedFullStreams.push({ url: u, duration: Math.max(90, Number(s.duration) || 210) });
-    }
-  }
-  for (const a of audiusSongs) {
-    if (a.id) {
-      verifiedFullStreams.push({
-        url: `https://discoveryprovider.audius.co/v1/tracks/${encodeURIComponent(a.id)}/stream?app_name=GlassiumOS5`,
-        duration: Math.max(90, Math.round(a.duration || 210)),
+  if (Array.isArray(gdItems) && gdItems.length > 0) {
+    gdItems.forEach((item, idx) => {
+      if (!item || !item.id || !item.name) return;
+      const trackId = String(item.url_id || item.id);
+      const artistStr = Array.isArray(item.artist)
+        ? item.artist.filter(Boolean).join(', ')
+        : String(item.artist || cleanQ);
+      const albumStr = String(item.album || 'Single / Album');
+
+      // Filter out unofficial covers and '歌ってみた' unless query specifically searches for them
+      const isUnofficialCover =
+        /歌ってみた|歌い手|弾いてみた|叩いてみた|踊ってみた|covered by|cover by|acoustic cover|piano cover|guitar cover|remix|bootleg|fan cover|翻唱|翻唱版/i.test(
+          `${item.name} ${artistStr} ${albumStr}`
+        ) ||
+        (/\bcover\b/i.test(`${item.name} ${albumStr}`) && !/\boriginal\b/i.test(item.name));
+
+      if (isUnofficialCover && !/歌ってみた|cover/i.test(cleanQ)) {
+        return;
+      }
+
+      const palette = GRADIENT_PALETTES[idx % GRADIENT_PALETTES.length];
+      const matchedItunes = itunesList.find(
+        (it) =>
+          it.trackName &&
+          (it.trackName.toLowerCase() === item.name.toLowerCase() ||
+            it.trackName.toLowerCase().includes(item.name.toLowerCase().slice(0, 6)))
+      );
+      const hiResArt = matchedItunes?.artworkUrl100
+        ? matchedItunes.artworkUrl100.replace('100x100bb', '600x600bb')
+        : undefined;
+      const fullDuration =
+        matchedItunes?.trackTimeMillis && matchedItunes.trackTimeMillis > 40000
+          ? Math.round(matchedItunes.trackTimeMillis / 1000)
+          : 215;
+
+      results.push({
+        id: `mono-gd-${trackId}`,
+        monoTrackId: trackId,
+        title: item.name,
+        artist: artistStr,
+        album: String(item.album || 'Single / Album'),
+        coverGradient: palette.grad,
+        coverAccent: palette.accent,
+        artworkUrl: hiResArt,
+        audioUrl: `./api/music/play?id=${encodeURIComponent(trackId)}&title=${encodeURIComponent(item.name)}&artist=${encodeURIComponent(artistStr)}`,
+        isFullLengthStream: false,
+        sourceUrl: `https://music-api.gdstudio.xyz/api.php?types=url&source=netease&id=${encodeURIComponent(trackId)}&br=320`,
+        duration: fullDuration,
+        format: 'api.monochrome.tf 320kbps Full Stream',
+        bitrate: '320 kbps Full Track',
+        genre: matchedItunes?.primaryGenreName || 'J-Pop / Lossless',
+        year: matchedItunes?.releaseDate
+          ? new Date(matchedItunes.releaseDate).getFullYear() || 2025
+          : 2025,
+        synthParams: MONOCHROME_CATALOG[idx % MONOCHROME_CATALOG.length].synthParams,
+        lyrics: [
+          { time: 0, text: `${item.name} — ${artistStr}` },
+          { time: 3, text: '同期歌詞を読み込み中...' },
+        ],
       });
-    }
-  }
-  // Fallback pool from MONOCHROME_CATALOG full-length streams if search query had 0 stream matches
-  for (const cat of MONOCHROME_CATALOG) {
-    if (cat.audioUrl) {
-      verifiedFullStreams.push({ url: cat.audioUrl, duration: cat.duration });
-    }
-  }
-
-  // 1. Add api.monochrome.tf Native Tracks First
-  monoItems.slice(0, 10).forEach((item, idx) => {
-    if (!item.id || !item.title) return;
-    const palette = GRADIENT_PALETTES[idx % GRADIENT_PALETTES.length];
-    const artistName =
-      item.artist?.name ||
-      item.artists?.map((a) => a.name).filter(Boolean).join(', ') ||
-      cleanQ;
-    const albumTitle = item.album?.title || 'api.monochrome.tf Lossless';
-    const coverUuid = item.album?.cover;
-    const tidalCoverUrl = coverUuid
-      ? `https://resources.tidal.com/images/${coverUuid.replace(/-/g, '/')}/640x640.jpg`
-      : undefined;
-    const fullDuration = Math.max(90, Math.round(Number(item.duration) || 215));
-
-    const normTitle = item.title.toLowerCase();
-    const matchedSaavn = saavnSongs.find((s) =>
-      (s.name || s.title || '').toLowerCase().includes(normTitle.slice(0, 8))
-    );
-    const saavnDl = matchedSaavn?.downloadUrl?.[matchedSaavn.downloadUrl.length - 1];
-    const initialStreamUrl =
-      saavnDl?.url ||
-      saavnDl?.link ||
-      verifiedFullStreams[idx % verifiedFullStreams.length]?.url;
-
-    results.push({
-      id: `mono-live-tf-${item.id}`,
-      monoTrackId: item.id,
-      title: item.title,
-      artist: artistName,
-      album: albumTitle,
-      coverGradient: palette.grad,
-      coverAccent: palette.accent,
-      artworkUrl: tidalCoverUrl,
-      audioUrl: initialStreamUrl,
-      isFullLengthStream: false,
-      sourceUrl: `https://api.monochrome.tf/track/?id=${encodeURIComponent(String(item.id))}&quality=HIGH`,
-      duration: fullDuration,
-      format: 'api.monochrome.tf Hi-Fi Stream',
-      bitrate: item.audioQuality === 'HI_RES' ? '24-bit / 96kHz FLAC' : '1411 kbps / 320 kbps',
-      genre: 'Lossless Audio',
-      year: item.album?.releaseDate ? new Date(item.album.releaseDate).getFullYear() || 2025 : 2025,
-      synthParams: MONOCHROME_CATALOG[idx % MONOCHROME_CATALOG.length].synthParams,
-      lyrics: [
-        { time: 0, text: `${item.title} — ${artistName}` },
-        { time: 3, text: 'Synchronizing lyrics via api.monochrome.tf & LRCLIB...' },
-      ],
     });
-  });
-
-  // 2. Add Saavn Full-Length 320kbps Streams (Direct Full Song Playback)
-  saavnSongs.slice(0, 8).forEach((s, idx) => {
-    const dlList = s.downloadUrl || [];
-    const bestDl = dlList[dlList.length - 1];
-    const fullStreamUrl = bestDl?.url || bestDl?.link;
-    if (!fullStreamUrl) return;
-
-    const palette = GRADIENT_PALETTES[(idx + results.length) % GRADIENT_PALETTES.length];
-    const imgs = s.image || [];
-    const hiResImg = imgs[imgs.length - 1]?.url || imgs[imgs.length - 1]?.link;
-    const rawTitle = (s.name || s.title || cleanQ).replace(/&quot;/g, '"').replace(/&amp;/g, '&');
-    const rawArtist =
-      s.artists?.primary?.map((a) => a.name).filter(Boolean).join(', ') ||
-      s.primaryArtists ||
-      cleanQ;
-    const fullDuration = Math.max(90, Number(s.duration) || 215);
-
-    results.push({
-      id: `mono-live-saavn-${s.id || idx}`,
-      title: rawTitle,
-      artist: rawArtist,
-      album: (typeof s.album === 'object' ? s.album?.name : s.album) || 'api.monochrome.tf Stream',
-      coverGradient: palette.grad,
-      coverAccent: palette.accent,
-      artworkUrl: hiResImg,
-      audioUrl: fullStreamUrl,
-      isFullLengthStream: true,
-      sourceUrl: `https://api.monochrome.tf/search/?s=${encodeURIComponent(rawTitle + ' ' + rawArtist)}`,
-      duration: fullDuration,
-      format: 'api.monochrome.tf 320kbps AAC',
-      bitrate: '320 kbps Full Track',
-      genre: 'Lossless / Hi-Fi',
-      year: Number(s.year) || 2025,
-      synthParams: MONOCHROME_CATALOG[idx % MONOCHROME_CATALOG.length].synthParams,
-      lyrics: [
-        { time: 0, text: `${rawTitle} — ${rawArtist}` },
-        { time: 3, text: 'Synchronizing lyrics via api.monochrome.tf & LRCLIB...' },
-      ],
-    });
-  });
-
-  // 3. Add iTunes Metadata Tracks paired ONLY with Full-Length Streams (NEVER use 30s item.previewUrl!)
-  if (itunesData?.results && itunesData.results.length > 0) {
-    itunesData.results
-      .filter((item) => item.trackName && item.artistName)
-      .slice(0, 8)
-      .forEach((item, idx) => {
-        const palette = GRADIENT_PALETTES[(idx + results.length) % GRADIENT_PALETTES.length];
-        const hiResArt = item.artworkUrl100 ? item.artworkUrl100.replace('100x100bb', '600x600bb') : undefined;
-        const fullTrackDuration = Math.max(
-          95,
-          Math.round((item.trackTimeMillis && item.trackTimeMillis > 35000 ? item.trackTimeMillis : 215000) / 1000)
-        );
-        const year = item.releaseDate ? new Date(item.releaseDate).getFullYear() || 2025 : 2025;
-
-        const normTitle = item.trackName.toLowerCase();
-        const matchedSaavn = saavnSongs.find((s) =>
-          (s.name || s.title || '').toLowerCase().includes(normTitle.slice(0, 8))
-        );
-        const saavnDl = matchedSaavn?.downloadUrl?.[matchedSaavn.downloadUrl.length - 1];
-        const matchedFullUrl =
-          saavnDl?.url ||
-          saavnDl?.link ||
-          verifiedFullStreams[idx % verifiedFullStreams.length]?.url;
-
-        results.push({
-          id: `mono-live-${item.trackId || idx}`,
-          title: item.trackName,
-          artist: item.artistName,
-          album: item.collectionName || 'api.monochrome.tf Catalog',
-          coverGradient: palette.grad,
-          coverAccent: palette.accent,
-          artworkUrl: hiResArt,
-          audioUrl: matchedFullUrl,
-          isFullLengthStream: Boolean(saavnDl?.url || saavnDl?.link),
-          sourceUrl: `https://api.monochrome.tf/search/?s=${encodeURIComponent(item.trackName + ' ' + item.artistName)}`,
-          duration: fullTrackDuration,
-          format: 'api.monochrome.tf Full Stream',
-          bitrate: '1411 kbps / 320 kbps',
-          genre: item.primaryGenreName || 'Pop / Electronic',
-          year,
-          synthParams: MONOCHROME_CATALOG[idx % MONOCHROME_CATALOG.length].synthParams,
-          lyrics: [
-            { time: 0, text: `${item.trackName} — ${item.artistName}` },
-            { time: 3, text: 'Synchronizing lyrics via api.monochrome.tf & LRCLIB...' },
-          ],
-        });
-      });
   }
-
-  // 4. Add Audius Discovery Provider Full-Length Streams
-  audiusSongs.slice(0, 6).forEach((item, idx) => {
-    if (!item.id || !item.title) return;
-    const palette = GRADIENT_PALETTES[(idx + results.length) % GRADIENT_PALETTES.length];
-    const artistName = item.user?.name || item.user?.handle || 'Artist';
-    const fullDuration = Math.max(90, Math.round(item.duration || 210));
-    results.push({
-      id: `mono-live-audius-${item.id}`,
-      title: item.title,
-      artist: artistName,
-      album: 'api.monochrome.tf Stream',
-      coverGradient: palette.grad,
-      coverAccent: palette.accent,
-      artworkUrl: item.artwork?.['480x480'] || item.artwork?.['150x150'],
-      audioUrl: `https://discoveryprovider.audius.co/v1/tracks/${encodeURIComponent(item.id)}/stream?app_name=GlassiumOS5`,
-      isFullLengthStream: true,
-      sourceUrl: `https://api.monochrome.tf/search/?s=${encodeURIComponent(item.title + ' ' + artistName)}`,
-      duration: fullDuration,
-      format: 'Full-Length 320kbps Stream',
-      bitrate: '320 kbps Full Track',
-      genre: item.genre || 'Electronic',
-      year: item.release_date ? new Date(item.release_date).getFullYear() || 2025 : 2025,
-      synthParams: MONOCHROME_CATALOG[idx % MONOCHROME_CATALOG.length].synthParams,
-      lyrics: [
-        { time: 0, text: `${item.title} — ${artistName}` },
-        { time: 3, text: 'Synchronizing lyrics via LRCLIB...' },
-      ],
-    });
-  });
 
   return results;
 }

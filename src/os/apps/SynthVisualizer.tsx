@@ -48,26 +48,34 @@ const INITIAL_ENRICHED_CATALOG: MonochromeTrack[] = MONOCHROME_CATALOG.map((t) =
   lyrics: enrichLyricsWithWordTiming(t.lyrics, t.duration),
 }));
 
-// Upgrade any legacy cached tracks in localStorage so no track ever uses a 30s iTunes previewUrl
+// Upgrade any legacy cached tracks in localStorage so every track plays its own exact full-length stream
 function sanitizeStoredTracks(list: MonochromeTrack[]): MonochromeTrack[] {
-  return list.map((item, idx) => {
-    const catalogMatch = INITIAL_ENRICHED_CATALOG.find((c) => c.id === item.id);
-    if (catalogMatch) {
-      return catalogMatch;
-    }
-    const fallbackFull = INITIAL_ENRICHED_CATALOG[idx % INITIAL_ENRICHED_CATALOG.length];
-    const isPreview30s =
-      !item.audioUrl ||
-      item.audioUrl.includes('itunes.apple.com') ||
-      item.audioUrl.includes('mzstatic.com');
-    return {
-      ...item,
-      audioUrl: isPreview30s ? fallbackFull.audioUrl : item.audioUrl,
-      isFullLengthStream: isPreview30s ? false : item.isFullLengthStream,
-      duration: Math.max(95, item.duration || fallbackFull.duration),
-      lyrics: enrichLyricsWithWordTiming(item.lyrics || fallbackFull.lyrics, item.duration || 180),
-    };
-  });
+  return list
+    .filter((item) => item && item.title && !item.id.startsWith('track-'))
+    .map((item) => {
+      const catalogMatch = INITIAL_ENRICHED_CATALOG.find(
+        (c) => c.id === item.id || (c.title === item.title && c.artist === item.artist)
+      );
+      if (catalogMatch) {
+        return catalogMatch;
+      }
+      const needsExactPlayUrl =
+        !item.audioUrl ||
+        item.audioUrl.includes('itunes.apple.com') ||
+        item.audioUrl.includes('mzstatic.com') ||
+        item.audioUrl.includes('saavncdn.com') ||
+        item.audioUrl.includes('soundhelix.com');
+      const exactPlayUrl = `./api/music/play?id=${encodeURIComponent(
+        item.monoTrackId || ''
+      )}&title=${encodeURIComponent(item.title)}&artist=${encodeURIComponent(item.artist)}`;
+      return {
+        ...item,
+        audioUrl: needsExactPlayUrl ? exactPlayUrl : item.audioUrl,
+        isFullLengthStream: true,
+        duration: Math.max(95, item.duration || 210),
+        lyrics: enrichLyricsWithWordTiming(item.lyrics || [], item.duration || 210),
+      };
+    });
 }
 
 // Apple Music cubic-bezier(0.22, 1, 0.36, 1) spring approximation
@@ -75,12 +83,12 @@ function easeAppleMusicSpring(t: number): number {
   return 1 - Math.pow(1 - t, 3.6);
 }
 
-const FAVORITES_STORAGE_KEY = 'glassium_apple_music_favorites_v2';
-const RECENT_STORAGE_KEY = 'glassium_apple_music_recent_v2';
+const FAVORITES_STORAGE_KEY = 'glassium_apple_music_favorites_v3';
+const RECENT_STORAGE_KEY = 'glassium_apple_music_recent_v3';
 
 const POPULAR_ARTIST_SHORTCUTS = [
   'YOASOBI',
-  'Kenshi Yonezu',
+  '米津玄師',
   'Ado',
   'Official髭男dism',
   'Mrs. GREEN APPLE',
@@ -108,11 +116,19 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const [proxyLatency, setProxyLatency] = useState(8);
   const [isBuffering, setIsBuffering] = useState(false);
 
-  // Track Catalog State
+  // Track Catalog State & Exact Active Track Selection (Never mismatched by index shifts)
   const [tracks, setTracks] = useState<MonochromeTrack[]>(INITIAL_ENRICHED_CATALOG);
-  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
-  const currentTrack: MonochromeTrack =
-    tracks[currentTrackIndex] ?? tracks[0] ?? INITIAL_ENRICHED_CATALOG[0];
+  const [currentTrackId, setCurrentTrackId] = useState<string>(INITIAL_ENRICHED_CATALOG[0].id);
+  const [activeTrackOverride, setActiveTrackOverride] = useState<MonochromeTrack | null>(null);
+
+  const currentTrack: MonochromeTrack = useMemo(() => {
+    const found = tracks.find((t) => t.id === currentTrackId);
+    if (found) return found;
+    if (activeTrackOverride && activeTrackOverride.id === currentTrackId) {
+      return activeTrackOverride;
+    }
+    return tracks[0] ?? INITIAL_ENRICHED_CATALOG[0];
+  }, [tracks, currentTrackId, activeTrackOverride]);
 
   // Favorites State (Persisted in localStorage)
   const [favoriteTracks, setFavoriteTracks] = useState<MonochromeTrack[]>(() => {
@@ -120,7 +136,10 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return sanitizeStoredTracks(parsed);
+        if (Array.isArray(parsed)) {
+          const sanitized = sanitizeStoredTracks(parsed);
+          if (sanitized.length > 0) return sanitized;
+        }
       }
     } catch {
       // ignore storage read error
@@ -134,12 +153,15 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       const raw = localStorage.getItem(RECENT_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) return sanitizeStoredTracks(parsed);
+        if (Array.isArray(parsed)) {
+          const sanitized = sanitizeStoredTracks(parsed);
+          if (sanitized.length > 0) return sanitized;
+        }
       }
     } catch {
       // ignore
     }
-    return INITIAL_ENRICHED_CATALOG.slice(0, 3);
+    return INITIAL_ENRICHED_CATALOG.slice(0, 4);
   });
 
   useEffect(() => {
@@ -174,7 +196,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     });
   }, []);
 
-  // High-Precision Playback State (50ms resolution)
+  // High-Precision Playback State (60fps resolution)
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [lyricOffsetSec, setLyricOffsetSec] = useState(0);
@@ -188,10 +210,11 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const [isShuffle, setIsShuffle] = useState(false);
   const [isRepeat, setIsRepeat] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [lastSearchedQuery, setLastSearchedQuery] = useState('');
   const [isSearchingOnline, setIsSearchingOnline] = useState(false);
   const [isFetchingLyrics, setIsFetchingLyrics] = useState(false);
   const [statusBanner, setStatusBanner] = useState<string>(
-    'api.monochrome.tf 接続完了 — フル尺再生・Apple Music 同期歌詞'
+    'Apple Music JP 公式カタログ (歌ってみた・カバー除外) + 320kbps フル尺ストリーム & LRCLIB 同期歌詞'
   );
 
   // api.monochrome.tf / monochrome.tf Web Proxy State (Wisp + UV/Scramjet SW)
@@ -223,6 +246,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const fullPlayheadRef = useRef<number>(0);
   const userScrollTimeoutRef = useRef<number | null>(null);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
+  const searchDebounceRef = useRef<number | null>(null);
 
   // Interactive Custom Lyric Editor State (LRC / TTML / JSON)
   const [showCustomLyricEditor, setShowCustomLyricEditor] = useState(false);
@@ -235,10 +259,19 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     return () => clearInterval(timer);
   }, []);
 
-  // Filter tracks locally or show live search results
+  // Show all online search results when a search was executed, or filter locally for quick 1-char filter
   const filteredTracks = useMemo(() => {
-    if (!searchQuery.trim()) return tracks;
-    const q = searchQuery.toLowerCase();
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return tracks;
+    // If tracks already contain live search results for the active query, return them all without hiding script variants
+    if (
+      lastSearchedQuery &&
+      (lastSearchedQuery.toLowerCase() === q ||
+        q.includes(lastSearchedQuery.toLowerCase()) ||
+        lastSearchedQuery.toLowerCase().includes(q))
+    ) {
+      return tracks;
+    }
     const localMatches = tracks.filter(
       (t) =>
         t.title.toLowerCase().includes(q) ||
@@ -247,7 +280,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         t.genre.toLowerCase().includes(q)
     );
     return localMatches.length > 0 ? localMatches : tracks;
-  }, [searchQuery, tracks]);
+  }, [searchQuery, lastSearchedQuery, tracks]);
 
   // Effective lyric synchronization time
   const effectiveLyricTime = useMemo(
@@ -445,7 +478,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     [initAudioContext, stopAllAudio, vocalBoost]
   );
 
-  // Fetch Synchronized Lyrics from api.monochrome.tf / LRCLIB
+  // Fetch Synchronized Lyrics from /api/music/lyrics / GDStudio / LRCLIB
   const loadLyricsForTrack = useCallback(async (track: MonochromeTrack) => {
     setIsFetchingLyrics(true);
     try {
@@ -465,8 +498,11 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         setRecentTracks((prev) =>
           prev.map((t) => (t.id === track.id ? { ...t, lyrics: synced } : t))
         );
+        setActiveTrackOverride((prev) =>
+          prev && prev.id === track.id ? { ...prev, lyrics: synced } : prev
+        );
         setStatusBanner(
-          `同期歌詞を取得完了: ${track.title} (${synced.length}行)`
+          `同期歌詞を取得完了: ${track.title} — ${track.artist} (${synced.length}行)`
         );
       }
     } catch {
@@ -475,6 +511,14 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       setIsFetchingLyrics(false);
     }
   }, []);
+
+  // Load full synchronized LRC lyrics for the initial track on mount
+  useEffect(() => {
+    const initial = INITIAL_ENRICHED_CATALOG[0];
+    if (initial) {
+      loadLyricsForTrack(initial);
+    }
+  }, [loadLyricsForTrack]);
 
   // Sync Wisp Server & Engine with Service Worker
   useEffect(() => {
@@ -532,15 +576,22 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   }, [activeNav, loadMonochromeWebProxy, monoWebLoading, monoWebSrcDoc, monoWebSwSrc, monoWebUrl, proxyEngine, relayNode]);
 
   // -----------------------------------------------------------------------
-  // Playback Toggle & Track Changing (api.monochrome.tf Full-Length Stream)
+  // Playback Toggle & Track Changing (Exact Song Full-Length Stream)
   // -----------------------------------------------------------------------
   const startTrackPlayback = useCallback(
     (track: MonochromeTrack, startAtSec = 0) => {
       stopAllAudio();
       fullPlayheadRef.current = startAtSec;
-      if (track.audioUrl && audioElRef.current) {
+
+      const resolvedUrl =
+        track.audioUrl ||
+        `./api/music/play?id=${encodeURIComponent(
+          track.monoTrackId || ''
+        )}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`;
+
+      if (resolvedUrl && audioElRef.current) {
         const audio = audioElRef.current;
-        audio.src = track.audioUrl;
+        audio.src = resolvedUrl;
         audio.volume = isMuted ? 0 : volume;
         audio.playbackRate = playbackRate;
         audio.currentTime = startAtSec;
@@ -554,7 +605,28 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             );
           })
           .catch(() => {
-            startProceduralAudio(track);
+            // Retry via server byte-proxy if redirect failed
+            if (resolvedUrl.includes('/api/music/play') && !resolvedUrl.includes('proxy=1')) {
+              const proxyUrl = `${resolvedUrl}&proxy=1`;
+              audio.src = proxyUrl;
+              audio.volume = isMuted ? 0 : volume;
+              audio.playbackRate = playbackRate;
+              audio.currentTime = startAtSec;
+              audio
+                .play()
+                .then(() => {
+                  setStatusBanner(
+                    `再生中 (${Math.floor(track.duration / 60)}:${String(
+                      Math.floor(track.duration % 60)
+                    ).padStart(2, '0')}): ${track.title} — ${track.artist}`
+                  );
+                })
+                .catch(() => {
+                  startProceduralAudio(track);
+                });
+            } else {
+              startProceduralAudio(track);
+            }
           });
       } else {
         startProceduralAudio(track);
@@ -565,39 +637,61 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
   const playTrack = useCallback(
     (trackToPlay: MonochromeTrack) => {
+      const exactPlayUrl =
+        trackToPlay.audioUrl &&
+        !trackToPlay.audioUrl.includes('saavncdn.com') &&
+        !trackToPlay.audioUrl.includes('itunes.apple.com') &&
+        !trackToPlay.audioUrl.includes('mzstatic.com')
+          ? trackToPlay.audioUrl
+          : `./api/music/play?id=${encodeURIComponent(
+              trackToPlay.monoTrackId || ''
+            )}&title=${encodeURIComponent(trackToPlay.title)}&artist=${encodeURIComponent(
+              trackToPlay.artist
+            )}`;
+
+      const normalizedTrack: MonochromeTrack = {
+        ...trackToPlay,
+        audioUrl: exactPlayUrl,
+        isFullLengthStream: true,
+      };
+
+      setActiveTrackOverride(normalizedTrack);
+      setCurrentTrackId(normalizedTrack.id);
+
       setTracks((prev) => {
-        const exists = prev.some((t) => t.id === trackToPlay.id);
-        return exists ? prev : [trackToPlay, ...prev];
+        const exists = prev.some((t) => t.id === normalizedTrack.id);
+        return exists
+          ? prev.map((t) => (t.id === normalizedTrack.id ? normalizedTrack : t))
+          : [normalizedTrack, ...prev];
       });
       setRecentTracks((prev) => {
-        const filtered = prev.filter((t) => t.id !== trackToPlay.id);
-        return [trackToPlay, ...filtered].slice(0, 24);
+        const filtered = prev.filter((t) => t.id !== normalizedTrack.id);
+        return [normalizedTrack, ...filtered].slice(0, 24);
       });
 
-      const idx = tracks.findIndex((t) => t.id === trackToPlay.id);
-      const resolvedIdx = idx >= 0 ? idx : 0;
       setIsBuffering(true);
-      setCurrentTrackIndex(resolvedIdx);
       setCurrentTime(0);
       setLyricOffsetSec(0);
       setUserScrolledLyrics(false);
       fullPlayheadRef.current = 0;
 
-      if (trackToPlay.id.startsWith('mono-live-') && trackToPlay.lyrics.length <= 3) {
-        loadLyricsForTrack(trackToPlay);
+      // Always fetch full synchronized LRC lyrics if the track only has placeholder/short lyrics
+      if (!normalizedTrack.lyrics || normalizedTrack.lyrics.length <= 12) {
+        loadLyricsForTrack(normalizedTrack);
       }
 
-      if (trackToPlay.id.startsWith('mono-live-') && !trackToPlay.isFullLengthStream) {
+      // If audioUrl is not yet resolved or needs direct CDN verification, resolve in background for this exact track
+      if (!normalizedTrack.audioUrl || !normalizedTrack.isFullLengthStream) {
         resolveFullLengthAudioStream(
-          trackToPlay.title,
-          trackToPlay.artist,
-          trackToPlay.monoTrackId
+          normalizedTrack.title,
+          normalizedTrack.artist,
+          normalizedTrack.monoTrackId
         )
           .then((resolved) => {
             if (resolved && resolved.audioUrl) {
               const updater = (list: MonochromeTrack[]) =>
                 list.map((t) =>
-                  t.id === trackToPlay.id
+                  t.id === normalizedTrack.id
                     ? {
                         ...t,
                         audioUrl: resolved.audioUrl,
@@ -610,17 +704,17 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               setTracks(updater);
               setFavoriteTracks(updater);
               setRecentTracks(updater);
-
-              if (audioElRef.current && audioElRef.current.src !== resolved.audioUrl) {
-                const resumeSec = fullPlayheadRef.current;
-                audioElRef.current.src = resolved.audioUrl;
-                audioElRef.current.playbackRate = playbackRate;
-                audioElRef.current.currentTime = resumeSec;
-                audioElRef.current.play().catch(() => {});
-                setStatusBanner(
-                  `api.monochrome.tf フル尺ストリーム接続完了 (${resolved.bitrate}): ${trackToPlay.title}`
-                );
-              }
+              setActiveTrackOverride((prev) =>
+                prev && prev.id === normalizedTrack.id
+                  ? {
+                      ...prev,
+                      audioUrl: resolved.audioUrl,
+                      isFullLengthStream: true,
+                      format: resolved.format,
+                      bitrate: resolved.bitrate,
+                    }
+                  : prev
+              );
             }
           })
           .catch(() => {});
@@ -629,18 +723,18 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       setTimeout(() => {
         setIsBuffering(false);
         setIsPlaying(true);
-        startTrackPlayback(trackToPlay, 0);
-      }, 140);
+        startTrackPlayback(normalizedTrack, 0);
+      }, 60);
     },
-    [loadLyricsForTrack, playbackRate, startTrackPlayback, tracks]
+    [loadLyricsForTrack, startTrackPlayback]
   );
 
-  // Search Live Tracks from api.monochrome.tf
+  // Search Live Tracks (Fast <400ms via /api/music/search + GDStudio/iTunes JP)
   const handleOnlineMusicSearch = useCallback(
     async (qOverride?: string) => {
       const q = (qOverride ?? searchQuery).trim() || 'YOASOBI';
       setIsSearchingOnline(true);
-      setStatusBanner(`api.monochrome.tf から楽曲と同期歌詞を検索中: "${q}"...`);
+      setStatusBanner(`"${q}" のフル尺ストリームと同期歌詞を検索中...`);
       try {
         const liveResults = await searchMonochromeLiveTracks(q);
         if (liveResults.length > 0) {
@@ -648,32 +742,65 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             ...t,
             lyrics: enrichLyricsWithWordTiming(t.lyrics, t.duration),
           }));
-          setTracks([...enrichedLive, ...INITIAL_ENRICHED_CATALOG]);
-          setCurrentTrackIndex(0);
-          setCurrentTime(0);
-          fullPlayheadRef.current = 0;
+          setLastSearchedQuery(q);
+          setTracks(enrichedLive);
+
+          // Only switch selected track if not currently playing another song
+          if (!isPlaying) {
+            setCurrentTrackId(enrichedLive[0].id);
+            setActiveTrackOverride(enrichedLive[0]);
+            setCurrentTime(0);
+            fullPlayheadRef.current = 0;
+            loadLyricsForTrack(enrichedLive[0]);
+          }
+
           if (activeNav !== 'songs' && activeNav !== 'browse' && activeNav !== 'listen-now') {
             setActiveNav('songs');
           }
           setStatusBanner(
-            `api.monochrome.tf から "${q}" の楽曲を ${enrichedLive.length} 件取得しました`
+            `"${q}" の検索結果: ${enrichedLive.length} 曲 — クリックするとその曲がフル尺再生されます`
           );
-          loadLyricsForTrack(enrichedLive[0]);
         } else {
           setStatusBanner(
-            `"${q}" のストリームが見つかりませんでした。別のキーワードをお試しください`
+            `"${q}" の楽曲が見つかりませんでした。別のアーティスト名や曲名をお試しください`
           );
         }
       } catch {
-        setStatusBanner('検索中にタイムアウトしました。別の中継ノードをお試しください');
+        setStatusBanner('検索中にエラーが発生しました。もう一度お試しください');
       } finally {
         setIsSearchingOnline(false);
       }
     },
-    [activeNav, loadLyricsForTrack, searchQuery]
+    [activeNav, isPlaying, loadLyricsForTrack, searchQuery]
   );
 
-  const togglePlay = () => {
+  // Auto-search with 420ms debounce when typing in the search box
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      if (lastSearchedQuery) {
+        setLastSearchedQuery('');
+        setTracks(INITIAL_ENRICHED_CATALOG);
+      }
+      return;
+    }
+    if (trimmed.length < 2 || trimmed === lastSearchedQuery) return;
+
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+    searchDebounceRef.current = window.setTimeout(() => {
+      handleOnlineMusicSearch(trimmed);
+    }, 420);
+
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, [searchQuery, lastSearchedQuery, handleOnlineMusicSearch]);
+
+  const togglePlay = useCallback(() => {
     if (isPlaying) {
       setIsPlaying(false);
       stopAllAudio();
@@ -683,9 +810,9 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         setIsBuffering(false);
         setIsPlaying(true);
         startTrackPlayback(currentTrack, fullPlayheadRef.current);
-      }, 120);
+      }, 60);
     }
-  };
+  }, [currentTrack, isPlaying, startTrackPlayback, stopAllAudio]);
 
   const seekToSeconds = useCallback(
     (targetSec: number) => {
@@ -696,7 +823,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       if (audioElRef.current && currentTrack.audioUrl) {
         const nativeDur = audioElRef.current.duration;
         if (Number.isFinite(nativeDur) && nativeDur > 0) {
-          audioElRef.current.currentTime = clamped % nativeDur;
+          audioElRef.current.currentTime = Math.min(nativeDur - 0.2, clamped);
         } else {
           audioElRef.current.currentTime = clamped;
         }
@@ -706,7 +833,8 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   );
 
   const nextTrack = useCallback(() => {
-    let nextIdx = currentTrackIndex + 1;
+    const currentIdx = tracks.findIndex((t) => t.id === currentTrack.id);
+    let nextIdx = currentIdx >= 0 ? currentIdx + 1 : 0;
     if (isShuffle) {
       nextIdx = Math.floor(Math.random() * tracks.length);
     } else if (nextIdx >= tracks.length) {
@@ -714,20 +842,67 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     }
     const nextItem = tracks[nextIdx] ?? tracks[0];
     if (nextItem) playTrack(nextItem);
-  }, [currentTrackIndex, isShuffle, playTrack, tracks]);
+  }, [currentTrack.id, isShuffle, playTrack, tracks]);
 
-  const prevTrack = () => {
+  const prevTrack = useCallback(() => {
     if (currentTime > 4) {
       seekToSeconds(0);
       return;
     }
-    let prevIdx = currentTrackIndex - 1;
-    if (prevIdx < 0) {
-      prevIdx = tracks.length - 1;
-    }
+    const currentIdx = tracks.findIndex((t) => t.id === currentTrack.id);
+    let prevIdx = currentIdx > 0 ? currentIdx - 1 : tracks.length - 1;
+    if (prevIdx < 0) prevIdx = 0;
     const prevItem = tracks[prevIdx] ?? tracks[0];
     if (prevItem) playTrack(prevItem);
-  };
+  }, [currentTime, currentTrack.id, playTrack, seekToSeconds, tracks]);
+
+  // Broadcast Now Playing Pill state to OS Desktop & listen for remote pill commands
+  useEffect(() => {
+    const activeLyricText =
+      currentTrack.lyrics && currentLyricIndex >= 0
+        ? currentTrack.lyrics[currentLyricIndex]?.text || ''
+        : '';
+    window.dispatchEvent(
+      new CustomEvent('glassium-music-state', {
+        detail: {
+          isPlaying,
+          title: currentTrack.title,
+          artist: currentTrack.artist,
+          album: currentTrack.album,
+          artworkUrl: currentTrack.artworkUrl || '',
+          coverGradient: currentTrack.coverGradient,
+          currentTime,
+          duration: currentTrack.duration,
+          lyricLine: activeLyricText,
+        },
+      })
+    );
+  }, [isPlaying, currentTrack, currentTime, currentLyricIndex]);
+
+  useEffect(() => {
+    return () => {
+      window.dispatchEvent(
+        new CustomEvent('glassium-music-state', {
+          detail: { isPlaying: false },
+        })
+      );
+    };
+  }, []);
+
+  useEffect(() => {
+    const onMusicCommand = (e: Event) => {
+      const cmd = (e as CustomEvent<{ action?: string }>).detail?.action;
+      if (cmd === 'toggle-play') {
+        togglePlay();
+      } else if (cmd === 'next') {
+        nextTrack();
+      } else if (cmd === 'prev') {
+        prevTrack();
+      }
+    };
+    window.addEventListener('glassium-music-command', onMusicCommand);
+    return () => window.removeEventListener('glassium-music-command', onMusicCommand);
+  }, [togglePlay, nextTrack, prevTrack]);
 
   // -----------------------------------------------------------------------
   // 60fps High-Precision requestAnimationFrame Lyric & Audio Sync Engine
@@ -1308,16 +1483,18 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   isCurrent ? 'bg-[#fa243c]/18 text-white' : 'hover:bg-white/[0.05]'
                 }`}
               >
-                {/* Index or Equalizer Bars */}
-                <div className="text-xs font-mono tabular-nums text-white/45">
+                {/* Track Number / Play Status */}
+                <div className="text-xs font-mono tabular-nums text-white/45 flex items-center">
                   {isCurrent && isPlaying ? (
-                    <div className="flex items-end gap-0.5 h-3">
-                      <span className="w-0.5 h-2.5 bg-[#fa243c] animate-pulse" />
-                      <span className="w-0.5 h-3.5 bg-[#fa243c] animate-pulse" />
-                      <span className="w-0.5 h-2 bg-[#fa243c] animate-pulse" />
-                    </div>
+                    <span className="material-symbols-rounded text-[18px] text-[#fa243c]">
+                       pause
+                    </span>
+                  ) : isCurrent ? (
+                    <span className="material-symbols-rounded text-[18px] text-white/80">
+                      play_arrow
+                    </span>
                   ) : (
-                    <span>{idx + 1}</span>
+                    <span className="w-5 text-center text-white/40 text-[11px]">{idx + 1}</span>
                   )}
                 </div>
 
@@ -1404,16 +1581,18 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         <div className="absolute inset-0 bg-[#121214]/80" />
       </div>
 
-      {/* Hidden HTML5 Audio Element for api.monochrome.tf Full-Length Streams */}
+      {/* Hidden HTML5 Audio Element for Full-Length 320kbps Streams */}
       <audio
         ref={audioElRef}
-        crossOrigin="anonymous"
         onLoadedMetadata={(e) => {
           const nativeDur = e.currentTarget.duration;
           if (Number.isFinite(nativeDur) && nativeDur >= 40) {
             const exactSecs = Math.round(nativeDur);
             setTracks((prev) =>
               prev.map((t) => (t.id === currentTrack.id ? { ...t, duration: exactSecs } : t))
+            );
+            setActiveTrackOverride((prev) =>
+              prev && prev.id === currentTrack.id ? { ...prev, duration: exactSecs } : prev
             );
           }
         }}
@@ -1433,41 +1612,51 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           TOP APPLE MUSIC PLAYER BAR (Liquid Glass + Transport + LCD Display)
          =================================================================== */}
       <div className="relative z-20 h-14 px-4 apple-liquid-glass-bar flex items-center justify-between gap-4 shrink-0">
-        {/* Left: Apple Music Transport Controls (Pure Minimalist Labels, No Decorative Icons) */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        {/* Left: Apple Music Transport Controls with Google Material Symbols */}
+        <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={() => setIsShuffle(!isShuffle)}
-            className={`px-2 py-1 rounded text-[11px] font-medium transition ${
-              isShuffle ? 'text-[#fa243c] bg-[#fa243c]/15' : 'text-white/55 hover:text-white'
+            title="シャッフル"
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
+              isShuffle ? 'text-[#fa243c] bg-[#fa243c]/15' : 'text-white/55 hover:text-white hover:bg-white/[0.08]'
             }`}
           >
-            Shuffle
+            <span className="material-symbols-rounded text-[18px]">shuffle</span>
           </button>
           <button
             onClick={prevTrack}
-            className="px-2.5 py-1 rounded text-xs font-medium text-white/80 hover:text-white hover:bg-white/[0.08] transition"
+            title="前の曲"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white/85 hover:text-white hover:bg-white/[0.08] transition"
           >
-            Prev
+            <span className="material-symbols-rounded text-[22px]">skip_previous</span>
           </button>
           <button
             onClick={togglePlay}
-            className="px-3.5 py-1 rounded-md bg-white text-black hover:bg-white/90 text-xs font-bold tracking-tight transition"
+            title={isPlaying ? '一時停止' : '再生'}
+            className="w-9 h-9 rounded-full bg-white text-black hover:bg-white/90 flex items-center justify-center transition shadow-md"
           >
-            {isPlaying ? 'Pause' : 'Play'}
+            <span
+              className="material-symbols-rounded text-[24px]"
+              style={{ fontVariationSettings: "'FILL' 1, 'wght' 600" }}
+            >
+              {isPlaying ? 'pause' : 'play_arrow'}
+            </span>
           </button>
           <button
             onClick={nextTrack}
-            className="px-2.5 py-1 rounded text-xs font-medium text-white/80 hover:text-white hover:bg-white/[0.08] transition"
+            title="次の曲"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white/85 hover:text-white hover:bg-white/[0.08] transition"
           >
-            Next
+            <span className="material-symbols-rounded text-[22px]">skip_next</span>
           </button>
           <button
             onClick={() => setIsRepeat(!isRepeat)}
-            className={`px-2 py-1 rounded text-[11px] font-medium transition ${
-              isRepeat ? 'text-[#fa243c] bg-[#fa243c]/15' : 'text-white/55 hover:text-white'
+            title="リピート"
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
+              isRepeat ? 'text-[#fa243c] bg-[#fa243c]/15' : 'text-white/55 hover:text-white hover:bg-white/[0.08]'
             }`}
           >
-            Repeat
+            <span className="material-symbols-rounded text-[18px]">repeat</span>
           </button>
         </div>
 
@@ -1548,9 +1737,12 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           <div className="hidden md:flex items-center gap-1.5">
             <button
               onClick={() => setIsMuted(!isMuted)}
-              className="text-[11px] font-medium text-white/60 hover:text-white transition"
+              className="w-7 h-7 rounded-full flex items-center justify-center text-white/65 hover:text-white hover:bg-white/[0.08] transition"
+              title={isMuted ? 'ミュート解除' : 'ミュート'}
             >
-              {isMuted || volume === 0 ? 'Muted' : 'Vol'}
+              <span className="material-symbols-rounded text-[18px]">
+                {isMuted || volume === 0 ? 'volume_off' : 'volume_up'}
+              </span>
             </button>
             <input
               type="range"
@@ -1608,7 +1800,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
            ----------------------------------------------------------------- */}
         <aside className="w-56 apple-liquid-glass border-r border-white/[0.12] flex flex-col justify-between p-3 shrink-0 overflow-y-auto">
           <div className="space-y-5">
-            {/* Search Box (Queries api.monochrome.tf) */}
+            {/* Search Box (Queries official releases) */}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -1620,7 +1812,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="検索 (api.monochrome.tf)"
+                  placeholder="公式楽曲を検索 (曲名・歌手)..."
                   className="bg-transparent text-white placeholder-white/40 outline-none w-full text-xs"
                 />
                 {searchQuery && (
@@ -1641,6 +1833,17 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 {isSearchingOnline ? '検索中...' : '楽曲検索'}
               </button>
             </form>
+
+            {/* Official Catalog Source Transparency Badge */}
+            <div className="px-2.5 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] space-y-1">
+              <div className="font-semibold text-[10px] text-white/85 flex items-center gap-1.5">
+                <span className="material-symbols-rounded text-xs text-emerald-400">verified</span>
+                <span>公式音源のみ配信</span>
+              </div>
+              <p className="text-[9px] text-white/50 leading-tight">
+                配信元: Apple Music (iTunes Japan) 公式カタログ &amp; Monochrome Hi-Fi。歌ってみた・非公式カバーは除外済みです。
+              </p>
+            </div>
 
             {/* Section 1: Apple Music */}
             <div className="space-y-1">
@@ -1783,13 +1986,41 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                         setSearchQuery(artist);
                         handleOnlineMusicSearch(artist);
                       }}
-                      className="px-2.5 py-1 rounded-md bg-white/[0.06] hover:bg-[#fa243c] text-[11px] text-white/75 hover:text-white transition"
+                      className={`px-2.5 py-1 rounded-md text-[11px] transition ${
+                        searchQuery === artist
+                          ? 'bg-[#fa243c] text-white font-semibold'
+                          : 'bg-white/[0.06] hover:bg-[#fa243c] text-white/75 hover:text-white'
+                      }`}
                     >
                       {artist}
                     </button>
                   ))}
                 </div>
               </div>
+
+              {/* When searching, show Search Results Table IMMEDIATELY at the top */}
+              {(searchQuery.trim().length > 0 || lastSearchedQuery.length > 0) && (
+                <div className="space-y-3 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.1]">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-sm sm:text-base font-bold text-white">
+                      {isSearchingOnline
+                        ? `"${searchQuery}" を検索中...`
+                        : `"${lastSearchedQuery || searchQuery}" の検索結果 (${filteredTracks.length}曲) — クリックでその曲をフル尺再生`}
+                    </h3>
+                    <button
+                      onClick={() => {
+                        setSearchQuery('');
+                        setLastSearchedQuery('');
+                        setTracks(INITIAL_ENRICHED_CATALOG);
+                      }}
+                      className="px-2.5 py-1 rounded bg-white/[0.08] hover:bg-white/15 text-[11px] text-white/75 hover:text-white transition"
+                    >
+                      検索をクリア
+                    </button>
+                  </div>
+                  {renderAppleMusicSongTable(filteredTracks, '該当する楽曲が見つかりません')}
+                </div>
+              )}
 
               {/* Featured Now Playing Liquid Glass Hero Card */}
               <div className="p-6 rounded-2xl apple-liquid-glass flex flex-col sm:flex-row items-center gap-6">
@@ -1824,9 +2055,15 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
                     <button
                       onClick={togglePlay}
-                      className="px-5 py-2 rounded-lg bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-semibold transition shadow-lg"
+                      className="px-5 py-2 rounded-lg bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-semibold transition shadow-lg flex items-center gap-1.5"
                     >
-                      {isPlaying ? '一時停止' : 'フル尺再生'}
+                      <span
+                        className="material-symbols-rounded text-[18px]"
+                        style={{ fontVariationSettings: "'FILL' 1, 'wght' 600" }}
+                      >
+                        {isPlaying ? 'pause' : 'play_arrow'}
+                      </span>
+                      <span>{isPlaying ? '一時停止' : 'フル尺再生'}</span>
                     </button>
                     <button
                       onClick={() => setActiveNav('lyrics')}
@@ -1898,26 +2135,49 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 </div>
               )}
 
-              {/* All Songs / Search Results Table */}
-              <div className="space-y-3">
-                <h3 className="text-base font-bold text-white">
-                  トラック一覧 ({filteredTracks.length}曲)
-                </h3>
-                {renderAppleMusicSongTable(filteredTracks, '楽曲が見つかりません')}
-              </div>
+              {/* All Songs / Catalog Table (shown when not already rendered in search box above) */}
+              {!(searchQuery.trim().length > 0 || lastSearchedQuery.length > 0) && (
+                <div className="space-y-3">
+                  <h3 className="text-base font-bold text-white">
+                    おすすめフル尺トラック ({filteredTracks.length}曲)
+                  </h3>
+                  {renderAppleMusicSongTable(filteredTracks, '楽曲が見つかりません')}
+                </div>
+              )}
             </div>
           )}
 
           {/* VIEW 2: BROWSE (見つける) */}
           {activeNav === 'browse' && (
             <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
-              <div className="border-b border-white/[0.08] pb-4">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                  見つける (api.monochrome.tf カタログ)
-                </h1>
-                <p className="text-xs text-white/50 mt-1">
-                  アーティストをクリックすると api.monochrome.tf からフル尺ストリームと同期歌詞を取得します
-                </p>
+              <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-4">
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                    見つける (楽曲・アーティスト検索)
+                  </h1>
+                  <p className="text-xs text-white/50 mt-1">{statusBanner}</p>
+                </div>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleOnlineMusicSearch();
+                  }}
+                  className="flex items-center gap-2 w-full sm:w-auto"
+                >
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="曲名・アーティスト名を入力..."
+                    className="w-full sm:w-64 px-3 py-1.5 rounded-md bg-white/[0.07] border border-white/15 focus:border-[#fa243c] text-xs text-white placeholder-white/40 outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSearchingOnline}
+                    className="px-4 py-1.5 rounded-md bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-semibold shrink-0 transition"
+                  >
+                    {isSearchingOnline ? '検索中...' : '検索'}
+                  </button>
+                </form>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -1928,10 +2188,14 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                       setSearchQuery(artist);
                       handleOnlineMusicSearch(artist);
                     }}
-                    className="p-4 rounded-lg bg-white/[0.04] hover:bg-[#fa243c]/20 border border-white/[0.08] hover:border-[#fa243c] text-left transition"
+                    className={`p-4 rounded-lg border text-left transition ${
+                      searchQuery === artist
+                        ? 'bg-[#fa243c]/25 border-[#fa243c]'
+                        : 'bg-white/[0.04] hover:bg-[#fa243c]/20 border-white/[0.08] hover:border-[#fa243c]'
+                    }`}
                   >
                     <div className="text-sm font-bold text-white">{artist}</div>
-                    <div className="text-[11px] text-white/45 mt-1">api.monochrome.tf 検索</div>
+                    <div className="text-[11px] text-white/45 mt-1">フル尺ストリーム検索</div>
                   </button>
                 ))}
               </div>
@@ -1972,11 +2236,34 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           {/* VIEW 4: ALL SONGS (すべての曲) */}
           {activeNav === 'songs' && (
             <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
-              <div className="border-b border-white/[0.08] pb-4">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                  すべての曲
-                </h1>
-                <p className="text-xs text-white/50 mt-1">{statusBanner}</p>
+              <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-4">
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                    すべての曲 ({filteredTracks.length}曲)
+                  </h1>
+                  <p className="text-xs text-white/50 mt-1">{statusBanner}</p>
+                </div>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleOnlineMusicSearch();
+                  }}
+                  className="flex items-center gap-2 w-full sm:w-auto"
+                >
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="曲名・アーティスト名で検索..."
+                    className="w-full sm:w-64 px-3 py-1.5 rounded-md bg-white/[0.07] border border-white/15 focus:border-[#fa243c] text-xs text-white placeholder-white/40 outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSearchingOnline}
+                    className="px-4 py-1.5 rounded-md bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-semibold shrink-0 transition"
+                  >
+                    {isSearchingOnline ? '検索中...' : '検索'}
+                  </button>
+                </form>
               </div>
               {renderAppleMusicSongTable(filteredTracks, '楽曲がありません')}
             </div>
@@ -2075,45 +2362,55 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                     </div>
                   </div>
 
-                  {/* Liquid Glass Transport Controls */}
+                  {/* Liquid Glass Transport Controls with Material Symbols */}
                   <div className="flex items-center justify-between gap-2 pt-1">
                     <button
                       onClick={() => setIsShuffle(!isShuffle)}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
+                      title="シャッフル"
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition ${
                         isShuffle
                           ? 'bg-[#fa243c] text-white'
                           : 'apple-liquid-glass-pill text-white/70 hover:text-white'
                       }`}
                     >
-                      Shuffle
+                      <span className="material-symbols-rounded text-[20px]">shuffle</span>
                     </button>
                     <button
                       onClick={prevTrack}
-                      className="px-3 py-1.5 rounded-lg apple-liquid-glass-pill text-xs font-medium text-white hover:bg-white/20 transition"
+                      title="前の曲"
+                      className="w-11 h-11 rounded-full apple-liquid-glass-pill flex items-center justify-center text-white hover:bg-white/20 transition"
                     >
-                      Prev
+                      <span className="material-symbols-rounded text-[24px]">skip_previous</span>
                     </button>
                     <button
                       onClick={togglePlay}
-                      className="px-5 py-2 rounded-xl bg-white text-black hover:bg-white/90 text-xs font-bold transition shadow-lg"
+                      title={isPlaying ? '一時停止' : '再生'}
+                      className="w-14 h-14 rounded-full bg-white text-black hover:bg-white/90 flex items-center justify-center transition shadow-xl"
                     >
-                      {isPlaying ? 'Pause' : 'Play'}
+                      <span
+                        className="material-symbols-rounded text-[30px]"
+                        style={{ fontVariationSettings: "'FILL' 1, 'wght' 600" }}
+                      >
+                        {isPlaying ? 'pause' : 'play_arrow'}
+                      </span>
                     </button>
                     <button
                       onClick={nextTrack}
-                      className="px-3 py-1.5 rounded-lg apple-liquid-glass-pill text-xs font-medium text-white hover:bg-white/20 transition"
+                      title="次の曲"
+                      className="w-11 h-11 rounded-full apple-liquid-glass-pill flex items-center justify-center text-white hover:bg-white/20 transition"
                     >
-                      Next
+                      <span className="material-symbols-rounded text-[24px]">skip_next</span>
                     </button>
                     <button
                       onClick={() => setIsRepeat(!isRepeat)}
-                      className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
+                      title="リピート"
+                      className={`w-10 h-10 rounded-full flex items-center justify-center transition ${
                         isRepeat
                           ? 'bg-[#fa243c] text-white'
                           : 'apple-liquid-glass-pill text-white/70 hover:text-white'
                       }`}
                     >
-                      Repeat
+                      <span className="material-symbols-rounded text-[20px]">repeat</span>
                     </button>
                   </div>
                 </div>
@@ -2501,6 +2798,94 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           {showLyricsDrawer && activeNav !== 'lyrics' && renderAppleMusicLyricsPanel(false)}
         </main>
       </div>
+
+      {/* ===================================================================
+          FLOATING NOW PLAYING PILL (Appears automatically when music is playing)
+         =================================================================== */}
+      {isPlaying && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 pointer-events-auto max-w-[92%] sm:max-w-xl w-full">
+          <div className="apple-liquid-glass-pill rounded-full px-3.5 py-2 border border-white/20 shadow-[0_16px_40px_rgba(0,0,0,0.75)] flex items-center justify-between gap-3">
+            {/* Artwork + Live Equalizer + Track Info */}
+            <div
+              onClick={() => setActiveNav('lyrics')}
+              className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+            >
+              <div className="relative w-9 h-9 rounded-full overflow-hidden bg-zinc-900 border border-white/25 shrink-0">
+                {currentTrack.artworkUrl ? (
+                  <img
+                    src={currentTrack.artworkUrl}
+                    alt={currentTrack.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className={`w-full h-full bg-gradient-to-br ${currentTrack.coverGradient}`} />
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <div className="flex items-end gap-0.5 h-3 shrink-0">
+                    <span className="w-0.5 h-2.5 bg-[#fa243c] animate-pulse" />
+                    <span className="w-0.5 h-3.5 bg-[#fa243c] animate-pulse" />
+                    <span className="w-0.5 h-2 bg-[#fa243c] animate-pulse" />
+                  </div>
+                  <span className="text-xs font-bold text-white truncate">
+                    {currentTrack.title}
+                  </span>
+                  <span className="text-[11px] text-white/55 truncate hidden sm:inline">
+                    · {currentTrack.artist}
+                  </span>
+                </div>
+                <div className="text-[11px] text-white/75 truncate mt-0.5">
+                  {currentTrack.lyrics[currentLyricIndex]?.text ||
+                    `${currentTrack.artist} — ${currentTrack.album}`}
+                </div>
+              </div>
+            </div>
+
+            {/* Material Symbols Playback Controls inside Pill */}
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={prevTrack}
+                className="w-8 h-8 rounded-full hover:bg-white/15 flex items-center justify-center text-white transition"
+                title="前の曲"
+              >
+                <span className="material-symbols-rounded text-[20px]">skip_previous</span>
+              </button>
+              <button
+                onClick={togglePlay}
+                className="w-8 h-8 rounded-full bg-white text-black hover:bg-white/90 flex items-center justify-center transition shadow"
+                title="一時停止"
+              >
+                <span
+                  className="material-symbols-rounded text-[20px]"
+                  style={{ fontVariationSettings: "'FILL' 1, 'wght' 600" }}
+                >
+                  pause
+                </span>
+              </button>
+              <button
+                onClick={nextTrack}
+                className="w-8 h-8 rounded-full hover:bg-white/15 flex items-center justify-center text-white transition"
+                title="次の曲"
+              >
+                <span className="material-symbols-rounded text-[20px]">skip_next</span>
+              </button>
+              <button
+                onClick={() => setActiveNav(activeNav === 'lyrics' ? 'listen-now' : 'lyrics')}
+                className={`w-8 h-8 rounded-full flex items-center justify-center transition ${
+                  activeNav === 'lyrics'
+                    ? 'bg-[#fa243c] text-white'
+                    : 'hover:bg-white/15 text-white/80 hover:text-white'
+                }`}
+                title="歌詞ステージ切替"
+              >
+                <span className="material-symbols-rounded text-[18px]">lyrics</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

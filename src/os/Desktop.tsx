@@ -220,6 +220,34 @@ export function Desktop() {
     return !dismissed;
   });
 
+  // Global OS Music State & Floating Now Playing Pill State
+  const [musicState, setMusicState] = useState<{
+    isPlaying: boolean;
+    title?: string;
+    artist?: string;
+    album?: string;
+    artworkUrl?: string;
+    coverGradient?: string;
+    currentTime?: number;
+    duration?: number;
+    lyricLine?: string;
+  } | null>(null);
+  const [pillDismissed, setPillDismissed] = useState(false);
+
+  useEffect(() => {
+    const onMusicState = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) {
+        setMusicState(detail);
+        if (detail.isPlaying) {
+          setPillDismissed(false);
+        }
+      }
+    };
+    window.addEventListener('glassium-music-state', onMusicState);
+    return () => window.removeEventListener('glassium-music-state', onMusicState);
+  }, []);
+
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(timer);
@@ -675,13 +703,43 @@ export function Desktop() {
             <span className="font-semibold">{timeStr}</span>
             {/* Dynamic Island Pill */}
             <div
-              onClick={() => setNotifCenterOpen(!notifCenterOpen)}
+              onClick={() => {
+                if (musicState?.isPlaying) {
+                  openApp('synth');
+                } else {
+                  setNotifCenterOpen(!notifCenterOpen);
+                }
+              }}
               className="flex cursor-pointer items-center gap-2 rounded-full bg-black/90 px-4 py-1.5 text-white ring-1 ring-white/25 shadow-2xl hover:scale-105 transition"
             >
-              <span className={`h-2 w-2 rounded-full ${dynamicIslandEvent ? 'bg-cyan-400 animate-ping' : 'bg-emerald-400 animate-pulse'}`} />
-              <span className="text-[11px] font-medium font-sans">
-                {dynamicIslandEvent ? `${dynamicIslandEvent.title}${dynamicIslandEvent.subtitle ? ` · ${dynamicIslandEvent.subtitle}` : ''}` : 'GlassiumOS 5 Active'}
-              </span>
+              {musicState?.isPlaying ? (
+                <>
+                  <span className="material-symbols-rounded text-cyan-400 text-sm animate-pulse">music_note</span>
+                  <span className="text-[11px] font-medium font-sans truncate max-w-[140px] sm:max-w-[190px]">
+                    {musicState.title || '再生中'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.dispatchEvent(
+                        new CustomEvent('glassium-music-command', { detail: { action: 'toggle-play' } })
+                      );
+                    }}
+                    title="一時停止"
+                    className="ml-0.5 text-white/80 hover:text-cyan-300"
+                  >
+                    <span className="material-symbols-rounded text-sm">pause</span>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className={`h-2 w-2 rounded-full ${dynamicIslandEvent ? 'bg-cyan-400 animate-ping' : 'bg-emerald-400 animate-pulse'}`} />
+                  <span className="text-[11px] font-medium font-sans">
+                    {dynamicIslandEvent ? `${dynamicIslandEvent.title}${dynamicIslandEvent.subtitle ? ` · ${dynamicIslandEvent.subtitle}` : ''}` : 'GlassiumOS 5 Active'}
+                  </span>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-1.5">
               <Icon name="Wifi" size={13} />
@@ -1752,6 +1810,129 @@ export function Desktop() {
                 </button>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ========================================================
+          OS-LEVEL FLOATING "NOW PLAYING PILL" (Liquid Glass + Material Symbols)
+          Active whenever music is playing across all windows and desktop shells
+         ======================================================== */}
+      <AnimatePresence>
+        {musicState?.isPlaying && !pillDismissed && (
+          <motion.div
+            initial={{ y: 60, opacity: 0, scale: 0.92 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: 50, opacity: 0, scale: 0.9 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+            className="fixed bottom-14 sm:bottom-16 left-1/2 -translate-x-1/2 z-[4200] max-w-[94vw] w-auto pointer-events-auto"
+          >
+            <div className="relative group px-3.5 py-2 rounded-full bg-slate-950/80 backdrop-blur-2xl border border-white/20 shadow-2xl flex items-center gap-3 ring-1 ring-white/10 hover:border-cyan-400/50 transition">
+              <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-cyan-500/20 via-fuchsia-500/20 to-blue-500/20 blur-md pointer-events-none opacity-70 group-hover:opacity-100 transition" />
+
+              {/* Artwork Thumbnail / Clickable to open SynthVisualizer */}
+              <button
+                type="button"
+                onClick={() => openApp('synth')}
+                title="Apple Music プレイヤーを開く"
+                className="relative z-10 w-9 h-9 rounded-full overflow-hidden bg-slate-800 border border-white/20 shrink-0 shadow-md group-hover:scale-105 transition flex items-center justify-center cursor-pointer"
+              >
+                {musicState.artworkUrl ? (
+                  <img
+                    src={musicState.artworkUrl}
+                    alt={musicState.title || 'Track Artwork'}
+                    className="w-full h-full object-cover animate-[spin_12s_linear_infinite]"
+                  />
+                ) : (
+                  <span className="material-symbols-rounded text-cyan-400 text-lg">music_note</span>
+                )}
+              </button>
+
+              {/* Title, Artist, & Realtime Synchronized Lyric Line */}
+              <div
+                onClick={() => openApp('synth')}
+                className="relative z-10 min-w-0 max-w-[170px] sm:max-w-[280px] cursor-pointer flex flex-col justify-center"
+              >
+                <div className="flex items-center gap-1.5 truncate">
+                  <span className="text-xs font-bold text-white tracking-tight truncate">
+                    {musicState.title || 'Playing Track'}
+                  </span>
+                  <span className="text-[10px] text-white/50 truncate">
+                    · {musicState.artist || 'Official Artist'}
+                  </span>
+                </div>
+                {musicState.lyricLine ? (
+                  <span className="text-[10px] text-cyan-300/90 font-medium truncate block animate-pulse">
+                    {musicState.lyricLine}
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-white/40 truncate block">
+                    {musicState.album || 'Apple Music Lossless Hi-Fi'}
+                  </span>
+                )}
+              </div>
+
+              {/* Equalizer Visualizer Pulse Indicator */}
+              <div className="relative z-10 hidden sm:flex items-center gap-0.5 h-4 px-1 shrink-0">
+                <span className="w-0.5 h-3 bg-cyan-400 rounded-full animate-[bounce_0.8s_ease-in-out_infinite]" />
+                <span className="w-0.5 h-4 bg-sky-300 rounded-full animate-[bounce_0.6s_ease-in-out_infinite_0.15s]" />
+                <span className="w-0.5 h-2.5 bg-fuchsia-400 rounded-full animate-[bounce_0.75s_ease-in-out_infinite_0.3s]" />
+                <span className="w-0.5 h-3.5 bg-teal-300 rounded-full animate-[bounce_0.9s_ease-in-out_infinite_0.2s]" />
+              </div>
+
+              {/* Transport Buttons with authentic Material Symbols */}
+              <div className="relative z-10 flex items-center gap-1 shrink-0 border-l border-white/10 pl-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.dispatchEvent(
+                      new CustomEvent('glassium-music-command', { detail: { action: 'prev' } })
+                    )
+                  }
+                  title="前の曲"
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 active:scale-90 transition cursor-pointer"
+                >
+                  <span className="material-symbols-rounded text-lg">skip_previous</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.dispatchEvent(
+                      new CustomEvent('glassium-music-command', { detail: { action: 'toggle-play' } })
+                    )
+                  }
+                  title={musicState.isPlaying ? '一時停止' : '再生'}
+                  className="w-8 h-8 rounded-full bg-cyan-500 text-slate-950 flex items-center justify-center font-bold shadow-lg shadow-cyan-500/30 hover:scale-105 active:scale-95 transition cursor-pointer"
+                >
+                  <span className="material-symbols-rounded text-xl leading-none">
+                    {musicState.isPlaying ? 'pause' : 'play_arrow'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    window.dispatchEvent(
+                      new CustomEvent('glassium-music-command', { detail: { action: 'next' } })
+                    )
+                  }
+                  title="次の曲"
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 active:scale-90 transition cursor-pointer"
+                >
+                  <span className="material-symbols-rounded text-lg">skip_next</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPillDismissed(true)}
+                  title="ピルを閉じる (バックグラウンド再生は継続)"
+                  className="ml-1 w-6 h-6 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition cursor-pointer"
+                >
+                  <span className="material-symbols-rounded text-sm">close</span>
+                </button>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

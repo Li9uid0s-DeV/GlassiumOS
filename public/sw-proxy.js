@@ -2,7 +2,7 @@
 // GlassiumOS 5 — Wisp v1 + Ultraviolet (/uv/service/) & Scramjet (/scramjet/)
 // Service Worker Proxy Engine
 // =========================================================================
-const SW_VERSION = 'glassium-wisp-uv-scramjet-v4.0';
+const SW_VERSION = 'glassium-wisp-uv-scramjet-v5.3';
 
 let activeConfig = {
   wispServer: 'wss://wisp.mercurywork.shop/',
@@ -229,23 +229,34 @@ function buildServiceProxyPath(targetUrl, engine) {
 // 3. Extract Target URL from Service Worker Request (/uv/service/*, /scramjet/*, Referer)
 // =========================================================================
 function isHostApplicationAsset(pathname, searchParams) {
+  if (!pathname) return true;
   if (searchParams && searchParams.has('__os_direct')) return true;
   if (
     pathname === '/' ||
     pathname === '/index.html' ||
+    pathname === '/favicon.svg' ||
     pathname === '/sw-proxy.js' ||
+    pathname.startsWith('/assets/') ||
     pathname.startsWith('/src/') ||
-    pathname.startsWith('/@vite') ||
-    pathname.startsWith('/@react-refresh') ||
-    pathname.startsWith('/@fs/') ||
-    pathname.startsWith('/@id/') ||
+    pathname.startsWith('/@') ||
     pathname.startsWith('/node_modules/') ||
-    pathname.startsWith('/api/wisp') ||
-    pathname.startsWith('/api/proxy') ||
-    pathname.startsWith('/api/ai') ||
-    pathname.startsWith('/assets/aistudio/')
+    pathname.startsWith('/api/') ||
+    pathname.endsWith('.js') ||
+    pathname.endsWith('.css') ||
+    pathname.endsWith('.ts') ||
+    pathname.endsWith('.tsx') ||
+    pathname.endsWith('.svg') ||
+    pathname.endsWith('.png') ||
+    pathname.endsWith('.jpg') ||
+    pathname.endsWith('.jpeg') ||
+    pathname.endsWith('.webp') ||
+    pathname.endsWith('.woff') ||
+    pathname.endsWith('.woff2') ||
+    pathname.endsWith('.json')
   ) {
-    return true;
+    if (!pathname.startsWith('/uv/service/') && !pathname.startsWith('/scramjet/')) {
+      return true;
+    }
   }
   return false;
 }
@@ -879,12 +890,27 @@ self.addEventListener('install', () => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      try {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map((name) => caches.delete(name)));
+      } catch {
+        // ignore
+      }
+      await self.clients.claim();
+    })()
+  );
 });
 
 self.addEventListener('message', (event) => {
   const data = event.data;
   if (!data || typeof data !== 'object') return;
+
+  if (data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+    return;
+  }
 
   if (data.type === 'CONFIGURE_WISP_SW') {
     if (typeof data.wispServer === 'string' && data.wispServer.trim()) {
@@ -912,13 +938,19 @@ self.addEventListener('message', (event) => {
 self.addEventListener('fetch', (event) => {
   const reqUrl = new URL(event.request.url);
 
-  // Only intercept requests targeting our own origin (Service Worker scope)
+  // 1. Only intercept requests targeting our own origin (Service Worker scope)
   if (reqUrl.origin !== self.location.origin) {
     return;
   }
 
+  // 2. ABSOLUTELY NEVER intercept host application assets, index.html, scripts, styles, or APIs
+  if (isHostApplicationAsset(reqUrl.pathname, reqUrl.searchParams)) {
+    return;
+  }
+
+  // 3. Only intercept if explicit proxy path or initiated by an iframe with proxy referrer
   let routeInfo = extractTargetFromPath(reqUrl);
-  if (!routeInfo) {
+  if (!routeInfo && event.request.referrer && (event.request.referrer.includes('/uv/service/') || event.request.referrer.includes('/scramjet/'))) {
     routeInfo = extractTargetFromRefererOrClient(event.request, reqUrl);
   }
 

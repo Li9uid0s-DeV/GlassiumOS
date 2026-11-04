@@ -1,9 +1,42 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useOS } from '../OSContext';
 import { Icon } from '../Icon';
 import { KanbanView, HabitView, WhiteboardView } from './ExtraAppsSuite';
 
 type CalTab = 'agenda' | 'kanban' | 'habit' | 'whiteboard';
+
+interface ForecastDay {
+  dayLabel: string;
+  dateStr: string;
+  condition: string;
+  iconName: string;
+  high: number;
+  low: number;
+}
+
+interface CalendarWeatherState {
+  city: string;
+  currentTemp: number;
+  condition: string;
+  iconName: string;
+  high: number;
+  low: number;
+  humidity: number;
+  forecast: ForecastDay[];
+  loading: boolean;
+  error?: string;
+}
+
+function getWeatherConditionMeta(code: number): { condition: string; icon: string } {
+  if (code === 0) return { condition: '快晴', icon: 'Sun' };
+  if (code === 1 || code === 2) return { condition: '晴れ / 曇り', icon: 'CloudSun' };
+  if (code === 3) return { condition: '曇り', icon: 'Cloud' };
+  if (code === 45 || code === 48) return { condition: '霧', icon: 'CloudFog' };
+  if ([51, 53, 55, 61, 63, 65, 80, 81, 82].includes(code)) return { condition: '雨', icon: 'CloudRain' };
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return { condition: '雪', icon: 'Snowflake' };
+  if ([95, 96, 99].includes(code)) return { condition: '雷雨', icon: 'CloudLightning' };
+  return { condition: '晴れ', icon: 'Sun' };
+}
 
 export function CalendarApp({ initialTab }: { initialTab?: string }) {
   const { calendarTasks, addTask, toggleTask, deleteTask } = useOS();
@@ -17,6 +50,114 @@ export function CalendarApp({ initialTab }: { initialTab?: string }) {
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState<'system' | 'work' | 'personal'>('work');
   const [newPriority, setNewPriority] = useState<'low' | 'medium' | 'high'>('medium');
+
+  // Weather Widget State for Calendar Dashboard
+  const [weather, setWeather] = useState<CalendarWeatherState>({
+    city: '東京 (Tokyo)',
+    currentTemp: 21,
+    condition: '晴れ / 一部曇り',
+    iconName: 'Sun',
+    high: 24,
+    low: 15,
+    humidity: 48,
+    forecast: [
+      { dayLabel: '明日', dateStr: '明日', condition: '快晴', iconName: 'Sun', high: 23, low: 14 },
+      { dayLabel: '明後日', dateStr: '明後日', condition: '晴れ時々曇り', iconName: 'CloudSun', high: 22, low: 13 },
+      { dayLabel: '3日後', dateStr: '3日後', condition: '小雨', iconName: 'CloudRain', high: 19, low: 12 },
+    ],
+    loading: false,
+  });
+
+  const fetchCalendarWeather = useCallback(async (lat = 35.6762, lon = 139.6503, locName = '東京 (Tokyo)') => {
+    setWeather((prev) => ({ ...prev, loading: true, error: undefined }));
+    try {
+      const res = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=4`,
+        { signal: AbortSignal.timeout(6000) }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const curCode = data?.current?.weather_code ?? 0;
+        const curMeta = getWeatherConditionMeta(curCode);
+        const curT = Math.round(data?.current?.temperature_2m ?? 21);
+        const curHum = Math.round(data?.current?.relative_humidity_2m ?? 50);
+
+        const dailyCodes: number[] = data?.daily?.weather_code ?? [];
+        const dailyMax: number[] = data?.daily?.temperature_2m_max ?? [];
+        const dailyMin: number[] = data?.daily?.temperature_2m_min ?? [];
+        const dailyDates: string[] = data?.daily?.time ?? [];
+
+        const todayHigh = Math.round(dailyMax[0] ?? curT + 3);
+        const todayLow = Math.round(dailyMin[0] ?? curT - 6);
+
+        const dayLabels = ['明日', '明後日', '3日後'];
+        const forecastList: ForecastDay[] = [];
+        for (let i = 1; i <= 3; i++) {
+          const code = dailyCodes[i] ?? 0;
+          const meta = getWeatherConditionMeta(code);
+          const rawDate = dailyDates[i] || '';
+          let dLabel = dayLabels[i - 1];
+          if (rawDate) {
+            const d = new Date(rawDate);
+            const wDays = ['日', '月', '火', '水', '木', '金', '土'];
+            dLabel = `${dayLabels[i - 1]} (${wDays[d.getDay()]})`;
+          }
+          forecastList.push({
+            dayLabel: dLabel,
+            dateStr: rawDate,
+            condition: meta.condition,
+            iconName: meta.icon,
+            high: Math.round(dailyMax[i] ?? curT + 2),
+            low: Math.round(dailyMin[i] ?? curT - 5),
+          });
+        }
+
+        setWeather({
+          city: locName,
+          currentTemp: curT,
+          condition: curMeta.condition,
+          iconName: curMeta.icon,
+          high: todayHigh,
+          low: todayLow,
+          humidity: curHum,
+          forecast: forecastList,
+          loading: false,
+        });
+        return;
+      }
+    } catch {
+      // Fallback gracefully on network issues
+    }
+    setWeather((prev) => ({ ...prev, loading: false }));
+  }, []);
+
+  // Request user location on mount
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          let detectedCity = '現在地 (Local)';
+          try {
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            if (tz) {
+              const parts = tz.split('/');
+              detectedCity = parts[parts.length - 1].replace(/_/g, ' ');
+            }
+          } catch {
+            // ignore
+          }
+          fetchCalendarWeather(latitude, longitude, detectedCity);
+        },
+        () => {
+          fetchCalendarWeather(35.6762, 139.6503, '東京 (Tokyo)');
+        },
+        { timeout: 4500, enableHighAccuracy: false }
+      );
+    } else {
+      fetchCalendarWeather(35.6762, 139.6503, '東京 (Tokyo)');
+    }
+  }, [fetchCalendarWeather]);
 
   useEffect(() => {
     if (initialTab === 'kanban' || initialTab === 'habit' || initialTab === 'whiteboard') {
@@ -158,6 +299,93 @@ export function CalendarApp({ initialTab }: { initialTab?: string }) {
 
           {/* Right Tasks Agenda */}
           <div className="flex-1 flex flex-col p-6 overflow-y-auto">
+            {/* Location Weather & 3-Day Forecast Dashboard Widget */}
+            <div className="relative mb-5 p-4 rounded-2xl bg-gradient-to-r from-sky-950/40 via-indigo-950/30 to-slate-900/50 border border-white/15 backdrop-blur-xl shadow-xl overflow-hidden">
+              <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-cyan-500/15 blur-2xl pointer-events-none" />
+              <div className="absolute -left-8 -bottom-8 w-28 h-28 rounded-full bg-indigo-500/10 blur-xl pointer-events-none" />
+
+              {/* Widget Header: Location & Reload */}
+              <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/10 relative z-10">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-rounded text-cyan-400 text-base">location_on</span>
+                  <span className="text-xs font-semibold text-white tracking-wide">
+                    {weather.city}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-medium">
+                    {weather.condition}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) => fetchCalendarWeather(pos.coords.latitude, pos.coords.longitude, '現在地 (GPS)'),
+                        () => fetchCalendarWeather(35.6762, 139.6503, '東京 (Tokyo)')
+                      );
+                    } else {
+                      fetchCalendarWeather(35.6762, 139.6503, '東京 (Tokyo)');
+                    }
+                  }}
+                  title="天気を再取得"
+                  className="flex items-center gap-1 text-[11px] text-white/50 hover:text-cyan-300 transition"
+                >
+                  <span className={`material-symbols-rounded text-sm ${weather.loading ? 'animate-spin text-cyan-400' : ''}`}>
+                    sync
+                  </span>
+                  <span className="hidden sm:inline">更新</span>
+                </button>
+              </div>
+
+              {/* Main Weather Row: Current Temp + 3-Day Forecast Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center relative z-10">
+                {/* Current Temperature block (cols 1-5) */}
+                <div className="md:col-span-5 flex items-center gap-3.5 pr-2 md:border-r border-white/10">
+                  <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-amber-300 shadow-inner">
+                    <Icon name={weather.iconName} size={28} />
+                  </div>
+                  <div>
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-3xl font-bold tracking-tight text-white font-mono">
+                        {weather.currentTemp}°
+                      </span>
+                      <span className="text-xs font-medium text-white/60">C</span>
+                    </div>
+                    <div className="text-[11px] text-white/60 flex items-center gap-2 mt-0.5">
+                      <span className="text-rose-300 font-medium">最高 {weather.high}°</span>
+                      <span>·</span>
+                      <span className="text-sky-300 font-medium">最低 {weather.low}°</span>
+                      <span>·</span>
+                      <span>湿度 {weather.humidity}%</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3-Day Forecast Cards (cols 6-12) */}
+                <div className="md:col-span-7 grid grid-cols-3 gap-2">
+                  {weather.forecast.map((day, idx) => (
+                    <div
+                      key={idx}
+                      className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 flex flex-col items-center justify-between text-center transition"
+                    >
+                      <span className="text-[10px] text-white/70 font-medium truncate w-full">
+                        {day.dayLabel}
+                      </span>
+                      <div className="my-1 text-cyan-300">
+                        <Icon name={day.iconName} size={18} />
+                      </div>
+                      <div className="text-[11px] font-mono font-semibold text-white">
+                        {day.high}° <span className="text-white/40 font-normal">/ {day.low}°</span>
+                      </div>
+                      <span className="text-[9px] text-white/50 truncate w-full mt-0.5">
+                        {day.condition}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             <div className="mb-4 pb-2 border-b border-white/10">
               <h3 className="text-sm font-semibold text-white">{selectedDate} の予定</h3>
             </div>
