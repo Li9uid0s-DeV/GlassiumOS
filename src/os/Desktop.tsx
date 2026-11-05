@@ -1,4 +1,4 @@
-import { Component, ErrorInfo, ReactNode, useEffect, useState } from 'react';
+import React, { Component, ErrorInfo, ReactNode, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useOS } from './OSContext';
 import { WindowFrame } from './WindowFrame';
