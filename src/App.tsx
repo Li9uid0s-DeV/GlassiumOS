@@ -39,7 +39,7 @@ class RootErrorBoundary extends React.Component<
         <div className="flex h-screen w-screen flex-col items-center justify-center bg-[#030712] p-6 text-white select-none">
           <div className="max-w-md bg-white/[0.04] p-8 text-center backdrop-blur-2xl">
             <div className="text-xs font-mono uppercase tracking-widest text-cyan-400 mb-2">
-              GlassiumOS 5 u1 · GlasispectUI Recovery
+              GlassiumOS 5 u2 · GlasispectUI Recovery
             </div>
             <h1 className="text-xl font-bold text-white mb-2">
               システム表示を復元しています

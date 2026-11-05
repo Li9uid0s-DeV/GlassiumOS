@@ -54,6 +54,29 @@ export interface MusicVideoItem {
   thumbnailUrl?: string;
 }
 
+export interface ArtistAlbumItem {
+  id: string;
+  collectionId: string;
+  title: string;
+  artist: string;
+  artworkUrl: string;
+  year: number;
+  trackCount: number;
+  genre: string;
+}
+
+export interface ArtistSingleItem {
+  id: string;
+  collectionId: string;
+  title: string;
+  cleanTitle: string;
+  artist: string;
+  artworkUrl: string;
+  year: number;
+  trackCount: number;
+  audioUrl: string;
+}
+
 export interface ArtistProfileData {
   name: string;
   englishName: string;
@@ -63,6 +86,9 @@ export interface ArtistProfileData {
   bannerGradient: string;
   avatarUrl: string;
   bannerUrl?: string;
+  topTracks?: MonochromeTrack[];
+  albums?: ArtistAlbumItem[];
+  singles?: ArtistSingleItem[];
   mvs: MusicVideoItem[];
 }
 
@@ -73,6 +99,44 @@ function cleanPrimaryArtistName(rawArtist: string): string {
     .split(/\s*[,、]\s*/)[0]
     .trim();
   return cleaned || rawArtist.trim();
+}
+
+const CLIENT_ARTIST_ALIASES: Record<string, string[]> = {
+  yoasobi: ['yoasobi', 'ヨアソビ'],
+  vaundy: ['vaundy', 'バウンディ'],
+  '米津玄師': ['米津玄師', 'kenshiyonezu', 'yonezukenshi'],
+  kenshiyonezu: ['米津玄師', 'kenshiyonezu', 'yonezukenshi'],
+  'official髭男dism': ['official髭男dism', 'officialhigedandism'],
+  officialhigedandism: ['official髭男dism', 'officialhigedandism'],
+  ado: ['ado', 'アド'],
+  mrsgreenapple: ['mrsgreenapple', 'ミセスグリーンアップル'],
+  creepynuts: ['creepynuts', 'クリーピーナッツ'],
+  tuki: ['tuki', 'ツキ'],
+  dualipa: ['dualipa', 'デュアリパ'],
+  daftpunk: ['daftpunk', 'ダフトパンク'],
+};
+
+function normArtistCompare(s: string): string {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[\s\-_()（）【】「」『』〜~・.,!?'"]/g, '');
+}
+
+function isSameArtistClient(candidateArtist: string, targetArtist: string): boolean {
+  if (!candidateArtist || !targetArtist) return false;
+  if (/cover|tribute|karaoke|歌ってみた|翻唱|オルゴール/i.test(candidateArtist)) return false;
+  const targetClean = normArtistCompare(cleanPrimaryArtistName(targetArtist));
+  const allowed = new Set<string>([
+    targetClean,
+    ...(CLIENT_ARTIST_ALIASES[targetClean] || []).map(normArtistCompare),
+  ]);
+  const candClean = normArtistCompare(cleanPrimaryArtistName(candidateArtist));
+  if (allowed.has(candClean)) return true;
+  const parts = candidateArtist
+    .split(/[,、/&×()]/)
+    .map(normArtistCompare)
+    .filter(Boolean);
+  return parts.some((p) => allowed.has(p));
 }
 
 const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
@@ -769,38 +833,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   };
 
   // -----------------------------------------------------------------------
-  // Web Audio Context Setup
-  // -----------------------------------------------------------------------
-  const initAudioContext = useCallback(() => {
-    if (audioCtxRef.current) return audioCtxRef.current;
-    const AudioCtx =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    const ctx = new AudioCtx();
-    audioCtxRef.current = ctx;
-
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = 256;
-    analyser.smoothingTimeConstant = 0.82;
-    analyserNodeRef.current = analyser;
-
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(filterCutoff, ctx.currentTime);
-    filterNodeRef.current = filter;
-
-    const masterGain = ctx.createGain();
-    masterGain.gain.setValueAtTime(isMuted ? 0 : volume, ctx.currentTime);
-    masterGainRef.current = masterGain;
-
-    filter.connect(masterGain);
-    masterGain.connect(analyser);
-    analyser.connect(ctx.destination);
-
-    return ctx;
-  }, [filterCutoff, isMuted, volume]);
-
-  // -----------------------------------------------------------------------
   // Procedural Hi-Fi Music Synthesis Engine + HTML5 Audio Stream Engine
   // -----------------------------------------------------------------------
   const stopAllAudio = useCallback(() => {
@@ -926,28 +958,31 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const startTrackPlayback = useCallback(
     (track: MonochromeTrack, startAtSec = 0) => {
       stopAllAudio();
-      initAudioContext();
       fullPlayheadRef.current = startAtSec;
       globalAudio.setVolume(isMuted ? 0 : volume);
       globalAudio.setPlaybackRate(playbackRate);
       globalAudio.playTrack(track, startAtSec);
     },
-    [initAudioContext, isMuted, playbackRate, stopAllAudio, volume]
+    [isMuted, playbackRate, stopAllAudio, volume]
   );
 
   const playTrack = useCallback(
     (trackToPlay: MonochromeTrack) => {
-      const exactPlayUrl =
-        trackToPlay.audioUrl &&
-        !trackToPlay.audioUrl.includes('saavncdn.com') &&
-        !trackToPlay.audioUrl.includes('itunes.apple.com') &&
-        !trackToPlay.audioUrl.includes('mzstatic.com')
-          ? trackToPlay.audioUrl
-          : `/api/music/play?id=${encodeURIComponent(
-              trackToPlay.monoTrackId || trackToPlay.id
-            )}&title=${encodeURIComponent(trackToPlay.title)}&artist=${encodeURIComponent(
-              trackToPlay.artist
-            )}`;
+      const rawIdStr = String(trackToPlay.monoTrackId || trackToPlay.id || '').trim();
+      const isNonNetease = /^(?:mono-itunes-|itunes-|album-|single-|artist-)/i.test(rawIdStr);
+      const cleanNumericId = isNonNetease
+        ? ''
+        : rawIdStr
+            .replace(/^mono-live-gd-/, '')
+            .replace(/^mono-gd-/, '')
+            .replace(/^mono-live-tf-/, '')
+            .replace(/^mono-live-/, '')
+            .trim();
+      const exactPlayUrl = `/api/music/play?id=${encodeURIComponent(
+        /^\d+$/.test(cleanNumericId) ? cleanNumericId : ''
+      )}&title=${encodeURIComponent(trackToPlay.title)}&artist=${encodeURIComponent(
+        cleanPrimaryArtistName(trackToPlay.artist)
+      )}`;
 
       const normalizedTrack: MonochromeTrack = {
         ...trackToPlay,
@@ -1382,7 +1417,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           return;
         }
       } else {
-        setCurrentTime(activeSec);
+        setCurrentTime((prev) => (Math.abs(activeSec - prev) >= 0.2 ? activeSec : prev));
       }
 
       rafSyncIdRef.current = requestAnimationFrame(syncFrame60fps);
@@ -1894,6 +1929,61 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     [fetchLiveMvsForQuery, isPlaying]
   );
 
+  const [selectedArtistAlbum, setSelectedArtistAlbum] = useState<ArtistAlbumItem | null>(null);
+  const [selectedAlbumTracks, setSelectedAlbumTracks] = useState<MonochromeTrack[]>([]);
+  const [isLoadingAlbumTracks, setIsLoadingAlbumTracks] = useState(false);
+
+  const openAlbumTracks = useCallback(async (album: ArtistAlbumItem) => {
+    setSelectedArtistAlbum(album);
+    setIsLoadingAlbumTracks(true);
+    try {
+      const resp = await fetch(
+        `/api/music/album?collectionId=${encodeURIComponent(album.collectionId)}&album=${encodeURIComponent(album.title)}&artist=${encodeURIComponent(album.artist)}`
+      );
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data.tracks) && data.tracks.length > 0) {
+          const mapped: MonochromeTrack[] = data.tracks.map(
+            (item: Record<string, unknown>, idx: number) => ({
+              id: String(item.id || `album-t-${idx}`),
+              monoTrackId: String(item.monoTrackId || ''),
+              title: String(item.title || 'Track'),
+              artist: String(item.artist || album.artist),
+              album: String(item.album || album.title),
+              coverGradient: 'from-rose-950 via-zinc-900 to-black',
+              coverAccent: '#fa243c',
+              artworkUrl: item.artworkUrl ? String(item.artworkUrl) : album.artworkUrl,
+              audioUrl: String(
+                item.audioUrl ||
+                  `/api/music/play?title=${encodeURIComponent(String(item.title || ''))}&artist=${encodeURIComponent(album.artist)}`
+              ),
+              isFullLengthStream: true,
+              duration: Number(item.duration) || 215,
+              format: 'api.monochrome.tf Full-Length Hi-Res Stream',
+              bitrate: '320 kbps Full Track',
+              genre: String(item.genre || album.genre || 'Album'),
+              year: Number(item.year) || album.year,
+              lyrics: enrichLyricsWithWordTiming(
+                [
+                  { time: 0, text: `${String(item.title || '')} — ${album.artist}` },
+                  { time: 3, text: '同期歌詞を読み込み中...' },
+                ],
+                Number(item.duration) || 215
+              ),
+            })
+          );
+          setSelectedAlbumTracks(mapped);
+          return;
+        }
+      }
+      setSelectedAlbumTracks([]);
+    } catch {
+      setSelectedAlbumTracks([]);
+    } finally {
+      setIsLoadingAlbumTracks(false);
+    }
+  }, []);
+
   const fetchArtistProfileFromApi = useCallback(async (artistName: string) => {
     const cleanArtist = cleanPrimaryArtistName(artistName);
     setIsFetchingArtist(true);
@@ -1915,6 +2005,74 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               thumbnailUrl: m.thumbnailUrl ? String(m.thumbnailUrl) : undefined,
             }))
           : [];
+
+        const apiTopTracks: MonochromeTrack[] = Array.isArray(data.topTracks)
+          ? data.topTracks
+              .filter((t: Record<string, unknown>) =>
+                isSameArtistClient(String(t.artist || cleanArtist), cleanArtist)
+              )
+              .map((t: Record<string, unknown>, idx: number) => {
+                const dur = Number(t.duration) || 215;
+                return {
+                  id: String(t.id || `artist-top-${idx}`),
+                  monoTrackId: String(t.monoTrackId || ''),
+                  title: String(t.title || 'Track'),
+                  artist: cleanArtist,
+                  album: String(t.album || 'Single'),
+                  coverGradient: 'from-rose-950 via-zinc-900 to-black',
+                  coverAccent: '#fa243c',
+                  artworkUrl: t.artworkUrl ? String(t.artworkUrl) : undefined,
+                  audioUrl: String(
+                    t.audioUrl ||
+                      `/api/music/play?title=${encodeURIComponent(String(t.title || ''))}&artist=${encodeURIComponent(cleanArtist)}`
+                  ),
+                  isFullLengthStream: true,
+                  duration: dur,
+                  format: String(t.format || 'api.monochrome.tf Full-Length Stream'),
+                  bitrate: String(t.bitrate || '320 kbps Full Track'),
+                  genre: String(t.genre || 'J-Pop / Lossless'),
+                  year: Number(t.year) || 2025,
+                  lyrics: enrichLyricsWithWordTiming(
+                    [
+                      { time: 0, text: `${String(t.title || '')} — ${cleanArtist}` },
+                      { time: 3, text: '同期歌詞を読み込み中...' },
+                    ],
+                    dur
+                  ),
+                };
+              })
+          : [];
+
+        const apiAlbums: ArtistAlbumItem[] = Array.isArray(data.albums)
+          ? data.albums.map((a: Record<string, unknown>, idx: number) => ({
+              id: String(a.id || `album-${idx}`),
+              collectionId: String(a.collectionId || ''),
+              title: String(a.title || 'Album'),
+              artist: cleanArtist,
+              artworkUrl: String(a.artworkUrl || ''),
+              year: Number(a.year) || 2024,
+              trackCount: Number(a.trackCount) || 10,
+              genre: String(a.genre || 'Album'),
+            }))
+          : [];
+
+        const apiSingles: ArtistSingleItem[] = Array.isArray(data.singles)
+          ? data.singles.map((s: Record<string, unknown>, idx: number) => ({
+              id: String(s.id || `single-${idx}`),
+              collectionId: String(s.collectionId || ''),
+              title: String(s.title || 'Single'),
+              cleanTitle: String(s.cleanTitle || s.title || 'Single'),
+              artist: cleanArtist,
+              artworkUrl: String(s.artworkUrl || ''),
+              year: Number(s.year) || 2024,
+              trackCount: Number(s.trackCount) || 1,
+              audioUrl: String(
+                s.audioUrl ||
+                  `/api/music/play?title=${encodeURIComponent(String(s.cleanTitle || s.title || ''))}&artist=${encodeURIComponent(cleanArtist)}`
+              ),
+            }))
+          : [];
+
         if (apiMvs.length > 0) {
           setLiveMvCatalog((prev) => {
             const ids = new Set(apiMvs.map((x) => x.id));
@@ -1932,12 +2090,11 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           bio: presetMeta?.bio || String(data.bio || `${cleanArtist} の公式アーティストプロフィール。`),
           bannerGradient:
             presetMeta?.bannerGradient || 'from-rose-600 via-purple-700 to-slate-950',
-          avatarUrl: String(
-            data.avatarUrl ||
-              presetMeta?.avatarUrl ||
-              ''
-          ),
+          avatarUrl: String(data.avatarUrl || presetMeta?.avatarUrl || ''),
           bannerUrl: String(data.bannerUrl || data.avatarUrl || ''),
+          topTracks: apiTopTracks,
+          albums: apiAlbums,
+          singles: apiSingles,
           mvs: apiMvs,
         });
       }
@@ -1953,11 +2110,12 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       if (e) e.stopPropagation();
       const cleanArtist = cleanPrimaryArtistName(artistName);
       setSelectedArtistName(cleanArtist);
+      setSelectedArtistAlbum(null);
+      setSelectedAlbumTracks([]);
       setActiveNav('artist');
       fetchArtistProfileFromApi(cleanArtist);
-      handleOnlineMusicSearch(cleanArtist);
     },
-    [fetchArtistProfileFromApi, handleOnlineMusicSearch]
+    [fetchArtistProfileFromApi]
   );
 
   // Fetch initial artist profile when artist tab is opened
@@ -1967,44 +2125,47 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     }
   }, [activeNav, selectedArtistName, fetchArtistProfileFromApi]);
 
+  // Strictly filtered tracks for the currently selected artist (NEVER includes other artists)
+  const artistStrictTopTracks = useMemo(() => {
+    const cleanSelected = cleanPrimaryArtistName(selectedArtistName);
+    if (
+      liveArtistProfile &&
+      normArtistCompare(liveArtistProfile.name) === normArtistCompare(cleanSelected) &&
+      liveArtistProfile.topTracks &&
+      liveArtistProfile.topTracks.length > 0
+    ) {
+      return liveArtistProfile.topTracks;
+    }
+    return INITIAL_ENRICHED_CATALOG.filter((t) =>
+      isSameArtistClient(t.artist, cleanSelected)
+    );
+  }, [selectedArtistName, liveArtistProfile]);
+
   const activeArtistProfile: ArtistProfileData = useMemo(() => {
     const cleanSelected = cleanPrimaryArtistName(selectedArtistName);
     if (
       liveArtistProfile &&
-      liveArtistProfile.name.toLowerCase() === cleanSelected.toLowerCase()
+      normArtistCompare(liveArtistProfile.name) === normArtistCompare(cleanSelected)
     ) {
-      const matchedTrackArt = tracks.find((t) =>
-        cleanPrimaryArtistName(t.artist).toLowerCase().includes(cleanSelected.toLowerCase())
-      )?.artworkUrl;
+      const matchedTrackArt = artistStrictTopTracks[0]?.artworkUrl;
       return {
         ...liveArtistProfile,
         avatarUrl:
           liveArtistProfile.avatarUrl ||
           matchedTrackArt ||
-          currentTrack.artworkUrl ||
           '',
         mvs:
           liveArtistProfile.mvs.length > 0
             ? liveArtistProfile.mvs
-            : OFFICIAL_MV_CATALOG.filter((m) =>
-                m.artist.toLowerCase().includes(cleanSelected.toLowerCase())
-              ),
+            : OFFICIAL_MV_CATALOG.filter((m) => isSameArtistClient(m.artist, cleanSelected)),
       };
     }
 
     const meta = ARTIST_METADATA_MAP[cleanSelected];
-    const matchedTrackArt =
-      tracks.find((t) =>
-        cleanPrimaryArtistName(t.artist).toLowerCase().includes(cleanSelected.toLowerCase())
-      )?.artworkUrl ||
-      (cleanPrimaryArtistName(currentTrack.artist).toLowerCase() === cleanSelected.toLowerCase()
-        ? currentTrack.artworkUrl
-        : '');
+    const matchedTrackArt = artistStrictTopTracks[0]?.artworkUrl || '';
 
-    const artistMvs = liveMvCatalog.filter(
-      (m) =>
-        m.artist.toLowerCase().includes(cleanSelected.toLowerCase()) ||
-        cleanSelected.toLowerCase().includes(m.artist.toLowerCase())
+    const artistMvs = OFFICIAL_MV_CATALOG.filter((m) =>
+      isSameArtistClient(m.artist, cleanSelected)
     );
 
     return {
@@ -2014,12 +2175,15 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       monthlyListeners: meta?.monthlyListeners || '680万人 / 月',
       bio:
         meta?.bio ||
-        `${cleanSelected} の公式アーティストページ。Monochrome Music から取得したアーティスト画像、人気楽曲のフル尺ストリーム、および公式ミュージックビデオ (MV) を一覧で楽しめます。`,
+        `${cleanSelected} の公式アーティストページ。Monochrome Music から取得したアーティスト画像、人気楽曲、アルバム、シングル、および公式ミュージックビデオ (MV) を一覧で楽しめます。`,
       bannerGradient: meta?.bannerGradient || 'from-rose-600 via-purple-700 to-slate-950',
       avatarUrl: meta?.avatarUrl || matchedTrackArt || '',
+      topTracks: artistStrictTopTracks,
+      albums: [],
+      singles: [],
       mvs: artistMvs,
     };
-  }, [selectedArtistName, liveArtistProfile, tracks, currentTrack, liveMvCatalog]);
+  }, [selectedArtistName, liveArtistProfile, artistStrictTopTracks]);
 
   // -----------------------------------------------------------------------
   // Apple Music Track Table Renderer (Used in Songs, Favorites, Recent, Browse, Artist)
@@ -2623,7 +2787,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             </div>
           )}
 
-          {/* VIEW 3: ARTIST PAGE (専用アーティストページ - Monochrome / Deezer / iTunes アーティスト画像・MV連携) */}
+          {/* VIEW 3: ARTIST PAGE (専用アーティストページ - 人気曲・アルバム・シングル & EP・公式MV) */}
           {activeNav === 'artist' && (
             <div className="flex-1 overflow-y-auto p-6 sm:p-8 pb-36 space-y-8">
               {/* Artist Selector Bar */}
@@ -2677,7 +2841,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                       <span className="material-symbols-rounded text-xs">verified</span>
                       <span>
                         Monochrome 公式アーティスト · {activeArtistProfile.monthlyListeners}
-                        {isFetchingArtist ? ' · 同期中...' : ''}
+                        {isFetchingArtist ? ' · ディスコグラフィ同期中...' : ''}
                       </span>
                     </div>
                     <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
@@ -2693,14 +2857,14 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                       <button
                         type="button"
                         onClick={() => {
-                          if (filteredTracks.length > 0) {
-                            playTrack(filteredTracks[0]);
+                          if (artistStrictTopTracks.length > 0) {
+                            playTrack(artistStrictTopTracks[0]);
                           }
                         }}
                         className="px-5 py-2 rounded-lg bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-bold transition shadow-lg flex items-center gap-1.5"
                       >
                         <span className="material-symbols-rounded text-[18px]">play_arrow</span>
-                        <span>人気曲をフル尺再生</span>
+                        <span>人気曲をフル尺再生 ({artistStrictTopTracks.length}曲)</span>
                       </button>
                       {activeArtistProfile.mvs.length > 0 && (
                         <button
@@ -2721,12 +2885,252 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 </div>
               </div>
 
-              {/* Artist Official MVs Section */}
+              {/* SECTION 1: 人気曲 (Top Songs - Strictly Only This Artist) */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span className="material-symbols-rounded text-[#fa243c] text-xl">
+                        local_fire_department
+                      </span>
+                      <span>
+                        {activeArtistProfile.name} の人気曲 ({artistStrictTopTracks.length}曲)
+                      </span>
+                    </h2>
+                    <p className="text-[11px] text-white/45 mt-0.5">
+                      {activeArtistProfile.name} 本人の公式楽曲のみを厳密フィルタリングして表示しています
+                    </p>
+                  </div>
+                  {isFetchingArtist && (
+                    <span className="text-xs text-[#fa243c] font-mono">
+                      ディスコグラフィを取得中...
+                    </span>
+                  )}
+                </div>
+                {renderAppleMusicSongTable(
+                  artistStrictTopTracks,
+                  isFetchingArtist
+                    ? `${activeArtistProfile.name} の人気楽曲を読み込み中です...`
+                    : `${activeArtistProfile.name} の楽曲データが見つかりませんでした`
+                )}
+              </div>
+
+              {/* SECTION 2: アルバム (Official Albums + Expandable Album Tracklist) */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                    <span className="material-symbols-rounded text-cyan-400 text-xl">album</span>
+                    <span>
+                      アルバム ({activeArtistProfile.albums?.length || 0}作品)
+                    </span>
+                  </h2>
+                  {selectedArtistAlbum && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedArtistAlbum(null);
+                        setSelectedAlbumTracks([]);
+                      }}
+                      className="text-xs text-white/60 hover:text-white px-2.5 py-1 rounded-lg bg-white/10"
+                    >
+                      収録曲パネルを閉じる
+                    </button>
+                  )}
+                </div>
+
+                {activeArtistProfile.albums && activeArtistProfile.albums.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {activeArtistProfile.albums.map((alb) => {
+                      const isSelected = selectedArtistAlbum?.id === alb.id;
+                      return (
+                        <div
+                          key={alb.id}
+                          onClick={() => openAlbumTracks(alb)}
+                          className={`group cursor-pointer rounded-xl p-3 border transition flex flex-col gap-2.5 ${
+                            isSelected
+                              ? 'bg-[#fa243c]/15 border-[#fa243c]'
+                              : 'bg-white/[0.03] hover:bg-white/[0.08] border-white/10'
+                          }`}
+                        >
+                          <div className="aspect-square w-full rounded-lg overflow-hidden bg-zinc-900 relative shadow-lg">
+                            {alb.artworkUrl ? (
+                              <img
+                                src={alb.artworkUrl}
+                                alt={alb.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <span className="material-symbols-rounded text-4xl text-white/30">
+                                  album
+                                </span>
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                              <div className="px-3 py-1.5 rounded-lg bg-[#fa243c] text-white text-[11px] font-bold shadow-lg flex items-center gap-1">
+                                <span className="material-symbols-rounded text-sm">queue_music</span>
+                                <span>収録曲を表示</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs font-bold text-white truncate" title={alb.title}>
+                              {alb.title}
+                            </div>
+                            <div className="text-[11px] text-white/50 mt-0.5">
+                              {alb.year}年 · 全{alb.trackCount}曲 · {alb.genre}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-6 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs text-white/45 text-center">
+                    {isFetchingArtist
+                      ? `${activeArtistProfile.name} のアルバム一覧を取得中...`
+                      : '登録されているフルアルバムはありません'}
+                  </div>
+                )}
+
+                {/* Expanded Album Tracklist Panel */}
+                {selectedArtistAlbum && (
+                  <div className="rounded-2xl p-5 bg-white/[0.04] border border-white/15 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-3">
+                      <div className="flex items-center gap-3.5">
+                        {selectedArtistAlbum.artworkUrl && (
+                          <img
+                            src={selectedArtistAlbum.artworkUrl}
+                            alt={selectedArtistAlbum.title}
+                            className="w-14 h-14 rounded-xl object-cover border border-white/20"
+                          />
+                        )}
+                        <div>
+                          <div className="text-[10px] font-mono uppercase tracking-wider text-cyan-300">
+                            ALBUM TRACKLIST · {selectedArtistAlbum.year}年
+                          </div>
+                          <h3 className="text-base font-bold text-white">
+                            {selectedArtistAlbum.title}
+                          </h3>
+                          <p className="text-xs text-white/55">
+                            {selectedArtistAlbum.artist} · 全{selectedAlbumTracks.length || selectedArtistAlbum.trackCount}曲
+                          </p>
+                        </div>
+                      </div>
+                      {selectedAlbumTracks.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => playTrack(selectedAlbumTracks[0])}
+                          className="px-4 py-2 rounded-lg bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-bold transition flex items-center gap-1.5"
+                        >
+                          <span className="material-symbols-rounded text-base">play_arrow</span>
+                          <span>アルバムを最初から再生</span>
+                        </button>
+                      )}
+                    </div>
+                    {isLoadingAlbumTracks ? (
+                      <div className="py-8 text-center text-xs text-white/55 font-mono">
+                        『{selectedArtistAlbum.title}』の収録曲を取得中...
+                      </div>
+                    ) : (
+                      renderAppleMusicSongTable(
+                        selectedAlbumTracks,
+                        '収録曲データが見つかりませんでした'
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 3: シングル & EP (Official Singles & EPs) */}
+              <div className="space-y-3">
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <span className="material-symbols-rounded text-amber-400 text-xl">music_note</span>
+                  <span>
+                    シングル &amp; EP ({activeArtistProfile.singles?.length || 0}作品)
+                  </span>
+                </h2>
+                {activeArtistProfile.singles && activeArtistProfile.singles.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                    {activeArtistProfile.singles.map((sg) => (
+                      <div
+                        key={sg.id}
+                        onClick={() => {
+                          playTrack({
+                            id: sg.id,
+                            monoTrackId: '',
+                            title: sg.cleanTitle,
+                            artist: sg.artist,
+                            album: sg.title,
+                            coverGradient: 'from-rose-950 via-zinc-900 to-black',
+                            coverAccent: '#fa243c',
+                            artworkUrl: sg.artworkUrl,
+                            audioUrl: sg.audioUrl,
+                            isFullLengthStream: true,
+                            duration: 215,
+                            format: 'api.monochrome.tf Full-Length Stream',
+                            bitrate: '320 kbps Full Track',
+                            genre: 'Single',
+                            year: sg.year,
+                            lyrics: [
+                              { time: 0, text: `${sg.cleanTitle} — ${sg.artist}` },
+                              { time: 3, text: '同期歌詞を読み込み中...' },
+                            ],
+                          });
+                        }}
+                        className="group cursor-pointer rounded-xl p-3 bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 hover:border-[#fa243c]/50 transition flex items-center gap-3"
+                      >
+                        <div className="w-14 h-14 rounded-lg overflow-hidden bg-zinc-900 shrink-0 relative">
+                          {sg.artworkUrl ? (
+                            <img
+                              src={sg.artworkUrl}
+                              alt={sg.title}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <span className="material-symbols-rounded text-xl text-white/30">
+                                music_note
+                              </span>
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                            <span className="material-symbols-rounded text-white text-xl">
+                              play_arrow
+                            </span>
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-bold text-white truncate" title={sg.title}>
+                            {sg.cleanTitle}
+                          </div>
+                          <div className="text-[10px] text-white/50 truncate mt-0.5">
+                            {sg.year}年 · シングル
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="p-6 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs text-white/45 text-center">
+                    {isFetchingArtist
+                      ? `${activeArtistProfile.name} のシングル一覧を取得中...`
+                      : '登録されているシングルはありません'}
+                  </div>
+                )}
+              </div>
+
+              {/* SECTION 4: ミュージックビデオ (Official MVs) */}
               {activeArtistProfile.mvs.length > 0 && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-white">
-                      {activeArtistProfile.name} のミュージックビデオ (MV)
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <span className="material-symbols-rounded text-purple-400 text-xl">
+                        smart_display
+                      </span>
+                      <span>
+                        {activeArtistProfile.name} のミュージックビデオ ({activeArtistProfile.mvs.length}本)
+                      </span>
                     </h2>
                     <button
                       type="button"
@@ -2782,24 +3186,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   </div>
                 </div>
               )}
-
-              {/* Artist Top Tracks Section */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-bold text-white">
-                    {activeArtistProfile.name} の人気楽曲 ({filteredTracks.length}曲)
-                  </h2>
-                  {isSearchingOnline && (
-                    <span className="text-xs text-[#fa243c] font-mono">
-                      カタログを取得中...
-                    </span>
-                  )}
-                </div>
-                {renderAppleMusicSongTable(
-                  filteredTracks,
-                  `${activeArtistProfile.name} の楽曲を読み込み中です...`
-                )}
-              </div>
             </div>
           )}
 

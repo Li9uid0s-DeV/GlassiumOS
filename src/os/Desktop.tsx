@@ -221,7 +221,7 @@ export function Desktop() {
   const [draggingNote, setDraggingNote] = useState<{ id: string; x: number; y: number } | null>(null);
   const [showGlasiusWidget, setShowGlasiusWidget] = useState<boolean>(true);
   const [showWhatsNewModal, setShowWhatsNewModal] = useState<boolean>(() => {
-    const dismissed = localStorage.getItem('glassium_v5.0_u1_whats_new_dismissed');
+    const dismissed = localStorage.getItem('glassium_v5.0_u2_whats_new_dismissed');
     return !dismissed;
   });
 
@@ -495,7 +495,7 @@ export function Desktop() {
               <div className="cursor-pointer hover:opacity-80" onClick={() => openApp('settings')}>
                 <AppLogo size={16} />
               </div>
-              <span className="font-bold tracking-tight">GlassiumOS 5 u1</span>
+              <span className="font-bold tracking-tight">GlassiumOS 5 u2</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('explorer')}>Files</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('settings')}>Settings</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => setShellMode('windows')}>View</span>
@@ -1788,7 +1788,7 @@ export function Desktop() {
         )}
       </AnimatePresence>
 
-      {/* What's New Release Notes Modal (GlassiumOS 5 u1) */}
+      {/* What's New Release Notes Modal (GlassiumOS 5 u2) */}
       <AnimatePresence>
         {showWhatsNewModal && (
           <motion.div
@@ -1797,7 +1797,7 @@ export function Desktop() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-6"
             onClick={() => {
-              localStorage.setItem('glassium_v5.0_u1_whats_new_dismissed', 'true');
+              localStorage.setItem('glassium_v5.0_u2_whats_new_dismissed', 'true');
               setShowWhatsNewModal(false);
             }}
           >
@@ -1807,23 +1807,30 @@ export function Desktop() {
               exit={{ scale: 0.96, y: 12 }}
               transition={{ duration: 0.18 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-xl max-h-[85vh] liquid-glass-window rounded-2xl border border-white/20 p-6 sm:p-8 shadow-2xl flex flex-col gap-5 overflow-hidden relative text-white"
+              className="w-full max-w-2xl max-h-[86vh] liquid-glass-window rounded-2xl border border-white/20 p-6 sm:p-8 shadow-2xl flex flex-col gap-5 overflow-hidden relative text-white"
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b border-white/10 pb-4">
                 <div className="flex items-center gap-3">
-                  <AppLogo size={26} />
+                  <AppLogo size={28} />
                   <div>
-                    <h2 className="text-lg font-bold tracking-tight">GlassiumOS 5 u1 更新内容</h2>
-                    <p className="text-xs text-white/50 font-mono">GlassiumOS 5 u1 · GlasispectUI Release Notes</p>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-bold tracking-tight">GlassiumOS 5 u2 更新内容</h2>
+                      <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 text-[10px] font-mono font-bold">
+                        UPDATE 2 (u1 以降の新機能)
+                      </span>
+                    </div>
+                    <p className="text-xs text-white/50 font-mono mt-0.5">
+                      GlassiumOS 5 u2 · GlasispectUI Release Notes
+                    </p>
                   </div>
                 </div>
                 <button
                   onClick={() => {
-                    localStorage.setItem('glassium_v5.0_u1_whats_new_dismissed', 'true');
+                    localStorage.setItem('glassium_v5.0_u2_whats_new_dismissed', 'true');
                     setShowWhatsNewModal(false);
                   }}
-                  className="p-1.5 text-white/60 hover:text-white transition"
+                  className="p-1.5 text-white/60 hover:text-white transition cursor-pointer"
                 >
                   <Icon name="X" size={18} />
                 </button>
@@ -1832,38 +1839,62 @@ export function Desktop() {
               {/* Release Notes Content List */}
               <div className="flex-1 overflow-y-auto pr-1 text-xs divide-y divide-white/10">
                 <div className="py-3.5 first:pt-0 flex flex-col gap-1">
-                  <div className="font-semibold text-white">1. GlasispectUI ＆ 2世代前デフォルト Live2D 壁紙（全5色）の復刻</div>
-                  <p className="text-white/65 leading-relaxed">
-                    UI名称を「GlasispectUI」へ刷新し、既存の2Dライブ壁紙を残したまま、2世代前のデフォルトだったLive2D壁紙（Amethyst &amp; Cyan Silk / Abyssal Deep Ocean / Polar Emerald Aurora / Neon Cyber Dusk / Crimson Rose Nebula）を復刻しました。また「Glassium Studio」「Spect Studio」への名称変更とアイコン修正、ブラウザの404エラー修正を適用しました。
+                  <div className="font-semibold text-cyan-300 flex items-center gap-2">
+                    <span>1. Music フル尺高速再生エンジン（30秒制限の完全解消）＆ 厳密一致の同期歌詞</span>
+                  </div>
+                  <p className="text-white/70 leading-relaxed">
+                    VIP試聴クリップ（30秒）を自動検知して除外し、320kbpsフル尺ストリームへ即座に接続するマルチソース解決エンジンを搭載。さらにLRCLIBタイムスタンプ同期歌詞に曲名・アーティスト名の厳密一致検証を導入し、別曲の歌詞が表示される問題を解消しました。
                   </p>
                 </div>
 
                 <div className="py-3.5 flex flex-col gap-1">
-                  <div className="font-semibold text-white">2. 電卓・ファイルアプリ・Terminal の大幅機能強化</div>
-                  <p className="text-white/65 leading-relaxed">
-                    電卓に画面端マグネット吸着「Liquid Glass ミニウィジェット」、単位や文字を自動除去して計算する「SpectClip」、変数ストック「スマート・タグ保存」、Editorグラフ出力、AI「コンテキスト数式シミュレーター」を搭載。ファイルアプリにはホバー/クリックで浮かび上がる「空間レイヤー表示（スペクト・プレビュー）」、「流動的スマート・ドロップ・ゾーン」、「スマート・タグ・バインダー」、AI「セマンティック・サーチ＆一括アクション」を追加しました。
+                  <div className="font-semibold text-cyan-300 flex items-center gap-2">
+                    <span>2. 専用アーティストページ刷新（人気曲・アルバム収録曲展開・シングル &amp; EP・公式MV）</span>
+                  </div>
+                  <p className="text-white/70 leading-relaxed">
+                    再生中の歌手名をクリックするとその歌手の専用アーティストページへ直行。Monochrome / Apple Musicからアーティスト画像・人気曲・アルバム（クリックで収録曲一覧を展開＆直接再生）・シングル＆EP・公式MVを取得し、厳格な歌手名フィルタリングにより別の歌手の曲が混入しないよう完全分離しました。
                   </p>
                 </div>
 
                 <div className="py-3.5 flex flex-col gap-1">
-                  <div className="font-semibold text-white">3. 3DMaze（全50階層ローグライク）＆ Slope 物理演算アップデート</div>
-                  <p className="text-white/65 leading-relaxed">
-                    Slopeのコース外落下重力と当たり判定を改善。3DMazeはThree.js（深度ベースフォグ・16×16チャンク生成）による全50階層・5属性エリア（土➔クリスタル➔Void➔ネオン➔インフェルノ）、木/銀/金/XP/ボス/アイテムチェスト、4段階の難易度、デイリーチャレンジRTAに対応しました。
+                  <div className="font-semibold text-cyan-300 flex items-center gap-2">
+                    <span>3. Dolby Atmos 3D 空間オーディオ ＆ Music 詳細設定タブ</span>
+                  </div>
+                  <p className="text-white/70 leading-relaxed">
+                    Musicアプリ内に「設定」タブを追加し、ストリーミング音質（Hi-Res Lossless / 320kbps / 192kbps）、取得サイト優先度、ダウンロード品質（FLAC / MP3 320kbps）、MV画質（4K UHD / 1080p / 720p）を自在に変更可能に。3Dサラウンドリバーブ＆ダイナミックEQによる「Dolby Atmos」空間オーディオにも対応しました。
+                  </p>
+                </div>
+
+                <div className="py-3.5 flex flex-col gap-1">
+                  <div className="font-semibold text-cyan-300 flex items-center gap-2">
+                    <span>4. Liquid Glass 再生ピル（自由ドラッグ移動・ミニピル最小化）＆ 最大化連動グラデーション</span>
+                  </div>
+                  <p className="text-white/70 leading-relaxed">
+                    画面下部のLiquid Glass音楽ドック（ピル）を画面内の好きな位置へドラッグ移動したり、コンパクトなミニピルへ最小化できるようになりました。また上部の「いま聴く」バーを廃止し、背景の動的グラデーションはアートワーク最大化時（歌詞フル画面／最大化表示）のみ発色するよう改善しました。
+                  </p>
+                </div>
+
+                <div className="py-3.5 flex flex-col gap-1">
+                  <div className="font-semibold text-cyan-300 flex items-center gap-2">
+                    <span>5. GlasiusCard デスクトップウィジェット・48時間降水マップ・Entertainment 軽量化</span>
+                  </div>
+                  <p className="text-white/70 leading-relaxed">
+                    デスクトップ上でドラッグ移動できる「GlasiusCard」ウィジェット（時計・天気・予定統合）、Calendarアプリの48時間降水予報アニメーションマップ＆天気連動アドバイス、Jina Cloud Readerの完全削除およびEntertainmentアプリの高速・軽量化を実装しました。
                   </p>
                 </div>
               </div>
 
               {/* Modal Footer */}
               <div className="pt-3 border-t border-white/10 flex items-center justify-between">
-                <span className="text-[11px] text-white/40 font-mono">GlassiumOS 5 u1 · GlasispectUI</span>
+                <span className="text-[11px] text-white/40 font-mono">GlassiumOS 5 u2 · GlasispectUI</span>
                 <button
                   onClick={() => {
-                    localStorage.setItem('glassium_v5.0_u1_whats_new_dismissed', 'true');
+                    localStorage.setItem('glassium_v5.0_u2_whats_new_dismissed', 'true');
                     setShowWhatsNewModal(false);
                   }}
-                  className="px-4 py-1.5 rounded-lg bg-white text-black font-semibold text-xs hover:bg-slate-200 transition"
+                  className="px-5 py-1.5 rounded-lg bg-cyan-400 text-slate-950 font-bold text-xs hover:bg-cyan-300 transition cursor-pointer"
                 >
-                  閉じる
+                  GlassiumOS 5 u2 をはじめる
                 </button>
               </div>
             </motion.div>

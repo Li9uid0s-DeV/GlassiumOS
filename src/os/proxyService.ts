@@ -458,8 +458,8 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     ],
   },
   {
-    id: 'mono-gd-1895330368',
-    monoTrackId: '1895330368',
+    id: 'mono-gd-1888864514',
+    monoTrackId: '1888864514',
     title: '踊り子',
     artist: 'Vaundy',
     album: 'replica',
@@ -467,9 +467,9 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#10b981',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/4a/12/35/4a123514-9273-fa7a-c75c-43f11d1efd15/197187122110.jpg/600x600bb.jpg',
-    audioUrl: '/api/music/play?id=1895330368&title=%E8%B8%8A%E3%82%8A%E5%AD%90&artist=Vaundy',
+    audioUrl: '/api/music/play?id=1888864514&title=%E8%B8%8A%E3%82%8A%E5%AD%90&artist=Vaundy',
     isFullLengthStream: true,
-    duration: 219,
+    duration: 229,
     format: 'api.monochrome.tf 320kbps Full Stream',
     bitrate: '320 kbps Hi-Fi',
     genre: 'J-Pop / Neo-Soul',
@@ -482,8 +482,8 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     ],
   },
   {
-    id: 'mono-gd-1404882103',
-    monoTrackId: '1404882103',
+    id: 'mono-gd-1442021148',
+    monoTrackId: '1442021148',
     title: '東京フラッシュ',
     artist: 'Vaundy',
     album: 'strobo',
@@ -491,9 +491,9 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#ea580c',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/eb/05/cf/eb05cfda-ce2b-65bc-65ae-49339e0839e0/195081156844.jpg/600x600bb.jpg',
-    audioUrl: '/api/music/play?id=1404882103&title=%E6%9D%B1%E4%BA%AC%E3%83%9F%E3%83%A9%E3%83%83%E3%82%B7%E3%83%A5&artist=Vaundy',
+    audioUrl: '/api/music/play?id=1442021148&title=%E6%9D%B1%E4%BA%AC%E3%83%9F%E3%83%A9%E3%83%83%E3%82%B7%E3%83%A5&artist=Vaundy',
     isFullLengthStream: true,
-    duration: 249,
+    duration: 259,
     format: 'api.monochrome.tf 320kbps Full Stream',
     bitrate: '320 kbps Hi-Fi',
     genre: 'R&B / City Pop',
@@ -578,8 +578,8 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     ],
   },
   {
-    id: 'mono-gd-2141525010',
-    monoTrackId: '2141525010',
+    id: 'mono-gd-2138967363',
+    monoTrackId: '2138967363',
     title: 'さよーならまたいつか！',
     artist: '米津玄師',
     album: 'LOST CORNER',
@@ -587,7 +587,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#0ea5e9',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/7e/61/9c/7e619c9e-561d-85fa-7fcf-d843ff2e43bc/jacket_SECL03112B00Z_550.jpg/600x600bb.jpg',
-    audioUrl: '/api/music/play?id=2141525010&title=%E3%81%95%E3%82%88%E3%83%BC%E3%81%AA%E3%82%89%E3%81%BE%E3%81%9F%E3%81%84%E3%81%A4%E3%81%8B%EF%BC%81&artist=%E7%B1%B3%E6%B4%A5%E7%8E%84%E5%B8%AB',
+    audioUrl: '/api/music/play?id=2138967363&title=%E3%81%95%E3%82%88%E3%83%BC%E3%81%AA%E3%82%89%E3%81%BE%E3%81%9F%E3%81%84%E3%81%A4%E3%81%8B%EF%BC%81&artist=%E7%B1%B3%E6%B4%A5%E7%8E%84%E5%B8%AB',
     isFullLengthStream: true,
     duration: 201,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -626,8 +626,8 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     ],
   },
   {
-    id: 'mono-gd-1985392576',
-    monoTrackId: '1985392576',
+    id: 'mono-gd-1987814537',
+    monoTrackId: '1987814537',
     title: 'Subtitle',
     artist: 'Official髭男dism',
     album: 'Rejoice',
@@ -635,9 +635,9 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#6366f1',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/92/ff/fb/92fffb77-3e47-e177-3b2e-07a8274737d6/PCSP_04523.jpg/600x600bb.jpg',
-    audioUrl: '/api/music/play?id=1985392576&title=Subtitle&artist=Official%E9%AB%AD%E7%94%B7dism',
+    audioUrl: '/api/music/play?id=1987814537&title=Subtitle&artist=Official%E9%AB%AD%E7%94%B7dism',
     isFullLengthStream: true,
-    duration: 310,
+    duration: 305,
     format: 'api.monochrome.tf 320kbps Full Stream',
     bitrate: '320 kbps Hi-Fi',
     genre: 'J-Pop / Ballad',
@@ -1673,14 +1673,14 @@ export interface MusicSettingsConfig {
   dolbyAtmosPreset: 'theater' | 'studio' | 'binaural';
 }
 
-const MUSIC_SETTINGS_STORAGE_KEY = 'glassium_music_settings_v1';
+const MUSIC_SETTINGS_STORAGE_KEY = 'glassium_music_settings_v2';
 
 export const DEFAULT_MUSIC_SETTINGS: MusicSettingsConfig = {
   streamingQuality: '320',
   sourceSite: 'auto',
   downloadQuality: '320',
   mvQuality: '1080p',
-  dolbyAtmosEnabled: true,
+  dolbyAtmosEnabled: false,
   dolbyAtmosPreset: 'theater',
 };
 
@@ -1727,13 +1727,16 @@ export function buildTrackDownloadUrl(
   settings?: MusicSettingsConfig
 ): string {
   const cfg = settings || getMusicSettings();
-  const cleanId = String(track.monoTrackId || track.id || '')
-    .replace(/^mono-live-gd-/, '')
-    .replace(/^mono-gd-/, '')
-    .replace(/^mono-live-tf-/, '')
-    .replace(/^mono-live-/, '')
-    .replace(/^mono-itunes-/, '')
-    .trim();
+  const raw = String(track.monoTrackId || track.id || '').trim();
+  const isItunes = /^(?:mono-itunes-|itunes-|album-|single-|artist-)/i.test(raw);
+  const cleanId = isItunes
+    ? ''
+    : raw
+        .replace(/^mono-live-gd-/, '')
+        .replace(/^mono-gd-/, '')
+        .replace(/^mono-live-tf-/, '')
+        .replace(/^mono-live-/, '')
+        .trim();
   const numericId = /^\d+$/.test(cleanId) ? cleanId : '';
   return `/api/music/download?id=${encodeURIComponent(numericId)}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}&quality=${encodeURIComponent(cfg.downloadQuality)}&source=${encodeURIComponent(cfg.sourceSite)}`;
 }
