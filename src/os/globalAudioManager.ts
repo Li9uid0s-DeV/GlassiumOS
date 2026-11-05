@@ -249,7 +249,7 @@ class GlobalAudioManager {
     const resolvedUrl =
       track.audioUrl && !track.audioUrl.includes('saavncdn.com') && !track.audioUrl.includes('itunes.apple.com')
         ? track.audioUrl
-        : `./api/music/play?id=${encodeURIComponent(track.monoTrackId || track.id)}&title=${encodeURIComponent(
+        : `/api/music/play?id=${encodeURIComponent(track.monoTrackId || track.id)}&title=${encodeURIComponent(
             track.title
           )}&artist=${encodeURIComponent(track.artist)}`;
 

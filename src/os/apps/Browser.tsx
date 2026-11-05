@@ -1093,12 +1093,7 @@ export function BrowserApp({ payload }: Props) {
                 >
                   {engine === 'scramjet' ? 'Ultraviolet SWで再読込' : 'Scramjet SWで再読込'}
                 </button>
-                <button
-                  onClick={() => loadProxiedWebpage(loadedUrl, 'jina-reader', engine)}
-                  className="px-2 py-0.5 bg-white/5 hover:bg-white/15 text-amber-300"
-                >
-                  Cloud Reader変換
-                </button>
+
                 <button
                   onClick={() => {
                     setGcsCustomTargetUrl(loadedUrl);
@@ -1159,12 +1154,7 @@ export function BrowserApp({ payload }: Props) {
                     >
                       Ultraviolet SW + Wisp で再試行
                     </button>
-                    <button
-                      onClick={() => loadProxiedWebpage(loadedUrl, 'jina-reader', engine)}
-                      className="px-4 py-2 bg-cyan-500 text-black font-semibold text-xs transition hover:bg-cyan-400"
-                    >
-                      Cloud Reader ノードで開く
-                    </button>
+
                     <button
                       onClick={() => navigateTo('about:start')}
                       className="px-4 py-2 bg-white/10 text-white text-xs hover:bg-white/20 transition"

@@ -319,7 +319,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#fa243c',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/7f/8c/90/7f8c90dd-e11f-30d5-271d-4b72eee970bd/195497666737.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1409311773&title=%E5%A4%9C%E3%81%AB%E9%A7%86%E3%81%91%E3%82%8B&artist=YOASOBI',
+    audioUrl: '/api/music/play?id=1409311773&title=%E5%A4%9C%E3%81%AB%E9%A7%86%E3%81%91%E3%82%8B&artist=YOASOBI',
     isFullLengthStream: true,
     duration: 259,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -362,7 +362,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#ec4899',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/3a/17/eb/3a17eb30-eacb-82eb-51df-d1321dbb55bc/197188492205.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=2034742057&title=%E3%82%A2%E3%82%A4%E3%83%89%E3%83%AB&artist=YOASOBI',
+    audioUrl: '/api/music/play?id=2034742057&title=%E3%82%A2%E3%82%A4%E3%83%89%E3%83%AB&artist=YOASOBI',
     isFullLengthStream: true,
     duration: 213,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -391,7 +391,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#38bdf8',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/ce/27/b5/ce27b5e4-245c-0cfa-89eb-daefb0a56247/197189154218.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=3453846400&title=%E5%8B%87%E8%80%85&artist=YOASOBI',
+    audioUrl: '/api/music/play?id=3453846400&title=%E5%8B%87%E8%80%85&artist=YOASOBI',
     isFullLengthStream: true,
     duration: 194,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -416,7 +416,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#0ea5e9',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/44/22/e1/4422e11d-28e4-1ec3-7ef2-9f6b9076bc1e/195497217311.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1474409758&title=%E7%BE%A4%E9%9D%92&artist=YOASOBI',
+    audioUrl: '/api/music/play?id=1474409758&title=%E7%BE%A4%E9%9D%92&artist=YOASOBI',
     isFullLengthStream: true,
     duration: 242,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -441,7 +441,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#f59e0b',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/09/89/00/09890002-b2de-3637-39b2-f6c2d34d0e93/197189854859.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1447572611&title=%E6%80%AA%E7%8D%A3%E3%81%AE%E8%8A%B1%E5%94%84&artist=Vaundy',
+    audioUrl: '/api/music/play?id=1447572611&title=%E6%80%AA%E7%8D%A3%E3%81%AE%E8%8A%B1%E5%94%84&artist=Vaundy',
     isFullLengthStream: true,
     duration: 225,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -467,7 +467,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#10b981',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/4a/12/35/4a123514-9273-fa7a-c75c-43f11d1efd15/197187122110.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1895330368&title=%E8%B8%8A%E3%82%8A%E5%AD%90&artist=Vaundy',
+    audioUrl: '/api/music/play?id=1895330368&title=%E8%B8%8A%E3%82%8A%E5%AD%90&artist=Vaundy',
     isFullLengthStream: true,
     duration: 219,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -491,7 +491,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#ea580c',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/eb/05/cf/eb05cfda-ce2b-65bc-65ae-49339e0839e0/195081156844.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1404882103&title=%E6%9D%B1%E4%BA%AC%E3%83%9F%E3%83%A9%E3%83%83%E3%82%B7%E3%83%A5&artist=Vaundy',
+    audioUrl: '/api/music/play?id=1404882103&title=%E6%9D%B1%E4%BA%AC%E3%83%9F%E3%83%A9%E3%83%83%E3%82%B7%E3%83%A5&artist=Vaundy',
     isFullLengthStream: true,
     duration: 249,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -514,7 +514,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#06b6d4',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/86/b0/9d/86b09d63-367a-563a-1e24-d5d62c220ac8/jacket_SRCL09749B00Z_550.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=536622304&title=Lemon&artist=%E7%B1%B3%E6%B4%A5%E7%8E%84%E5%B8%AB',
+    audioUrl: '/api/music/play?id=536622304&title=Lemon&artist=%E7%B1%B3%E6%B4%A5%E7%8E%84%E5%B8%AB',
     isFullLengthStream: true,
     duration: 256,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -540,7 +540,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#ef4444',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/04/e7/bb/04e7bb46-4cb4-6889-fce5-9509df2ee443/jacket_SECL02815B00Z_550.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1986803568&title=KICK%20BACK&artist=%E7%B1%B3%E6%B4%A5%E7%8E%84%E5%B8%AB',
+    audioUrl: '/api/music/play?id=1986803568&title=KICK%20BACK&artist=%E7%B1%B3%E6%B4%A5%E7%8E%84%E5%B8%AB',
     isFullLengthStream: true,
     duration: 193,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -564,7 +564,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#eab308',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/a4/0f/f2/a40ff262-b9cf-2c8c-1ae3-855d0458dfa3/jacket_SECL02598B00Z_550.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1459993358&title=%E6%84%9F%E9%9B%BB&artist=%E7%B1%B3%E6%B4%A5%E7%8E%84%E5%B8%AB',
+    audioUrl: '/api/music/play?id=1459993358&title=%E6%84%9F%E9%9B%BB&artist=%E7%B1%B3%E6%B4%A5%E7%8E%84%E5%B8%AB',
     isFullLengthStream: true,
     duration: 264,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -587,7 +587,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#0ea5e9',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/7e/61/9c/7e619c9e-561d-85fa-7fcf-d843ff2e43bc/jacket_SECL03112B00Z_550.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=2141525010&title=%E3%81%95%E3%82%88%E3%83%BC%E3%81%AA%E3%82%89%E3%81%BE%E3%81%9F%E3%81%84%E3%81%A4%E3%81%8B%EF%BC%81&artist=%E7%B1%B3%E6%B4%A5%E7%8E%84%E5%B8%AB',
+    audioUrl: '/api/music/play?id=2141525010&title=%E3%81%95%E3%82%88%E3%83%BC%E3%81%AA%E3%82%89%E3%81%BE%E3%81%9F%E3%81%84%E3%81%A4%E3%81%8B%EF%BC%81&artist=%E7%B1%B3%E6%B4%A5%E7%8E%84%E5%B8%AB',
     isFullLengthStream: true,
     duration: 201,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -610,7 +610,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#10b981',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music113/v4/9c/7d/88/9c7d883d-4477-bf68-f56f-a726030a63a2/PCCA_04822.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1365924378&title=Pretender&artist=Official%E9%AB%AD%E7%94%B7dism',
+    audioUrl: '/api/music/play?id=1365924378&title=Pretender&artist=Official%E9%AB%AD%E7%94%B7dism',
     isFullLengthStream: true,
     duration: 327,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -635,7 +635,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#6366f1',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/92/ff/fb/92fffb77-3e47-e177-3b2e-07a8274737d6/PCSP_04523.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1985392576&title=Subtitle&artist=Official%E9%AB%AD%E7%94%B7dism',
+    audioUrl: '/api/music/play?id=1985392576&title=Subtitle&artist=Official%E9%AB%AD%E7%94%B7dism',
     isFullLengthStream: true,
     duration: 310,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -659,7 +659,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#f59e0b',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/fc/29/75/fc297597-90fb-29b6-8bb0-d790f1190bc9/PCSP_04135.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1937978308&title=%E3%83%9F%E3%83%83%E3%82%AF%E3%82%B9%E3%83%8A%E3%83%83%E3%83%84&artist=Official%E9%AB%AD%E7%94%B7dism',
+    audioUrl: '/api/music/play?id=1937978308&title=%E3%83%9F%E3%83%83%E3%82%AF%E3%82%B9%E3%83%8A%E3%83%83%E3%83%84&artist=Official%E9%AB%AD%E7%94%B7dism',
     isFullLengthStream: true,
     duration: 212,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -682,7 +682,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#8b5cf6',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/4c/3b/b2/4c3bb247-3be8-0c57-aa9a-7f1775a7b7a8/24UMGIM32931.rgb.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=2144813587&title=%E3%83%A9%E3%82%A4%E3%83%A9%E3%83%83%E3%82%AF&artist=Mrs.%20GREEN%20APPLE',
+    audioUrl: '/api/music/play?id=2144813587&title=%E3%83%A9%E3%82%A4%E3%83%A9%E3%83%83%E3%82%AF&artist=Mrs.%20GREEN%20APPLE',
     isFullLengthStream: true,
     duration: 288,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -707,7 +707,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#06b6d4',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/64/46/74/6446740c-255e-5bb6-1f92-563b7c8446c8/18UMGIM08434.rgb.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=574963458&title=%E9%9D%92%E3%81%A8%E5%A4%8F&artist=Mrs.%20GREEN%20APPLE',
+    audioUrl: '/api/music/play?id=574963458&title=%E9%9D%92%E3%81%A8%E5%A4%8F&artist=Mrs.%20GREEN%20APPLE',
     isFullLengthStream: true,
     duration: 270,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -731,7 +731,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#f43f5e',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/ef/a0/62/efa0628e-5b1d-c4ad-7377-52643a60a726/22UMGIM46093.rgb.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1947702816&title=%E3%83%80%E3%83%B3%E3%82%B9%E3%83%9B%E3%83%BC%E3%83%AB&artist=Mrs.%20GREEN%20APPLE',
+    audioUrl: '/api/music/play?id=1947702816&title=%E3%83%80%E3%83%B3%E3%82%B9%E3%83%9B%E3%83%BC%E3%83%AB&artist=Mrs.%20GREEN%20APPLE',
     isFullLengthStream: true,
     duration: 204,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -754,7 +754,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#f59e0b',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/6e/8b/63/6e8b6348-73b3-8b74-12ea-9e0c1f609e5e/23UMGIM35091.rgb.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=2043653198&title=%E3%82%B1%E3%82%BB%E3%83%A9%E3%82%BB%E3%83%A9&artist=Mrs.%20GREEN%20APPLE',
+    audioUrl: '/api/music/play?id=2043653198&title=%E3%82%B1%E3%82%BB%E3%83%A9%E3%82%BB%E3%83%A9&artist=Mrs.%20GREEN%20APPLE',
     isFullLengthStream: true,
     duration: 272,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -777,7 +777,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#3b82f6',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/cb/82/41/cb8241a3-5324-bbaa-8da2-33c5b29b1c7d/20UMGIM76771.rgb.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1489254523&title=%E3%81%86%E3%81%A3%E3%81%9B%E3%81%87%E3%82%8F&artist=Ado',
+    audioUrl: '/api/music/play?id=1489254523&title=%E3%81%86%E3%81%A3%E3%81%9B%E3%81%87%E3%82%8F&artist=Ado',
     isFullLengthStream: true,
     duration: 205,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -803,7 +803,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#f43f5e',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/64/e5/ea/64e5ea9d-72e2-53b4-82a8-a379db933f7c/22UMGIM50811.rgb.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1954437911&title=%E6%96%B0%E6%99%82%E4%BB%A3&artist=Ado',
+    audioUrl: '/api/music/play?id=1954437911&title=%E6%96%B0%E6%99%82%E4%BB%A3&artist=Ado',
     isFullLengthStream: true,
     duration: 226,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -826,7 +826,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#d946ef',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/09/b8/4e/09b84ef7-b2e1-4566-075e-ba6a4bf7ce97/23UMGIM78877.rgb.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=2077035650&title=%E5%94%B1&artist=Ado',
+    audioUrl: '/api/music/play?id=2077035650&title=%E5%94%B1&artist=Ado',
     isFullLengthStream: true,
     duration: 191,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -849,7 +849,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#f59e0b',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/12/81/dc/1281dc28-48e6-5ff7-642d-6cf4d487d9e0/4547366660890.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=2107565588&title=Bling-Bang-Bang-Born&artist=Creepy%20Nuts',
+    audioUrl: '/api/music/play?id=2107565588&title=Bling-Bang-Bang-Born&artist=Creepy%20Nuts',
     isFullLengthStream: true,
     duration: 168,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -873,7 +873,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#38bdf8',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/d5/4b/56/d54b5687-9bb3-9366-2180-87779d71cfa0/4547366665789.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=2118335011&title=%E4%BA%8C%E5%BA%A6%E5%5D%9D&artist=Creepy%20Nuts',
+    audioUrl: '/api/music/play?id=2118335011&title=%E4%BA%8C%E5%BA%A6%E5%5D%9D&artist=Creepy%20Nuts',
     isFullLengthStream: true,
     duration: 198,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -895,7 +895,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#94a3b8',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/4a/12/35/4a123514-9273-fa7a-c75c-43f11d1efd15/197187122110.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1347630432&title=%E7%99%BD%E6%97%A5&artist=King%20Gnu',
+    audioUrl: '/api/music/play?id=1347630432&title=%E7%99%BD%E6%97%A5&artist=King%20Gnu',
     isFullLengthStream: true,
     duration: 275,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -920,7 +920,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#ef4444',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/8e/31/58/8e3158c3-f61b-9fba-4b2a-7bf33890f912/4547366637304.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=2074163984&title=SPECIALZ&artist=King%20Gnu',
+    audioUrl: '/api/music/play?id=2074163984&title=SPECIALZ&artist=King%20Gnu',
     isFullLengthStream: true,
     duration: 238,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -943,7 +943,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#d97706',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/08/96/95/089695fa-9ef1-893f-c603-f3089d79ca6f/4547366539356.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1489254521&title=%E3%83%89%E3%83%A9%E3%82%A4%E3%83%95%E3%83%A9%E3%83%AF%E3%83%BC&artist=%E5%84%AA%E9%87%8C',
+    audioUrl: '/api/music/play?id=1489254521&title=%E3%83%89%E3%83%A9%E3%82%A4%E3%83%95%E3%83%A9%E3%83%AF%E3%83%BC&artist=%E5%84%AA%E9%87%8C',
     isFullLengthStream: true,
     duration: 286,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -966,7 +966,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#3b82f6',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/08/96/95/089695fa-9ef1-893f-c603-f3089d79ca6f/4547366539356.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1891557999&title=%E3%83%99%E3%83%86%E3%83%AB%E3%82%AE%E3%82%A6%E3%82%B9&artist=%E5%84%AA%E9%87%8C',
+    audioUrl: '/api/music/play?id=1891557999&title=%E3%83%99%E3%83%86%E3%83%AB%E3%82%AE%E3%82%A6%E3%82%B9&artist=%E5%84%AA%E9%87%8C',
     isFullLengthStream: true,
     duration: 230,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -988,7 +988,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#f59e0b',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/71/84/c5/7184c58d-71b5-31a8-9be5-94f31c2c2f78/075679867902.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1299550532&title=%E3%83%9E%E3%83%AA%E3%83%BC%E3%82%B0%E3%83%BC%E3%83%AB%E3%83%89&artist=%E3%81%82%E3%81%84%E3%81%BF%E3%82%87%E3%82%93',
+    audioUrl: '/api/music/play?id=1299550532&title=%E3%83%9E%E3%83%AA%E3%83%BC%E3%82%B0%E3%83%BC%E3%83%AB%E3%83%89&artist=%E3%81%82%E3%81%84%E3%81%BF%E3%82%87%E3%82%93',
     isFullLengthStream: true,
     duration: 306,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -1012,7 +1012,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#0284c7',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/f7/e4/df/f7e4dfbf-8ee3-6bb3-2e06-c87fa9f654b9/21UMGIM61622.rgb.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=3443675790&title=%E6%B0%B4%E5%B9%B3%E7%B7%9A&artist=back%20number',
+    audioUrl: '/api/music/play?id=3443675790&title=%E6%B0%B4%E5%B9%B3%E7%B7%9A&artist=back%20number',
     isFullLengthStream: true,
     duration: 288,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -1036,7 +1036,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#f43f5e',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/e0/f8/bf/e0f8bfdf-5202-bdfa-19d2-349fce8f6453/197189728440.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=2123841181&title=%E6%99%A9%E9%A4%90%E6%AD%8C&artist=tuki.',
+    audioUrl: '/api/music/play?id=2123841181&title=%E6%99%A9%E9%A4%90%E6%AD%8C&artist=tuki.',
     isFullLengthStream: true,
     duration: 215,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -1059,7 +1059,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#a8a29e',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/a4/0f/f2/a40ff262-b9cf-2c8c-1ae3-855d0458dfa3/jacket_SECL02598B00Z_550.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=1449537106&title=%E6%AD%BB%E3%81%AC%E3%81%AE%E3%81%8C%E3%81%84%E3%81%84%E3%82%8F&artist=%E8%97%A4%E4%BA%95%20%E9%A2%A8',
+    audioUrl: '/api/music/play?id=1449537106&title=%E6%AD%BB%E3%81%AC%E3%81%AE%E3%81%8C%E3%81%84%E3%81%84%E3%82%8F&artist=%E8%97%A4%E4%BA%95%20%E9%A2%A8',
     isFullLengthStream: true,
     duration: 185,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -1084,7 +1084,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#38bdf8',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/ee/18/d5/ee18d53d-d6a5-be23-5e3d-24903c73fc5f/16UMGIM35232.rgb.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=421423830&title=%E5%89%8D%E5%89%8D%E5%89%8D%E4%B8%96&artist=RADWIMPS',
+    audioUrl: '/api/music/play?id=421423830&title=%E5%89%8D%E5%89%8D%E5%89%8D%E4%B8%96&artist=RADWIMPS',
     isFullLengthStream: true,
     duration: 285,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -1109,7 +1109,7 @@ export const MONOCHROME_CATALOG: MonochromeTrack[] = [
     coverAccent: '#f59e0b',
     artworkUrl:
       'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/a4/00/60/a400609b-640a-5c1a-7b3b-821ef9a1e345/886443927087.jpg/600x600bb.jpg',
-    audioUrl: './api/music/play?id=26304195&title=Get%20Lucky&artist=Daft%20Punk',
+    audioUrl: '/api/music/play?id=26304195&title=Get%20Lucky&artist=Daft%20Punk',
     isFullLengthStream: true,
     duration: 369,
     format: 'api.monochrome.tf 320kbps Full Stream',
@@ -1141,7 +1141,6 @@ export type ProxyRelayNodeId =
   | 'allorigins'
   | 'codetabs'
   | 'corsproxy'
-  | 'jina-reader'
   | 'gcs-gateway'
   | 'local-api';
 
@@ -1195,13 +1194,6 @@ export const PROXY_RELAY_SERVERS: ProxyRelayServerInfo[] = [
     endpointLabel: 'https://corsproxy.io',
     region: 'Anycast Edge',
     description: 'エッジキャッシュ対応のプロキシノード',
-  },
-  {
-    id: 'jina-reader',
-    name: 'Jina Cloud Reader Engine',
-    endpointLabel: 'https://r.jina.ai',
-    region: 'Cloud Render',
-    description: 'SPAやJavaScript必須ページをクラウド側でレンダリングして取得します',
   },
   {
     id: 'gcs-gateway',
@@ -1418,69 +1410,6 @@ export async function fetchHtmlViaProxyCascade(
     return null;
   };
 
-  const tryJinaReader = async (): Promise<string | null> => {
-    try {
-      const res = await fetch(`https://r.jina.ai/${cleanTarget}`, {
-        headers: { Accept: 'text/plain' },
-        signal: AbortSignal.timeout(8000),
-      });
-      if (res.ok) {
-        const text = await res.text();
-        if (text && text.trim().length > 20 && !isGitHubPages404OrInvalid(text)) {
-          const esc = text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/(https?:\/\/[^\s<>"']+)/g, '<a href="$1" style="color:#38bdf8;">$1</a>');
-          return `<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><style>
-            body { margin: 0; padding: 24px 32px; background: #090d16; color: #f1f5f9; font-family: system-ui, -apple-system, sans-serif; line-height: 1.75; }
-            .hdr { padding: 12px 16px; background: rgba(6,182,212,0.12); border-left: 3px solid #06b6d4; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-            .hdr span { font-size: 12px; color: #67e8f9; font-weight: 700; }
-            pre { white-space: pre-wrap; word-break: break-word; font-family: inherit; font-size: 14px; }
-          </style></head><body>
-            <div class="hdr"><span>Glasispect Cloud Reader Proxy — ${cleanTarget}</span></div>
-            <pre>${esc}</pre>
-          </body></html>`;
-        }
-      }
-    } catch {
-      // ignore
-    }
-    return null;
-  };
-
-  const tryDirectGcs = async (): Promise<string | null> => {
-    if (!cleanTarget.includes('storage.googleapis.com')) return null;
-    try {
-      const res = await fetch(cleanTarget, { signal: AbortSignal.timeout(6000) });
-      if (res.ok) {
-        const text = await res.text();
-        if (text.trim().startsWith('<?xml') || text.includes('<ListBucketResult')) {
-          const keys = Array.from(text.matchAll(/<Key>([^<]+)<\/Key>/g)).map((m) => m[1]);
-          const baseBucketUrl = cleanTarget.replace(/\?.*$/, '').replace(/\/$/, '');
-          const rows = keys
-            .slice(0, 100)
-            .map(
-              (k) =>
-                `<li style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.08);">
-                  <a href="${baseBucketUrl}/${encodeURI(k)}" style="color:#38bdf8;text-decoration:none;font-family:monospace;font-size:13px;">${k}</a>
-                </li>`
-            )
-            .join('');
-          return `<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="background:#090d16;color:#f8fafc;font-family:system-ui,sans-serif;padding:28px;">
-            <h2 style="color:#38bdf8;margin-top:0;">Google Cloud Storage Bucket Explorer (${baseBucketUrl})</h2>
-            <p style="font-size:12px;color:#94a3b8;">オブジェクト数: ${keys.length} 件 — クリックでプロキシ内表示</p>
-            <ul style="list-style:none;padding:0;">${rows || '<li>公開オブジェクトが見つかりませんでした</li>'}</ul>
-          </body></html>`;
-        }
-        return text;
-      }
-    } catch {
-      // ignore
-    }
-    return null;
-  };
-
   type AttemptFn = { name: string; fn: () => Promise<string | null> };
   const pipeline: AttemptFn[] = [];
 
@@ -1489,7 +1418,6 @@ export async function fetchHtmlViaProxyCascade(
   if (preferredNode === 'allorigins') pipeline.push({ name: 'AllOrigins Relay', fn: tryAllOrigins });
   if (preferredNode === 'codetabs') pipeline.push({ name: 'CodeTabs Relay', fn: tryCodeTabs });
   if (preferredNode === 'corsproxy') pipeline.push({ name: 'CorsProxy.io', fn: tryCorsProxyIo });
-  if (preferredNode === 'jina-reader') pipeline.push({ name: 'Jina Cloud Reader', fn: tryJinaReader });
   if (preferredNode === 'gcs-gateway') pipeline.push({ name: 'storage.googleapis.com Gateway', fn: tryDirectGcs });
   if (preferredNode === 'local-api') pipeline.push({ name: 'Local Server Proxy', fn: tryLocalApi });
 
@@ -1501,8 +1429,7 @@ export async function fetchHtmlViaProxyCascade(
     { name: 'Local Server Proxy', fn: tryLocalApi },
     { name: 'AllOrigins Relay', fn: tryAllOrigins },
     { name: 'CodeTabs Relay', fn: tryCodeTabs },
-    { name: 'CorsProxy.io', fn: tryCorsProxyIo },
-    { name: 'Jina Cloud Reader', fn: tryJinaReader }
+    { name: 'CorsProxy.io', fn: tryCorsProxyIo }
   );
 
   for (const step of pipeline) {
@@ -1880,7 +1807,7 @@ export async function fetchSynchronizedLyricsFromLrclib(
   // 1. Try local server /api/music/lyrics endpoint first (fastest & strips metadata headers)
   try {
     const srvRes = await fetch(
-      `./api/music/lyrics?id=${encodeURIComponent(cleanId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`,
+      `/api/music/lyrics?id=${encodeURIComponent(cleanId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`,
       { signal: AbortSignal.timeout(4500) }
     );
     if (srvRes.ok) {
@@ -2033,7 +1960,7 @@ export async function resolveFullLengthAudioStream(
   // 1. Try local backend /api/music/info first (resolves exact GDStudio/NetEase 320kbps stream)
   try {
     const infoRes = await fetch(
-      `./api/music/info?id=${encodeURIComponent(cleanId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`,
+      `/api/music/info?id=${encodeURIComponent(cleanId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`,
       { signal: AbortSignal.timeout(5500) }
     );
     if (infoRes.ok) {
@@ -2124,7 +2051,7 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
 
   // 1. Primary: Query our fast server-side /api/music/search endpoint (~300ms response, 0 CORS issues)
   try {
-    const srvRes = await fetch(`./api/music/search?q=${encodeURIComponent(cleanQ)}`, {
+    const srvRes = await fetch(`/api/music/search?q=${encodeURIComponent(cleanQ)}`, {
       signal: AbortSignal.timeout(7000),
     });
     if (srvRes.ok) {
@@ -2236,7 +2163,7 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
         coverGradient: palette.grad,
         coverAccent: palette.accent,
         artworkUrl: hiResArt,
-        audioUrl: `./api/music/play?id=${encodeURIComponent(trackId)}&title=${encodeURIComponent(item.name)}&artist=${encodeURIComponent(artistStr)}`,
+        audioUrl: `/api/music/play?id=${encodeURIComponent(trackId)}&title=${encodeURIComponent(item.name)}&artist=${encodeURIComponent(artistStr)}`,
         isFullLengthStream: false,
         sourceUrl: `https://music-api.gdstudio.xyz/api.php?types=url&source=netease&id=${encodeURIComponent(trackId)}&br=320`,
         duration: fullDuration,

@@ -866,7 +866,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
             : undefined;
           const artworkUrl =
             hiResItunesArt ||
-            (item.pic_id ? `./api/music/pic?id=${encodeURIComponent(String(item.pic_id))}` : undefined);
+            (item.pic_id ? `/api/music/pic?id=${encodeURIComponent(String(item.pic_id))}` : undefined);
 
           const durationSec =
             matchedItunes?.trackTimeMillis && matchedItunes.trackTimeMillis > 40000
@@ -884,7 +884,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
             artist: artistStr,
             album: albumStr,
             artworkUrl,
-            audioUrl: `./api/music/play?id=${encodeURIComponent(trackId)}&title=${encodeURIComponent(item.name)}&artist=${encodeURIComponent(artistStr)}`,
+            audioUrl: `/api/music/play?id=${encodeURIComponent(trackId)}&title=${encodeURIComponent(item.name)}&artist=${encodeURIComponent(artistStr)}`,
             duration: durationSec,
             format: 'api.monochrome.tf / 320kbps Full Stream',
             bitrate: '320 kbps Full Track',
@@ -917,7 +917,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
           artist: it.artistName,
           album: it.collectionName || 'Single',
           artworkUrl: hiResArt,
-          audioUrl: `./api/music/play?title=${encodeURIComponent(it.trackName)}&artist=${encodeURIComponent(it.artistName)}`,
+          audioUrl: `/api/music/play?title=${encodeURIComponent(it.trackName)}&artist=${encodeURIComponent(it.artistName)}`,
           duration: durationSec,
           format: 'api.monochrome.tf / 320kbps Full Stream',
           bitrate: '320 kbps Full Track',
@@ -947,7 +947,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
 
     res.json({
       audioUrl: resolved.url,
-      proxyAudioUrl: `./api/music/play?id=${encodeURIComponent(resolved.resolvedId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&proxy=1`,
+      proxyAudioUrl: `/api/music/play?id=${encodeURIComponent(resolved.resolvedId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&proxy=1`,
       resolvedId: resolved.resolvedId,
       format: 'api.monochrome.tf 320kbps MP3 Full Stream',
       bitrate: `${resolved.br} kbps Hi-Fi`,
@@ -1204,7 +1204,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
 
       const resolvedNetEase = await Promise.race([
         neteasePromise,
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000)),
       ]);
 
       if (resolvedNetEase?.url) {

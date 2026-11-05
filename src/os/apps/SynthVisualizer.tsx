@@ -65,7 +65,7 @@ function sanitizeStoredTracks(list: MonochromeTrack[]): MonochromeTrack[] {
         item.audioUrl.includes('mzstatic.com') ||
         item.audioUrl.includes('saavncdn.com') ||
         item.audioUrl.includes('soundhelix.com');
-      const exactPlayUrl = `./api/music/play?id=${encodeURIComponent(
+      const exactPlayUrl = `/api/music/play?id=${encodeURIComponent(
         item.monoTrackId || ''
       )}&title=${encodeURIComponent(item.title)}&artist=${encodeURIComponent(item.artist)}`;
       return {
@@ -557,7 +557,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         !trackToPlay.audioUrl.includes('itunes.apple.com') &&
         !trackToPlay.audioUrl.includes('mzstatic.com')
           ? trackToPlay.audioUrl
-          : `./api/music/play?id=${encodeURIComponent(
+          : `/api/music/play?id=${encodeURIComponent(
               trackToPlay.monoTrackId || trackToPlay.id
             )}&title=${encodeURIComponent(trackToPlay.title)}&artist=${encodeURIComponent(
               trackToPlay.artist
