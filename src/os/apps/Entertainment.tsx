@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 
 export type EntertainmentTab = 'movies' | 'anime' | 'youtube' | 'shorts';
-export type StreamingProvider = 'prime-shows' | 'streamex' | 'flixhd' | 'mapletv' | 'youtube';
+export type StreamingProvider = 'mapple-fun' | 'streamex' | 'flixhd' | 'mapletv' | 'youtube';
 
 interface MediaItem {
   id: string;
@@ -43,11 +43,11 @@ const PROVIDER_METADATA: Record<
   StreamingProvider,
   { name: string; badge: string; color: string; desc: string }
 > = {
-  'prime-shows': {
-    name: 'Prime Shows',
+  'mapple-fun': {
+    name: 'Mapple Fun (mapple.fun)',
     badge: '推奨 (Primary)',
     color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    desc: '最優先のストリーミングソース。高画質映画・海外ドラマ・アニメを中継',
+    desc: 'https://mapple.fun/ 高画質映画・海外ドラマ・アニメダイレクトストリーム',
   },
   streamex: {
     name: 'StreameX',
@@ -65,7 +65,7 @@ const PROVIDER_METADATA: Record<
     name: 'Maple TV',
     badge: 'ミラー 3 (Mirror)',
     color: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-    desc: 'カナダ・アジア分散エッジ中継サーバー',
+    desc: '分散エッジ中継サーバー',
   },
   youtube: {
     name: 'YouTube',
@@ -395,7 +395,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     return 'movies';
   });
 
-  const [provider, setProvider] = useState<StreamingProvider>('prime-shows');
+  const [provider, setProvider] = useState<StreamingProvider>('mapple-fun');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string>('All');
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(CURATED_MEDIA_CATALOG[0]);
@@ -463,7 +463,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     return list;
   }, [activeTab, selectedGenre, searchQuery]);
 
-  // Compute embed URL for current player & provider (Prime Shows, StreameX, FlixHD, Maple TV, YouTube)
+  // Compute embed URL for current player & provider (mapple.fun, StreameX, FlixHD, Maple TV, YouTube)
   const currentEmbedUrl = useMemo(() => {
     if (!selectedMedia) return '';
 
@@ -473,12 +473,12 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     const isMovie = selectedMedia.type === 'movie';
 
     switch (provider) {
-      case 'prime-shows':
-        // Prime Shows stream embed server
+      case 'mapple-fun':
+        // https://mapple.fun/ stream embed server
         if (isMovie) {
-          return `https://primeshow.top/embed/movie/${tmdbId}`;
+          return `https://mapple.fun/embed/movie/${tmdbId}`;
         }
-        return `https://primeshow.top/embed/tv/${tmdbId}/1/${ep}`;
+        return `https://mapple.fun/embed/tv/${tmdbId}/1/${ep}`;
 
       case 'streamex':
         if (isMovie) {
@@ -631,7 +631,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
             onChange={(e) => setProvider(e.target.value as StreamingProvider)}
             className="bg-black/60 border border-white/15 text-white text-xs font-semibold rounded-lg px-2.5 py-1.5 outline-none hover:border-white/30 transition cursor-pointer"
           >
-            <option value="prime-shows">Prime Shows (推奨)</option>
+            <option value="mapple-fun">Mapple Fun (mapple.fun) (推奨)</option>
             <option value="streamex">StreameX (ミラー 1)</option>
             <option value="flixhd">FlixHD (1080p)</option>
             <option value="mapletv">Maple TV (ミラー 3)</option>
