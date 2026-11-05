@@ -68,7 +68,11 @@ export function CalendarApp({ initialTab }: { initialTab?: string }) {
     loading: false,
   });
 
+  const [coords, setCoords] = useState<{ lat: number; lon: number }>({ lat: 35.6762, lon: 139.6503 });
+  const [showExtendedMap, setShowExtendedMap] = useState(false);
+
   const fetchCalendarWeather = useCallback(async (lat = 35.6762, lon = 139.6503, locName = '東京 (Tokyo)') => {
+    setCoords({ lat, lon });
     setWeather((prev) => ({ ...prev, loading: true, error: undefined }));
     try {
       const res = await fetch(
@@ -304,7 +308,7 @@ export function CalendarApp({ initialTab }: { initialTab?: string }) {
               <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-cyan-500/15 blur-2xl pointer-events-none" />
               <div className="absolute -left-8 -bottom-8 w-28 h-28 rounded-full bg-indigo-500/10 blur-xl pointer-events-none" />
 
-              {/* Widget Header: Location & Reload */}
+              {/* Widget Header: Location, View Extended Map & Reload */}
               <div className="flex items-center justify-between mb-3 pb-2 border-b border-white/10 relative z-10">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-rounded text-cyan-400 text-base">location_on</span>
@@ -315,26 +319,37 @@ export function CalendarApp({ initialTab }: { initialTab?: string }) {
                     {weather.condition}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
-                      navigator.geolocation.getCurrentPosition(
-                        (pos) => fetchCalendarWeather(pos.coords.latitude, pos.coords.longitude, '現在地 (GPS)'),
-                        () => fetchCalendarWeather(35.6762, 139.6503, '東京 (Tokyo)')
-                      );
-                    } else {
-                      fetchCalendarWeather(35.6762, 139.6503, '東京 (Tokyo)');
-                    }
-                  }}
-                  title="天気を再取得"
-                  className="flex items-center gap-1 text-[11px] text-white/50 hover:text-cyan-300 transition"
-                >
-                  <span className={`material-symbols-rounded text-sm ${weather.loading ? 'animate-spin text-cyan-400' : ''}`}>
-                    sync
-                  </span>
-                  <span className="hidden sm:inline">更新</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowExtendedMap(true)}
+                    className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-cyan-500/25 to-blue-500/25 hover:from-cyan-500/40 hover:to-blue-500/40 text-cyan-200 border border-cyan-400/40 text-[11px] font-medium flex items-center gap-1.5 transition shadow-sm"
+                    title="48時間降水予測インタラクティブマップを開く"
+                  >
+                    <span className="material-symbols-rounded text-sm">map</span>
+                    <span>View Extended Map</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+                        navigator.geolocation.getCurrentPosition(
+                          (pos) => fetchCalendarWeather(pos.coords.latitude, pos.coords.longitude, '現在地 (GPS)'),
+                          () => fetchCalendarWeather(35.6762, 139.6503, '東京 (Tokyo)')
+                        );
+                      } else {
+                        fetchCalendarWeather(35.6762, 139.6503, '東京 (Tokyo)');
+                      }
+                    }}
+                    title="天気を再取得"
+                    className="flex items-center gap-1 text-[11px] text-white/50 hover:text-cyan-300 transition"
+                  >
+                    <span className={`material-symbols-rounded text-sm ${weather.loading ? 'animate-spin text-cyan-400' : ''}`}>
+                      sync
+                    </span>
+                    <span className="hidden sm:inline">更新</span>
+                  </button>
+                </div>
               </div>
 
               {/* Main Weather Row: Current Temp + 3-Day Forecast Cards */}
@@ -484,6 +499,123 @@ export function CalendarApp({ initialTab }: { initialTab?: string }) {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 48-Hour Regional Precipitation Forecast Extended Map Modal (Open-Meteo API) */}
+      {showExtendedMap && (
+        <div className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-xl flex items-center justify-center p-3 sm:p-6">
+          <div className="w-full max-w-4xl h-[82vh] bg-slate-950 border border-white/20 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-white">
+            {/* Modal Header */}
+            <div className="px-5 py-3.5 bg-slate-900/90 border-b border-white/10 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <span className="material-symbols-rounded text-cyan-400 text-xl">umbrella</span>
+                <div>
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    Open-Meteo 48時間降水予測マップ
+                    <span className="px-2 py-0.5 rounded text-[10px] bg-cyan-500/20 text-cyan-300 font-mono">
+                      {weather.city} ({coords.lat.toFixed(2)}, {coords.lon.toFixed(2)})
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-white/50">
+                    Open-Meteo API リアルタイム48時間アワーリー降水量・降水確率・レーダー予測
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowExtendedMap(false)}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-rose-500 text-white/80 hover:text-white flex items-center justify-center transition"
+                title="閉じる"
+              >
+                <span className="material-symbols-rounded text-lg">close</span>
+              </button>
+            </div>
+
+            {/* Interactive Open-Meteo Precipitation Map Iframe */}
+            <div className="flex-1 w-full bg-slate-900 relative">
+              <iframe
+                title="Regional 48-Hour Precipitation Forecast Map"
+                className="w-full h-full border-0"
+                srcDoc={`
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Precipitation Forecast Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    body, html, #map { margin: 0; padding: 0; width: 100%; height: 100%; background: #0f172a; font-family: sans-serif; color: #fff; }
+    .hud { position: absolute; bottom: 16px; left: 16px; right: 16px; z-index: 1000; background: rgba(15,23,42,0.9); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; p-3; padding: 12px; }
+    .bar-container { display: flex; align-items: flex-end; gap: 2px; height: 50px; margin-top: 8px; overflow-x: auto; }
+    .bar { flex: 1; min-width: 8px; background: rgba(6,182,212,0.6); border-radius: 2px 2px 0 0; transition: height 0.2s; }
+    .bar.active { background: #38bdf8; box-shadow: 0 0 8px #38bdf8; }
+    .info-row { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div class="hud">
+    <div class="info-row">
+      <span id="time-label">48時間降水予測タイムライン</span>
+      <span id="precip-val" style="color: #38bdf8;">0.0 mm/h</span>
+    </div>
+    <div class="bar-container" id="chart"></div>
+  </div>
+  <script>
+    const lat = ${coords.lat};
+    const lon = ${coords.lon};
+    const map = L.map('map', { zoomControl: false }).setView([lat, lon], 8);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 18,
+      attribution: '&copy; OpenStreetMap & Open-Meteo'
+    }).addTo(map);
+
+    L.circleMarker([lat, lon], {
+      radius: 12,
+      color: '#06b6d4',
+      fillColor: '#38bdf8',
+      fillOpacity: 0.8
+    }).addTo(map).bindPopup('<b>${weather.city}</b><br>降水観測ステーション').openPopup();
+
+    fetch('https://api.open-meteo.com/v1/forecast?latitude=' + lat + '&longitude=' + lon + '&hourly=precipitation,rain,showers,weather_code,temperature_2m&timezone=auto&forecast_days=2')
+      .then(r => r.json())
+      .then(data => {
+        const hourly = data.hourly || {};
+        const times = hourly.time || [];
+        const precip = hourly.precipitation || [];
+        const chartEl = document.getElementById('chart');
+
+        precip.forEach((val, idx) => {
+          const bar = document.createElement('div');
+          bar.className = 'bar' + (idx === 0 ? ' active' : '');
+          const h = Math.min(48, Math.max(4, val * 12));
+          bar.style.height = h + 'px';
+          bar.title = (times[idx] || '').replace('T', ' ') + ': ' + val + ' mm/h';
+          bar.onclick = () => {
+            document.querySelectorAll('.bar').forEach(b => b.classList.remove('active'));
+            bar.classList.add('active');
+            document.getElementById('time-label').innerText = (times[idx] || '').replace('T', ' ');
+            document.getElementById('precip-val').innerText = val + ' mm/h';
+          };
+          chartEl.appendChild(bar);
+        });
+
+        if (precip.length > 0) {
+          document.getElementById('precip-val').innerText = precip[0] + ' mm/h';
+          if (times[0]) document.getElementById('time-label').innerText = times[0].replace('T', ' ');
+        }
+      }).catch(e => {
+        console.error(e);
+      });
+  </script>
+</body>
+</html>
+                `}
+              />
             </div>
           </div>
         </div>

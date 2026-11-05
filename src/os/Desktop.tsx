@@ -30,6 +30,7 @@ import { renderExtraApp } from './apps/ExtraAppsSuite';
 import { Icon } from './Icon';
 import { AppId, TASKBAR_APPS, DESKTOP_ICON_SIZE_PRESETS, DesktopIconSize } from './types';
 import { AppLogo } from './AppLogo';
+import { GlasiusCard } from './GlasiusCard';
 
 function renderApp(appId: string, payload?: unknown) {
   switch (appId) {
@@ -218,6 +219,7 @@ export function Desktop() {
   const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [draggingNote, setDraggingNote] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [showGlasiusWidget, setShowGlasiusWidget] = useState<boolean>(true);
   const [showWhatsNewModal, setShowWhatsNewModal] = useState<boolean>(() => {
     const dismissed = localStorage.getItem('glassium_v5.0_u1_whats_new_dismissed');
     return !dismissed;
@@ -1513,6 +1515,13 @@ export function Desktop() {
               <div className="text-[9px] text-amber-300/80">21°C · Clear</div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Signature GlasiusCard Widget (Desktop Layer) */}
+      {showGlasiusWidget && (
+        <div className="absolute top-12 right-6 z-20 pointer-events-auto">
+          <GlasiusCard onClose={() => setShowGlasiusWidget(false)} />
         </div>
       )}
 

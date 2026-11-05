@@ -445,7 +445,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
   const fetchMappleMovies = useCallback(async (q?: string) => {
     setIsSearchingOnline(true);
     try {
-      const res = await fetch(`./api/entertainment/mapple/movies?q=${encodeURIComponent(q || '')}`);
+      const res = await fetch(`/api/entertainment/mapple/movies?q=${encodeURIComponent(q || '')}`);
       if (res.ok) {
         const data = (await res.json()) as { results?: MediaItem[] };
         if (Array.isArray(data.results) && data.results.length > 0) {
@@ -481,7 +481,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     const timer = setTimeout(async () => {
       setIsSearchingOnline(true);
       try {
-        const res = await fetch(`./api/entertainment/mapple/movies?q=${encodeURIComponent(q)}`);
+        const res = await fetch(`/api/entertainment/mapple/movies?q=${encodeURIComponent(q)}`);
         if (res.ok) {
           const data = (await res.json()) as { results?: MediaItem[] };
           if (Array.isArray(data.results) && data.results.length > 0) {
@@ -505,7 +505,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
   // Fetch TV episodes count when selected media changes
   useEffect(() => {
     if (selectedMedia && selectedMedia.type !== 'movie' && selectedMedia.tmdbId) {
-      fetch(`./api/entertainment/tv?id=${selectedMedia.tmdbId}`)
+      fetch(`/api/entertainment/tv?id=${selectedMedia.tmdbId}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
           if (data?.episodesCount) {
@@ -763,6 +763,16 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
                           {PROVIDER_METADATA[provider].name}
                         </span>
                       </div>
+                      <a
+                        href={currentEmbedUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="h-8 px-2.5 rounded-full bg-black/80 backdrop-blur-md hover:bg-white/20 flex items-center gap-1 text-white text-xs border border-white/20 transition"
+                        title="別タブで動画ページを直接開く"
+                      >
+                        <span className="material-symbols-rounded text-sm">open_in_new</span>
+                        <span className="hidden sm:inline">直リンク</span>
+                      </a>
                       <button
                         onClick={() => setTheaterMode(!theaterMode)}
                         className="w-8 h-8 rounded-full bg-black/80 backdrop-blur-md hover:bg-white/20 flex items-center justify-center text-white border border-white/20 transition"
