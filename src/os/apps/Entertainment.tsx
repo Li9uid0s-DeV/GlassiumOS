@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 
 export type EntertainmentTab = 'movies' | 'anime' | 'youtube' | 'shorts';
 export type StreamingProvider = 'mapple-fun' | 'streamex' | 'flixhd' | 'mapletv' | 'youtube';
