@@ -252,7 +252,13 @@ function isHostApplicationAsset(pathname, searchParams) {
     pathname.endsWith('.webp') ||
     pathname.endsWith('.woff') ||
     pathname.endsWith('.woff2') ||
-    pathname.endsWith('.json')
+    pathname.endsWith('.json') ||
+    pathname.endsWith('.mp3') ||
+    pathname.endsWith('.m4a') ||
+    pathname.endsWith('.flac') ||
+    pathname.endsWith('.ogg') ||
+    pathname.endsWith('.wav') ||
+    pathname.endsWith('.mp4')
   ) {
     if (!pathname.startsWith('/uv/service/') && !pathname.startsWith('/scramjet/')) {
       return true;
@@ -842,43 +848,6 @@ async function fetchUpstreamViaWispAndRelays(targetUrlStr, request) {
     // Next relay
   }
 
-  // Transport 7: Jina Cloud Reader (for Cloudflare/JS-blocked HTML documents)
-  if (acceptHeader.includes('text/html') || !/\.(js|css|png|jpg|jpeg|webp|svg|woff2?|mp4|mp3|flac)$/i.test(cleanTarget)) {
-    try {
-      const jinaRes = await fetch('https://r.jina.ai/' + cleanTarget, {
-        headers: { Accept: 'text/plain' },
-        signal: AbortSignal.timeout(8500),
-      });
-      if (jinaRes.ok) {
-        const text = await jinaRes.text();
-        if (text && text.length > 20) {
-          const escaped = text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-          const readerHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-            body { margin: 0; padding: 24px 32px; background: #090d16; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; line-height: 1.7; }
-            .bar { padding: 10px 14px; background: rgba(6,182,212,0.12); border-left: 3px solid #06b6d4; margin-bottom: 18px; font-size: 12px; color: #67e8f9; font-family: monospace; }
-            pre { white-space: pre-wrap; word-break: break-word; font-family: inherit; font-size: 14px; }
-          </style></head><body>
-            <div class="bar">Wisp / Scramjet Cloud Reader — ${cleanTarget}</div>
-            <pre>${escaped}</pre>
-          </body></html>`;
-          const encoded = new TextEncoder().encode(readerHtml);
-          return {
-            buffer: encoded.buffer,
-            contentType: 'text/html; charset=utf-8',
-            status: 200,
-            finalUrl: cleanTarget,
-            transport: 'jina-cloud-reader',
-          };
-        }
-      }
-    } catch {
-      // exhausted
-    }
-  }
-
   return null;
 }
 
@@ -936,6 +905,11 @@ self.addEventListener('message', (event) => {
 // 7. Fetch Interceptor for /uv/service/*, /scramjet/*, /sw-proxy, and Sub-Resources
 // =========================================================================
 self.addEventListener('fetch', (event) => {
+  // Never intercept audio or video media elements from the host OS
+  if (event.request.destination === 'audio' || event.request.destination === 'video') {
+    return;
+  }
+
   const reqUrl = new URL(event.request.url);
 
   // 1. Only intercept requests targeting our own origin (Service Worker scope)

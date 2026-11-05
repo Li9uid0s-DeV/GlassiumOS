@@ -56,6 +56,7 @@ class GlobalAudioManager {
   private constructor() {
     this.audio = new Audio();
     this.audio.preload = 'auto';
+    this.audio.crossOrigin = 'anonymous';
 
     const initialSettings = getMusicSettings();
 
@@ -103,6 +104,14 @@ class GlobalAudioManager {
         this.ensureDolbyAtmosGraph();
       }
       this.applyDolbyAtmosParameters(detail.dolbyAtmosEnabled, detail.dolbyAtmosPreset);
+    });
+
+    // Pause Music automatically when Entertainment starts playing video/cinema
+    window.addEventListener('glassium-media-focus', (evt: Event) => {
+      const detail = (evt as CustomEvent<{ source?: string }>).detail;
+      if (detail?.source === 'entertainment' && this.state.isPlaying) {
+        this.pause();
+      }
     });
   }
 
@@ -512,6 +521,11 @@ class GlobalAudioManager {
 
   public async playTrack(track: MonochromeTrack, startAtSec = 0): Promise<void> {
     this.pendingTrack = track;
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('glassium-media-focus', { detail: { source: 'music' } })
+      );
+    }
     if (this.state.dolbyAtmosEnabled || this.graphConnected) {
       this.ensureDolbyAtmosGraph();
     }
@@ -583,6 +597,7 @@ class GlobalAudioManager {
 
     this.syncMediaSessionMetadata(track);
 
+    // Stage 1: Primary server stream proxy (/api/music/play)
     try {
       this.playPromise = this.audio.play();
       await this.playPromise;
@@ -601,29 +616,73 @@ class GlobalAudioManager {
       if ((err as Error)?.name === 'AbortError' || this.pendingTrack !== track) {
         return;
       }
-      console.warn('Primary stream retry by title+artist:', (err as Error)?.message);
+      console.warn('Stage 1 (/api/music/play) fallback to Stage 2 direct CDN:', (err as Error)?.message);
     }
 
-    // Automatic Fallback: Search by title + artist without ID in case the cached ID was replaced
+    // Stage 2: Resolve direct NetEase / Monochrome CDN stream URL (/api/music/info) with Access-Control-Allow-Origin: *
     if (this.pendingTrack === track) {
       try {
-        const searchRetryUrl = `/api/music/play?title=${encodeURIComponent(
-          track.title
-        )}&artist=${encodeURIComponent(cleanArtist)}&br=${brVal}&source=netease&t=${Date.now()}`;
-        this.audio.src = searchRetryUrl;
-        this.playPromise = this.audio.play();
-        await this.playPromise;
-        this.playPromise = null;
-        this.updateState({
-          isPlaying: true,
-          isBuffering: false,
-          error: null,
-          statusMessage: `フル尺再生中: ${track.title} — ${cleanArtist}`,
-        });
-        return;
+        const infoRes = await fetch(
+          `/api/music/info?id=${encodeURIComponent(numericId)}&title=${encodeURIComponent(
+            track.title
+          )}&artist=${encodeURIComponent(cleanArtist)}&br=${brVal}&source=${encodeURIComponent(
+            settings.sourceSite
+          )}`
+        );
+        if (infoRes.ok && this.pendingTrack === track) {
+          const infoJson = (await infoRes.json()) as { url?: string };
+          if (infoJson.url && infoJson.url.startsWith('http')) {
+            this.audio.src = infoJson.url;
+            this.playPromise = this.audio.play();
+            await this.playPromise;
+            this.playPromise = null;
+            this.updateState({
+              isPlaying: true,
+              isBuffering: false,
+              error: null,
+              statusMessage: `フル尺再生中 (Direct CDN): ${track.title} — ${cleanArtist}`,
+            });
+            return;
+          }
+        }
       } catch (err2: unknown) {
         this.playPromise = null;
         if ((err2 as Error)?.name === 'AbortError' || this.pendingTrack !== track) {
+          return;
+        }
+      }
+    }
+
+    // Stage 3: Direct client-side iTunes JP/US AAC stream fallback
+    if (this.pendingTrack === track) {
+      try {
+        const itunesRes = await fetch(
+          `https://itunes.apple.com/search?term=${encodeURIComponent(
+            `${track.title} ${cleanArtist}`
+          )}&country=JP&entity=song&limit=5`
+        );
+        if (itunesRes.ok && this.pendingTrack === track) {
+          const itunesData = (await itunesRes.json()) as {
+            results?: { previewUrl?: string }[];
+          };
+          const previewUrl = itunesData.results?.find((r) => r.previewUrl)?.previewUrl;
+          if (previewUrl) {
+            this.audio.src = previewUrl;
+            this.playPromise = this.audio.play();
+            await this.playPromise;
+            this.playPromise = null;
+            this.updateState({
+              isPlaying: true,
+              isBuffering: false,
+              error: null,
+              statusMessage: `再生中 (AAC Stream): ${track.title} — ${cleanArtist}`,
+            });
+            return;
+          }
+        }
+      } catch (err3: unknown) {
+        this.playPromise = null;
+        if ((err3 as Error)?.name === 'AbortError' || this.pendingTrack !== track) {
           return;
         }
       }
@@ -661,6 +720,11 @@ class GlobalAudioManager {
 
   public async resume(): Promise<void> {
     if (!this.state.track) return;
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('glassium-media-focus', { detail: { source: 'music' } })
+      );
+    }
     if (this.state.dolbyAtmosEnabled || this.graphConnected) {
       this.ensureDolbyAtmosGraph();
     }

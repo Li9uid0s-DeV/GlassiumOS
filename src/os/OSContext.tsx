@@ -49,6 +49,7 @@ export interface DeskStickyNote {
 
 export type Wallpaper =
   | 'live2d'
+  | 'golden-sparkle'
   | 'space'
   | 'aurora'
   | 'sunset'
@@ -60,6 +61,7 @@ export type Wallpaper =
 
 export type Theme = 'dark' | 'light';
 export type AuroraColor =
+  | 'golden-sparkle'
   | 'amethyst-cyan-silk'
   | 'abyssal-deep-ocean'
   | 'polar-emerald-aurora'
@@ -507,11 +509,16 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const [selectedCustomId, setSelectedCustomId] = useState<string | null>(persistedSettings.selectedCustomId ?? null);
   const [theme, setThemeState] = useState<Theme>(persistedSettings.theme ?? 'dark');
   const [accentColor, setAccentColor] = useState<AccentColor>(persistedSettings.accentColor ?? 'cyan');
-  const [language, setLanguageState] = useState<OSLanguage>(
-    (persistedSettings.language as OSLanguage) ?? 'en'
-  );
+  const [language, setLanguageState] = useState<OSLanguage>(() => {
+    return loadPersisted<OSLanguage>('glassium-os-lang-v2', 'ja');
+  });
   const setLanguage = useCallback((lang: OSLanguage) => {
     setLanguageState(lang);
+    try {
+      localStorage.setItem('glassium-os-lang-v2', JSON.stringify(lang));
+    } catch {
+      // ignore
+    }
     if (typeof document !== 'undefined') {
       document.documentElement.lang = lang;
     }

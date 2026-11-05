@@ -897,12 +897,8 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     }
   }, [loadLyricsForTrack]);
 
-  // Sync Wisp Server & Engine with Service Worker
-  useEffect(() => {
-    ensureServiceWorkerReady().then(() => {
-      configureServiceWorkerWisp(wispServer, proxyEngine, relayNode);
-    });
-  }, [wispServer, proxyEngine, relayNode]);
+  // Note: Proxy Service Worker is only registered on demand when opening the Monochrome Web Proxy tab
+  // so it never intercepts or slows down native Music or Entertainment streaming.
 
   // Load Monochrome Web Proxy Tab via Wisp v1 + Service Worker (/scramjet/* or /uv/service/*)
   const loadMonochromeWebProxy = useCallback(
@@ -2488,22 +2484,23 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               </div>
               {(
                 [
-                  { id: 'browse', label: '見つける' },
-                  { id: 'mv', label: 'MV (ミュージックビデオ)' },
-                  { id: 'artist', label: 'アーティストページ' },
-                  { id: 'lyrics', label: 'アートワーク最大化 & 歌詞' },
-                ] as { id: AppleMusicNavId; label: string }[]
+                  { id: 'browse', label: '見つける', icon: 'explore' },
+                  { id: 'mv', label: 'MV (ミュージックビデオ)', icon: 'smart_display' },
+                  { id: 'artist', label: 'アーティストページ', icon: 'person' },
+                  { id: 'lyrics', label: 'アートワーク最大化 & 歌詞', icon: 'lyrics' },
+                ] as { id: AppleMusicNavId; label: string; icon: string }[]
               ).map((item) => (
                 <button
                   key={item.id}
                   onClick={() => setActiveNav(item.id)}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
+                  className={`w-full flex items-center gap-2 text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
                     activeNav === item.id
-                      ? 'bg-[#fa243c] text-white font-semibold'
+                      ? 'bg-[#fa243c] text-white font-semibold shadow-sm'
                       : 'text-white/75 hover:bg-white/[0.06] hover:text-white'
                   }`}
                 >
-                  {item.label}
+                  <span className="material-symbols-rounded text-[16px] shrink-0">{item.icon}</span>
+                  <span className="truncate">{item.label}</span>
                 </button>
               ))}
             </div>
@@ -2515,21 +2512,24 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               </div>
               {(
                 [
-                  { id: 'favorites', label: 'お気に入り', count: favoriteTracks.length },
-                  { id: 'songs', label: 'すべての曲', count: tracks.length },
-                  { id: 'recent', label: '最近再生した項目', count: recentTracks.length },
-                ] as { id: AppleMusicNavId; label: string; count: number }[]
+                  { id: 'favorites', label: 'お気に入り', count: favoriteTracks.length, icon: 'favorite' },
+                  { id: 'songs', label: 'すべての曲', count: tracks.length, icon: 'library_music' },
+                  { id: 'recent', label: '最近再生した項目', count: recentTracks.length, icon: 'history' },
+                ] as { id: AppleMusicNavId; label: string; count: number; icon: string }[]
               ).map((item) => (
                 <button
                   key={item.id}
                   onClick={() => setActiveNav(item.id)}
                   className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
                     activeNav === item.id
-                      ? 'bg-[#fa243c] text-white font-semibold'
+                      ? 'bg-[#fa243c] text-white font-semibold shadow-sm'
                       : 'text-white/75 hover:bg-white/[0.06] hover:text-white'
                   }`}
                 >
-                  <span>{item.label}</span>
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className="material-symbols-rounded text-[16px] shrink-0">{item.icon}</span>
+                    <span className="truncate">{item.label}</span>
+                  </span>
                   <span
                     className={`text-[10px] font-mono tabular-nums ${
                       activeNav === item.id ? 'text-white/90' : 'text-white/40'
@@ -2548,23 +2548,24 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               </div>
               {(
                 [
-                  { id: 'settings', label: '設定 (音質・DL・MV・Atmos)' },
-                  { id: 'monochrome-web', label: 'api.monochrome.tf Web' },
-                  { id: 'synth', label: 'シンセサイザー' },
-                  { id: 'drumpad', label: 'ドラム & 周波数' },
-                  { id: 'proxy', label: 'プロキシ設定' },
-                ] as { id: AppleMusicNavId; label: string }[]
+                  { id: 'settings', label: '設定 (音質・DL・MV・Atmos)', icon: 'tune' },
+                  { id: 'monochrome-web', label: 'api.monochrome.tf Web', icon: 'language' },
+                  { id: 'synth', label: 'シンセサイザー', icon: 'piano' },
+                  { id: 'drumpad', label: 'ドラム & 周波数', icon: 'equalizer' },
+                  { id: 'proxy', label: 'プロキシ設定', icon: 'hub' },
+                ] as { id: AppleMusicNavId; label: string; icon: string }[]
               ).map((item) => (
                 <button
                   key={item.id}
                   onClick={() => setActiveNav(item.id)}
-                  className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
+                  className={`w-full flex items-center gap-2 text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
                     activeNav === item.id
-                      ? 'bg-[#fa243c] text-white font-semibold'
+                      ? 'bg-[#fa243c] text-white font-semibold shadow-sm'
                       : 'text-white/75 hover:bg-white/[0.06] hover:text-white'
                   }`}
                 >
-                  {item.label}
+                  <span className="material-symbols-rounded text-[16px] shrink-0">{item.icon}</span>
+                  <span className="truncate">{item.label}</span>
                 </button>
               ))}
             </div>
@@ -4267,10 +4268,11 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   <button
                     type="button"
                     onClick={() => setPillOffset({ x: 0, y: 0 })}
-                    className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[9px] font-mono text-white/75 hover:text-white transition"
+                    className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[9px] font-mono text-white/75 hover:text-white flex items-center gap-0.5 transition"
                     title="ピルの位置を中央下部にリセット"
                   >
-                    位置戻す
+                    <span className="material-symbols-rounded text-[12px]">restart_alt</span>
+                    <span>位置戻す</span>
                   </button>
                 )}
                 <button
@@ -4441,16 +4443,18 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   }`}
                   title="Dolby Atmos 3D 空間オーディオ ON/OFF"
                 >
+                  <span className="material-symbols-rounded text-[14px]">surround_sound</span>
                   <span>Atmos</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => triggerTrackDownload(currentTrack)}
-                  className="px-2 py-1 rounded-lg bg-white/[0.1] border border-white/15 text-cyan-200 hover:bg-cyan-500 hover:text-slate-950 text-[11px] font-semibold transition hidden sm:inline-block"
+                  className="px-2 py-1 rounded-lg bg-white/[0.1] border border-white/15 text-cyan-200 hover:bg-cyan-500 hover:text-slate-950 text-[11px] font-semibold transition hidden sm:flex items-center gap-1 whitespace-nowrap"
                   title={`この曲をダウンロード (${musicSettings.downloadQuality.toUpperCase()})`}
                 >
-                  DL
+                  <span className="material-symbols-rounded text-[14px]">download</span>
+                  <span>DL</span>
                 </button>
 
                 <button
@@ -4484,26 +4488,29 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 <button
                   type="button"
                   onClick={() => setShowLyricsDrawer((s) => !s)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition whitespace-nowrap border ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 whitespace-nowrap border ${
                     showLyricsDrawer || activeNav === 'lyrics'
                       ? 'bg-[#fa243c] border-[#fa243c] text-white shadow-md'
                       : 'bg-white/[0.1] border-white/15 text-white/85 hover:text-white hover:bg-white/20'
                   }`}
+                  title="同期歌詞ドロワーを表示/非表示"
                 >
-                  歌詞
+                  <span className="material-symbols-rounded text-[15px]">lyrics</span>
+                  <span>歌詞</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setActiveNav(activeNav === 'settings' ? 'browse' : 'settings')}
-                  className={`px-2 py-1 rounded-lg text-xs font-semibold transition border ${
+                  className={`px-2 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 whitespace-nowrap border ${
                     activeNav === 'settings'
                       ? 'bg-[#fa243c] border-[#fa243c] text-white shadow-md'
                       : 'bg-white/[0.1] border-white/15 text-white/85 hover:text-white hover:bg-white/20'
                   }`}
                   title="音質・取得サイト・DL品質・MV画質・Dolby Atmos 設定"
                 >
-                  設定
+                  <span className="material-symbols-rounded text-[15px]">tune</span>
+                  <span>設定</span>
                 </button>
 
                 <div className="hidden xl:flex items-center gap-1.5 pl-1">

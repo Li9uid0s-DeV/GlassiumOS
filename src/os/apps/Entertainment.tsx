@@ -494,6 +494,26 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     }
   }, [activeTab, mappleMovies.length, fetchMappleMovies]);
 
+  // Coordinate audio focus with Music app so Entertainment and Music never conflict
+  useEffect(() => {
+    const onMediaFocus = (evt: Event) => {
+      const detail = (evt as CustomEvent<{ source?: string }>).detail;
+      if (detail?.source === 'music') {
+        setIsPlayingCinema(false);
+      }
+    };
+    window.addEventListener('glassium-media-focus', onMediaFocus);
+    return () => window.removeEventListener('glassium-media-focus', onMediaFocus);
+  }, []);
+
+  useEffect(() => {
+    if (isPlayingCinema || activeTab === 'youtube' || activeTab === 'shorts') {
+      window.dispatchEvent(
+        new CustomEvent('glassium-media-focus', { detail: { source: 'entertainment' } })
+      );
+    }
+  }, [isPlayingCinema, activeTab]);
+
   // Debounced live TMDB / Mapple search fetch with query cache
   useEffect(() => {
     const q = searchQuery.trim();

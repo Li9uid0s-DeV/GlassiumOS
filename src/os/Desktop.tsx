@@ -306,7 +306,7 @@ export function Desktop() {
   const dateStr = time.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 
   const customWallpaper = customWallpapers.find((c) => c.id === selectedCustomId);
-  const useLive2D = wallpaper === 'live2d' && !liteMode;
+  const useLive2D = (wallpaper === 'live2d' || wallpaper === 'golden-sparkle') && !liteMode;
   const useShader = wallpaper === 'shader' && !liteMode;
   const useSpace = wallpaper === 'space' && !liteMode;
   const shaderOpacity = transparency / 100;
@@ -472,8 +472,13 @@ export function Desktop() {
         />
       )}
 
-      {/* 2D Interactive Aurora Silk Live Wallpaper (Default on initial startup) */}
-      {useLive2D && !customWallpaper && <Live2DWallpaper lite={false} />}
+      {/* 2D Interactive Aurora Silk & PS5 Golden Sparkle Live Wallpaper */}
+      {useLive2D && !customWallpaper && (
+        <Live2DWallpaper
+          lite={false}
+          auroraColor={wallpaper === 'golden-sparkle' ? 'golden-sparkle' : undefined}
+        />
+      )}
 
       {/* 3D Black Hole Raymarching Space live wallpaper */}
       {useSpace && !customWallpaper && <SpaceWallpaper lite={false} preset={nebulaPreset} />}
@@ -1875,11 +1880,20 @@ export function Desktop() {
                 </div>
 
                 <div className="py-3.5 flex flex-col gap-1">
-                  <div className="font-semibold text-cyan-300 flex items-center gap-2">
+                  <div className="font-bold text-cyan-300 flex items-center gap-2">
                     <span>5. GlasiusCard デスクトップウィジェット・48時間降水マップ・Entertainment 軽量化</span>
                   </div>
-                  <p className="text-white/70 leading-relaxed">
+                  <p className="text-white/55 leading-relaxed">
                     デスクトップ上でドラッグ移動できる「GlasiusCard」ウィジェット（時計・天気・予定統合）、Calendarアプリの48時間降水予報アニメーションマップ＆天気連動アドバイス、Jina Cloud Readerの完全削除およびEntertainmentアプリの高速・軽量化を実装しました。
+                  </p>
+                </div>
+
+                <div className="py-3.5 flex flex-col gap-1">
+                  <div className="font-bold text-amber-300 flex items-center gap-2">
+                    <span>6. 新背景「Golden Sparkle (PS5スタイル)」＆ GlassiumOS 4.7 マウス連動オーロラ・純正級UI刷新</span>
+                  </div>
+                  <p className="text-white/55 leading-relaxed">
+                    PS5のホーム画面に着想を得た黄金の光の波とダイヤモンド粒子が煌めく新ライブ背景「Golden Sparkle」を追加。さらに背景オーロラの形状をGlassiumOS 4.7のS字シルクカーテンへ復元し、マウス移動に滑らかに追従するよう進化しました。UI全体の文字コントラスト強化、機械的な日英併記の排除、専用グラデーションアイコンバッジ、MusicドックのMaterial Symbolsアイコン統一を実施しています。
                   </p>
                 </div>
               </div>
@@ -2067,21 +2081,52 @@ export function Desktop() {
                       </button>
                     </div>
                     {musicState.lyricLine ? (
-                      <span className="text-[10px] text-white/90 font-medium truncate block">
-                        ♪ {musicState.lyricLine}
+                      <span className="text-[10.5px] text-white/85 font-medium truncate flex items-center gap-1">
+                        <span className="material-symbols-rounded text-[13px] text-rose-400">lyrics</span>
+                        <span className="truncate">{musicState.lyricLine}</span>
                       </span>
                     ) : (
-                      <span className="text-[10px] text-white/60 truncate block">
+                      <span className="text-[10.5px] text-white/50 truncate block">
                         {musicState.album || 'Lossless Hi-Fi Stream'}
                       </span>
                     )}
                   </div>
 
-                  {/* Transport Buttons inside Liquid Glass Dock */}
+                  {/* Quick MV / Artist / Transport Buttons inside Liquid Glass Dock */}
                   <div
                     data-no-dock-drag="true"
-                    className="relative z-10 flex items-center gap-1 shrink-0 border-l border-white/20 pl-2.5"
+                    className="relative z-10 flex items-center gap-1 shrink-0 border-l border-white/15 pl-2.5"
                   >
+                    <button
+                      type="button"
+                      onClick={() => openApp('synth', { payload: { tab: 'mv' } })}
+                      title="MVを開く"
+                      className="hidden sm:flex w-7 h-7 rounded-lg items-center justify-center text-white/70 hover:text-white hover:bg-white/15 transition cursor-pointer"
+                    >
+                      <span className="material-symbols-rounded text-[16px]">smart_display</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openApp('synth', { payload: { tab: 'artist' } });
+                        setTimeout(() => {
+                          window.dispatchEvent(
+                            new CustomEvent('glassium-music-command', {
+                              detail: {
+                                action: 'open-artist',
+                                artist: musicState.artist || 'YOASOBI',
+                              },
+                            })
+                          );
+                        }, 80);
+                      }}
+                      title="アーティストページ"
+                      className="hidden sm:flex w-7 h-7 rounded-lg items-center justify-center text-white/70 hover:text-white hover:bg-white/15 transition cursor-pointer"
+                    >
+                      <span className="material-symbols-rounded text-[16px]">person</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() =>
@@ -2092,7 +2137,7 @@ export function Desktop() {
                       title="前の曲"
                       className="w-8 h-8 rounded-xl flex items-center justify-center text-white/85 hover:text-white hover:bg-white/15 active:scale-90 transition cursor-pointer"
                     >
-                      <span className="material-symbols-rounded text-lg">skip_previous</span>
+                      <span className="material-symbols-rounded text-[19px]">skip_previous</span>
                     </button>
 
                     <button
@@ -2105,7 +2150,10 @@ export function Desktop() {
                       title={musicState.isPlaying ? '一時停止' : '再生'}
                       className="w-8 h-8 rounded-xl bg-white text-slate-950 flex items-center justify-center font-bold shadow-[0_6px_18px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-95 transition cursor-pointer"
                     >
-                      <span className="material-symbols-rounded text-xl leading-none">
+                      <span
+                        className="material-symbols-rounded text-[20px] leading-none"
+                        style={{ fontVariationSettings: "'FILL' 1, 'wght' 600" }}
+                      >
                         {musicState.isPlaying ? 'pause' : 'play_arrow'}
                       </span>
                     </button>
@@ -2120,7 +2168,7 @@ export function Desktop() {
                       title="次の曲"
                       className="w-8 h-8 rounded-xl flex items-center justify-center text-white/85 hover:text-white hover:bg-white/15 active:scale-90 transition cursor-pointer"
                     >
-                      <span className="material-symbols-rounded text-lg">skip_next</span>
+                      <span className="material-symbols-rounded text-[19px]">skip_next</span>
                     </button>
 
                     <button
@@ -2129,7 +2177,7 @@ export function Desktop() {
                       title="ミニピルに最小化"
                       className="ml-0.5 w-6 h-6 rounded-lg flex items-center justify-center text-white/65 hover:text-white hover:bg-white/15 transition cursor-pointer"
                     >
-                      <span className="material-symbols-rounded text-sm">close_fullscreen</span>
+                      <span className="material-symbols-rounded text-[15px]">close_fullscreen</span>
                     </button>
 
                     <button
@@ -2138,7 +2186,7 @@ export function Desktop() {
                       title="ドックを隠す (バックグラウンド再生は継続)"
                       className="w-6 h-6 rounded-lg flex items-center justify-center text-white/50 hover:text-white hover:bg-white/15 transition cursor-pointer"
                     >
-                      <span className="material-symbols-rounded text-sm">close</span>
+                      <span className="material-symbols-rounded text-[15px]">close</span>
                     </button>
                   </div>
                 </div>

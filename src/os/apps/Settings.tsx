@@ -28,31 +28,120 @@ type AccountsSubView = 'main' | 'profile' | 'security';
 
 interface NavItem {
   id: NavCategory;
-  label: string;
+  labelJa: string;
+  labelEn: string;
   icon: string;
+  badgeGradient: string;
+  iconColor: string;
 }
 
 const SIDEBAR_NAV: NavItem[] = [
-  { id: 'system', label: 'System (システム)', icon: 'Monitor' },
-  { id: 'personalization', label: 'Personalization (個人設定)', icon: 'Palette' },
-  { id: 'apps', label: 'Apps (アプリ)', icon: 'LayoutGrid' },
-  { id: 'accounts', label: 'Accounts (アカウント)', icon: 'User' },
+  {
+    id: 'system',
+    labelJa: 'システム',
+    labelEn: 'System',
+    icon: 'Monitor',
+    badgeGradient: 'from-sky-500/25 to-cyan-500/10 border-sky-400/25',
+    iconColor: 'text-sky-400',
+  },
+  {
+    id: 'personalization',
+    labelJa: '個人用設定',
+    labelEn: 'Personalization',
+    icon: 'Palette',
+    badgeGradient: 'from-fuchsia-500/25 to-rose-500/10 border-fuchsia-400/25',
+    iconColor: 'text-fuchsia-400',
+  },
+  {
+    id: 'apps',
+    labelJa: 'アプリ',
+    labelEn: 'Apps',
+    icon: 'LayoutGrid',
+    badgeGradient: 'from-emerald-500/25 to-teal-500/10 border-emerald-400/25',
+    iconColor: 'text-emerald-400',
+  },
+  {
+    id: 'accounts',
+    labelJa: 'アカウント',
+    labelEn: 'Accounts',
+    icon: 'User',
+    badgeGradient: 'from-amber-500/25 to-orange-500/10 border-amber-400/25',
+    iconColor: 'text-amber-400',
+  },
 ];
 
 interface SystemCard {
   id: SystemSubView;
-  title: string;
-  desc: string;
+  titleJa: string;
+  titleEn: string;
+  descJa: string;
+  descEn: string;
   icon: string;
+  badgeGradient: string;
+  iconColor: string;
 }
 
 const SYSTEM_CARDS: SystemCard[] = [
-  { id: 'display', title: 'Display & Wallpapers', desc: 'Wallpapers, 2D Live Wallpapers, icon sizing, grid snap', icon: 'Monitor' },
-  { id: 'sound', title: 'Sound', desc: 'Master volume and system audio effects', icon: 'Volume2' },
-  { id: 'power', title: 'Power & Sleep', desc: 'Screen sleep, lock screen style, sleep clock', icon: 'BatteryCharging' },
-  { id: 'multitasking', title: 'Multitasking & Taskbar', desc: '50:50 window snap, taskbar alignment, auto-hide', icon: 'Layers' },
-  { id: 'language', title: 'Language & Region (言語と地域)', desc: 'OS system language selection (English [Default] / 日本語)', icon: 'Globe' },
-  { id: 'aicomponents', title: 'AI Assistant Settings', desc: 'GlassiumOS 5 AI integration, response style, and connection check', icon: 'Sparkles' },
+  {
+    id: 'display',
+    titleJa: 'ディスプレイと背景',
+    titleEn: 'Display & Wallpapers',
+    descJa: 'オーロラライブ背景、Golden Sparkle、アイコンサイズ、グリッド整列',
+    descEn: 'Live aurora backgrounds, Golden Sparkle, icon sizing, grid alignment',
+    icon: 'Monitor',
+    badgeGradient: 'from-cyan-500/25 via-sky-500/15 to-blue-600/10 border-cyan-400/30',
+    iconColor: 'text-cyan-300',
+  },
+  {
+    id: 'sound',
+    titleJa: 'サウンド',
+    titleEn: 'Sound',
+    descJa: 'マスター音量とシステム効果音のバランス調整',
+    descEn: 'Master volume and system sound effects',
+    icon: 'Volume2',
+    badgeGradient: 'from-emerald-500/25 via-teal-500/15 to-cyan-600/10 border-emerald-400/30',
+    iconColor: 'text-emerald-300',
+  },
+  {
+    id: 'power',
+    titleJa: '電源とスリープ',
+    titleEn: 'Power & Sleep',
+    descJa: '画面スリープ、ロック画面スタイル、スリープ時計の配置',
+    descEn: 'Screen sleep, lock screen style, sleep clock layout',
+    icon: 'BatteryCharging',
+    badgeGradient: 'from-amber-500/25 via-orange-500/15 to-yellow-600/10 border-amber-400/30',
+    iconColor: 'text-amber-300',
+  },
+  {
+    id: 'multitasking',
+    titleJa: 'マルチタスクとタスクバー',
+    titleEn: 'Multitasking & Taskbar',
+    descJa: 'ウィンドウ左右スナップ整列、タスクバー配置、自動非表示',
+    descEn: 'Split window snap, taskbar alignment, auto-hide behavior',
+    icon: 'Layers',
+    badgeGradient: 'from-violet-500/25 via-indigo-500/15 to-purple-600/10 border-violet-400/30',
+    iconColor: 'text-violet-300',
+  },
+  {
+    id: 'language',
+    titleJa: '言語と地域',
+    titleEn: 'Language & Region',
+    descJa: 'システム全体の表示言語とローカライズ設定',
+    descEn: 'System display language and regional formatting',
+    icon: 'Globe',
+    badgeGradient: 'from-blue-500/25 via-indigo-500/15 to-sky-600/10 border-blue-400/30',
+    iconColor: 'text-blue-300',
+  },
+  {
+    id: 'aicomponents',
+    titleJa: 'AI アシスタント',
+    titleEn: 'AI Assistant',
+    descJa: 'OS操作の自動実行、応答スタイル、エンジンの接続診断',
+    descEn: 'Automated OS actions, response style, and engine diagnostics',
+    icon: 'Sparkles',
+    badgeGradient: 'from-fuchsia-500/25 via-pink-500/15 to-rose-600/10 border-fuchsia-400/30',
+    iconColor: 'text-fuchsia-300',
+  },
 ];
 
 const RESTORED_DEFAULT_LIVE2D_PALETTES: {
@@ -63,37 +152,44 @@ const RESTORED_DEFAULT_LIVE2D_PALETTES: {
   accentWave: string;
 }[] = [
   {
+    id: 'golden-sparkle',
+    label: 'Golden Sparkle',
+    desc: 'PS5風 黄金の光の波・ボケ玉・4方向ダイヤモンドスパークル',
+    cssGradient: 'linear-gradient(135deg, #060402 0%, #3b2306 38%, #d97706 74%, #fde047 100%)',
+    accentWave: '#fde047',
+  },
+  {
     id: 'amethyst-cyan-silk',
     label: 'Amethyst & Cyan Silk',
-    desc: '2世代前デフォルト復刻: アメジスト＆シアンの流体シルクオーロラ',
+    desc: 'GlassiumOS 4.7 復刻: マウス連動 S字シルクオーロラ',
     cssGradient: 'linear-gradient(135deg, #030712 0%, #0e7490 48%, #4c1d95 100%)',
     accentWave: '#38bdf8',
   },
   {
     id: 'abyssal-deep-ocean',
     label: 'Abyssal Deep Ocean',
-    desc: '2世代前デフォルト復刻: 深海アビスブルーとアクア発光シルク',
+    desc: 'GlassiumOS 4.7 復刻: 深海アビスブルーとアクア発光シルク',
     cssGradient: 'linear-gradient(135deg, #010916 0%, #062845 50%, #0284c7 100%)',
     accentWave: '#0ea5e9',
   },
   {
     id: 'polar-emerald-aurora',
     label: 'Polar Emerald Aurora',
-    desc: '2世代前デフォルト復刻: 極地エメラルドとスカイブルーのオーロラ帯',
+    desc: 'GlassiumOS 4.7 復刻: 極地エメラルドとスカイブルーのオーロラ帯',
     cssGradient: 'linear-gradient(135deg, #011f18 0%, #059669 50%, #0369a1 100%)',
     accentWave: '#10b981',
   },
   {
     id: 'neon-cyber-dusk',
     label: 'Neon Cyber Dusk',
-    desc: '2世代前デフォルト復刻: サイバーマゼンタ＆ネオンシアンの黄昏',
+    desc: 'GlassiumOS 4.7 復刻: サイバーマゼンタ＆ネオンシアンの黄昏',
     cssGradient: 'linear-gradient(135deg, #090418 0%, #701a75 50%, #06b6d4 100%)',
     accentWave: '#e879f9',
   },
   {
     id: 'crimson-rose-nebula',
     label: 'Crimson Rose Nebula',
-    desc: '2世代前デフォルト復刻: クリムゾンローズ星雲とアンバーシルク',
+    desc: 'GlassiumOS 4.7 復刻: クリムゾンローズ星雲とアンバーシルク',
     cssGradient: 'linear-gradient(135deg, #1a0612 0%, #9f1239 50%, #d97706 100%)',
     accentWave: '#f43f5e',
   },
@@ -106,6 +202,13 @@ const AURORA_PALETTES: {
   cssGradient: string;
   accentWave: string;
 }[] = [
+  {
+    id: 'golden-sparkle',
+    label: 'Golden Sparkle',
+    desc: 'Volumetric golden waves, warm bokeh orbs & diamond starlight sparkles',
+    cssGradient: 'linear-gradient(135deg, #060402 0%, #3b2306 38%, #d97706 74%, #fde047 100%)',
+    accentWave: '#fde047',
+  },
   {
     id: 'cyan-violet',
     label: 'Cyan & Violet Silk',
@@ -844,56 +947,92 @@ export function SettingsApp() {
     }
   };
 
-  const renderBreadcrumbHeader = (title: string, onBack: () => void) => (
-    <div className={`flex items-center gap-2 mb-5 pb-2.5 border-b ${isLight ? 'border-slate-300' : 'border-white/10'}`}>
+  const isJa = language === 'ja';
+
+  const getSystemCardValueLabel = (cardId: SystemSubView): string => {
+    switch (cardId) {
+      case 'display':
+        return wallpaper === 'golden-sparkle' || auroraColor === 'golden-sparkle'
+          ? 'Golden Sparkle'
+          : WALLPAPERS[wallpaper]?.label || wallpaper;
+      case 'sound':
+        return `${volume}%`;
+      case 'power':
+        return lockScreenStyle === 'hyperos3' ? 'Glassium Depth' : lockScreenStyle;
+      case 'multitasking':
+        return taskbarAlign === 'center'
+          ? isJa
+            ? '中央揃え'
+            : 'Centered'
+          : isJa
+          ? '左揃え'
+          : 'Left';
+      case 'language':
+        return isJa ? '日本語' : 'English';
+      case 'aicomponents':
+        return aiAutoExecute ? (isJa ? '有効' : 'Active') : isJa ? '手動' : 'Manual';
+      default:
+        return '';
+    }
+  };
+
+  const renderBreadcrumbHeader = (titleJa: string, titleEn: string, onBack: () => void) => (
+    <div className={`flex items-center gap-2.5 mb-6 pb-3 border-b ${isLight ? 'border-slate-300/80' : 'border-white/[0.08]'}`}>
       <button
         type="button"
         onClick={() => {
           playSound('click');
           onBack();
         }}
-        className={`p-1.5 transition ${isLight ? 'hover:bg-slate-200 text-slate-800' : 'hover:bg-white/10 text-white/90'}`}
-        title="戻る"
+        className={`w-8 h-8 rounded-xl flex items-center justify-center border transition ${
+          isLight
+            ? 'bg-white border-slate-200 hover:bg-slate-100 text-slate-800 shadow-xs'
+            : 'bg-white/[0.05] border-white/[0.1] hover:bg-white/[0.1] text-white/90'
+        }`}
+        title={isJa ? '戻る' : 'Back'}
       >
-        <Icon name="ArrowLeft" size={16} />
+        <Icon name="ArrowLeft" size={15} />
       </button>
-      <h2 className="text-sm font-bold text-[var(--os-accent)]">{title}</h2>
+      <h2 className="text-base font-bold tracking-tight">{isJa ? titleJa : titleEn}</h2>
     </div>
   );
 
-  const rowHoverClass = isLight ? 'hover:bg-slate-200/60' : 'hover:bg-white/[0.04]';
-  const dividerClass = isLight ? 'divide-slate-300/70 border-slate-300/70' : 'divide-white/[0.08] border-white/[0.08]';
+  const rowHoverClass = isLight ? 'hover:bg-slate-200/50' : 'hover:bg-white/[0.04]';
+  const dividerClass = isLight ? 'divide-slate-200/80 border-slate-200/80' : 'divide-white/[0.07] border-white/[0.08]';
+  const cardSurfaceClass = isLight
+    ? 'bg-white/80 border border-slate-200/90 shadow-xs rounded-2xl overflow-hidden'
+    : 'bg-white/[0.025] border border-white/[0.08] rounded-2xl overflow-hidden';
 
   return (
     <div
       className={`flex h-full w-full select-none overflow-hidden font-sans ${
-        isLight ? 'bg-slate-50 text-slate-900' : 'bg-slate-950 text-slate-100'
+        isLight ? 'bg-slate-50 text-slate-900' : 'bg-[#090d16] text-slate-100'
       }`}
     >
       {/* Left Sidebar Navigation */}
       <div
-        className={`w-56 shrink-0 border-r p-3 flex flex-col justify-between ${
-          isLight ? 'bg-slate-100 border-slate-300' : 'bg-black/30 border-white/[0.08]'
+        className={`w-60 shrink-0 border-r px-3.5 py-4 flex flex-col justify-between ${
+          isLight ? 'bg-slate-100/90 border-slate-200/90' : 'bg-black/35 border-white/[0.07]'
         }`}
       >
-        <div className="space-y-4">
+        <div className="space-y-5">
           {/* User Compact Profile */}
-          <div className={`flex items-center gap-3 pb-3 border-b ${isLight ? 'border-slate-300' : 'border-white/10'}`}>
-            <div className="w-9 h-9 rounded-full bg-[var(--os-accent)]/20 text-[var(--os-accent)] flex items-center justify-center font-bold overflow-hidden shrink-0">
+          <div className={`flex items-center gap-3 px-2 pb-3.5 border-b ${isLight ? 'border-slate-200/90' : 'border-white/[0.08]'}`}>
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-sky-500/25 to-indigo-500/15 border border-white/15 text-[var(--os-accent)] flex items-center justify-center font-bold overflow-hidden shrink-0 shadow-inner">
               {customAvatarUrl ? (
                 <img src={customAvatarUrl} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
-                <Icon name={selectedAvatarIcon || 'User'} size={20} />
+                <Icon name={selectedAvatarIcon || 'User'} size={19} />
               )}
             </div>
             <div className="min-w-0">
-              <div className="text-xs font-bold truncate">{profileName}</div>
-              <div className="text-[10px] opacity-60 truncate">{profileRole}</div>
+              <div className="text-[13px] font-bold tracking-tight truncate">{profileName}</div>
+              <div className="text-[11px] opacity-50 truncate">{profileRole}</div>
             </div>
           </div>
 
-          {/* Navigation Items */}
-          <nav className={`divide-y ${isLight ? 'divide-slate-200' : 'divide-white/[0.05]'}`}>
+          {/* Navigation Items with Custom Bespoke Squircle Icon Badges */}
+          <nav className="space-y-1">
             {SIDEBAR_NAV.map((nav) => {
               const active = activeCategory === nav.id;
               return (
@@ -907,16 +1046,22 @@ export function SettingsApp() {
                     setPersonalSubView('main');
                     setAccountsSubView('main');
                   }}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-xs font-semibold transition-all ${
+                  className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-xs transition-all ${
                     active
-                      ? 'border-l-2 border-[var(--os-accent)] text-[var(--os-accent)] font-bold bg-[var(--os-accent)]/10'
+                      ? isLight
+                        ? 'bg-white text-slate-950 font-bold shadow-xs border border-slate-200/80'
+                        : 'bg-white/[0.09] text-white font-bold border border-white/[0.12] shadow-sm'
                       : isLight
-                      ? 'text-slate-800 hover:bg-slate-200/70'
-                      : 'text-slate-200 hover:bg-white/[0.05]'
+                      ? 'text-slate-700 font-medium hover:bg-slate-200/60'
+                      : 'text-slate-300/85 font-medium hover:bg-white/[0.04] hover:text-white'
                   }`}
                 >
-                  <Icon name={nav.icon} size={18} />
-                  <span>{nav.label}</span>
+                  <span
+                    className={`w-7 h-7 rounded-lg bg-gradient-to-br ${nav.badgeGradient} border flex items-center justify-center shrink-0 ${nav.iconColor}`}
+                  >
+                    <Icon name={nav.icon} size={15} />
+                  </span>
+                  <span className="tracking-tight">{isJa ? nav.labelJa : nav.labelEn}</span>
                 </button>
               );
             })}
@@ -925,17 +1070,17 @@ export function SettingsApp() {
 
         {/* System Version Tag */}
         <div
-          className={`px-3 py-2 text-[11px] opacity-70 border-t flex items-center justify-between font-mono ${
-            isLight ? 'border-slate-300' : 'border-white/[0.08]'
+          className={`px-2.5 pt-3 text-[11px] opacity-45 border-t flex items-center justify-between font-mono ${
+            isLight ? 'border-slate-200/90' : 'border-white/[0.07]'
           }`}
         >
-          <span>GlassiumOS 5 u1</span>
+          <span>GlassiumOS 5 u2</span>
           <span>GlasispectUI</span>
         </div>
       </div>
 
       {/* Main Content View Container */}
-      <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-7 py-6 custom-scrollbar">
         <AnimatePresence mode="wait">
           {/* ==================== 1. SYSTEM CATEGORY ==================== */}
           {activeCategory === 'system' && (
@@ -949,12 +1094,18 @@ export function SettingsApp() {
             >
               {systemSubView === 'main' ? (
                 <>
-                  <div className="mb-4">
-                    <h1 className="text-xl font-bold">System (システム設定)</h1>
-                    <p className="text-xs opacity-60">ディスプレイ、壁紙、音量、電源・スリープ、タスクバーの設定</p>
+                  <div className="mb-5">
+                    <h1 className="text-2xl font-bold tracking-tight">
+                      {isJa ? 'システム' : 'System'}
+                    </h1>
+                    <p className="text-xs opacity-50 mt-1">
+                      {isJa
+                        ? 'ディスプレイ、背景、サウンド、電源、マルチタスク環境を管理します'
+                        : 'Manage display, backgrounds, audio, power, and multitasking behavior'}
+                    </p>
                   </div>
 
-                  <div className={`divide-y border-y ${dividerClass}`}>
+                  <div className={`${cardSurfaceClass} divide-y ${dividerClass}`}>
                     {SYSTEM_CARDS.map((card) => (
                       <button
                         key={card.id}
@@ -963,24 +1114,33 @@ export function SettingsApp() {
                           playSound('click');
                           setSystemSubView(card.id);
                         }}
-                        className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${rowHoverClass}`}
+                        className={`w-full flex items-center justify-between py-4 px-4 transition text-left group ${rowHoverClass}`}
                       >
-                        <div className="flex items-center gap-3.5 min-w-0">
-                          <div className="p-2 bg-[var(--os-accent)]/15 text-[var(--os-accent)] shrink-0">
-                            <Icon name={card.icon} size={20} />
+                        <div className="flex items-center gap-4 min-w-0 pr-4">
+                          <div
+                            className={`w-10 h-10 rounded-xl bg-gradient-to-br ${card.badgeGradient} border flex items-center justify-center shrink-0 shadow-inner ${card.iconColor}`}
+                          >
+                            <Icon name={card.icon} size={19} />
                           </div>
-                          <div>
-                            <div className="text-xs font-bold group-hover:text-[var(--os-accent)] transition-colors">
-                              {card.title}
+                          <div className="min-w-0">
+                            <div className="text-[13px] font-bold tracking-tight group-hover:text-[var(--os-accent)] transition-colors">
+                              {isJa ? card.titleJa : card.titleEn}
                             </div>
-                            <div className="text-[11px] opacity-60 truncate">{card.desc}</div>
+                            <div className="text-[11px] opacity-50 truncate mt-0.5 leading-relaxed">
+                              {isJa ? card.descJa : card.descEn}
+                            </div>
                           </div>
                         </div>
-                        <Icon
-                          name="ChevronRight"
-                          size={16}
-                          className="opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition"
-                        />
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <span className="text-[11px] font-medium opacity-45 group-hover:opacity-75 transition-opacity">
+                            {getSystemCardValueLabel(card.id)}
+                          </span>
+                          <Icon
+                            name="ChevronRight"
+                            size={15}
+                            className="opacity-30 group-hover:opacity-90 group-hover:translate-x-0.5 transition"
+                          />
+                        </div>
                       </button>
                     ))}
                   </div>
@@ -988,14 +1148,20 @@ export function SettingsApp() {
               ) : systemSubView === 'display' ? (
                 /* ---------------- DISPLAY & WALLPAPERS SUB-PAGE ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('Display & Wallpapers (壁紙 ＆ ディスプレイ)', () => setSystemSubView('main'))}
+                  {renderBreadcrumbHeader('ディスプレイと背景', 'Display & Wallpapers', () => setSystemSubView('main'))}
 
                   {/* 1. Built-In Wallpapers with Guaranteed Inline CSS Previews */}
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <div>
-                        <h3 className="text-xs font-bold">標準壁紙 (System Wallpapers)</h3>
-                        <p className="text-[11px] opacity-60">クリックすると即座にデスクトップ背景へ反映されます</p>
+                        <h3 className="text-[13px] font-bold tracking-tight">
+                          {isJa ? 'システム壁紙・Golden Sparkle' : 'System Wallpapers & Golden Sparkle'}
+                        </h3>
+                        <p className="text-[11px] opacity-50 mt-0.5">
+                          {isJa
+                            ? 'クリックすると即座にデスクトップ背景へ反映されます'
+                            : 'Select a preset to apply immediately to your desktop'}
+                        </p>
                       </div>
                     </div>
 
@@ -1557,7 +1723,7 @@ export function SettingsApp() {
               ) : systemSubView === 'sound' ? (
                 /* ---------------- SOUND SUB-PAGE ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('Sound (音量 ＆ 効果音)', () => setSystemSubView('main'))}
+                  {renderBreadcrumbHeader('サウンド', 'Sound', () => setSystemSubView('main'))}
 
                   <div className="space-y-4">
                     <CustomSlider
@@ -1565,14 +1731,20 @@ export function SettingsApp() {
                       max={100}
                       value={volume}
                       onChange={setVolume}
-                      label="マスター音量 (Master Volume)"
+                      label={isJa ? 'マスター音量' : 'Master Volume'}
                       valueText={`${volume}%`}
                     />
 
                     <div className={`pt-4 border-t flex items-center justify-between ${isLight ? 'border-slate-300' : 'border-white/10'}`}>
                       <div>
-                        <div className="text-xs font-bold">システム効果音</div>
-                        <div className="text-[11px] opacity-60">クリック音、ウィンドウ起動音、通知音を再生します</div>
+                        <div className="text-[13px] font-bold tracking-tight">
+                          {isJa ? 'システム効果音' : 'System Sound Effects'}
+                        </div>
+                        <div className="text-[11px] opacity-50 mt-0.5">
+                          {isJa
+                            ? 'クリック音、ウィンドウ起動音、通知音を再生します'
+                            : 'Play interface clicks, window transitions, and notification chimes'}
+                        </div>
                       </div>
                       <ToggleSwitch checked={soundEnabled} onChange={setSoundEnabled} />
                     </div>
@@ -1581,30 +1753,38 @@ export function SettingsApp() {
               ) : systemSubView === 'power' ? (
                 /* ---------------- POWER & SLEEP ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('Power & Sleep (スリープ ＆ ロック)', () => setSystemSubView('main'))}
+                  {renderBreadcrumbHeader('電源とスリープ', 'Power & Sleep', () => setSystemSubView('main'))}
 
                   <div className="space-y-5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="text-xs font-bold">画面スリープ (Sleep Screen)</h3>
-                        <p className="text-[11px] opacity-60">ロック画面・スリープモードを即座に起動します</p>
+                        <h3 className="text-[13px] font-bold tracking-tight">
+                          {isJa ? '画面スリープ' : 'Sleep Screen'}
+                        </h3>
+                        <p className="text-[11px] opacity-50 mt-0.5">
+                          {isJa
+                            ? 'ロック画面・スリープモードを即座に起動します'
+                            : 'Enter lock screen and ambient sleep mode immediately'}
+                        </p>
                       </div>
                       <button
                         type="button"
                         onClick={() => lockSystem()}
-                        className="px-3.5 py-1.5 bg-[var(--os-accent)] text-black text-xs font-bold shadow hover:brightness-110"
+                        className="px-3.5 py-1.5 rounded-xl bg-[var(--os-accent)] text-black text-xs font-bold shadow hover:brightness-110"
                       >
-                        スリープ起動
+                        {isJa ? 'スリープ起動' : 'Sleep Now'}
                       </button>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 pt-2">
                       <div>
-                        <label className="block text-xs font-semibold mb-1">ロック画面スタイル</label>
+                        <label className="block text-xs font-semibold mb-1">
+                          {isJa ? 'ロック画面スタイル' : 'Lock Screen Style'}
+                        </label>
                         <select
                           value={lockScreenStyle}
                           onChange={(e) => setLockScreenStyle(e.target.value as LockScreenStyle)}
-                          className={`w-full text-xs p-2.5 border-b outline-none ${
+                          className={`w-full text-xs p-2.5 rounded-xl border outline-none ${
                             isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-black/40 border-white/15 text-white'
                           }`}
                         >
@@ -1616,11 +1796,13 @@ export function SettingsApp() {
                       </div>
 
                       <div>
-                        <label className="block text-xs font-semibold mb-1">スリープ時計スタイル</label>
+                        <label className="block text-xs font-semibold mb-1">
+                          {isJa ? 'スリープ時計スタイル' : 'Sleep Clock Style'}
+                        </label>
                         <select
                           value={sleepClockStyle}
                           onChange={(e) => setSleepClockStyle(e.target.value as SleepClockStyle)}
-                          className={`w-full text-xs p-2.5 border-b outline-none ${
+                          className={`w-full text-xs p-2.5 rounded-xl border outline-none ${
                             isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-black/40 border-white/15 text-white'
                           }`}
                         >
@@ -1634,14 +1816,16 @@ export function SettingsApp() {
                     </div>
 
                     <div className={`pt-4 border-t ${isLight ? 'border-slate-300' : 'border-white/10'}`}>
-                      <label className="block text-xs font-semibold mb-2">スリープ背景テーマ</label>
+                      <label className="block text-xs font-semibold mb-2">
+                        {isJa ? 'スリープ背景テーマ' : 'Sleep Background'}
+                      </label>
                       <div className="grid grid-cols-3 gap-2 text-xs">
                         {(['aurora', 'void', 'matrix', 'galaxy', 'retro', 'wallpaper'] as SleepBackground[]).map((bg) => (
                           <button
                             key={bg}
                             type="button"
                             onClick={() => setSleepBackground(bg)}
-                            className={`p-2.5 text-center capitalize transition ${
+                            className={`p-2.5 rounded-xl text-center capitalize transition ${
                               sleepBackground === bg
                                 ? 'bg-[var(--os-accent)] text-black font-bold'
                                 : isLight
@@ -1656,14 +1840,16 @@ export function SettingsApp() {
                     </div>
 
                     <div className={`pt-4 border-t ${isLight ? 'border-slate-300' : 'border-white/10'}`}>
-                      <label className="block text-xs font-semibold mb-2">時計の配置場所</label>
+                      <label className="block text-xs font-semibold mb-2">
+                        {isJa ? '時計の配置場所' : 'Clock Position'}
+                      </label>
                       <div className="grid grid-cols-3 gap-2 text-xs">
                         {(['top', 'center', 'bottom'] as ClockPosition[]).map((pos) => (
                           <button
                             key={pos}
                             type="button"
                             onClick={() => setClockPosition(pos)}
-                            className={`p-2.5 text-center uppercase font-mono transition ${
+                            className={`p-2.5 rounded-xl text-center uppercase font-mono transition ${
                               clockPosition === pos
                                 ? 'bg-[var(--os-accent)] text-black font-bold'
                                 : isLight
@@ -1681,13 +1867,19 @@ export function SettingsApp() {
               ) : systemSubView === 'multitasking' ? (
                 /* ---------------- MULTITASKING & TASKBAR ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('Multitasking & Taskbar (マルチタスク ＆ タスクバー)', () => setSystemSubView('main'))}
+                  {renderBreadcrumbHeader('マルチタスクとタスクバー', 'Multitasking & Taskbar', () => setSystemSubView('main'))}
 
                   <div className="space-y-5">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h3 className="text-xs font-bold">ウィンドウ左右整列 (50:50 Snap)</h3>
-                        <p className="text-[11px] opacity-60">開いているウィンドウを左右50:50に自動配置します</p>
+                        <h3 className="text-[13px] font-bold tracking-tight">
+                          {isJa ? 'ウィンドウ左右スナップ整列' : 'Split-Screen Window Snap'}
+                        </h3>
+                        <p className="text-[11px] opacity-50 mt-0.5">
+                          {isJa
+                            ? '開いているウィンドウを画面の左右に均等配置します'
+                            : 'Tile open desktop windows side by side automatically'}
+                        </p>
                       </div>
                       <button
                         type="button"
@@ -1695,22 +1887,26 @@ export function SettingsApp() {
                           playSound('click');
                           snapAllWindows5050();
                         }}
-                        className="px-3.5 py-1.5 bg-[var(--os-accent)] text-black text-xs font-bold shadow hover:brightness-110"
+                        className="px-3.5 py-1.5 rounded-xl bg-[var(--os-accent)] text-black text-xs font-bold shadow hover:brightness-110"
                       >
-                        ウィンドウ整列
+                        {isJa ? 'ウィンドウ整列' : 'Snap Windows'}
                       </button>
                     </div>
 
                     <div className={`pt-4 border-t flex items-center justify-between ${isLight ? 'border-slate-300' : 'border-white/10'}`}>
                       <div>
-                        <h3 className="text-xs font-bold">タスクバーアイコン配置</h3>
-                        <p className="text-[11px] opacity-60">中央揃えまたは左揃えを切り替えます</p>
+                        <h3 className="text-[13px] font-bold tracking-tight">
+                          {isJa ? 'タスクバーのアイコン配置' : 'Taskbar Alignment'}
+                        </h3>
+                        <p className="text-[11px] opacity-50 mt-0.5">
+                          {isJa ? '中央揃えまたは左揃えを切り替えます' : 'Choose centered or left-aligned taskbar icons'}
+                        </p>
                       </div>
                       <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={() => setTaskbarAlign('center')}
-                          className={`px-3 py-1.5 text-xs font-semibold transition ${
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
                             taskbarAlign === 'center'
                               ? 'bg-[var(--os-accent)] text-black font-bold'
                               : isLight
@@ -1718,12 +1914,12 @@ export function SettingsApp() {
                               : 'bg-white/10 text-white'
                           }`}
                         >
-                          中央揃え
+                          {isJa ? '中央揃え' : 'Center'}
                         </button>
                         <button
                           type="button"
                           onClick={() => setTaskbarAlign('left')}
-                          className={`px-3 py-1.5 text-xs font-semibold transition ${
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
                             taskbarAlign === 'left'
                               ? 'bg-[var(--os-accent)] text-black font-bold'
                               : isLight
@@ -1731,15 +1927,21 @@ export function SettingsApp() {
                               : 'bg-white/10 text-white'
                           }`}
                         >
-                          左揃え
+                          {isJa ? '左揃え' : 'Left'}
                         </button>
                       </div>
                     </div>
 
                     <div className={`pt-4 border-t flex items-center justify-between ${isLight ? 'border-slate-300' : 'border-white/10'}`}>
                       <div>
-                        <h3 className="text-xs font-bold">タスクバーを自動的に隠す</h3>
-                        <p className="text-[11px] opacity-60">カーソルを画面下部に移動した際のみ表示します</p>
+                        <h3 className="text-[13px] font-bold tracking-tight">
+                          {isJa ? 'タスクバーを自動的に隠す' : 'Automatically Hide Taskbar'}
+                        </h3>
+                        <p className="text-[11px] opacity-50 mt-0.5">
+                          {isJa
+                            ? 'カーソルを画面下部に移動した際のみ表示します'
+                            : 'Reveal the taskbar only when hovering near the bottom edge'}
+                        </p>
                       </div>
                       <ToggleSwitch checked={autoHideTaskbar} onChange={setAutoHideTaskbar} />
                     </div>
@@ -1748,50 +1950,54 @@ export function SettingsApp() {
               ) : systemSubView === 'language' ? (
                 /* ---------------- LANGUAGE & REGION ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('Language & Region (言語と地域)', () => setSystemSubView('main'))}
+                  {renderBreadcrumbHeader('言語と地域', 'Language & Region', () => setSystemSubView('main'))}
 
                   <div className="space-y-5">
                     <div>
-                      <h3 className="text-xs font-bold mb-1">System Display Language (システム表示言語)</h3>
-                      <p className="text-[11px] opacity-60 mb-3">
-                        OS全体の表示言語を English または 日本語 から選択します。
+                      <h3 className="text-[13px] font-bold tracking-tight mb-1">
+                        {isJa ? 'システムの表示言語' : 'System Display Language'}
+                      </h3>
+                      <p className="text-[11px] opacity-50 mb-4">
+                        {isJa
+                          ? '選択した言語ルールに沿ってシステム全体の表記を統一します'
+                          : 'Unify all interface labels and descriptions in your preferred language'}
                       </p>
 
-                      <div className={`divide-y border-y ${dividerClass}`}>
+                      <div className={`${cardSurfaceClass} divide-y ${dividerClass}`}>
                         <button
                           type="button"
                           onClick={() => {
                             playSound('click');
-                            setLanguage('en');
-                            addNotification({ title: 'Language Changed', message: 'System language set to English (US).' });
+                            setLanguage('ja');
+                            addNotification({ title: '言語設定', message: 'システム言語を日本語に設定しました。' });
                           }}
-                          className={`w-full py-3.5 px-2 text-left flex items-center justify-between transition ${rowHoverClass}`}
+                          className={`w-full py-4 px-4 text-left flex items-center justify-between transition ${rowHoverClass}`}
                         >
                           <div>
-                            <div className={`text-xs font-bold ${language === 'en' ? 'text-[var(--os-accent)]' : ''}`}>
-                              English (US) [Default]
+                            <div className={`text-[13px] font-bold tracking-tight ${language === 'ja' ? 'text-[var(--os-accent)]' : ''}`}>
+                              日本語
                             </div>
-                            <div className="text-[11px] opacity-60">Primary OS System Language</div>
+                            <div className="text-[11px] opacity-50 mt-0.5">システム全体の表記を日本語に統一します</div>
                           </div>
-                          {language === 'en' && <Icon name="CheckCircle2" size={18} className="text-[var(--os-accent)] shrink-0" />}
+                          {language === 'ja' && <Icon name="CheckCircle2" size={18} className="text-[var(--os-accent)] shrink-0" />}
                         </button>
 
                         <button
                           type="button"
                           onClick={() => {
                             playSound('click');
-                            setLanguage('ja');
-                            addNotification({ title: '言語変更', message: 'システム言語を日本語に設定しました。' });
+                            setLanguage('en');
+                            addNotification({ title: 'Language Changed', message: 'System language set to English.' });
                           }}
-                          className={`w-full py-3.5 px-2 text-left flex items-center justify-between transition ${rowHoverClass}`}
+                          className={`w-full py-4 px-4 text-left flex items-center justify-between transition ${rowHoverClass}`}
                         >
                           <div>
-                            <div className={`text-xs font-bold ${language === 'ja' ? 'text-[var(--os-accent)]' : ''}`}>
-                              日本語 (Japanese)
+                            <div className={`text-[13px] font-bold tracking-tight ${language === 'en' ? 'text-[var(--os-accent)]' : ''}`}>
+                              English
                             </div>
-                            <div className="text-[11px] opacity-60">日本語表示モード</div>
+                            <div className="text-[11px] opacity-50 mt-0.5">Unify all system labels in English</div>
                           </div>
-                          {language === 'ja' && <Icon name="CheckCircle2" size={18} className="text-[var(--os-accent)] shrink-0" />}
+                          {language === 'en' && <Icon name="CheckCircle2" size={18} className="text-[var(--os-accent)] shrink-0" />}
                         </button>
                       </div>
                     </div>
@@ -1800,14 +2006,18 @@ export function SettingsApp() {
               ) : (
                 /* ---------------- AI ASSISTANT SETTINGS ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('AI Assistant Settings (GlassiumOS 5 AI 統合設定)', () => setSystemSubView('main'))}
+                  {renderBreadcrumbHeader('AI アシスタント', 'AI Assistant', () => setSystemSubView('main'))}
 
-                  <div className={`divide-y border-y ${dividerClass}`}>
+                  <div className={`${cardSurfaceClass} divide-y ${dividerClass} px-4`}>
                     <div className="py-4 flex items-center justify-between">
                       <div>
-                        <div className="text-xs font-bold">OS操作の自動実行 (Auto-Execute OS Commands)</div>
-                        <div className="text-[11px] opacity-60">
-                          AIへの指示（「ダークモードにして」「電卓を開いて」など）を即座にOSへ反映します
+                        <div className="text-[13px] font-bold tracking-tight">
+                          {isJa ? 'OS操作の自動実行' : 'Auto-Execute OS Actions'}
+                        </div>
+                        <div className="text-[11px] opacity-50 mt-0.5">
+                          {isJa
+                            ? 'AIへの自然言語指示を即座にシステム設定やアプリ起動へ反映します'
+                            : 'Automatically execute system changes and app launches from natural language'}
                         </div>
                       </div>
                       <ToggleSwitch checked={aiAutoExecute} onChange={setAiAutoExecute} />
@@ -1815,22 +2025,26 @@ export function SettingsApp() {
 
                     <div className="py-4 flex items-center justify-between">
                       <div>
-                        <div className="text-xs font-bold">AI 応答スタイル (Response Style)</div>
-                        <div className="text-[11px] opacity-60">AIアシスタントおよびEditor文書作成支援の回答スタイル</div>
+                        <div className="text-[13px] font-bold tracking-tight">
+                          {isJa ? '応答スタイル' : 'Response Style'}
+                        </div>
+                        <div className="text-[11px] opacity-50 mt-0.5">
+                          {isJa ? 'AIアシスタントおよび文章作成支援の回答トーン' : 'Tone and detail level for AI responses'}
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         {(
                           [
-                            { id: 'concise', label: '簡潔' },
-                            { id: 'balanced', label: '標準' },
-                            { id: 'detailed', label: '詳細' },
+                            { id: 'concise', labelJa: '簡潔', labelEn: 'Concise' },
+                            { id: 'balanced', labelJa: '標準', labelEn: 'Balanced' },
+                            { id: 'detailed', labelJa: '詳細', labelEn: 'Detailed' },
                           ] as const
                         ).map((st) => (
                           <button
                             key={st.id}
                             type="button"
                             onClick={() => setAiResponseStyle(st.id)}
-                            className={`px-3 py-1.5 text-xs font-semibold transition ${
+                            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
                               aiResponseStyle === st.id
                                 ? 'bg-[var(--os-accent)] text-black font-bold'
                                 : isLight
@@ -1838,7 +2052,7 @@ export function SettingsApp() {
                                 : 'bg-white/10 text-white'
                             }`}
                           >
-                            {st.label}
+                            {isJa ? st.labelJa : st.labelEn}
                           </button>
                         ))}
                       </div>
@@ -1846,27 +2060,31 @@ export function SettingsApp() {
 
                     <div className="py-4 flex items-center justify-between">
                       <div>
-                        <div className="text-xs font-bold">AI エンジン稼働ステータス確認</div>
-                        <div className="text-[11px] opacity-60">
-                          サーバーサイド AI エンドポイント（/api/ai/chat）およびローカル推論エンジンの応答を確認します
+                        <div className="text-[13px] font-bold tracking-tight">
+                          {isJa ? 'AI エンジン接続診断' : 'AI Engine Diagnostics'}
+                        </div>
+                        <div className="text-[11px] opacity-50 mt-0.5">
+                          {isJa
+                            ? '推論エンドポイントの稼働状態を確認します'
+                            : 'Verify server-side AI endpoint connectivity'}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
                           onClick={handleTestAIConnection}
-                          className="px-3.5 py-1.5 bg-[var(--os-accent)] text-black text-xs font-bold shadow hover:brightness-110"
+                          className="px-3.5 py-1.5 rounded-xl bg-[var(--os-accent)] text-black text-xs font-bold shadow hover:brightness-110"
                         >
-                          動作テスト
+                          {isJa ? '接続テスト' : 'Test Connection'}
                         </button>
                         <button
                           type="button"
                           onClick={() => openApp('ai')}
-                          className={`px-3.5 py-1.5 text-xs font-semibold ${
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold ${
                             isLight ? 'bg-slate-200 text-slate-800' : 'bg-white/10 text-white'
                           }`}
                         >
-                          AI アシスタントを開く
+                          {isJa ? '開く' : 'Open AI'}
                         </button>
                       </div>
                     </div>
@@ -1874,11 +2092,11 @@ export function SettingsApp() {
 
                   {aiTestMessage && (
                     <div
-                      className={`p-3 text-xs border-l-2 ${
+                      className={`p-3 rounded-xl text-xs border-l-2 ${
                         aiTestStatus === 'success'
-                          ? 'border-emerald-500 bg-emerald-500/10 text-emerald-500'
+                          ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400'
                           : aiTestStatus === 'error'
-                          ? 'border-rose-500 bg-rose-500/10 text-rose-500'
+                          ? 'border-rose-500 bg-rose-500/10 text-rose-400'
                           : 'border-sky-500 bg-sky-500/10 text-sky-400'
                       }`}
                     >
@@ -1902,29 +2120,37 @@ export function SettingsApp() {
             >
               {personalSubView === 'main' ? (
                 <>
-                  <div className="mb-4">
-                    <h1 className="text-xl font-bold">Personalization (個人設定)</h1>
-                    <p className="text-xs opacity-60">
-                      OS UIスタイル、壁紙、サーフェスマテリアルエンジン、アクセントカラーの調整
+                  <div className="mb-5">
+                    <h1 className="text-2xl font-bold tracking-tight">
+                      {isJa ? '個人用設定' : 'Personalization'}
+                    </h1>
+                    <p className="text-xs opacity-50 mt-1">
+                      {isJa
+                        ? 'シェルレイアウト、Golden Sparkle / オーロラ背景、マテリアル質感、アクセントカラーをカスタマイズします'
+                        : 'Customize shell layout, Golden Sparkle / Aurora backgrounds, surface materials, and accent colors'}
                     </p>
                   </div>
 
-                  <div className={`divide-y border-y ${dividerClass}`}>
-                    <div className="py-3.5 px-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3.5">
-                        <div className="p-2 bg-[var(--os-accent)]/15 text-[var(--os-accent)]">
-                          <Icon name="Moon" size={20} />
+                  <div className={`${cardSurfaceClass} divide-y ${dividerClass}`}>
+                    <div className="py-4 px-4 flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/25 to-slate-500/10 border border-indigo-400/30 text-indigo-300 flex items-center justify-center shrink-0">
+                          <Icon name="Moon" size={19} />
                         </div>
                         <div>
-                          <div className="text-xs font-bold">カラーモード (Theme Mode)</div>
-                          <div className="text-[11px] opacity-60">ダークモードとライトモードを切り替えます</div>
+                          <div className="text-[13px] font-bold tracking-tight">
+                            {isJa ? '外観モード' : 'Appearance Mode'}
+                          </div>
+                          <div className="text-[11px] opacity-50 mt-0.5">
+                            {isJa ? 'ダークモードとライトモードを切り替えます' : 'Switch between dark and light system surfaces'}
+                          </div>
                         </div>
                       </div>
                       <div className="flex gap-2">
                         <button
                           type="button"
                           onClick={() => setTheme('dark')}
-                          className={`px-3.5 py-1.5 text-xs font-semibold transition ${
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
                             theme === 'dark'
                               ? 'bg-[var(--os-accent)] text-black font-bold'
                               : isLight
@@ -1932,12 +2158,12 @@ export function SettingsApp() {
                               : 'bg-white/10 text-white'
                           }`}
                         >
-                          Dark
+                          {isJa ? 'ダーク' : 'Dark'}
                         </button>
                         <button
                           type="button"
                           onClick={() => setTheme('light')}
-                          className={`px-3.5 py-1.5 text-xs font-semibold transition ${
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
                             theme === 'light'
                               ? 'bg-[var(--os-accent)] text-black font-bold'
                               : isLight
@@ -1945,7 +2171,7 @@ export function SettingsApp() {
                               : 'bg-white/10 text-white'
                           }`}
                         >
-                          Light
+                          {isJa ? 'ライト' : 'Light'}
                         </button>
                       </div>
                     </div>
@@ -1956,26 +2182,31 @@ export function SettingsApp() {
                         playSound('click');
                         setPersonalSubView('uistyle');
                       }}
-                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${rowHoverClass}`}
+                      className={`w-full flex items-center justify-between py-4 px-4 transition text-left group ${rowHoverClass}`}
                     >
-                      <div className="flex items-center gap-3.5">
-                        <div className="p-2 bg-[var(--os-accent)]/15 text-[var(--os-accent)]">
-                          <Icon name="Layout" size={20} />
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/25 to-blue-500/10 border border-cyan-400/30 text-cyan-300 flex items-center justify-center shrink-0">
+                          <Icon name="Layout" size={19} />
                         </div>
                         <div>
-                          <div className="text-xs font-bold group-hover:text-[var(--os-accent)] transition-colors">
-                            UI Style Presets (OSシェル・ウィンドウレイアウト切替)
+                          <div className="text-[13px] font-bold tracking-tight group-hover:text-[var(--os-accent)] transition-colors">
+                            {isJa ? 'デスクトップシェル・UIスタイル' : 'Desktop Shell & UI Style'}
                           </div>
-                          <div className="text-[11px] opacity-60">
-                            GlassiumOS 5、Windows 11、Windows 10、Windows 8.1、Ubuntu、macOS の即時切替
+                          <div className="text-[11px] opacity-50 mt-0.5">
+                            {isJa
+                              ? 'GlassiumOS 5、Windows 11、macOS、Ubuntu などのシェル操作体系を切り替え'
+                              : 'Switch between GlassiumOS 5, Windows 11, macOS, Ubuntu, and more'}
                           </div>
                         </div>
                       </div>
-                      <Icon
-                        name="ChevronRight"
-                        size={16}
-                        className="opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition"
-                      />
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="text-[11px] font-medium opacity-45">{shellMode}</span>
+                        <Icon
+                          name="ChevronRight"
+                          size={15}
+                          className="opacity-30 group-hover:opacity-90 group-hover:translate-x-0.5 transition"
+                        />
+                      </div>
                     </button>
 
                     <button
@@ -1985,26 +2216,35 @@ export function SettingsApp() {
                         setActiveCategory('system');
                         setSystemSubView('display');
                       }}
-                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${rowHoverClass}`}
+                      className={`w-full flex items-center justify-between py-4 px-4 transition text-left group ${rowHoverClass}`}
                     >
-                      <div className="flex items-center gap-3.5">
-                        <div className="p-2 bg-[var(--os-accent)]/15 text-[var(--os-accent)]">
-                          <Icon name="Image" size={20} />
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/25 to-yellow-500/10 border border-amber-400/30 text-amber-300 flex items-center justify-center shrink-0">
+                          <Icon name="Image" size={19} />
                         </div>
                         <div>
-                          <div className="text-xs font-bold group-hover:text-[var(--os-accent)] transition-colors">
-                            Wallpapers & 2D Live Aurora (壁紙 ＆ ライブ壁紙)
+                          <div className="text-[13px] font-bold tracking-tight group-hover:text-[var(--os-accent)] transition-colors">
+                            {isJa ? '壁紙・Golden Sparkle・オーロラ背景' : 'Wallpapers, Golden Sparkle & Aurora'}
                           </div>
-                          <div className="text-[11px] opacity-60">
-                            10種類の2Dライブ壁紙、標準壁紙、カスタム画像アップロード
+                          <div className="text-[11px] opacity-50 mt-0.5">
+                            {isJa
+                              ? 'マウス連動オーロラ、PS5風 Golden Sparkle、3D宇宙背景、カスタム画像'
+                              : 'Mouse-interactive Aurora, Golden Sparkle, 3D cosmos, and custom images'}
                           </div>
                         </div>
                       </div>
-                      <Icon
-                        name="ChevronRight"
-                        size={16}
-                        className="opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition"
-                      />
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="text-[11px] font-medium opacity-45">
+                          {wallpaper === 'golden-sparkle' || auroraColor === 'golden-sparkle'
+                            ? 'Golden Sparkle'
+                            : WALLPAPERS[wallpaper]?.label || wallpaper}
+                        </span>
+                        <Icon
+                          name="ChevronRight"
+                          size={15}
+                          className="opacity-30 group-hover:opacity-90 group-hover:translate-x-0.5 transition"
+                        />
+                      </div>
                     </button>
 
                     <button
@@ -2013,26 +2253,31 @@ export function SettingsApp() {
                         playSound('click');
                         setPersonalSubView('surface');
                       }}
-                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${rowHoverClass}`}
+                      className={`w-full flex items-center justify-between py-4 px-4 transition text-left group ${rowHoverClass}`}
                     >
-                      <div className="flex items-center gap-3.5">
-                        <div className="p-2 bg-[var(--os-accent)]/15 text-[var(--os-accent)]">
-                          <Icon name="Sparkles" size={20} />
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-fuchsia-500/25 to-purple-500/10 border border-fuchsia-400/30 text-fuchsia-300 flex items-center justify-center shrink-0">
+                          <Icon name="Sparkles" size={19} />
                         </div>
                         <div>
-                          <div className="text-xs font-bold group-hover:text-[var(--os-accent)] transition-colors">
-                            Surface Material Engine (質感エンジン)
+                          <div className="text-[13px] font-bold tracking-tight group-hover:text-[var(--os-accent)] transition-colors">
+                            {isJa ? 'サーフェスマテリアル質感' : 'Surface Material Engine'}
                           </div>
-                          <div className="text-[11px] opacity-60">
-                            Liquid Glass, Mica, Frosted Acrylic, Slate, Cyberpunk HUD の切り替え
+                          <div className="text-[11px] opacity-50 mt-0.5">
+                            {isJa
+                              ? 'Liquid Glass、Mica、Frosted Acrylic、High-Contrast Slate の質感切替'
+                              : 'Switch between Liquid Glass, Mica, Frosted Acrylic, and High-Contrast Slate'}
                           </div>
                         </div>
                       </div>
-                      <Icon
-                        name="ChevronRight"
-                        size={16}
-                        className="opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition"
-                      />
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="text-[11px] font-medium opacity-45">{designEngine}</span>
+                        <Icon
+                          name="ChevronRight"
+                          size={15}
+                          className="opacity-30 group-hover:opacity-90 group-hover:translate-x-0.5 transition"
+                        />
+                      </div>
                     </button>
 
                     <button
@@ -2041,26 +2286,31 @@ export function SettingsApp() {
                         playSound('click');
                         setPersonalSubView('accent');
                       }}
-                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${rowHoverClass}`}
+                      className={`w-full flex items-center justify-between py-4 px-4 transition text-left group ${rowHoverClass}`}
                     >
-                      <div className="flex items-center gap-3.5">
-                        <div className="p-2 bg-[var(--os-accent)]/15 text-[var(--os-accent)]">
-                          <Icon name="Palette" size={20} />
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-500/25 to-orange-500/10 border border-rose-400/30 text-rose-300 flex items-center justify-center shrink-0">
+                          <Icon name="Palette" size={19} />
                         </div>
                         <div>
-                          <div className="text-xs font-bold group-hover:text-[var(--os-accent)] transition-colors">
-                            Accent Color (アクセントカラー)
+                          <div className="text-[13px] font-bold tracking-tight group-hover:text-[var(--os-accent)] transition-colors">
+                            {isJa ? 'アクセントカラー' : 'Accent Color'}
                           </div>
-                          <div className="text-[11px] opacity-60">
-                            シアン、ブルー、バイオレット、エメラルド、ローズ、アンバー
+                          <div className="text-[11px] opacity-50 mt-0.5">
+                            {isJa
+                              ? 'システム全体の強調色とアクティブインジケーターの色'
+                              : 'Primary highlight color across buttons, badges, and active states'}
                           </div>
                         </div>
                       </div>
-                      <Icon
-                        name="ChevronRight"
-                        size={16}
-                        className="opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition"
-                      />
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="text-[11px] font-medium opacity-45 capitalize">{accentColor}</span>
+                        <Icon
+                          name="ChevronRight"
+                          size={15}
+                          className="opacity-30 group-hover:opacity-90 group-hover:translate-x-0.5 transition"
+                        />
+                      </div>
                     </button>
 
                     <button
@@ -2069,33 +2319,40 @@ export function SettingsApp() {
                         playSound('click');
                         setPersonalSubView('glass');
                       }}
-                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${rowHoverClass}`}
+                      className={`w-full flex items-center justify-between py-4 px-4 transition text-left group ${rowHoverClass}`}
                     >
-                      <div className="flex items-center gap-3.5">
-                        <div className="p-2 bg-[var(--os-accent)]/15 text-[var(--os-accent)]">
-                          <Icon name="Sliders" size={20} />
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/25 to-teal-500/10 border border-emerald-400/30 text-emerald-300 flex items-center justify-center shrink-0">
+                          <Icon name="Sliders" size={19} />
                         </div>
                         <div>
-                          <div className="text-xs font-bold group-hover:text-[var(--os-accent)] transition-colors">
-                            Advanced Optical Parameters
+                          <div className="text-[13px] font-bold tracking-tight group-hover:text-[var(--os-accent)] transition-colors">
+                            {isJa ? '光学ガラス詳細パラメータ' : 'Optical Glass Parameters'}
                           </div>
-                          <div className="text-[11px] opacity-60">ぼかし量、角丸、透過率、ガラス屈折スライダー</div>
+                          <div className="text-[11px] opacity-50 mt-0.5">
+                            {isJa
+                              ? 'すりガラスのぼかし量、ウィンドウ角丸、透過率、屈折度の微調整'
+                              : 'Fine-tune blur radius, corner rounding, transparency, and refraction'}
+                          </div>
                         </div>
                       </div>
-                      <Icon
-                        name="ChevronRight"
-                        size={16}
-                        className="opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition"
-                      />
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="text-[11px] font-mono opacity-45">{blurAmount}px</span>
+                        <Icon
+                          name="ChevronRight"
+                          size={15}
+                          className="opacity-30 group-hover:opacity-90 group-hover:translate-x-0.5 transition"
+                        />
+                      </div>
                     </button>
                   </div>
                 </>
               ) : personalSubView === 'uistyle' ? (
                 /* ---------------- UI STYLE WITH DISTINCT DIAGRAMS ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('UI Style Presets (GlassiumOS 5 / 各OSスタイル)', () => setPersonalSubView('main'))}
+                  {renderBreadcrumbHeader('デスクトップシェル・UIスタイル', 'Desktop Shell & UI Style', () => setPersonalSubView('main'))}
 
-                  <div className={`divide-y border-y ${dividerClass}`}>
+                  <div className={`${cardSurfaceClass} divide-y ${dividerClass}`}>
                     {SHELL_MODES.map((sm) => {
                       const selected = shellMode === sm.id;
                       return (
@@ -2103,18 +2360,18 @@ export function SettingsApp() {
                           key={sm.id}
                           type="button"
                           onClick={() => handleSelectShellMode(sm.id)}
-                          className={`w-full py-3.5 px-2 text-left transition flex items-center gap-4 ${
+                          className={`w-full py-3.5 px-4 text-left transition flex items-center gap-4 ${
                             selected ? 'bg-[var(--os-accent)]/10' : rowHoverClass
                           }`}
                         >
-                          <div className="w-36 shrink-0">
+                          <div className="w-36 shrink-0 rounded-lg overflow-hidden border border-white/10">
                             <ShellMockupDiagram type={sm.mockupType} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <div className={`text-xs font-bold ${selected ? 'text-[var(--os-accent)]' : ''}`}>
+                            <div className={`text-[13px] font-bold tracking-tight ${selected ? 'text-[var(--os-accent)]' : ''}`}>
                               {sm.label}
                             </div>
-                            <div className="text-[11px] opacity-60 mt-0.5">{sm.desc}</div>
+                            <div className="text-[11px] opacity-50 mt-0.5">{sm.desc}</div>
                           </div>
                           {selected && <Icon name="CheckCircle2" size={18} className="text-[var(--os-accent)] shrink-0" />}
                         </button>
@@ -2125,9 +2382,9 @@ export function SettingsApp() {
               ) : personalSubView === 'surface' ? (
                 /* ---------------- SURFACE MATERIAL ENGINE ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('Surface Material Engine (質感エンジン連動)', () => setPersonalSubView('main'))}
+                  {renderBreadcrumbHeader('サーフェスマテリアル質感', 'Surface Material Engine', () => setPersonalSubView('main'))}
 
-                  <div className={`divide-y border-y ${dividerClass}`}>
+                  <div className={`${cardSurfaceClass} divide-y ${dividerClass}`}>
                     {DESIGN_ENGINES.map((de) => {
                       const selected = designEngine === de.id;
                       return (
@@ -2135,17 +2392,17 @@ export function SettingsApp() {
                           key={de.id}
                           type="button"
                           onClick={() => handleSelectSurfaceEngine(de.id)}
-                          className={`w-full py-3.5 px-2 text-left transition flex items-center justify-between gap-4 ${
+                          className={`w-full py-3.5 px-4 text-left transition flex items-center justify-between gap-4 ${
                             selected ? 'bg-[var(--os-accent)]/10' : rowHoverClass
                           }`}
                         >
                           <div className="flex items-center gap-3.5 min-w-0">
-                            <div className="w-14 h-9 shrink-0" style={{ background: de.cssBg }} />
+                            <div className="w-14 h-9 rounded-lg border border-white/15 shrink-0" style={{ background: de.cssBg }} />
                             <div>
-                              <div className={`text-xs font-bold ${selected ? 'text-[var(--os-accent)]' : ''}`}>
+                              <div className={`text-[13px] font-bold tracking-tight ${selected ? 'text-[var(--os-accent)]' : ''}`}>
                                 {de.label}
                               </div>
-                              <div className="text-[11px] opacity-60">{de.desc}</div>
+                              <div className="text-[11px] opacity-50 mt-0.5">{de.desc}</div>
                             </div>
                           </div>
                           {selected && <Icon name="CheckCircle2" size={18} className="text-[var(--os-accent)] shrink-0" />}
@@ -2157,9 +2414,9 @@ export function SettingsApp() {
               ) : personalSubView === 'accent' ? (
                 /* ---------------- ACCENT COLOR ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('Accent Color (アクセントカラー切り替え)', () => setPersonalSubView('main'))}
+                  {renderBreadcrumbHeader('アクセントカラー', 'Accent Color', () => setPersonalSubView('main'))}
 
-                  <div className={`divide-y border-y ${dividerClass}`}>
+                  <div className={`${cardSurfaceClass} divide-y ${dividerClass}`}>
                     {ACCENT_COLOR_PRESETS.map((p) => {
                       const selected = accentColor === p.id;
                       return (
@@ -2170,13 +2427,13 @@ export function SettingsApp() {
                             playSound('click');
                             setAccentColor(p.id);
                           }}
-                          className={`w-full py-3.5 px-2 flex items-center justify-between transition ${
+                          className={`w-full py-3.5 px-4 flex items-center justify-between transition ${
                             selected ? 'bg-[var(--os-accent)]/10 font-bold' : rowHoverClass
                           }`}
                         >
                           <div className="flex items-center gap-3">
-                            <span className="w-5 h-5 rounded-full shrink-0" style={{ backgroundColor: p.hex }} />
-                            <span className={`text-xs font-bold ${selected ? 'text-[var(--os-accent)]' : ''}`}>
+                            <span className="w-5 h-5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: p.hex }} />
+                            <span className={`text-[13px] font-bold tracking-tight ${selected ? 'text-[var(--os-accent)]' : ''}`}>
                               {p.labelJa}
                             </span>
                           </div>
@@ -2189,7 +2446,7 @@ export function SettingsApp() {
               ) : (
                 /* ---------------- GLASS PARAMETERS ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('Advanced Optical Parameters', () => setPersonalSubView('main'))}
+                  {renderBreadcrumbHeader('光学ガラス詳細パラメータ', 'Optical Glass Parameters', () => setPersonalSubView('main'))}
 
                   <div className="space-y-5 text-xs">
                     <CustomSlider
@@ -2197,7 +2454,7 @@ export function SettingsApp() {
                       max={60}
                       value={blurAmount}
                       onChange={setBlurAmount}
-                      label="すりガラスのぼかし量 (Blur Amount)"
+                      label={isJa ? 'すりガラスのぼかし量' : 'Backdrop Blur Radius'}
                       valueText={`${blurAmount}px`}
                     />
                     <CustomSlider
@@ -2205,7 +2462,7 @@ export function SettingsApp() {
                       max={36}
                       value={cornerRadius}
                       onChange={setCornerRadius}
-                      label="ウィンドウ角丸 (Corner Radius)"
+                      label={isJa ? 'ウィンドウ角丸' : 'Window Corner Radius'}
                       valueText={`${cornerRadius}px`}
                     />
                     <CustomSlider
@@ -2213,7 +2470,7 @@ export function SettingsApp() {
                       max={95}
                       value={transparency}
                       onChange={setTransparency}
-                      label="透過率 (Transparency)"
+                      label={isJa ? 'サーフェス不透明度' : 'Surface Opacity'}
                       valueText={`${transparency}%`}
                     />
                     <CustomSlider
@@ -2221,7 +2478,7 @@ export function SettingsApp() {
                       max={100}
                       value={glassWobble}
                       onChange={setGlassWobble}
-                      label="液体ガラス屈折量 (Glass Refraction)"
+                      label={isJa ? '液体ガラス屈折量' : 'Liquid Glass Refraction'}
                       valueText={`${glassWobble}%`}
                     />
                   </div>
@@ -2240,41 +2497,47 @@ export function SettingsApp() {
               transition={{ duration: 0.15 }}
               className="max-w-4xl space-y-4"
             >
-              <div className="mb-4">
-                <h1 className="text-xl font-bold">Installed Apps (アプリ管理)</h1>
-                <p className="text-xs opacity-60">インストール済みシステムアプリおよびストアアプリの一覧と起動</p>
+              <div className="mb-5">
+                <h1 className="text-2xl font-bold tracking-tight">
+                  {isJa ? 'インストール済みアプリ' : 'Installed Apps'}
+                </h1>
+                <p className="text-xs opacity-50 mt-1">
+                  {isJa
+                    ? 'システム標準アプリおよび追加アプリの一覧とクイック起動'
+                    : 'View and launch installed system applications'}
+                </p>
               </div>
 
               <input
                 type="text"
                 value={appSearch}
                 onChange={(e) => setAppSearch(e.target.value)}
-                placeholder="アプリを検索..."
-                className={`w-full p-2.5 text-xs border-b outline-none ${
-                  isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-black/40 border-white/15 text-white'
+                placeholder={isJa ? 'アプリ名で検索...' : 'Search apps...'}
+                className={`w-full px-3.5 py-2.5 text-xs rounded-xl border outline-none ${
+                  isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-white/[0.03] border-white/[0.1] text-white'
                 }`}
               />
 
-              <div className={`divide-y border-y ${dividerClass}`}>
+              <div className={`${cardSurfaceClass} divide-y ${dividerClass}`}>
                 {installedApps
                   .filter((a) => !appSearch || a.name.toLowerCase().includes(appSearch.toLowerCase()))
                   .map((app) => (
-                    <div key={app.id} className="flex items-center justify-between py-3.5 px-3">
+                    <div key={app.id} className="flex items-center justify-between py-3.5 px-4">
                       <div className="flex items-center gap-3.5">
-                        <div className="p-2 bg-[var(--os-accent)]/15 text-[var(--os-accent)]">
-                          <Icon name={app.icon || 'AppWindow'} size={20} />
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-indigo-500/10 border border-white/15 text-[var(--os-accent)] flex items-center justify-center shrink-0">
+                          <Icon name={app.icon || 'AppWindow'} size={19} />
                         </div>
                         <div>
-                          <div className="text-xs font-bold">{app.name}</div>
-                          <div className="text-[11px] opacity-60">{app.description}</div>
+                          <div className="text-[13px] font-bold tracking-tight">{app.name}</div>
+                          <div className="text-[11px] opacity-50 mt-0.5">{app.description}</div>
                         </div>
                       </div>
                       <button
                         type="button"
                         onClick={() => openApp(app.appId as AppId)}
-                        className="px-3.5 py-1.5 bg-[var(--os-accent)] text-black text-xs font-bold shadow hover:brightness-110"
+                        className="px-3.5 py-1.5 rounded-xl bg-[var(--os-accent)] text-black text-xs font-bold shadow hover:brightness-110"
                       >
-                        開く
+                        {isJa ? '開く' : 'Open'}
                       </button>
                     </div>
                   ))}
@@ -2294,36 +2557,47 @@ export function SettingsApp() {
             >
               {accountsSubView === 'main' ? (
                 <>
-                  <div className="mb-4">
-                    <h1 className="text-xl font-bold">Accounts (アカウント設定)</h1>
-                    <p className="text-xs opacity-60">ユーザープロファイル、セキュリティPIN、権限グループの設定</p>
+                  <div className="mb-5">
+                    <h1 className="text-2xl font-bold tracking-tight">
+                      {isJa ? 'アカウント' : 'Accounts'}
+                    </h1>
+                    <p className="text-xs opacity-50 mt-1">
+                      {isJa
+                        ? 'ユーザープロファイル、セキュリティPIN、権限グループを管理します'
+                        : 'Manage user profile, security PIN, and permission groups'}
+                    </p>
                   </div>
 
-                  <div className={`divide-y border-y ${dividerClass}`}>
+                  <div className={`${cardSurfaceClass} divide-y ${dividerClass}`}>
                     <button
                       type="button"
                       onClick={() => {
                         playSound('click');
                         setAccountsSubView('profile');
                       }}
-                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${rowHoverClass}`}
+                      className={`w-full flex items-center justify-between py-4 px-4 transition text-left group ${rowHoverClass}`}
                     >
-                      <div className="flex items-center gap-3.5">
-                        <div className="p-2 bg-[var(--os-accent)]/15 text-[var(--os-accent)]">
-                          <Icon name="User" size={20} />
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/25 to-orange-500/10 border border-amber-400/30 text-amber-300 flex items-center justify-center shrink-0">
+                          <Icon name="User" size={19} />
                         </div>
                         <div>
-                          <div className="text-xs font-bold group-hover:text-[var(--os-accent)] transition-colors">
-                            ユーザープロファイル ＆ アバター写真
+                          <div className="text-[13px] font-bold tracking-tight group-hover:text-[var(--os-accent)] transition-colors">
+                            {isJa ? 'ユーザープロファイルとアバター' : 'User Profile & Avatar'}
                           </div>
-                          <div className="text-[11px] opacity-60">表示名、ユーザーアバターアイコン、権限グループ</div>
+                          <div className="text-[11px] opacity-50 mt-0.5">
+                            {isJa ? '表示名、アバターアイコン、権限グループの設定' : 'Display name, avatar icon, and role group'}
+                          </div>
                         </div>
                       </div>
-                      <Icon
-                        name="ChevronRight"
-                        size={16}
-                        className="opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition"
-                      />
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="text-[11px] font-medium opacity-45">{profileName}</span>
+                        <Icon
+                          name="ChevronRight"
+                          size={15}
+                          className="opacity-30 group-hover:opacity-90 group-hover:translate-x-0.5 transition"
+                        />
+                      </div>
                     </button>
 
                     <button
@@ -2332,23 +2606,25 @@ export function SettingsApp() {
                         playSound('click');
                         setAccountsSubView('security');
                       }}
-                      className={`w-full flex items-center justify-between py-3.5 px-3 transition text-left group ${rowHoverClass}`}
+                      className={`w-full flex items-center justify-between py-4 px-4 transition text-left group ${rowHoverClass}`}
                     >
-                      <div className="flex items-center gap-3.5">
-                        <div className="p-2 bg-[var(--os-accent)]/15 text-[var(--os-accent)]">
-                          <Icon name="Key" size={20} />
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/25 to-teal-500/10 border border-emerald-400/30 text-emerald-300 flex items-center justify-center shrink-0">
+                          <Icon name="Key" size={19} />
                         </div>
                         <div>
-                          <div className="text-xs font-bold group-hover:text-[var(--os-accent)] transition-colors">
-                            サインインオプション ＆ PINセキュリティ
+                          <div className="text-[13px] font-bold tracking-tight group-hover:text-[var(--os-accent)] transition-colors">
+                            {isJa ? 'サインインとPINセキュリティ' : 'Sign-In & PIN Security'}
                           </div>
-                          <div className="text-[11px] opacity-60">パスワード変更、セキュリティPINコード</div>
+                          <div className="text-[11px] opacity-50 mt-0.5">
+                            {isJa ? 'パスワード変更とロック解除PINコードの設定' : 'Password and 4-digit unlock PIN configuration'}
+                          </div>
                         </div>
                       </div>
                       <Icon
                         name="ChevronRight"
-                        size={16}
-                        className="opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition"
+                        size={15}
+                        className="opacity-30 group-hover:opacity-90 group-hover:translate-x-0.5 transition"
                       />
                     </button>
                   </div>
@@ -2356,7 +2632,7 @@ export function SettingsApp() {
               ) : accountsSubView === 'profile' ? (
                 /* ---------------- USER PROFILE & AVATARS ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('ユーザープロファイル ＆ アバター設定', () => setAccountsSubView('main'))}
+                  {renderBreadcrumbHeader('ユーザープロファイルとアバター', 'User Profile & Avatar', () => setAccountsSubView('main'))}
 
                   <form onSubmit={handleSaveAccount} className="space-y-5">
                     <div>
@@ -2464,30 +2740,34 @@ export function SettingsApp() {
               ) : (
                 /* ---------------- SECURITY & PIN ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('サインインオプション ＆ PINセキュリティ', () => setAccountsSubView('main'))}
+                  {renderBreadcrumbHeader('サインインとPINセキュリティ', 'Sign-In & PIN Security', () => setAccountsSubView('main'))}
 
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-xs font-semibold mb-1">ログインパスワード (Password)</label>
+                      <label className="block text-xs font-semibold mb-1">
+                        {isJa ? 'ログインパスワード' : 'Login Password'}
+                      </label>
                       <input
                         type="password"
                         value={profilePassword}
                         onChange={(e) => setProfilePassword(e.target.value)}
-                        placeholder="パスワードを入力"
-                        className={`w-full p-2.5 text-xs border-b outline-none ${
+                        placeholder={isJa ? 'パスワードを入力' : 'Enter password'}
+                        className={`w-full p-2.5 text-xs rounded-xl border outline-none ${
                           isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-black/40 border-white/15 text-white'
                         }`}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold mb-1">4桁セキュリティPINコード</label>
+                      <label className="block text-xs font-semibold mb-1">
+                        {isJa ? '4桁セキュリティPINコード' : '4-Digit Security PIN'}
+                      </label>
                       <input
                         type="text"
                         maxLength={4}
                         value={securityPin}
                         onChange={(e) => setSecurityPin(e.target.value)}
-                        className={`w-full p-2.5 text-xs font-mono border-b outline-none ${
+                        className={`w-full p-2.5 text-xs font-mono rounded-xl border outline-none ${
                           isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-black/40 border-white/15 text-white'
                         }`}
                       />
@@ -2498,11 +2778,11 @@ export function SettingsApp() {
                         type="button"
                         onClick={() => {
                           playSound('notify');
-                          addNotification({ title: 'Security', message: 'セキュリティPINコードを適用しました。' });
+                          addNotification({ title: 'Security', message: isJa ? 'セキュリティPINコードを適用しました。' : 'Security PIN updated.' });
                         }}
-                        className="px-4 py-2 bg-[var(--os-accent)] text-black text-xs font-bold shadow"
+                        className="px-4 py-2 rounded-xl bg-[var(--os-accent)] text-black text-xs font-bold shadow"
                       >
-                        PINを更新
+                        {isJa ? 'PINを更新' : 'Update PIN'}
                       </button>
                     </div>
                   </div>
