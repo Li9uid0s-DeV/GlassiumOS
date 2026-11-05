@@ -954,6 +954,122 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     });
   });
 
+  // -------------------------------------------------------------------------
+  // Live TMDB & Mapple Entertainment Search Endpoints
+  // -------------------------------------------------------------------------
+  app.get('/api/entertainment/search', async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const q = String(req.query.q || '').trim();
+    if (!q) {
+      res.json({ results: [] });
+      return;
+    }
+
+    try {
+      const tmdbKey = 'a07e22bc18f5cb106bfe4cc1f83ad8ed';
+      const searchUrl = `https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${encodeURIComponent(q)}&language=ja-JP&include_adult=false`;
+
+      const response = await fetch(searchUrl, { signal: AbortSignal.timeout(5000) });
+      if (!response.ok) {
+        res.json({ results: [] });
+        return;
+      }
+
+      const data = (await response.json()) as {
+        results?: Array<{
+          id: number;
+          media_type: string;
+          title?: string;
+          name?: string;
+          original_title?: string;
+          original_name?: string;
+          overview?: string;
+          poster_path?: string;
+          backdrop_path?: string;
+          release_date?: string;
+          first_air_date?: string;
+          vote_average?: number;
+        }>;
+      };
+
+      const items = data.results || [];
+      const formatted = items
+        .filter((it) => it.media_type === 'movie' || it.media_type === 'tv')
+        .slice(0, 16)
+        .map((it) => {
+          const isMovie = it.media_type === 'movie';
+          const title = it.title || it.name || 'Untitled';
+          const origTitle = it.original_title || it.original_name || title;
+          const dateStr = it.release_date || it.first_air_date;
+          const year = dateStr ? new Date(dateStr).getFullYear() || 2024 : 2024;
+          const rating = Number((it.vote_average || 8.0).toFixed(1));
+
+          const isAnime =
+            /[\u3040-\u30ff\u4e00-\u9faf]/.test(origTitle) ||
+            /anime|animation|アニメ|劇場版/i.test(title);
+
+          return {
+            id: `tmdb-${it.media_type}-${it.id}`,
+            title,
+            originalTitle: origTitle,
+            type: isMovie ? 'movie' : isAnime ? 'anime' : 'series',
+            year,
+            rating,
+            genre: isMovie
+              ? ['映画', 'SF', 'アクション']
+              : isAnime
+              ? ['アニメ', 'ファンタジー', '冒険']
+              : ['海外ドラマ', 'サスペンス', 'ドラマ'],
+            posterUrl: it.poster_path
+              ? `https://image.tmdb.org/t/p/w500${it.poster_path}`
+              : 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop&q=80',
+            backdropUrl: it.backdrop_path ? `https://image.tmdb.org/t/p/w1280${it.backdrop_path}` : undefined,
+            description: it.overview || '作品のあらすじ情報が準備中です。',
+            episodesCount: isMovie ? undefined : 24,
+            tmdbId: it.id,
+          };
+        });
+
+      res.json({ results: formatted });
+    } catch {
+      res.json({ results: [] });
+    }
+  });
+
+  app.get('/api/entertainment/tv', async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const tvId = String(req.query.id || '').trim();
+    if (!tvId) {
+      res.status(400).json({ error: 'Missing TV ID' });
+      return;
+    }
+
+    try {
+      const tmdbKey = 'a07e22bc18f5cb106bfe4cc1f83ad8ed';
+      const detailUrl = `https://api.themoviedb.org/3/tv/${tvId}?api_key=${tmdbKey}&language=ja-JP`;
+      const response = await fetch(detailUrl, { signal: AbortSignal.timeout(4000) });
+      if (!response.ok) {
+        res.json({ episodesCount: 12 });
+        return;
+      }
+
+      const data = (await response.json()) as {
+        number_of_episodes?: number;
+        number_of_seasons?: number;
+      };
+
+      res.json({
+        episodesCount: data.number_of_episodes || 12,
+        seasonsCount: data.number_of_seasons || 1,
+      });
+    } catch {
+      res.json({ episodesCount: 12 });
+    }
+  });
+
+  // -------------------------------------------------------------------------
+  // Music Streaming API Route
+  // -------------------------------------------------------------------------
   app.get('/api/music/play', async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
@@ -961,27 +1077,74 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     const title = String(req.query.title || '');
     const artist = String(req.query.artist || '');
 
-    const resolved = await resolveExactGdStudioStream(rawId, title, artist);
-    let targetStreamUrl = resolved?.url;
+    let targetStreamUrl: string | undefined;
 
-    // Fallback: If NetEase stream is not found, fetch official preview from iTunes Japan
-    if (!targetStreamUrl && (title || artist)) {
-      try {
+    // 1. Fast Promise.race between NetEase (2.5s timeout) and JioSaavn / iTunes
+    try {
+      const neteasePromise = resolveExactGdStudioStream(rawId, title, artist);
+      const fallbackPromise = (async () => {
         const queryTerm = `${title} ${artist}`.trim();
-        const itRes = await fetch(
-          `https://itunes.apple.com/search?term=${encodeURIComponent(queryTerm)}&country=JP&entity=song&limit=3`,
-          { signal: AbortSignal.timeout(4500) }
-        );
-        if (itRes.ok) {
-          const itData = (await itRes.json()) as { results?: Array<{ previewUrl?: string }> };
-          const pUrl = itData?.results?.find((r) => r.previewUrl)?.previewUrl;
-          if (pUrl) {
-            targetStreamUrl = pUrl;
+        if (!queryTerm) return null;
+
+        // Try JioSaavn
+        try {
+          const saavnRes = await fetch(
+            `https://saavn.dev/api/search/songs?query=${encodeURIComponent(queryTerm)}`,
+            { signal: AbortSignal.timeout(2200) }
+          );
+          if (saavnRes.ok) {
+            const saavnData = (await saavnRes.json()) as {
+              data?: { results?: Array<{ downloadUrl?: Array<{ link?: string }> }> };
+            };
+            const links = saavnData?.data?.results?.[0]?.downloadUrl;
+            if (Array.isArray(links) && links.length > 0) {
+              const bestLink = links[links.length - 1]?.link || links[0]?.link;
+              if (bestLink) return bestLink.replace(/^http:\/\//i, 'https://');
+            }
+          }
+        } catch {
+          // ignore
+        }
+
+        // Try iTunes Preview
+        try {
+          const itRes = await fetch(
+            `https://itunes.apple.com/search?term=${encodeURIComponent(queryTerm)}&country=JP&entity=song&limit=3`,
+            { signal: AbortSignal.timeout(2200) }
+          );
+          if (itRes.ok) {
+            const itData = (await itRes.json()) as { results?: Array<{ previewUrl?: string }> };
+            const pUrl = itData?.results?.find((r) => r.previewUrl)?.previewUrl;
+            if (pUrl) return pUrl;
+          }
+        } catch {
+          // ignore
+        }
+
+        return null;
+      })();
+
+      const resolvedNetEase = await Promise.race([
+        neteasePromise,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+      ]);
+
+      if (resolvedNetEase?.url) {
+        targetStreamUrl = resolvedNetEase.url;
+      } else {
+        const fbUrl = await fallbackPromise;
+        if (fbUrl) {
+          targetStreamUrl = fbUrl;
+        } else {
+          // Final attempt to wait for NetEase if fallback didn't return
+          const lateNetEase = await neteasePromise;
+          if (lateNetEase?.url) {
+            targetStreamUrl = lateNetEase.url;
           }
         }
-      } catch {
-        // ignore
       }
+    } catch {
+      // ignore
     }
 
     if (!targetStreamUrl) {

@@ -437,9 +437,68 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
 
   const isWatchlisted = (id: string) => watchlist.includes(id);
 
-  // Filter media based on tab, genre, and search
+  const [onlineSearchResults, setOnlineSearchResults] = useState<MediaItem[]>([]);
+  const [isSearchingOnline, setIsSearchingOnline] = useState(false);
+
+  // Debounced live TMDB / Mapple search fetch
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setOnlineSearchResults([]);
+      setIsSearchingOnline(false);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingOnline(true);
+      try {
+        const res = await fetch(`./api/entertainment/search?q=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          const data = (await res.json()) as { results?: MediaItem[] };
+          if (Array.isArray(data.results) && data.results.length > 0) {
+            setOnlineSearchResults(data.results);
+            if (!isPlayingCinema) {
+              setSelectedMedia(data.results[0]);
+              setCurrentEpisode(1);
+            }
+          }
+        }
+      } catch {
+        // ignore
+      } finally {
+        setIsSearchingOnline(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, isPlayingCinema]);
+
+  // Fetch TV episodes count when selected media changes
+  useEffect(() => {
+    if (selectedMedia && selectedMedia.type !== 'movie' && selectedMedia.tmdbId) {
+      fetch(`./api/entertainment/tv?id=${selectedMedia.tmdbId}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data?.episodesCount) {
+            setSelectedMedia((prev) => (prev ? { ...prev, episodesCount: data.episodesCount } : prev));
+          }
+        })
+        .catch(() => {});
+    }
+  }, [selectedMedia?.tmdbId, selectedMedia?.type]);
+
+  // Filter media based on tab, genre, and search (combining local catalog + live TMDB search)
   const filteredCatalog = useMemo(() => {
-    let list = CURATED_MEDIA_CATALOG;
+    let list = [...onlineSearchResults, ...CURATED_MEDIA_CATALOG];
+    // Deduplicate by tmdbId or title
+    const seen = new Set<string>();
+    list = list.filter((m) => {
+      const key = m.tmdbId ? `tmdb-${m.tmdbId}` : m.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
     if (activeTab === 'movies') {
       list = list.filter((m) => m.type === 'movie' || m.type === 'series');
     } else if (activeTab === 'anime') {
@@ -451,7 +510,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     }
 
     const q = searchQuery.trim().toLowerCase();
-    if (q) {
+    if (q && onlineSearchResults.length === 0) {
       list = list.filter(
         (m) =>
           m.title.toLowerCase().includes(q) ||
@@ -461,7 +520,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
       );
     }
     return list;
-  }, [activeTab, selectedGenre, searchQuery]);
+  }, [onlineSearchResults, activeTab, selectedGenre, searchQuery]);
 
   // Compute embed URL for current player & provider (mapple.fun, StreameX, FlixHD, Maple TV, YouTube)
   const currentEmbedUrl = useMemo(() => {
@@ -799,9 +858,22 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="映画・ドラマ・アニメ名、ジャンルで検索..."
-                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-rose-500/60 focus:bg-white/10 transition"
+                  placeholder="映画・ドラマ・アニメ名 (TMDB/mapple.fun リアルタイム検索)..."
+                  className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-rose-500/60 focus:bg-white/10 transition"
                 />
+                {isSearchingOnline && (
+                  <span className="material-symbols-rounded absolute right-3 top-1/2 -translate-y-1/2 text-rose-400 text-sm animate-spin">
+                    progress_activity
+                  </span>
+                )}
+                {!isSearchingOnline && searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition"
+                  >
+                    <span className="material-symbols-rounded text-sm">close</span>
+                  </button>
+                )}
               </div>
 
               {/* Genre Pills */}
