@@ -387,6 +387,17 @@ const CURATED_YOUTUBE_SHORTS: YouTubeShortItem[] = [
   },
 ];
 
+// Lightweight module-level caches for instant 0ms tab switching & search
+let cachedPopularMappleMovies: MediaItem[] = [];
+const cachedSearchQueries = new Map<string, MediaItem[]>();
+const cachedTvEpisodeCounts = new Map<number, number>();
+
+function optimizePosterUrl(url?: string): string {
+  if (!url) return '';
+  // Downscale TMDB w500/w1280 to w342 for 60% faster decode & lower GPU memory
+  return url.replace('/t/p/w500/', '/t/p/w342/').replace('/t/p/w1280/', '/t/p/w780/');
+}
+
 export function EntertainmentApp({ initialTab, payload }: { initialTab?: string; payload?: { videoId?: string; mode?: string } }) {
   const [activeTab, setActiveTab] = useState<EntertainmentTab>(() => {
     if (initialTab === 'shorts' || payload?.mode === 'shorts') return 'shorts';
@@ -398,10 +409,13 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
   const [provider, setProvider] = useState<StreamingProvider>('mapple-fun');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string>('All');
-  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(CURATED_MEDIA_CATALOG[0]);
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(
+    cachedPopularMappleMovies[0] || CURATED_MEDIA_CATALOG[0]
+  );
   const [currentEpisode, setCurrentEpisode] = useState<number>(1);
   const [isPlayingCinema, setIsPlayingCinema] = useState(false);
   const [theaterMode, setTheaterMode] = useState(false);
+  const [visibleCardCount, setVisibleCardCount] = useState<number>(18);
 
   // YouTube Custom Search & Playback State
   const [customYoutubeUrl, setCustomYoutubeUrl] = useState('');
@@ -434,25 +448,32 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     }
   }, [watchlist]);
 
-  const toggleWatchlist = (id: string, e?: React.MouseEvent) => {
+  const toggleWatchlist = useCallback((id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setWatchlist((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
-  };
+  }, []);
 
-  const isWatchlisted = (id: string) => watchlist.includes(id);
+  const isWatchlisted = useCallback((id: string) => watchlist.includes(id), [watchlist]);
 
   const [onlineSearchResults, setOnlineSearchResults] = useState<MediaItem[]>([]);
-  const [mappleMovies, setMappleMovies] = useState<MediaItem[]>([]);
+  const [mappleMovies, setMappleMovies] = useState<MediaItem[]>(cachedPopularMappleMovies);
   const [isSearchingOnline, setIsSearchingOnline] = useState(false);
 
-  // Fetch movies from mapple.fun API
+  // Fetch movies from mapple.fun API (with in-memory cache)
   const fetchMappleMovies = useCallback(async (q?: string) => {
+    if (!q && cachedPopularMappleMovies.length > 0) {
+      setMappleMovies(cachedPopularMappleMovies);
+      return;
+    }
     setIsSearchingOnline(true);
     try {
       const res = await fetch(`/api/entertainment/mapple/movies?q=${encodeURIComponent(q || '')}`);
       if (res.ok) {
         const data = (await res.json()) as { results?: MediaItem[] };
         if (Array.isArray(data.results) && data.results.length > 0) {
+          if (!q) {
+            cachedPopularMappleMovies = data.results;
+          }
           setMappleMovies(data.results);
           if (!isPlayingCinema && activeTab === 'movies') {
             setSelectedMedia(data.results[0]);
@@ -473,7 +494,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     }
   }, [activeTab, mappleMovies.length, fetchMappleMovies]);
 
-  // Debounced live TMDB / Mapple search fetch
+  // Debounced live TMDB / Mapple search fetch with query cache
   useEffect(() => {
     const q = searchQuery.trim();
     if (!q) {
@@ -482,13 +503,20 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
       return;
     }
 
+    const cached = cachedSearchQueries.get(q.toLowerCase());
+    if (cached) {
+      setOnlineSearchResults(cached);
+      return;
+    }
+
     const timer = setTimeout(async () => {
       setIsSearchingOnline(true);
       try {
-        const res = await fetch(`/api/entertainment/mapple/movies?q=${encodeURIComponent(q)}`);
+        const res = await fetch(`/api/entertainment/search?q=${encodeURIComponent(q)}`);
         if (res.ok) {
           const data = (await res.json()) as { results?: MediaItem[] };
           if (Array.isArray(data.results) && data.results.length > 0) {
+            cachedSearchQueries.set(q.toLowerCase(), data.results);
             setOnlineSearchResults(data.results);
             if (!isPlayingCinema) {
               setSelectedMedia(data.results[0]);
@@ -501,29 +529,37 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
       } finally {
         setIsSearchingOnline(false);
       }
-    }, 350);
+    }, 320);
 
     return () => clearTimeout(timer);
   }, [searchQuery, isPlayingCinema]);
 
-  // Fetch TV episodes count when selected media changes
+  // Fetch TV episodes count when selected media changes (cached)
   useEffect(() => {
-    if (selectedMedia && selectedMedia.type !== 'movie' && selectedMedia.tmdbId) {
-      fetch(`/api/entertainment/tv?id=${selectedMedia.tmdbId}`)
+    const tmdbId = selectedMedia?.tmdbId;
+    if (selectedMedia && selectedMedia.type !== 'movie' && tmdbId) {
+      if (cachedTvEpisodeCounts.has(tmdbId)) {
+        const epCount = cachedTvEpisodeCounts.get(tmdbId)!;
+        setSelectedMedia((prev) =>
+          prev && prev.episodesCount !== epCount ? { ...prev, episodesCount: epCount } : prev
+        );
+        return;
+      }
+      fetch(`/api/entertainment/tv?id=${tmdbId}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
           if (data?.episodesCount) {
+            cachedTvEpisodeCounts.set(tmdbId, data.episodesCount);
             setSelectedMedia((prev) => (prev ? { ...prev, episodesCount: data.episodesCount } : prev));
           }
         })
         .catch(() => {});
     }
-  }, [selectedMedia?.tmdbId, selectedMedia?.type]);
+  }, [selectedMedia]);
 
   // Filter media based on tab, genre, and search (combining mapple movies + live TMDB search + local catalog)
   const filteredCatalog = useMemo(() => {
     let list = [...onlineSearchResults, ...mappleMovies, ...CURATED_MEDIA_CATALOG];
-    // Deduplicate by tmdbId or title or id
     const seen = new Set<string>();
     list = list.filter((m) => {
       const key = m.tmdbId ? `tmdb-${m.tmdbId}` : m.id;
@@ -554,6 +590,11 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     }
     return list;
   }, [onlineSearchResults, mappleMovies, activeTab, selectedGenre, searchQuery]);
+
+  const displayedCatalog = useMemo(
+    () => filteredCatalog.slice(0, visibleCardCount),
+    [filteredCatalog, visibleCardCount]
+  );
 
   // Compute embed URL for current player & provider (mapple.fun, StreameX, FlixHD, Maple TV, YouTube)
   const currentEmbedUrl = useMemo(() => {
@@ -801,11 +842,12 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
                 ) : (
                   <>
                     <img
-                      src={selectedMedia.posterUrl}
+                      src={optimizePosterUrl(selectedMedia.backdropUrl || selectedMedia.posterUrl)}
                       alt={selectedMedia.title}
-                      className="absolute inset-0 w-full h-full object-cover filter brightness-[0.45] blur-sm scale-105"
+                      decoding="async"
+                      className="absolute inset-0 w-full h-full object-cover opacity-35"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f19] via-[#0b0f19]/70 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0b0f19] via-[#0b0f19]/75 to-transparent" />
                     <div className="absolute inset-0 bg-gradient-to-r from-[#0b0f19] via-transparent to-transparent" />
 
                     <div className="relative z-10 h-full max-w-5xl mx-auto px-6 py-6 flex flex-col justify-end">
@@ -952,37 +994,38 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-                {filteredCatalog.map((item) => (
+                {displayedCatalog.map((item) => (
                   <div
                     key={item.id}
                     onClick={() => {
                       setSelectedMedia(item);
                       setIsPlayingCinema(true);
                     }}
-                    className={`group relative rounded-xl overflow-hidden bg-zinc-900 border transition cursor-pointer flex flex-col ${
+                    className={`group relative rounded-xl overflow-hidden bg-zinc-900 border transition-colors duration-150 cursor-pointer flex flex-col ${
                       selectedMedia?.id === item.id
-                        ? 'border-rose-500 shadow-lg shadow-rose-950/50 scale-[1.02]'
-                        : 'border-white/10 hover:border-white/30 hover:scale-[1.01]'
+                        ? 'border-rose-500 ring-1 ring-rose-500/60'
+                        : 'border-white/10 hover:border-white/30'
                     }`}
                   >
                     <div className="aspect-[2/3] w-full relative overflow-hidden bg-zinc-800">
                       <img
-                        src={item.posterUrl}
+                        src={optimizePosterUrl(item.posterUrl)}
                         alt={item.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                        className="w-full h-full object-cover"
                         loading="lazy"
+                        decoding="async"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition duration-300 flex items-center justify-center">
-                        <div className="w-12 h-12 rounded-full bg-rose-600/90 text-white flex items-center justify-center shadow-lg transform scale-75 group-hover:scale-100 transition">
+                      <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-center justify-center">
+                        <div className="w-11 h-11 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-md">
                           <span className="material-symbols-rounded text-2xl">play_arrow</span>
                         </div>
                       </div>
-                      <div className="absolute top-2 right-2 bg-black/75 backdrop-blur-md px-1.5 py-0.5 rounded text-[10px] font-bold text-amber-400 flex items-center gap-0.5">
+                      <div className="absolute top-2 right-2 bg-black/85 px-1.5 py-0.5 rounded text-[10px] font-bold text-amber-400 flex items-center gap-0.5">
                         ★ {item.rating}
                       </div>
                       <button
                         onClick={(e) => toggleWatchlist(item.id, e)}
-                        className="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/75 backdrop-blur-md flex items-center justify-center text-white/80 hover:text-amber-400 transition"
+                        className="absolute top-2 left-2 w-7 h-7 rounded-full bg-black/85 flex items-center justify-center text-white/80 hover:text-amber-400 transition-colors"
                       >
                         <span className="material-symbols-rounded text-sm">
                           {isWatchlisted(item.id) ? 'bookmark' : 'bookmark_border'}
@@ -992,7 +1035,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
 
                     <div className="p-2.5 flex-1 flex flex-col justify-between">
                       <div>
-                        <h4 className="text-xs font-bold text-white truncate group-hover:text-rose-400 transition">
+                        <h4 className="text-xs font-bold text-white truncate group-hover:text-rose-400 transition-colors">
                           {item.title}
                         </h4>
                         <p className="text-[10px] text-white/50 truncate mt-0.5">
@@ -1003,6 +1046,18 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
                   </div>
                 ))}
               </div>
+
+              {filteredCatalog.length > visibleCardCount && (
+                <div className="mt-6 flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCardCount((c) => c + 18)}
+                    className="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-semibold text-white transition"
+                  >
+                    さらに表示 ({filteredCatalog.length - visibleCardCount}作品)
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -1899,9 +1899,27 @@ export function Desktop() {
                     <span className="text-xs font-bold text-white tracking-tight truncate">
                       {musicState.title || 'Playing Track'}
                     </span>
-                    <span className="text-[11px] text-white/75 truncate">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openApp('synth', { payload: { tab: 'artist' } });
+                        setTimeout(() => {
+                          window.dispatchEvent(
+                            new CustomEvent('glassium-music-command', {
+                              detail: {
+                                action: 'open-artist',
+                                artist: musicState.artist || 'YOASOBI',
+                              },
+                            })
+                          );
+                        }, 80);
+                      }}
+                      className="text-[11px] text-white/85 hover:text-[#fa243c] hover:underline truncate font-semibold"
+                      title="アーティストページを開く"
+                    >
                       · {musicState.artist || 'Official Artist'}
-                    </span>
+                    </button>
                   </div>
                   {musicState.lyricLine ? (
                     <span className="text-[10px] text-white/90 font-medium truncate block">

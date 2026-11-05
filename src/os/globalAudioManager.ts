@@ -198,6 +198,14 @@ class GlobalAudioManager {
     return { ...this.state };
   }
 
+  public getAudioElement(): HTMLAudioElement {
+    return this.audio;
+  }
+
+  public getCurrentTime(): number {
+    return Number.isFinite(this.audio.currentTime) ? this.audio.currentTime : this.state.currentTime;
+  }
+
   public subscribe(listener: AudioListener): () => void {
     this.listeners.add(listener);
     listener(this.getState());
@@ -209,54 +217,47 @@ class GlobalAudioManager {
   private updateState(partial: Partial<GlobalAudioState>) {
     this.state = { ...this.state, ...partial };
     this.listeners.forEach((l) => l(this.getState()));
-
-    // Broadcast OS state event for Desktop Now Playing pill
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(
-        new CustomEvent('glassium-music-state', {
-          detail: {
-            isPlaying: this.state.isPlaying,
-            title: this.state.track?.title,
-            artist: this.state.track?.artist,
-            album: this.state.track?.album,
-            artworkUrl: this.state.track?.artworkUrl || '',
-            coverGradient: this.state.track?.coverGradient,
-            currentTime: this.state.currentTime,
-            duration: this.state.duration || this.state.track?.duration || 0,
-            lyricLine: '',
-          },
-        })
-      );
-    }
   }
 
   public async playTrack(track: MonochromeTrack, startAtSec = 0): Promise<void> {
     this.pendingTrack = track;
 
-    // Safely interrupt ongoing playback promise
-    if (this.playPromise) {
-      try {
-        await this.playPromise;
-      } catch {
-        // ignore interrupted play
-      }
-    }
-
-    // Check if target track changed
-    if (this.pendingTrack !== track) return;
+    const cleanArtist = (track.artist || '')
+      .replace(/\s*(?:作曲|作詞|編曲|feat\.|ft\.|with|prod\.).*$/i, '')
+      .split(/[,、/]/)[0]
+      .trim() || track.artist;
 
     // Build streaming proxy URL
     const resolvedUrl =
-      track.audioUrl && !track.audioUrl.includes('saavncdn.com') && !track.audioUrl.includes('itunes.apple.com')
+      track.audioUrl &&
+      !track.audioUrl.includes('saavncdn.com') &&
+      !track.audioUrl.includes('itunes.apple.com')
         ? track.audioUrl
-        : `/api/music/play?id=${encodeURIComponent(track.monoTrackId || track.id)}&title=${encodeURIComponent(
-            track.title
-          )}&artist=${encodeURIComponent(track.artist)}`;
+        : `/api/music/play?id=${encodeURIComponent(
+            track.monoTrackId || track.id
+          )}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(cleanArtist)}`;
 
-    this.audio.pause();
+    // Synchronously set src and trigger play() within the user gesture tick
+    try {
+      this.audio.pause();
+    } catch {
+      // ignore
+    }
     this.audio.src = resolvedUrl;
     this.audio.volume = this.state.isMuted ? 0 : this.state.volume;
     this.audio.playbackRate = this.state.playbackRate;
+
+    if (startAtSec > 0.5) {
+      const onLoaded = () => {
+        try {
+          this.audio.currentTime = startAtSec;
+        } catch {
+          // ignore
+        }
+        this.audio.removeEventListener('loadedmetadata', onLoaded);
+      };
+      this.audio.addEventListener('loadedmetadata', onLoaded);
+    }
 
     this.updateState({
       track,
@@ -264,42 +265,93 @@ class GlobalAudioManager {
       duration: track.duration,
       isBuffering: true,
       error: null,
-      statusMessage: `Playing: ${track.title} — ${track.artist}`,
+      statusMessage: `再生中: ${track.title} — ${cleanArtist}`,
     });
 
     this.syncMediaSessionMetadata(track);
 
     try {
-      this.audio.currentTime = startAtSec;
       this.playPromise = this.audio.play();
       await this.playPromise;
       this.playPromise = null;
-      this.updateState({ isPlaying: true, isBuffering: false });
+      if (this.pendingTrack === track) {
+        this.updateState({
+          isPlaying: true,
+          isBuffering: false,
+          error: null,
+          statusMessage: `再生中: ${track.title} — ${cleanArtist}`,
+        });
+      }
+      return;
     } catch (err: unknown) {
       this.playPromise = null;
-      const errorMsg = (err as Error)?.message || 'Playback blocked or failed';
-      console.warn('GlobalAudio play failed:', errorMsg);
+      // Ignore AbortError caused by rapid track switching
+      if ((err as Error)?.name === 'AbortError' || this.pendingTrack !== track) {
+        return;
+      }
+      console.warn('Primary stream play retry:', (err as Error)?.message);
+    }
 
-      // Attempt retry with proxy=1 flag if initial call failed
-      if (resolvedUrl.includes('/api/music/play') && !resolvedUrl.includes('proxy=1')) {
-        try {
-          this.audio.src = `${resolvedUrl}&proxy=1`;
-          this.audio.currentTime = startAtSec;
-          this.playPromise = this.audio.play();
-          await this.playPromise;
-          this.playPromise = null;
-          this.updateState({ isPlaying: true, isBuffering: false });
+    // Automatic Fallback 1: Retry via /api/music/play with cache-busting fallback flag
+    if (this.pendingTrack === track) {
+      try {
+        const retryUrl = `/api/music/play?title=${encodeURIComponent(
+          track.title
+        )}&artist=${encodeURIComponent(cleanArtist)}&fallback=1&t=${Date.now()}`;
+        this.audio.src = retryUrl;
+        this.playPromise = this.audio.play();
+        await this.playPromise;
+        this.playPromise = null;
+        this.updateState({
+          isPlaying: true,
+          isBuffering: false,
+          error: null,
+          statusMessage: `再生中: ${track.title} — ${cleanArtist}`,
+        });
+        return;
+      } catch (err2: unknown) {
+        this.playPromise = null;
+        if ((err2 as Error)?.name === 'AbortError' || this.pendingTrack !== track) {
           return;
-        } catch {
-          // fallback failed
         }
       }
+    }
 
+    // Automatic Fallback 2: Direct client-side iTunes JP/US AAC stream resolution
+    if (this.pendingTrack === track) {
+      try {
+        const q = `${track.title} ${cleanArtist}`.trim();
+        const itRes = await fetch(
+          `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&country=JP&entity=song&limit=3`
+        );
+        if (itRes.ok) {
+          const itData = (await itRes.json()) as { results?: Array<{ previewUrl?: string }> };
+          const directPreview = itData?.results?.find((r) => r.previewUrl)?.previewUrl;
+          if (directPreview && this.pendingTrack === track) {
+            this.audio.src = directPreview;
+            this.playPromise = this.audio.play();
+            await this.playPromise;
+            this.playPromise = null;
+            this.updateState({
+              isPlaying: true,
+              isBuffering: false,
+              error: null,
+              statusMessage: `再生中: ${track.title} — ${cleanArtist}`,
+            });
+            return;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    if (this.pendingTrack === track) {
       this.updateState({
         isPlaying: false,
         isBuffering: false,
-        error: errorMsg,
-        statusMessage: `Playback issue: Click play to start`,
+        error: null,
+        statusMessage: `${track.title} — 再生ボタンを押して開始`,
       });
     }
   }
@@ -315,33 +367,33 @@ class GlobalAudioManager {
   }
 
   public pause(): void {
-    if (this.playPromise) {
-      this.playPromise
-        .then(() => {
-          this.audio.pause();
-          this.updateState({ isPlaying: false });
-        })
-        .catch(() => {
-          this.audio.pause();
-          this.updateState({ isPlaying: false });
-        });
-    } else {
+    try {
       this.audio.pause();
-      this.updateState({ isPlaying: false });
+    } catch {
+      // ignore
     }
+    this.playPromise = null;
+    this.updateState({ isPlaying: false });
   }
 
   public async resume(): Promise<void> {
     if (!this.state.track) return;
+    if (!this.audio.src) {
+      await this.playTrack(this.state.track, this.state.currentTime);
+      return;
+    }
     try {
       this.playPromise = this.audio.play();
       await this.playPromise;
       this.playPromise = null;
-      this.updateState({ isPlaying: true });
-    } catch (err) {
+      this.updateState({
+        isPlaying: true,
+        isBuffering: false,
+        error: null,
+      });
+    } catch {
       this.playPromise = null;
-      console.warn('Resume failed:', err);
-      this.updateState({ isPlaying: false });
+      await this.playTrack(this.state.track, this.state.currentTime);
     }
   }
 

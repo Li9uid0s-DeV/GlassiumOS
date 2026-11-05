@@ -38,7 +38,8 @@ type AppleMusicNavId =
 
 export interface MusicVideoItem {
   id: string;
-  youtubeId: string;
+  youtubeId?: string;
+  videoUrl?: string;
   title: string;
   artist: string;
   album?: string;
@@ -56,7 +57,17 @@ export interface ArtistProfileData {
   bio: string;
   bannerGradient: string;
   avatarUrl: string;
+  bannerUrl?: string;
   mvs: MusicVideoItem[];
+}
+
+function cleanPrimaryArtistName(rawArtist: string): string {
+  if (!rawArtist) return 'YOASOBI';
+  const cleaned = rawArtist
+    .replace(/\s*[,、/／]?\s*(?:作曲|作詞|編曲)\s*[:：].*$/i, '')
+    .split(/\s*[,、]\s*/)[0]
+    .trim();
+  return cleaned || rawArtist.trim();
 }
 
 const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
@@ -273,8 +284,9 @@ const ARTIST_METADATA_MAP: Record<
 };
 
 function resolveMvForTrack(track: MonochromeTrack): MusicVideoItem {
+  const cleanArtist = cleanPrimaryArtistName(track.artist);
   const titleLower = track.title.toLowerCase();
-  const artistLower = track.artist.toLowerCase();
+  const artistLower = cleanArtist.toLowerCase();
   const exact = OFFICIAL_MV_CATALOG.find(
     (m) =>
       m.title.toLowerCase().includes(titleLower) ||
@@ -282,29 +294,13 @@ function resolveMvForTrack(track: MonochromeTrack): MusicVideoItem {
       (m.artist.toLowerCase() === artistLower && titleLower.includes(m.title.toLowerCase()))
   );
   if (exact) return exact;
-  const byArtist = OFFICIAL_MV_CATALOG.find(
-    (m) =>
-      artistLower.includes(m.artist.toLowerCase()) ||
-      m.artist.toLowerCase().includes(artistLower)
-  );
-  if (byArtist) {
-    return {
-      ...byArtist,
-      id: `mv-track-${track.id}`,
-      title: `${track.title} (${track.artist} Official MV)`,
-      artist: track.artist,
-      album: track.album,
-      thumbnailUrl: track.artworkUrl,
-    };
-  }
   return {
     id: `mv-track-${track.id}`,
-    youtubeId: 'ZRtdQ81jPUQ',
     title: `${track.title} — Official Music Video`,
-    artist: track.artist,
+    artist: cleanArtist,
     album: track.album,
     durationLabel: '3:45',
-    viewsLabel: '公式MV',
+    viewsLabel: 'Monochrome Official MV',
     year: 2024,
     thumbnailUrl: track.artworkUrl,
   };
@@ -318,7 +314,7 @@ function resolveInitialNav(tab?: string): AppleMusicNavId {
   if (tab === 'monochrome-web') return 'monochrome-web';
   if (tab === 'synth') return 'synth';
   if (tab === 'proxy') return 'proxy';
-  return 'listen-now';
+  return 'browse';
 }
 
 const INITIAL_ENRICHED_CATALOG: MonochromeTrack[] = MONOCHROME_CATALOG.map((t) => ({
@@ -379,9 +375,14 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const { openApp } = useOS();
 
   const [activeNav, setActiveNav] = useState<AppleMusicNavId>(() => resolveInitialNav(initialTab));
-  const [showLyricsDrawer, setShowLyricsDrawer] = useState<boolean>(true);
+  const [showLyricsDrawer, setShowLyricsDrawer] = useState<boolean>(false);
+  const [isArtworkMaximized, setIsArtworkMaximized] = useState<boolean>(false);
   const [selectedArtistName, setSelectedArtistName] = useState<string>('YOASOBI');
+  const [liveArtistProfile, setLiveArtistProfile] = useState<ArtistProfileData | null>(null);
+  const [isFetchingArtist, setIsFetchingArtist] = useState<boolean>(false);
   const [activeMvItem, setActiveMvItem] = useState<MusicVideoItem>(OFFICIAL_MV_CATALOG[0]);
+  const [liveMvCatalog, setLiveMvCatalog] = useState<MusicVideoItem[]>(OFFICIAL_MV_CATALOG);
+  const [isFetchingMv, setIsFetchingMv] = useState<boolean>(false);
   const [customMvYoutubeInput, setCustomMvYoutubeInput] = useState<string>('');
 
   useEffect(() => {
@@ -510,8 +511,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const [harmonics, setHarmonics] = useState(3);
   const [filterCutoff, setFilterCutoff] = useState(1400);
 
-  // Audio Element, Context & Nodes Refs
-  const audioElRef = useRef<HTMLAudioElement | null>(null);
+  // Audio Context & Nodes Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
@@ -713,9 +713,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       }
     });
     oscNodesRef.current = [];
-    if (audioElRef.current) {
-      audioElRef.current.pause();
-    }
   }, []);
 
   // Fetch Synchronized Lyrics from /api/music/lyrics / GDStudio / LRCLIB
@@ -903,8 +900,13 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             loadLyricsForTrack(enrichedLive[0]);
           }
 
-          if (activeNav !== 'songs' && activeNav !== 'browse' && activeNav !== 'listen-now') {
-            setActiveNav('songs');
+          if (
+            activeNav !== 'songs' &&
+            activeNav !== 'browse' &&
+            activeNav !== 'listen-now' &&
+            activeNav !== 'artist'
+          ) {
+            setActiveNav('browse');
           }
           setStatusBanner(
             `"${q}" の検索結果: ${enrichedLive.length} 曲 — クリックするとその曲がフル尺再生されます`
@@ -1166,13 +1168,18 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
   useEffect(() => {
     const onMusicCommand = (e: Event) => {
-      const cmd = (e as CustomEvent<{ action?: string }>).detail?.action;
+      const detail = (e as CustomEvent<{ action?: string; artist?: string }>).detail;
+      const cmd = detail?.action;
       if (cmd === 'toggle-play') {
         togglePlay();
       } else if (cmd === 'next') {
         nextTrack();
       } else if (cmd === 'prev') {
         prevTrack();
+      } else if (cmd === 'open-artist' && detail?.artist) {
+        const clean = cleanPrimaryArtistName(detail.artist);
+        setSelectedArtistName(clean);
+        setActiveNav('artist');
       }
     };
     window.addEventListener('glassium-music-command', onMusicCommand);
@@ -1181,7 +1188,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
   // -----------------------------------------------------------------------
   // 60fps High-Precision requestAnimationFrame Lyric & Audio Sync Engine
-  // (Runs ONLY while isPlaying is true; stops immediately on pause)
+  // Reads directly from globalAudio.getAudioElement() so currentTime advances smoothly
   // -----------------------------------------------------------------------
   useEffect(() => {
     if (!isPlaying) {
@@ -1198,18 +1205,17 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       const dtSec = Math.max(0, Math.min(0.1, (now - lastFramePerfRef.current) / 1000));
       lastFramePerfRef.current = now;
 
-      const audio = audioElRef.current;
+      const audio = globalAudio.getAudioElement();
       const targetFullDuration = Math.max(60, currentTrack.duration || 210);
       let activeSec = fullPlayheadRef.current;
 
-      // Read directly from HTML5 <audio> element at 60fps when streaming a track
+      // Read directly from GlobalAudioManager's HTML5 <audio> element at 60fps
       if (currentTrack.audioUrl && audio) {
         if (!audio.paused && Number.isFinite(audio.currentTime)) {
           activeSec = audio.currentTime;
           fullPlayheadRef.current = activeSec;
         } else {
-          // While buffering or holding, keep the stable current playhead
-          activeSec = fullPlayheadRef.current;
+          activeSec = globalAudio.getCurrentTime() || fullPlayheadRef.current;
         }
       } else {
         activeSec += dtSec * playbackRate;
@@ -1259,15 +1265,12 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         }
       }
 
-      // Advance only when audio has truly completed (audio.ended is true) or time exceeded
       if (audio && audio.ended) {
         if (isRepeat) {
           fullPlayheadRef.current = 0;
           setCurrentTime(0);
-          if (currentTrack.audioUrl) {
-            audio.currentTime = 0;
-            audio.play().catch(() => {});
-          }
+          globalAudio.seek(0);
+          globalAudio.resume();
         } else {
           nextTrack();
           return;
@@ -1289,16 +1292,14 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     };
   }, [isPlaying, currentTrack, isRepeat, lyricOffsetSec, nextTrack, playbackRate]);
 
-  // Volume, Mute & PlaybackRate adjustments
+  // Volume, Mute & PlaybackRate adjustments on GlobalAudioManager
   useEffect(() => {
     const targetGain = isMuted ? 0 : volume;
     if (masterGainRef.current && audioCtxRef.current) {
       masterGainRef.current.gain.setValueAtTime(targetGain, audioCtxRef.current.currentTime);
     }
-    if (audioElRef.current) {
-      audioElRef.current.volume = targetGain;
-      audioElRef.current.playbackRate = playbackRate;
-    }
+    globalAudio.setVolume(targetGain);
+    globalAudio.setPlaybackRate(playbackRate);
   }, [volume, isMuted, playbackRate]);
 
   // Synth parameter live updates
@@ -1727,61 +1728,188 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   };
 
   // -----------------------------------------------------------------------
-  // Open Official MV or Artist Page Helpers
+  // Open Official MV or Artist Page Helpers (Fetches real Monochrome / Deezer / iTunes data)
   // -----------------------------------------------------------------------
+  const fetchLiveMvsForQuery = useCallback(async (title: string, artist: string, switchActive = true) => {
+    const cleanArtist = cleanPrimaryArtistName(artist);
+    setIsFetchingMv(true);
+    try {
+      const resp = await fetch(
+        `/api/music/mv?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(cleanArtist)}&q=${encodeURIComponent(`${cleanArtist} ${title}`.trim())}`
+      );
+      if (resp.ok) {
+        const data = await resp.json();
+        if (Array.isArray(data.mvs) && data.mvs.length > 0) {
+          const mapped: MusicVideoItem[] = data.mvs.map((m: Record<string, unknown>, idx: number) => ({
+            id: String(m.id || `mv-live-${idx}`),
+            videoUrl: m.videoUrl ? String(m.videoUrl) : undefined,
+            youtubeId: m.youtubeId ? String(m.youtubeId) : undefined,
+            title: String(m.title || title || 'Music Video'),
+            artist: String(m.artist || cleanArtist),
+            album: String(m.album || ''),
+            durationLabel: String(m.durationLabel || '3:45'),
+            viewsLabel: String(m.viewsLabel || 'Monochrome Official MV'),
+            year: Number(m.year || 2024),
+            thumbnailUrl: m.thumbnailUrl ? String(m.thumbnailUrl) : undefined,
+          }));
+          setLiveMvCatalog((prev) => {
+            const existingIds = new Set(mapped.map((x) => x.id));
+            return [...mapped, ...prev.filter((p) => !existingIds.has(p.id))].slice(0, 28);
+          });
+          if (switchActive) {
+            setActiveMvItem(mapped[0]);
+          }
+          return mapped;
+        }
+      }
+    } catch {
+      // ignore network error
+    } finally {
+      setIsFetchingMv(false);
+    }
+    return [];
+  }, []);
+
   const openTrackMv = useCallback(
-    (track: MonochromeTrack, e?: React.MouseEvent) => {
+    async (track: MonochromeTrack, e?: React.MouseEvent) => {
       if (e) e.stopPropagation();
-      const resolvedMv = resolveMvForTrack(track);
-      setActiveMvItem(resolvedMv);
       if (isPlaying) {
         globalAudio.pause();
       }
+      const fallbackMv = resolveMvForTrack(track);
+      setActiveMvItem(fallbackMv);
       setActiveNav('mv');
+      await fetchLiveMvsForQuery(track.title, track.artist, true);
     },
-    [isPlaying]
+    [fetchLiveMvsForQuery, isPlaying]
   );
+
+  const fetchArtistProfileFromApi = useCallback(async (artistName: string) => {
+    const cleanArtist = cleanPrimaryArtistName(artistName);
+    setIsFetchingArtist(true);
+    try {
+      const resp = await fetch(`/api/music/artist?name=${encodeURIComponent(cleanArtist)}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        const apiMvs: MusicVideoItem[] = Array.isArray(data.mvs)
+          ? data.mvs.map((m: Record<string, unknown>, idx: number) => ({
+              id: String(m.id || `artist-mv-${idx}`),
+              videoUrl: m.videoUrl ? String(m.videoUrl) : undefined,
+              youtubeId: m.youtubeId ? String(m.youtubeId) : undefined,
+              title: String(m.title || `${cleanArtist} MV`),
+              artist: String(m.artist || cleanArtist),
+              album: String(m.album || ''),
+              durationLabel: String(m.durationLabel || '3:30'),
+              viewsLabel: String(m.viewsLabel || 'Monochrome Official MV'),
+              year: Number(m.year || 2024),
+              thumbnailUrl: m.thumbnailUrl ? String(m.thumbnailUrl) : undefined,
+            }))
+          : [];
+        if (apiMvs.length > 0) {
+          setLiveMvCatalog((prev) => {
+            const ids = new Set(apiMvs.map((x) => x.id));
+            return [...apiMvs, ...prev.filter((p) => !ids.has(p.id))].slice(0, 28);
+          });
+        }
+        const presetMeta = ARTIST_METADATA_MAP[cleanArtist];
+        setLiveArtistProfile({
+          name: String(data.name || cleanArtist),
+          englishName: presetMeta?.englishName || `${cleanArtist} Official`,
+          genre: String(data.genre || presetMeta?.genre || 'Official Recording Artist'),
+          monthlyListeners: String(
+            data.monthlyListeners || presetMeta?.monthlyListeners || '840万人 / 月'
+          ),
+          bio: presetMeta?.bio || String(data.bio || `${cleanArtist} の公式アーティストプロフィール。`),
+          bannerGradient:
+            presetMeta?.bannerGradient || 'from-rose-600 via-purple-700 to-slate-950',
+          avatarUrl: String(
+            data.avatarUrl ||
+              presetMeta?.avatarUrl ||
+              ''
+          ),
+          bannerUrl: String(data.bannerUrl || data.avatarUrl || ''),
+          mvs: apiMvs,
+        });
+      }
+    } catch {
+      // ignore error
+    } finally {
+      setIsFetchingArtist(false);
+    }
+  }, []);
 
   const openArtistPage = useCallback(
     (artistName: string, e?: React.MouseEvent) => {
       if (e) e.stopPropagation();
-      const cleanArtist = (artistName || 'YOASOBI').trim();
+      const cleanArtist = cleanPrimaryArtistName(artistName);
       setSelectedArtistName(cleanArtist);
       setActiveNav('artist');
+      fetchArtistProfileFromApi(cleanArtist);
       handleOnlineMusicSearch(cleanArtist);
     },
-    [handleOnlineMusicSearch]
+    [fetchArtistProfileFromApi, handleOnlineMusicSearch]
   );
 
+  // Fetch initial artist profile when artist tab is opened
+  useEffect(() => {
+    if (activeNav === 'artist') {
+      fetchArtistProfileFromApi(selectedArtistName);
+    }
+  }, [activeNav, selectedArtistName, fetchArtistProfileFromApi]);
+
   const activeArtistProfile: ArtistProfileData = useMemo(() => {
-    const meta = ARTIST_METADATA_MAP[selectedArtistName] || {
-      englishName: `${selectedArtistName} Official`,
-      genre: 'J-Pop / Official Catalog Artist',
-      monthlyListeners: '540万人 / 月',
-      bio: `${selectedArtistName} の公式アーティストページ。Apple Music (iTunes Japan) 公式カタログからのフル尺楽曲ストリーム、同期歌詞、および公式ミュージックビデオ (MV) を一覧で楽しめます。`,
-      bannerGradient: 'from-rose-600 via-purple-700 to-slate-950',
-      avatarUrl:
-        tracks.find((t) => t.artist.toLowerCase().includes(selectedArtistName.toLowerCase()))
-          ?.artworkUrl || 'https://img.youtube.com/vi/ZRtdQ81jPUQ/hqdefault.jpg',
-    };
-    const artistMvs = OFFICIAL_MV_CATALOG.filter(
+    const cleanSelected = cleanPrimaryArtistName(selectedArtistName);
+    if (
+      liveArtistProfile &&
+      liveArtistProfile.name.toLowerCase() === cleanSelected.toLowerCase()
+    ) {
+      const matchedTrackArt = tracks.find((t) =>
+        cleanPrimaryArtistName(t.artist).toLowerCase().includes(cleanSelected.toLowerCase())
+      )?.artworkUrl;
+      return {
+        ...liveArtistProfile,
+        avatarUrl:
+          liveArtistProfile.avatarUrl ||
+          matchedTrackArt ||
+          currentTrack.artworkUrl ||
+          '',
+        mvs:
+          liveArtistProfile.mvs.length > 0
+            ? liveArtistProfile.mvs
+            : OFFICIAL_MV_CATALOG.filter((m) =>
+                m.artist.toLowerCase().includes(cleanSelected.toLowerCase())
+              ),
+      };
+    }
+
+    const meta = ARTIST_METADATA_MAP[cleanSelected];
+    const matchedTrackArt =
+      tracks.find((t) =>
+        cleanPrimaryArtistName(t.artist).toLowerCase().includes(cleanSelected.toLowerCase())
+      )?.artworkUrl ||
+      (cleanPrimaryArtistName(currentTrack.artist).toLowerCase() === cleanSelected.toLowerCase()
+        ? currentTrack.artworkUrl
+        : '');
+
+    const artistMvs = liveMvCatalog.filter(
       (m) =>
-        m.artist.toLowerCase().includes(selectedArtistName.toLowerCase()) ||
-        selectedArtistName.toLowerCase().includes(m.artist.toLowerCase())
+        m.artist.toLowerCase().includes(cleanSelected.toLowerCase()) ||
+        cleanSelected.toLowerCase().includes(m.artist.toLowerCase())
     );
-    const fallbackMvs: MusicVideoItem[] =
-      artistMvs.length > 0
-        ? artistMvs
-        : tracks
-            .filter((t) => t.artist.toLowerCase().includes(selectedArtistName.toLowerCase()))
-            .slice(0, 4)
-            .map((t) => resolveMvForTrack(t));
+
     return {
-      name: selectedArtistName,
-      ...meta,
-      mvs: fallbackMvs.length > 0 ? fallbackMvs : OFFICIAL_MV_CATALOG.slice(0, 4),
+      name: cleanSelected,
+      englishName: meta?.englishName || `${cleanSelected} Official`,
+      genre: meta?.genre || 'Monochrome Music Official Artist',
+      monthlyListeners: meta?.monthlyListeners || '680万人 / 月',
+      bio:
+        meta?.bio ||
+        `${cleanSelected} の公式アーティストページ。Monochrome Music から取得したアーティスト画像、人気楽曲のフル尺ストリーム、および公式ミュージックビデオ (MV) を一覧で楽しめます。`,
+      bannerGradient: meta?.bannerGradient || 'from-rose-600 via-purple-700 to-slate-950',
+      avatarUrl: meta?.avatarUrl || matchedTrackArt || '',
+      mvs: artistMvs,
     };
-  }, [selectedArtistName, tracks]);
+  }, [selectedArtistName, liveArtistProfile, tracks, currentTrack, liveMvCatalog]);
 
   // -----------------------------------------------------------------------
   // Apple Music Track Table Renderer (Used in Songs, Favorites, Recent, Browse, Artist)
@@ -1862,7 +1990,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                       onClick={(e) => openArtistPage(track.artist, e)}
                       className="text-[11px] text-white/55 hover:text-[#fa243c] hover:underline truncate sm:hidden block text-left"
                     >
-                      {track.artist}
+                      {cleanPrimaryArtistName(track.artist)}
                     </button>
                   </div>
                 </div>
@@ -1873,9 +2001,9 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                     type="button"
                     onClick={(e) => openArtistPage(track.artist, e)}
                     className="text-xs text-white/75 hover:text-[#fa243c] hover:underline truncate transition text-left"
-                    title={`${track.artist} のアーティストページを開く`}
+                    title={`${cleanPrimaryArtistName(track.artist)} のアーティストページを開く`}
                   >
-                    {track.artist}
+                    {cleanPrimaryArtistName(track.artist)}
                   </button>
                 </div>
 
@@ -1919,171 +2047,123 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     );
   };
 
+  const showMaximizedArtworkBg = activeNav === 'lyrics' || isArtworkMaximized;
+
   return (
-    <div className="flex h-full w-full flex-col bg-[#0b0c10] text-white select-none overflow-hidden font-sans relative">
+    <div className="flex h-full w-full flex-col bg-[#121316] text-white select-none overflow-hidden font-sans relative">
       {/* ===================================================================
-          ARTWORK-ADAPTIVE MOVING GRADIENT ENGINE (アートワーク連動・流体背景グラデーション)
-          Multi-layered counter-rotating artwork pattern orbs + 4-quadrant color mesh
+          ARTWORK-ADAPTIVE MOVING GRADIENT ENGINE (アートワーク最大化時のみ背景色が変化)
          =================================================================== */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        {/* Layer 1: 4-Quadrant Extracted Color Mesh Gradient Orbs */}
-        <div
-          className="absolute -top-[18%] -left-[12%] w-[68%] h-[68%] rounded-full blur-[95px] opacity-65 artwork-fluid-orb-1 transition-colors duration-1000"
-          style={{
-            background: `radial-gradient(circle at center, ${artworkPalette.c1} 0%, ${artworkPalette.c2} 55%, transparent 75%)`,
-            animationPlayState: isPlaying ? 'running' : 'paused',
-          }}
-        />
-        <div
-          className="absolute -bottom-[20%] -right-[12%] w-[72%] h-[72%] rounded-full blur-[100px] opacity-60 artwork-fluid-orb-2 transition-colors duration-1000"
-          style={{
-            background: `radial-gradient(circle at center, ${artworkPalette.c3} 0%, ${artworkPalette.c4} 55%, transparent 75%)`,
-            animationPlayState: isPlaying ? 'running' : 'paused',
-          }}
-        />
-        <div
-          className="absolute top-[15%] left-[20%] w-[60%] h-[60%] rounded-full blur-[110px] opacity-50 artwork-fluid-orb-3 mix-blend-screen transition-colors duration-1000"
-          style={{
-            background: `radial-gradient(circle at center, ${artworkPalette.c2} 0%, ${artworkPalette.c4} 50%, transparent 75%)`,
-            animationPlayState: isPlaying ? 'running' : 'paused',
-          }}
-        />
-
-        {/* Layer 2: Multi-Layered Counter-Rotating Artwork Pattern Orbs */}
-        {currentTrack.artworkUrl ? (
-          <>
-            <img
-              src={currentTrack.artworkUrl}
-              alt=""
-              className="absolute -top-[15%] -left-[15%] w-[85%] h-[85%] object-cover rounded-full blur-[80px] saturate-[2.2] contrast-125 opacity-45 artwork-fluid-orb-1 transition-all duration-1000"
-              style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
-            />
-            <img
-              src={currentTrack.artworkUrl}
-              alt=""
-              className="absolute -bottom-[15%] -right-[15%] w-[85%] h-[85%] object-cover rounded-full blur-[85px] saturate-[2.4] contrast-125 opacity-40 artwork-fluid-orb-2 mix-blend-screen transition-all duration-1000"
-              style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
-            />
-            <img
-              src={currentTrack.artworkUrl}
-              alt=""
-              className="absolute top-[10%] left-[12%] w-[75%] h-[75%] object-cover rounded-full blur-[95px] saturate-[2.0] opacity-35 artwork-fluid-orb-3 mix-blend-lighten transition-all duration-1000"
-              style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
-            />
-          </>
-        ) : (
+      {showMaximizedArtworkBg && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 transition-opacity duration-700">
+          {/* Layer 1: 4-Quadrant Extracted Color Mesh Gradient Orbs */}
           <div
-            className={`w-full h-full bg-gradient-to-br ${currentTrack.coverGradient} opacity-45 blur-3xl artwork-fluid-orb-1 transition-all duration-1000`}
+            className="absolute -top-[18%] -left-[12%] w-[68%] h-[68%] rounded-full blur-[95px] opacity-65 artwork-fluid-orb-1 transition-colors duration-1000"
+            style={{
+              background: `radial-gradient(circle at center, ${artworkPalette.c1} 0%, ${artworkPalette.c2} 55%, transparent 75%)`,
+              animationPlayState: isPlaying ? 'running' : 'paused',
+            }}
           />
-        )}
+          <div
+            className="absolute -bottom-[20%] -right-[12%] w-[72%] h-[72%] rounded-full blur-[100px] opacity-60 artwork-fluid-orb-2 transition-colors duration-1000"
+            style={{
+              background: `radial-gradient(circle at center, ${artworkPalette.c3} 0%, ${artworkPalette.c4} 55%, transparent 75%)`,
+              animationPlayState: isPlaying ? 'running' : 'paused',
+            }}
+          />
+          <div
+            className="absolute top-[15%] left-[20%] w-[60%] h-[60%] rounded-full blur-[110px] opacity-50 artwork-fluid-orb-3 mix-blend-screen transition-colors duration-1000"
+            style={{
+              background: `radial-gradient(circle at center, ${artworkPalette.c2} 0%, ${artworkPalette.c4} 50%, transparent 75%)`,
+              animationPlayState: isPlaying ? 'running' : 'paused',
+            }}
+          />
 
-        {/* Layer 3: GlassiumOS Deep Frosted Diffusion Veil */}
-        <div className="absolute inset-0 bg-[#0b0c12]/62 backdrop-blur-[36px]" />
-      </div>
+          {/* Layer 2: Multi-Layered Counter-Rotating Artwork Pattern Orbs */}
+          {currentTrack.artworkUrl ? (
+            <>
+              <img
+                src={currentTrack.artworkUrl}
+                alt=""
+                className="absolute -top-[15%] -left-[15%] w-[85%] h-[85%] object-cover rounded-full blur-[80px] saturate-[2.2] contrast-125 opacity-45 artwork-fluid-orb-1 transition-all duration-1000"
+                style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
+              />
+              <img
+                src={currentTrack.artworkUrl}
+                alt=""
+                className="absolute -bottom-[15%] -right-[15%] w-[85%] h-[85%] object-cover rounded-full blur-[85px] saturate-[2.4] contrast-125 opacity-40 artwork-fluid-orb-2 mix-blend-screen transition-all duration-1000"
+                style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
+              />
+            </>
+          ) : (
+            <div
+              className={`w-full h-full bg-gradient-to-br ${currentTrack.coverGradient} opacity-45 blur-3xl artwork-fluid-orb-1 transition-all duration-1000`}
+            />
+          )}
 
-      {/* Hidden HTML5 Audio Element for Full-Length 320kbps Streams */}
-      <audio
-        ref={audioElRef}
-        preload="auto"
-        onLoadedMetadata={(e) => {
-          const nativeDur = e.currentTarget.duration;
-          if (Number.isFinite(nativeDur) && nativeDur >= 40) {
-            const exactSecs = Math.round(nativeDur);
-            setTracks((prev) =>
-              prev.map((t) => (t.id === currentTrack.id ? { ...t, duration: exactSecs } : t))
-            );
-            setActiveTrackOverride((prev) =>
-              prev && prev.id === currentTrack.id ? { ...prev, duration: exactSecs } : prev
-            );
-          }
-        }}
-        onError={(e) => {
-          console.warn('Audio stream glitch, auto-recovering:', e);
-          const audio = audioElRef.current;
-          if (audio && currentTrack.audioUrl && isPlaying) {
-            setTimeout(() => {
-              audio.play().catch(() => {});
-            }, 500);
-          }
-        }}
-        onEnded={() => {
-          if (isRepeat && audioElRef.current) {
-            fullPlayheadRef.current = 0;
-            setCurrentTime(0);
-            audioElRef.current.currentTime = 0;
-            audioElRef.current.play().catch(() => {});
-          } else {
-            nextTrack();
-          }
-        }}
-      />
+          {/* Layer 3: GlassiumOS Deep Frosted Diffusion Veil */}
+          <div className="absolute inset-0 bg-[#0b0c12]/55 backdrop-blur-[36px]" />
+        </div>
+      )}
 
       {/* ===================================================================
-          SLIM TOP NAVIGATION & QUICK ACCESS HEADER (Liquid Glass)
+          MAXIMIZED ARTWORK OVERLAY MODAL (アートワーク最大化モード)
          =================================================================== */}
-      <div className="relative z-20 h-11 px-4 apple-liquid-glass-bar flex items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <span className="text-xs font-bold tracking-tight text-white">Glassium Music</span>
-          <span className="text-[10px] text-white/45 hidden sm:inline truncate">
-            · Official Hi-Fi Stream · MV &amp; Artist Hub
-          </span>
-        </div>
-
-        {/* Quick View Switcher Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto">
-          {(
-            [
-              { id: 'listen-now', label: 'いま聴く' },
-              { id: 'mv', label: 'MV (ミュージックビデオ)' },
-              { id: 'artist', label: `アーティスト (${selectedArtistName})` },
-              { id: 'lyrics', label: '歌詞ステージ' },
-            ] as { id: AppleMusicNavId; label: string }[]
-          ).map((tab) => (
+      {isArtworkMaximized && (
+        <div
+          className="absolute inset-0 z-40 flex flex-col items-center justify-center p-6 pb-36 bg-black/35 backdrop-blur-xl animate-fadeIn"
+          onClick={() => setIsArtworkMaximized(false)}
+        >
+          <div
+            className="relative max-w-md w-full flex flex-col items-center gap-5"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
-              key={tab.id}
               type="button"
-              onClick={() => setActiveNav(tab.id)}
-              className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition ${
-                activeNav === tab.id
-                  ? 'bg-[#fa243c] text-white shadow'
-                  : 'bg-white/[0.06] text-white/70 hover:text-white hover:bg-white/[0.12]'
-              }`}
+              onClick={() => setIsArtworkMaximized(false)}
+              className="self-end px-3 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition flex items-center gap-1"
             >
-              {tab.label}
+              <span className="material-symbols-rounded text-sm">close_fullscreen</span>
+              <span>元の画面に戻る</span>
             </button>
-          ))}
+            <div className="w-64 h-64 sm:w-80 sm:h-80 rounded-3xl overflow-hidden border border-white/30 shadow-[0_32px_80px_rgba(0,0,0,0.75)] bg-zinc-900">
+              {currentTrack.artworkUrl ? (
+                <img
+                  src={currentTrack.artworkUrl}
+                  alt={currentTrack.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className={`w-full h-full bg-gradient-to-br ${currentTrack.coverGradient}`} />
+              )}
+            </div>
+            <div className="text-center space-y-1">
+              <h2 className="text-xl sm:text-2xl font-bold text-white">{currentTrack.title}</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsArtworkMaximized(false);
+                  openArtistPage(currentTrack.artist);
+                }}
+                className="text-sm font-semibold text-white/85 hover:text-[#fa243c] hover:underline transition"
+              >
+                {cleanPrimaryArtistName(currentTrack.artist)}
+              </button>
+              <p className="text-xs text-white/55">{currentTrack.album}</p>
+            </div>
+          </div>
         </div>
-
-        <div className="hidden md:flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={() => openTrackMv(currentTrack)}
-            className="px-2.5 py-1 rounded-lg bg-white/[0.08] hover:bg-[#fa243c] text-white text-[11px] font-semibold transition"
-          >
-            再生中曲のMVを開く
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowLyricsDrawer((s) => !s)}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition ${
-              showLyricsDrawer
-                ? 'bg-white/20 text-white'
-                : 'bg-white/[0.06] text-white/65 hover:text-white'
-            }`}
-          >
-            {showLyricsDrawer ? '歌詞ドロワー: ON' : '歌詞ドロワー: OFF'}
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* ===================================================================
           MAIN APPLE MUSIC WORKSPACE (Left Sidebar + Center Stage + Lyrics)
+          Full height with floating bottom Dock so page content scrolls underneath Dock
          =================================================================== */}
       <div className="relative z-10 flex-1 min-h-0 flex overflow-hidden">
         {/* -----------------------------------------------------------------
             LEFT APPLE MUSIC LIQUID GLASS SIDEBAR
            ----------------------------------------------------------------- */}
-        <aside className="w-56 apple-liquid-glass border-r border-white/[0.12] flex flex-col justify-between p-3 shrink-0 overflow-y-auto">
+        <aside className="w-56 apple-liquid-glass border-r border-white/[0.12] flex flex-col justify-between p-3 pb-36 shrink-0 overflow-y-auto">
           <div className="space-y-5">
             {/* Search Box (Queries official releases) */}
             <form
@@ -2097,7 +2177,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="公式楽曲を検索 (曲名・歌手)..."
+                  placeholder="楽曲・アーティスト検索..."
                   className="bg-transparent text-white placeholder-white/40 outline-none w-full text-xs"
                 />
                 {searchQuery && (
@@ -2119,29 +2199,17 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               </button>
             </form>
 
-            {/* Official Catalog Source Transparency Badge */}
-            <div className="px-2.5 py-2 rounded-lg bg-white/[0.04] border border-white/[0.08] space-y-1">
-              <div className="font-semibold text-[10px] text-white/85 flex items-center gap-1.5">
-                <span className="material-symbols-rounded text-xs text-emerald-400">verified</span>
-                <span>公式音源 &amp; 公式MV対応</span>
-              </div>
-              <p className="text-[9px] text-white/50 leading-tight">
-                Apple Music (iTunes Japan) 公式カタログ &amp; 公式MVプレイヤー統合。
-              </p>
-            </div>
-
-            {/* Section 1: Apple Music & MV / Artist */}
+            {/* Section 1: Music & MV / Artist (Without top 'いま聴く') */}
             <div className="space-y-1">
               <div className="px-2.5 text-[10px] font-semibold uppercase tracking-wider text-white/40">
-                Apple Music
+                Monochrome Music
               </div>
               {(
                 [
-                  { id: 'listen-now', label: 'いま聴く' },
                   { id: 'browse', label: '見つける' },
                   { id: 'mv', label: 'MV (ミュージックビデオ)' },
                   { id: 'artist', label: 'アーティストページ' },
-                  { id: 'lyrics', label: '歌詞フル画面' },
+                  { id: 'lyrics', label: 'アートワーク最大化 & 歌詞' },
                 ] as { id: AppleMusicNavId; label: string }[]
               ).map((item) => (
                 <button
@@ -2253,223 +2321,26 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             CENTER APPLE MUSIC CONTENT STAGE
            ----------------------------------------------------------------- */}
         <main className="flex-1 min-w-0 flex overflow-hidden">
-          {/* VIEW 1: LISTEN NOW (いま聴く) */}
-          {activeNav === 'listen-now' && (
-            <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-8">
-              <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-4">
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                    いま聴く
-                  </h1>
-                  <p className="text-xs text-white/50 mt-1">{statusBanner}</p>
-                </div>
-
-                {/* Quick Artist Page & Search Pills */}
-                <div className="flex flex-wrap gap-1.5">
-                  {POPULAR_ARTIST_SHORTCUTS.map((artist) => (
-                    <button
-                      key={artist}
-                      onClick={() => openArtistPage(artist)}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] transition ${
-                        selectedArtistName === artist && activeNav === 'artist'
-                          ? 'bg-[#fa243c] text-white font-semibold'
-                          : 'bg-white/[0.06] hover:bg-[#fa243c] text-white/75 hover:text-white'
-                      }`}
-                    >
-                      {artist}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* When searching, show Search Results Table IMMEDIATELY at the top */}
-              {(searchQuery.trim().length > 0 || lastSearchedQuery.length > 0) && (
-                <div className="space-y-3 p-4 rounded-2xl bg-white/[0.03] border border-white/[0.1]">
-                  <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-sm sm:text-base font-bold text-white">
-                      {isSearchingOnline
-                        ? `"${searchQuery}" を検索中...`
-                        : `"${lastSearchedQuery || searchQuery}" の検索結果 (${filteredTracks.length}曲) — クリックでその曲をフル尺再生`}
-                    </h3>
-                    <button
-                      onClick={() => {
-                        setSearchQuery('');
-                        setLastSearchedQuery('');
-                        setTracks(INITIAL_ENRICHED_CATALOG);
-                      }}
-                      className="px-2.5 py-1 rounded-lg bg-white/[0.08] hover:bg-white/15 text-[11px] text-white/75 hover:text-white transition"
-                    >
-                      検索をクリア
-                    </button>
-                  </div>
-                  {renderAppleMusicSongTable(filteredTracks, '該当する楽曲が見つかりません')}
-                </div>
-              )}
-
-              {/* Featured Now Playing Liquid Glass Hero Card */}
-              <div className="p-6 rounded-2xl apple-liquid-glass flex flex-col sm:flex-row items-center gap-6">
-                <div
-                  className={`w-36 h-36 sm:w-44 sm:h-44 rounded-xl overflow-hidden bg-zinc-900 border border-white/20 shrink-0 shadow-2xl transition-transform duration-500 ${
-                    isPlaying ? 'scale-100' : 'scale-95 opacity-85'
-                  }`}
-                >
-                  {currentTrack.artworkUrl ? (
-                    <img
-                      src={currentTrack.artworkUrl}
-                      alt={currentTrack.title}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div
-                      className={`w-full h-full bg-gradient-to-br ${currentTrack.coverGradient}`}
-                    />
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0 space-y-3 text-center sm:text-left">
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-[#fa243c]">
-                    Now Playing · 60fps Time-Synced Lyrics · {currentTrack.format}
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-bold text-white truncate">
-                    {currentTrack.title}
-                  </h2>
-                  <div className="flex items-center justify-center sm:justify-start gap-2 text-sm text-white/70 truncate">
-                    <button
-                      type="button"
-                      onClick={() => openArtistPage(currentTrack.artist)}
-                      className="hover:text-[#fa243c] hover:underline font-medium transition"
-                    >
-                      {currentTrack.artist}
-                    </button>
-                    <span>—</span>
-                    <span className="truncate">{currentTrack.album}</span>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
-                    <button
-                      onClick={togglePlay}
-                      className="px-5 py-2 rounded-lg bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-semibold transition shadow-lg flex items-center gap-1.5"
-                    >
-                      <span
-                        className="material-symbols-rounded text-[18px]"
-                        style={{ fontVariationSettings: "'FILL' 1, 'wght' 600" }}
-                      >
-                        {isPlaying ? 'pause' : 'play_arrow'}
-                      </span>
-                      <span>{isPlaying ? '一時停止' : 'フル尺再生'}</span>
-                    </button>
-                    <button
-                      onClick={() => openTrackMv(currentTrack)}
-                      className="px-4 py-2 rounded-lg apple-liquid-glass-pill hover:bg-[#fa243c] text-xs font-semibold text-white transition flex items-center gap-1.5"
-                    >
-                      <span className="material-symbols-rounded text-[16px]">smart_display</span>
-                      <span>公式MVを再生</span>
-                    </button>
-                    <button
-                      onClick={() => openArtistPage(currentTrack.artist)}
-                      className="px-4 py-2 rounded-lg apple-liquid-glass-pill hover:bg-white/20 text-xs font-semibold text-white transition flex items-center gap-1.5"
-                    >
-                      <span className="material-symbols-rounded text-[16px]">person</span>
-                      <span>アーティストページ</span>
-                    </button>
-                    <button
-                      onClick={() => setActiveNav('lyrics')}
-                      className="px-4 py-2 rounded-lg apple-liquid-glass-pill hover:bg-white/20 text-xs font-semibold text-white transition"
-                    >
-                      歌詞フル画面
-                    </button>
-                    <button
-                      onClick={() => toggleFavorite(currentTrack)}
-                      className={`px-4 py-2 rounded-lg text-xs font-semibold border transition ${
-                        isFavorite(currentTrack.id)
-                          ? 'bg-white text-black border-white'
-                          : 'apple-liquid-glass-pill text-white hover:bg-white/15'
-                      }`}
-                    >
-                      {isFavorite(currentTrack.id) ? 'お気に入り済' : '+ お気に入り'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Official Music Videos Quick Row */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-base font-bold text-white">注目ミュージックビデオ (MV)</h3>
-                  <button
-                    onClick={() => setActiveNav('mv')}
-                    className="text-xs text-[#fa243c] hover:underline"
-                  >
-                    MV一覧を開く ({OFFICIAL_MV_CATALOG.length}本)
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                  {OFFICIAL_MV_CATALOG.slice(0, 4).map((mv) => (
-                    <div
-                      key={mv.id}
-                      onClick={() => {
-                        setActiveMvItem(mv);
-                        if (isPlaying) globalAudio.pause();
-                        setActiveNav('mv');
-                      }}
-                      className="group cursor-pointer rounded-xl overflow-hidden apple-liquid-glass hover:border-[#fa243c]/60 transition flex flex-col"
-                    >
-                      <div className="aspect-video w-full relative overflow-hidden bg-zinc-900">
-                        <img
-                          src={`https://img.youtube.com/vi/${mv.youtubeId}/hqdefault.jpg`}
-                          alt={mv.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                        />
-                        <div className="absolute inset-0 bg-black/35 group-hover:bg-black/15 transition flex items-center justify-center">
-                          <div className="w-10 h-10 rounded-full bg-[#fa243c] text-white flex items-center justify-center shadow-lg">
-                            <span className="material-symbols-rounded text-xl">play_arrow</span>
-                          </div>
-                        </div>
-                        <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-mono text-white">
-                          {mv.durationLabel}
-                        </span>
-                      </div>
-                      <div className="p-3">
-                        <div className="text-xs font-bold text-white truncate">{mv.title}</div>
-                        <div className="text-[11px] text-white/55 truncate mt-0.5">
-                          {mv.artist} · {mv.viewsLabel}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* All Songs / Catalog Table (shown when not already rendered in search box above) */}
-              {!(searchQuery.trim().length > 0 || lastSearchedQuery.length > 0) && (
-                <div className="space-y-3">
-                  <h3 className="text-base font-bold text-white">
-                    おすすめフル尺トラック ({filteredTracks.length}曲)
-                  </h3>
-                  {renderAppleMusicSongTable(filteredTracks, '楽曲が見つかりません')}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* VIEW 2: MV (OFFICIAL MUSIC VIDEO STAGE) */}
+          {/* VIEW 2: MV (OFFICIAL MUSIC VIDEO STAGE - Monochrome / iTunes MV + YouTube MV) */}
           {activeNav === 'mv' && (
-            <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
+            <div className="flex-1 overflow-y-auto p-6 sm:p-8 pb-36 space-y-6">
               <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-4">
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-[#fa243c]">
-                    Official Music Video Stage
+                    Monochrome Official Music Video Stage
                   </div>
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
                     ミュージックビデオ (MV)
                   </h1>
                   <p className="text-xs text-white/55 mt-1">
                     {activeMvItem.title} — {activeMvItem.artist} ({activeMvItem.viewsLabel})
+                    {isFetchingMv ? ' · Monochrome MVを取得中...' : ''}
                   </p>
                 </div>
 
-                {/* Custom YouTube MV URL / ID Loader */}
+                {/* Search Monochrome MVs or Load YouTube ID */}
                 <form
-                  onSubmit={(e) => {
+                  onSubmit={async (e) => {
                     e.preventDefault();
                     const raw = customMvYoutubeInput.trim();
                     if (!raw) return;
@@ -2480,11 +2351,14 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                         id: `mv-custom-${ytId}`,
                         youtubeId: ytId,
                         title: `${currentTrack.title} (Custom MV)`,
-                        artist: currentTrack.artist,
+                        artist: cleanPrimaryArtistName(currentTrack.artist),
                         durationLabel: 'HD',
                         viewsLabel: 'YouTube MV',
                         year: 2025,
                       });
+                      setCustomMvYoutubeInput('');
+                    } else {
+                      await fetchLiveMvsForQuery(raw, '', true);
                       setCustomMvYoutubeInput('');
                     }
                   }}
@@ -2493,28 +2367,47 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   <input
                     value={customMvYoutubeInput}
                     onChange={(e) => setCustomMvYoutubeInput(e.target.value)}
-                    placeholder="YouTube MVのURLまたはIDを入力..."
-                    className="w-56 px-3 py-1.5 rounded-lg bg-white/[0.07] border border-white/15 text-xs text-white placeholder-white/40 outline-none focus:border-[#fa243c]"
+                    placeholder="曲名・歌手名でMV検索 または YouTube URL..."
+                    className="w-64 px-3 py-1.5 rounded-lg bg-white/[0.07] border border-white/15 text-xs text-white placeholder-white/40 outline-none focus:border-[#fa243c]"
                   />
                   <button
                     type="submit"
                     className="px-3.5 py-1.5 rounded-lg bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-semibold transition"
                   >
-                    MV読込
+                    MV検索
                   </button>
                 </form>
               </div>
 
-              {/* Active MV Cinema Player (16:9 Liquid Glass Frame) */}
+              {/* Active MV Cinema Player (16:9 Liquid Glass Frame - Native Monochrome Video or YouTube) */}
               <div className="rounded-2xl overflow-hidden apple-liquid-glass border border-white/20 shadow-2xl">
                 <div className="aspect-video w-full bg-black relative">
-                  <iframe
-                    src={`https://www.youtube-nocookie.com/embed/${activeMvItem.youtubeId}?autoplay=1&rel=0&modestbranding=1`}
-                    title={activeMvItem.title}
-                    className="w-full h-full border-0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                    allowFullScreen
-                  />
+                  {activeMvItem.videoUrl ? (
+                    <video
+                      key={activeMvItem.videoUrl}
+                      src={activeMvItem.videoUrl}
+                      poster={activeMvItem.thumbnailUrl}
+                      controls
+                      autoPlay
+                      playsInline
+                      className="w-full h-full object-contain bg-black"
+                    />
+                  ) : activeMvItem.youtubeId ? (
+                    <iframe
+                      src={`https://www.youtube-nocookie.com/embed/${activeMvItem.youtubeId}?autoplay=1&rel=0&modestbranding=1`}
+                      title={activeMvItem.title}
+                      className="w-full h-full border-0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-white/60">
+                      <span className="material-symbols-rounded text-4xl text-[#fa243c]">
+                        smart_display
+                      </span>
+                      <span className="text-xs">MVストリームを読み込み中...</span>
+                    </div>
+                  )}
                 </div>
                 <div className="p-4 flex flex-wrap items-center justify-between gap-4 bg-black/40">
                   <div>
@@ -2527,7 +2420,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                         onClick={() => openArtistPage(activeMvItem.artist)}
                         className="text-[#fa243c] hover:underline font-semibold"
                       >
-                        {activeMvItem.artist}
+                        {cleanPrimaryArtistName(activeMvItem.artist)}
                       </button>
                       <span>· {activeMvItem.year}年</span>
                       <span>· {activeMvItem.viewsLabel}</span>
@@ -2539,18 +2432,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                       onClick={() => openArtistPage(activeMvItem.artist)}
                       className="px-3.5 py-1.5 rounded-lg apple-liquid-glass-pill hover:bg-white/20 text-xs font-semibold text-white transition"
                     >
-                      {activeMvItem.artist} のアーティストページへ
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        openApp('entertainment', {
-                          payload: { videoId: activeMvItem.youtubeId, mode: 'youtube' },
-                        })
-                      }
-                      className="px-3.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-semibold text-white transition"
-                    >
-                      Entertainmentシアターで開く
+                      {cleanPrimaryArtistName(activeMvItem.artist)} のアーティストページへ
                     </button>
                   </div>
                 </div>
@@ -2559,11 +2441,16 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               {/* All Official MVs Grid */}
               <div className="space-y-3">
                 <h3 className="text-base font-bold text-white">
-                  公式ミュージックビデオ一覧 ({OFFICIAL_MV_CATALOG.length}本)
+                  ミュージックビデオ一覧 ({liveMvCatalog.length}本)
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {OFFICIAL_MV_CATALOG.map((mv) => {
-                    const isCurrentMv = mv.youtubeId === activeMvItem.youtubeId;
+                  {liveMvCatalog.map((mv) => {
+                    const isCurrentMv = mv.id === activeMvItem.id;
+                    const thumb =
+                      mv.thumbnailUrl ||
+                      (mv.youtubeId
+                        ? `https://img.youtube.com/vi/${mv.youtubeId}/hqdefault.jpg`
+                        : currentTrack.artworkUrl);
                     return (
                       <div
                         key={mv.id}
@@ -2578,11 +2465,13 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                         }`}
                       >
                         <div className="aspect-video w-full relative overflow-hidden bg-zinc-900">
-                          <img
-                            src={`https://img.youtube.com/vi/${mv.youtubeId}/hqdefault.jpg`}
-                            alt={mv.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                          />
+                          {thumb && (
+                            <img
+                              src={thumb}
+                              alt={mv.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                            />
+                          )}
                           <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition flex items-center justify-center">
                             <div className="w-10 h-10 rounded-full bg-[#fa243c] text-white flex items-center justify-center shadow-lg">
                               <span className="material-symbols-rounded text-xl">play_arrow</span>
@@ -2600,7 +2489,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                               onClick={(e) => openArtistPage(mv.artist, e)}
                               className="text-[11px] text-white/60 hover:text-[#fa243c] hover:underline truncate mt-0.5 block text-left"
                             >
-                              {mv.artist}
+                              {cleanPrimaryArtistName(mv.artist)}
                             </button>
                           </div>
                           <div className="text-[10px] text-white/40 mt-1">
@@ -2615,13 +2504,13 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             </div>
           )}
 
-          {/* VIEW 3: ARTIST PAGE (専用アーティストページ) */}
+          {/* VIEW 3: ARTIST PAGE (専用アーティストページ - Monochrome / Deezer / iTunes アーティスト画像・MV連携) */}
           {activeNav === 'artist' && (
-            <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-8">
+            <div className="flex-1 overflow-y-auto p-6 sm:p-8 pb-36 space-y-8">
               {/* Artist Selector Bar */}
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-xs text-white/50 mr-1">アーティスト切替:</span>
+                  <span className="text-xs text-white/50 mr-1">人気アーティスト:</span>
                   {POPULAR_ARTIST_SHORTCUTS.map((artist) => (
                     <button
                       key={artist}
@@ -2639,22 +2528,38 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 </div>
               </div>
 
-              {/* Artist Hero Banner (Liquid Glass) */}
+              {/* Artist Hero Banner (Liquid Glass + Real Artist Photo) */}
               <div
                 className={`relative rounded-2xl overflow-hidden border border-white/20 bg-gradient-to-br ${activeArtistProfile.bannerGradient} p-6 sm:p-8 shadow-2xl`}
               >
+                {activeArtistProfile.bannerUrl && (
+                  <img
+                    src={activeArtistProfile.bannerUrl}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover opacity-25 blur-xl scale-110 pointer-events-none"
+                  />
+                )}
                 <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-end gap-6">
-                  <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden border-2 border-white/30 shadow-2xl shrink-0 bg-zinc-900">
-                    <img
-                      src={activeArtistProfile.avatarUrl}
-                      alt={activeArtistProfile.name}
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden border-2 border-white/30 shadow-2xl shrink-0 bg-zinc-900 flex items-center justify-center">
+                    {activeArtistProfile.avatarUrl ? (
+                      <img
+                        src={activeArtistProfile.avatarUrl}
+                        alt={activeArtistProfile.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="material-symbols-rounded text-5xl text-white/40">
+                        person
+                      </span>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0 space-y-2 text-center sm:text-left">
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-black/40 backdrop-blur-md text-[11px] font-semibold text-emerald-300 border border-white/15">
                       <span className="material-symbols-rounded text-xs">verified</span>
-                      <span>公式認定アーティスト · {activeArtistProfile.monthlyListeners}</span>
+                      <span>
+                        Monochrome 公式アーティスト · {activeArtistProfile.monthlyListeners}
+                        {isFetchingArtist ? ' · 同期中...' : ''}
+                      </span>
                     </div>
                     <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
                       {activeArtistProfile.name}
@@ -2698,55 +2603,66 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               </div>
 
               {/* Artist Official MVs Section */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-bold text-white">
-                    {activeArtistProfile.name} の公式ミュージックビデオ (MV)
-                  </h2>
-                  <button
-                    type="button"
-                    onClick={() => setActiveNav('mv')}
-                    className="text-xs text-[#fa243c] hover:underline"
-                  >
-                    MVステージへ
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {activeArtistProfile.mvs.map((mv) => (
-                    <div
-                      key={mv.id}
-                      onClick={() => {
-                        setActiveMvItem(mv);
-                        if (isPlaying) globalAudio.pause();
-                        setActiveNav('mv');
-                      }}
-                      className="group cursor-pointer rounded-xl overflow-hidden apple-liquid-glass hover:border-[#fa243c]/60 transition flex flex-col"
+              {activeArtistProfile.mvs.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-bold text-white">
+                      {activeArtistProfile.name} のミュージックビデオ (MV)
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => setActiveNav('mv')}
+                      className="text-xs text-[#fa243c] hover:underline"
                     >
-                      <div className="aspect-video w-full relative overflow-hidden bg-zinc-900">
-                        <img
-                          src={`https://img.youtube.com/vi/${mv.youtubeId}/hqdefault.jpg`}
-                          alt={mv.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                        />
-                        <div className="absolute inset-0 bg-black/35 group-hover:bg-black/15 transition flex items-center justify-center">
-                          <div className="w-11 h-11 rounded-full bg-[#fa243c] text-white flex items-center justify-center shadow-lg">
-                            <span className="material-symbols-rounded text-2xl">play_arrow</span>
+                      MVステージへ
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    {activeArtistProfile.mvs.map((mv) => {
+                      const thumb =
+                        mv.thumbnailUrl ||
+                        (mv.youtubeId
+                          ? `https://img.youtube.com/vi/${mv.youtubeId}/hqdefault.jpg`
+                          : activeArtistProfile.avatarUrl);
+                      return (
+                        <div
+                          key={mv.id}
+                          onClick={() => {
+                            setActiveMvItem(mv);
+                            if (isPlaying) globalAudio.pause();
+                            setActiveNav('mv');
+                          }}
+                          className="group cursor-pointer rounded-xl overflow-hidden apple-liquid-glass hover:border-[#fa243c]/60 transition flex flex-col"
+                        >
+                          <div className="aspect-video w-full relative overflow-hidden bg-zinc-900">
+                            {thumb && (
+                              <img
+                                src={thumb}
+                                alt={mv.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                              />
+                            )}
+                            <div className="absolute inset-0 bg-black/35 group-hover:bg-black/15 transition flex items-center justify-center">
+                              <div className="w-11 h-11 rounded-full bg-[#fa243c] text-white flex items-center justify-center shadow-lg">
+                                <span className="material-symbols-rounded text-2xl">play_arrow</span>
+                              </div>
+                            </div>
+                            <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-mono text-white">
+                              {mv.durationLabel}
+                            </span>
+                          </div>
+                          <div className="p-3">
+                            <div className="text-xs font-bold text-white truncate">{mv.title}</div>
+                            <div className="text-[11px] text-white/55 mt-0.5">
+                              {mv.year}年 · {mv.viewsLabel}
+                            </div>
                           </div>
                         </div>
-                        <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-mono text-white">
-                          {mv.durationLabel}
-                        </span>
-                      </div>
-                      <div className="p-3">
-                        <div className="text-xs font-bold text-white truncate">{mv.title}</div>
-                        <div className="text-[11px] text-white/55 mt-0.5">
-                          {mv.year}年 · {mv.viewsLabel}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Artist Top Tracks Section */}
               <div className="space-y-3">
@@ -2769,12 +2685,12 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           )}
 
           {/* VIEW 4: BROWSE (見つける) */}
-          {activeNav === 'browse' && (
-            <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
+          {(activeNav === 'browse' || activeNav === 'listen-now') && (
+            <div className="flex-1 overflow-y-auto p-6 sm:p-8 pb-36 space-y-6">
               <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-4">
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                    見つける (楽曲・アーティスト検索)
+                    見つける (楽曲・アーティスト・MV)
                   </h1>
                   <p className="text-xs text-white/50 mt-1">{statusBanner}</p>
                 </div>
@@ -2810,7 +2726,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   >
                     <div className="text-sm font-bold text-white">{artist}</div>
                     <div className="text-[11px] text-white/55">
-                      アーティストページ &amp; 公式MVを開く →
+                      アーティストページ &amp; MVを開く →
                     </div>
                   </div>
                 ))}
@@ -2822,7 +2738,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
           {/* VIEW 5: FAVORITES (お気に入り) */}
           {activeNav === 'favorites' && (
-            <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
+            <div className="flex-1 overflow-y-auto p-6 sm:p-8 pb-36 space-y-6">
               <div className="flex items-end justify-between border-b border-white/[0.08] pb-4">
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
@@ -2851,7 +2767,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
           {/* VIEW 6: ALL SONGS (すべての曲) */}
           {activeNav === 'songs' && (
-            <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
+            <div className="flex-1 overflow-y-auto p-6 sm:p-8 pb-36 space-y-6">
               <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-4">
                 <div>
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
@@ -2887,7 +2803,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
           {/* VIEW 7: RECENTLY PLAYED (最近再生した項目) */}
           {activeNav === 'recent' && (
-            <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
+            <div className="flex-1 overflow-y-auto p-6 sm:p-8 pb-36 space-y-6">
               <div className="border-b border-white/[0.08] pb-4">
                 <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
                   最近再生した項目
@@ -2960,7 +2876,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                         onClick={() => openArtistPage(currentTrack.artist)}
                         className="text-sm text-white/70 hover:text-[#fa243c] hover:underline truncate mt-0.5 block text-left"
                       >
-                        {currentTrack.artist}
+                        {cleanPrimaryArtistName(currentTrack.artist)}
                       </button>
                       <p className="text-[11px] text-white/40 font-mono truncate mt-0.5">
                         {currentTrack.album} · {currentTrack.bitrate}
@@ -3335,11 +3251,10 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       </div>
 
       {/* ===================================================================
-          BOTTOM DOCK-STYLE LIQUID GLASS PLAYER BAR (画面下部固定・Liquid Glass Dock)
-          Features real-time artwork-pattern moving gradient underglow & full Now Playing info
+          BOTTOM DOCK-STYLE LIQUID GLASS PLAYER BAR (画面下部固定・背面にページ内容が透けて見えるフローティングDock)
          =================================================================== */}
-      <div className="sticky bottom-0 left-0 right-0 z-30 px-3 sm:px-5 pb-3 pt-1.5 shrink-0 pointer-events-auto">
-        <div className="relative mx-auto max-w-6xl rounded-2xl liquid-glass-music-dock liquid-glass-window overflow-hidden px-3.5 sm:px-5 py-2.5 flex flex-col gap-2">
+      <div className="absolute bottom-2.5 left-3 right-3 z-30 pointer-events-none">
+        <div className="pointer-events-auto relative mx-auto max-w-6xl rounded-2xl liquid-glass-music-dock liquid-glass-window overflow-hidden px-3.5 sm:px-5 py-2.5 flex flex-col gap-2">
           {/* Moving Artwork-Pattern Gradient Underglow Inside the Liquid Glass Dock */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-65">
             <div
@@ -3402,12 +3317,12 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
           {/* Main Dock Controls Row */}
           <div className="relative z-10 flex items-center justify-between gap-3">
-            {/* Left: Now Playing Artwork + Title + Status Badge + Clickable Artist + Synced Lyric Preview */}
+            {/* Left: Now Playing Artwork (Click to Maximize Artwork + Activate Moving Background) + Title + Clickable Artist */}
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <div
-                onClick={() => setActiveNav('lyrics')}
+                onClick={() => setIsArtworkMaximized((m) => !m)}
                 className="relative w-12 h-12 rounded-xl overflow-hidden bg-zinc-900 border border-white/25 shrink-0 cursor-pointer shadow-[0_8px_20px_rgba(0,0,0,0.5)] hover:scale-105 transition group"
-                title="クリックしてフルスクリーン歌詞ステージを開く"
+                title="クリックしてアートワークを最大化 (背景グラデーション連動)"
               >
                 {currentTrack.artworkUrl ? (
                   <img
@@ -3420,7 +3335,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 ) : (
                   <div className={`w-full h-full bg-gradient-to-br ${currentTrack.coverGradient}`} />
                 )}
-                {/* Live Playing Indicator Overlay on Artwork */}
                 {isPlaying && (
                   <div className="absolute bottom-1 right-1 px-1 py-0.5 rounded bg-black/65 backdrop-blur-md border border-white/20 flex items-end gap-[2px]">
                     <span className="w-[2px] h-2 bg-rose-400 animate-pulse" />
@@ -3433,18 +3347,18 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 min-w-0">
                   <span
-                    onClick={() => setActiveNav('lyrics')}
+                    onClick={() => setIsArtworkMaximized((m) => !m)}
                     className="text-xs sm:text-sm font-bold text-white truncate cursor-pointer hover:underline"
-                    title={currentTrack.title}
+                    title="クリックしてアートワークを最大化"
                   >
                     {currentTrack.title}
                   </span>
                   <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-white/10 border border-white/15 text-[9px] font-mono text-white/80 shrink-0">
-                    {currentTrack.bitrate || 'FLAC 24-bit'}
+                    {currentTrack.bitrate || '320kbps Full Track'}
                   </span>
                   {isBuffering && (
                     <span className="text-[10px] font-mono text-rose-300 animate-pulse shrink-0">
-                      Syncing...
+                      Loading...
                     </span>
                   )}
                 </div>
@@ -3453,10 +3367,10 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   <button
                     type="button"
                     onClick={() => openArtistPage(currentTrack.artist)}
-                    className="hover:text-white hover:underline font-semibold truncate transition text-white/90"
-                    title={`${currentTrack.artist} のアーティストページを開く`}
+                    className="hover:text-[#fa243c] hover:underline font-bold truncate transition text-white shrink-0"
+                    title={`${cleanPrimaryArtistName(currentTrack.artist)} のアーティストページを開く`}
                   >
-                    {currentTrack.artist}
+                    {cleanPrimaryArtistName(currentTrack.artist)}
                   </button>
                   <span className="text-white/40">·</span>
                   <span className="text-white/65 truncate font-medium">
