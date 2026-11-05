@@ -1397,12 +1397,26 @@ export async function fetchHtmlViaProxyCascade(
   const tryLocalApi = async (): Promise<string | null> => {
     if (isStaticHost && preferredNode !== 'local-api') return null;
     try {
-      const res = await fetch(`./api/proxy?url=${encodeURIComponent(cleanTarget)}`, {
+      const res = await fetch(`/api/proxy?url=${encodeURIComponent(cleanTarget)}`, {
         signal: AbortSignal.timeout(5500),
       });
       if (res.ok) {
         const text = await res.text();
         if (!isGitHubPages404OrInvalid(text)) return text;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  };
+
+  const tryDirectGcs = async (): Promise<string | null> => {
+    if (!cleanTarget.includes('storage.googleapis.com')) return null;
+    try {
+      const res = await fetch(cleanTarget, { signal: AbortSignal.timeout(5500) });
+      if (res.ok) {
+        const text = await res.text();
+        if (text && text.trim().length > 0) return text;
       }
     } catch {
       // ignore

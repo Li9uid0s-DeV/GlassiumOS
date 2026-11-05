@@ -81,6 +81,8 @@ export interface TaskbarApp {
 
 export const TASKBAR_APPS: TaskbarApp[] = [
   { appId: 'browser', label: 'Browser', icon: 'Globe' },
+  { appId: 'entertainment', label: 'Entertainment', icon: 'Tv' },
+  { appId: 'synth', label: 'Music', icon: 'Music' },
   { appId: 'notepad', label: 'Editor', icon: 'FileText' },
   { appId: 'terminal', label: 'Terminal', icon: 'SquareTerminal' },
   { appId: 'explorer', label: 'Files', icon: 'FolderOpen' },

@@ -371,7 +371,7 @@ export const WindowFrame: React.FC<Props> = ({ win, children }) => {
   const getWindowShapeClass = () => {
     if (win.maximized) return '!rounded-none';
     if (isGlassium5Mode) {
-      return `!rounded-none border-t-2 ${isFocused ? 'border-t-[var(--os-accent)]' : 'border-t-white/20'}`;
+      return `!rounded-2xl border-t ${isFocused ? 'border-t-[var(--os-accent)]/80 shadow-[0_24px_60px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(255,255,255,0.25)]' : 'border-t-white/20'}`;
     }
     if (isWin10Mode) {
       return `!rounded-none border ${isFocused ? 'border-[var(--os-accent)]/60' : isLight ? 'border-slate-300' : 'border-white/15'}`;

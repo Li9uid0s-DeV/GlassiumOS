@@ -369,7 +369,7 @@ const LS_THEMES_KEY = 'glassium-os-v5.0-u1-installed-themes';
 const LS_CURRENT_THEME_KEY = 'glassium-os-v5.0-u1-current-theme';
 const LS_TASKS_KEY = 'glassium-os-v5.0-u1-calendar-tasks';
 const LS_FS_KEY = 'glassium-os-v5.0-u1-filesystem';
-const LS_ICON_POS_KEY = 'glassium-os-v5.0-u1-icon-positions';
+const LS_ICON_POS_KEY = 'glassium-os-v5.0-u2-icon-positions';
 const LS_DESK_NOTES_KEY = 'glassium-os-v5.0-u1-desk-notes';
 const LS_DESKTOPS_KEY = 'glassium-os-v5.0-u1-desktops';
 
@@ -382,6 +382,7 @@ export const DEFAULT_DESKTOP_ICON_ORDER = [
   'settings',
   'game',
   'synth',
+  'entertainment',
   'calendar',
   'weather',
   'clock',

@@ -416,7 +416,11 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
   const [watchlist, setWatchlist] = useState<string[]>(() => {
     try {
       const saved = localStorage.getItem('glassium_entertainment_watchlist');
-      return saved ? JSON.parse(saved) : ['frieren-beyond-journeys-end', 'dune-part-two'];
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+      return ['frieren-beyond-journeys-end', 'dune-part-two'];
     } catch {
       return ['frieren-beyond-journeys-end', 'dune-part-two'];
     }
@@ -535,17 +539,17 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     }
 
     if (selectedGenre !== 'All') {
-      list = list.filter((m) => m.genre.includes(selectedGenre));
+      list = list.filter((m) => (m.genre || []).includes(selectedGenre));
     }
 
     const q = searchQuery.trim().toLowerCase();
     if (q && onlineSearchResults.length === 0) {
       list = list.filter(
         (m) =>
-          m.title.toLowerCase().includes(q) ||
+          (m.title || '').toLowerCase().includes(q) ||
           m.originalTitle?.toLowerCase().includes(q) ||
-          m.description.toLowerCase().includes(q) ||
-          m.genre.some((g) => g.toLowerCase().includes(q))
+          (m.description || '').toLowerCase().includes(q) ||
+          (m.genre || []).some((g) => g.toLowerCase().includes(q))
       );
     }
     return list;
@@ -992,7 +996,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
                           {item.title}
                         </h4>
                         <p className="text-[10px] text-white/50 truncate mt-0.5">
-                          {item.year} · {item.genre.slice(0, 2).join(' / ')}
+                          {item.year} · {(item.genre || []).slice(0, 2).join(' / ')}
                         </p>
                       </div>
                     </div>

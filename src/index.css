@@ -671,13 +671,9 @@ input[type='range'].glass-slider::-moz-range-thumb {
    PER-SHELL-MODE APP & WINDOW LAYOUT ADAPTATION
    ============================================================ */
 
-/* GlassiumOS 5 (Sharp Minimal Hairline Architecture) */
+/* GlassiumOS 5 (Fluid Liquid Glass Window Architecture) */
 [data-shell-mode='windows'] .liquid-glass-window {
-  border-radius: 0px !important;
-}
-[data-shell-mode='windows'] .window-body-shell-windows button:not(.rounded-full),
-[data-shell-mode='windows'] .window-body-shell-windows input:not([type='range']) {
-  border-radius: 0px !important;
+  border-radius: var(--theme-radius, 18px);
 }
 
 /* Windows 11 (Fluent Rounded Mica Architecture) */
@@ -849,3 +845,96 @@ input[type='range'].glass-slider::-moz-range-thumb {
   font-feature-settings: 'liga';
   font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
 }
+
+/* ============================================================
+   GLASSIUM LIQUID GLASS DOCK & ARTWORK-ADAPTIVE FLUID GRADIENT
+   ============================================================ */
+
+@keyframes artworkMeshOrbit1 {
+  0% {
+    transform: translate3d(-12%, -10%, 0) scale(1.25) rotate(0deg);
+  }
+  33% {
+    transform: translate3d(14%, -6%, 0) scale(1.4) rotate(120deg);
+  }
+  66% {
+    transform: translate3d(-6%, 14%, 0) scale(1.3) rotate(240deg);
+  }
+  100% {
+    transform: translate3d(-12%, -10%, 0) scale(1.25) rotate(360deg);
+  }
+}
+
+@keyframes artworkMeshOrbit2 {
+  0% {
+    transform: translate3d(14%, 12%, 0) scale(1.35) rotate(360deg);
+  }
+  50% {
+    transform: translate3d(-16%, -12%, 0) scale(1.55) rotate(180deg);
+  }
+  100% {
+    transform: translate3d(14%, 12%, 0) scale(1.35) rotate(0deg);
+  }
+}
+
+@keyframes artworkMeshOrbit3 {
+  0% {
+    transform: translate3d(-8%, 16%, 0) scale(1.2) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(16%, -14%, 0) scale(1.45) rotate(-180deg);
+  }
+  100% {
+    transform: translate3d(-8%, 16%, 0) scale(1.2) rotate(-360deg);
+  }
+}
+
+@keyframes dockGradientFlow {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.artwork-fluid-orb-1 {
+  animation: artworkMeshOrbit1 22s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  will-change: transform;
+}
+
+.artwork-fluid-orb-2 {
+  animation: artworkMeshOrbit2 28s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  will-change: transform;
+}
+
+.artwork-fluid-orb-3 {
+  animation: artworkMeshOrbit3 19s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+  will-change: transform;
+}
+
+.artwork-dock-underglow {
+  background-size: 240% 240%;
+  animation: dockGradientFlow 9s ease infinite;
+}
+
+.liquid-glass-music-dock {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.16) 0%,
+    rgba(255, 255, 255, 0.05) 48%,
+    rgba(15, 23, 42, 0.52) 100%
+  );
+  backdrop-filter: blur(36px) saturate(210%);
+  -webkit-backdrop-filter: blur(36px) saturate(210%);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.68),
+    0 6px 20px rgba(0, 0, 0, 0.4),
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.36),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+}
+
