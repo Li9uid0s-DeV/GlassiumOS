@@ -64,7 +64,8 @@ export type FluentIconType =
   | 'thermometer'
   | 'wind'
   | 'droplets'
-  | 'cloud';
+  | 'cloud'
+  | 'entertainment';
 
 const ICON_MAP: Record<string, FluentIconType> = {
   // Core Apps & Store IDs
@@ -76,6 +77,11 @@ const ICON_MAP: Record<string, FluentIconType> = {
   settings: 'settings',
   game: 'game',
   synth: 'synth',
+  entertainment: 'entertainment',
+  Tv: 'entertainment',
+  Film: 'entertainment',
+  Video: 'entertainment',
+  Clapperboard: 'entertainment',
   calendar: 'calendar',
   weather: 'weather',
   clock: 'clock',
@@ -1287,6 +1293,34 @@ export function FluentAppIcon({ name, size = 24, className = '', onClick }: Flue
             stroke={`url(#${rim})`}
             strokeWidth="1.2"
           />
+        </>
+      )}
+
+      {/* 59. ENTERTAINMENT APP ICON */}
+      {type === 'entertainment' && (
+        <>
+          <defs>
+            <linearGradient id={g1} x1="4" y1="8" x2="44" y2="40" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#f43f5e" />
+              <stop offset="50%" stopColor="#8b5cf6" />
+              <stop offset="100%" stopColor="#06b6d4" />
+            </linearGradient>
+            <linearGradient id={g2} x1="14" y1="14" x2="34" y2="34" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.95" />
+              <stop offset="100%" stopColor="#e2e8f0" stopOpacity="0.75" />
+            </linearGradient>
+          </defs>
+          {/* Main 3D Cinema TV Display Body */}
+          <rect x="5" y="9" width="38" height="28" rx="8" fill={`url(#${g1})`} filter={`url(#${sh})`} stroke={`url(#${rim})`} strokeWidth="1.2" />
+          {/* Screen Inner Bezel */}
+          <rect x="8" y="12" width="32" height="22" rx="5" fill="#090d16" fillOpacity="0.85" stroke="#ffffff" strokeOpacity="0.15" strokeWidth="0.8" />
+          {/* Glowing Play Gem in Screen Center */}
+          <polygon points="21,17 31,23 21,29" fill={`url(#${g2})`} filter={`url(#${sh})`} />
+          {/* Cinema Clapperboard / Film Perforations on Top Right */}
+          <circle cx="35" cy="16" r="1.8" fill="#f43f5e" />
+          <circle cx="35" cy="22" r="1.8" fill="#38bdf8" />
+          {/* TV Stand Base */}
+          <path d="M19 37 L29 37 L26 41 L22 41 Z" fill="#475569" stroke="#ffffff" strokeOpacity="0.3" strokeWidth="0.5" />
         </>
       )}
 

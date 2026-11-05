@@ -88,6 +88,8 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     posterUrl: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop&q=80',
     description: '魔王を倒した勇者一行のその後を描く後日譚ファンタジー。千年以上生きるエルフの魔法使いフリーレンが、人の心を知るための旅に出る。',
     episodesCount: 28,
+    tmdbId: 209867,
+    imdbId: 'tt22687790',
     youtubeId: 'qgQunxD0qMo',
     featured: true,
   },
@@ -102,6 +104,8 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     posterUrl: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=600&auto=format&fit=crop&q=80',
     description: '鬼殺隊最高位の剣士「柱」たちによる合同強化訓練が始まる。宿敵・鬼舞辻無惨との最終決戦に向け、炭治郎たちの過酷な修業の幕が上がる。',
     episodesCount: 8,
+    tmdbId: 85937,
+    imdbId: 'tt9335498',
     youtubeId: 'W3_n7wE4vY4',
     featured: true,
   },
@@ -459,34 +463,48 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     return list;
   }, [activeTab, selectedGenre, searchQuery]);
 
-  // Compute embed URL for current player & provider
+  // Compute embed URL for current player & provider (Prime Shows, StreameX, FlixHD, Maple TV, YouTube)
   const currentEmbedUrl = useMemo(() => {
     if (!selectedMedia) return '';
 
-    const ytId = selectedMedia.youtubeId || 'Way9Dexny3w';
+    const tmdbId = selectedMedia.tmdbId || 209867;
+    const imdbId = selectedMedia.imdbId || 'tt22687790';
+    const ep = currentEpisode || 1;
+    const isMovie = selectedMedia.type === 'movie';
 
     switch (provider) {
       case 'prime-shows':
-        // Prime Shows primary player mode: official trailer / episode stream overlay
-        return `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&modestbranding=1&rel=0&iv_load_policy=3`;
+        // Prime Shows stream embed server
+        if (isMovie) {
+          return `https://primeshow.top/embed/movie/${tmdbId}`;
+        }
+        return `https://primeshow.top/embed/tv/${tmdbId}/1/${ep}`;
 
       case 'streamex':
-        // StreameX mirror embed
-        return `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&modestbranding=1&color=white`;
+        if (isMovie) {
+          return `https://vidsrc.to/embed/movie/${tmdbId}`;
+        }
+        return `https://vidsrc.to/embed/tv/${tmdbId}/1/${ep}`;
 
       case 'flixhd':
-        // FlixHD 1080p mirror
-        return `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&vq=hd1080&rel=0`;
+        if (isMovie) {
+          return `https://vidsrc.me/embed/movie?imdb=${imdbId}`;
+        }
+        return `https://vidsrc.me/embed/tv?imdb=${imdbId}&season=1&episode=${ep}`;
 
       case 'mapletv':
-        // Maple TV mirror
-        return `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&controls=1`;
+        if (isMovie) {
+          return `https://embed.su/embed/movie/${tmdbId}`;
+        }
+        return `https://embed.su/embed/tv/${tmdbId}/1/${ep}`;
 
       case 'youtube':
-      default:
+      default: {
+        const ytId = selectedMedia.youtubeId || 'qgQunxD0qMo';
         return `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0`;
+      }
     }
-  }, [selectedMedia, provider]);
+  }, [selectedMedia, provider, currentEpisode]);
 
   const parseYoutubeInput = (raw: string): string | null => {
     const trimmed = raw.trim();

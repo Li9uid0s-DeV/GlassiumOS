@@ -19,6 +19,7 @@ import {
   testWispServerConnection,
 } from '../proxyService';
 import { useOS } from '../OSContext';
+import { globalAudio } from '../globalAudioManager';
 import { DrumPadTunerView } from './ExtraAppsSuite';
 
 type AppleMusicNavId =
@@ -250,6 +251,22 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   // Interactive Custom Lyric Editor State (LRC / TTML / JSON)
   const [showCustomLyricEditor, setShowCustomLyricEditor] = useState(false);
   const [customLyricInput, setCustomLyricInput] = useState('');
+
+  useEffect(() => {
+    const unsubscribe = globalAudio.subscribe((aState) => {
+      setIsPlaying(aState.isPlaying);
+      setIsBuffering(aState.isBuffering);
+      setCurrentTime(aState.currentTime);
+      if (aState.statusMessage) {
+        setStatusBanner(aState.statusMessage);
+      }
+      if (aState.track) {
+        setCurrentTrackId(aState.track.id);
+        setActiveTrackOverride(aState.track);
+      }
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -518,63 +535,16 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   }, [activeNav, loadMonochromeWebProxy, monoWebLoading, monoWebSrcDoc, monoWebSwSrc, monoWebUrl, proxyEngine, relayNode]);
 
   // -----------------------------------------------------------------------
-  // Playback Toggle & Track Changing (Exact Song Full-Length Stream)
+  // Playback Toggle & Track Changing (Exact Song Full-Length Stream via Global Audio)
   // -----------------------------------------------------------------------
   const startTrackPlayback = useCallback(
     (track: MonochromeTrack, startAtSec = 0) => {
       stopAllAudio();
       initAudioContext();
       fullPlayheadRef.current = startAtSec;
-
-      const resolvedUrl =
-        track.audioUrl ||
-        `./api/music/play?id=${encodeURIComponent(
-          track.monoTrackId || ''
-        )}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}`;
-
-      if (resolvedUrl && audioElRef.current) {
-        const audio = audioElRef.current;
-        audio.src = resolvedUrl;
-        audio.volume = isMuted ? 0 : volume;
-        audio.playbackRate = playbackRate;
-        audio.currentTime = startAtSec;
-        audio
-          .play()
-          .then(() => {
-            setStatusBanner(
-              `再生中 (${Math.floor(track.duration / 60)}:${String(
-                Math.floor(track.duration % 60)
-              ).padStart(2, '0')}): ${track.title} — ${track.artist}`
-            );
-          })
-          .catch((err) => {
-            console.warn('Audio play error, retrying with proxy query:', err);
-            // If direct play had issues, retry with explicit proxy=1
-            if (resolvedUrl.includes('/api/music/play') && !resolvedUrl.includes('proxy=1')) {
-              const proxyUrl = `${resolvedUrl}&proxy=1`;
-              audio.src = proxyUrl;
-              audio.volume = isMuted ? 0 : volume;
-              audio.playbackRate = playbackRate;
-              audio.currentTime = startAtSec;
-              audio
-                .play()
-                .then(() => {
-                  setStatusBanner(
-                    `再生中 (${Math.floor(track.duration / 60)}:${String(
-                      Math.floor(track.duration % 60)
-                    ).padStart(2, '0')}): ${track.title} — ${track.artist}`
-                  );
-                })
-                .catch(() => {
-                  setStatusBanner(`⚠️ 再生できませんでした: ${track.title} — ${track.artist}`);
-                  setIsPlaying(false);
-                });
-            } else {
-              setStatusBanner(`⚠️ 再生できませんでした: ${track.title} — ${track.artist}`);
-              setIsPlaying(false);
-            }
-          });
-      }
+      globalAudio.setVolume(isMuted ? 0 : volume);
+      globalAudio.setPlaybackRate(playbackRate);
+      globalAudio.playTrack(track, startAtSec);
     },
     [initAudioContext, isMuted, playbackRate, stopAllAudio, volume]
   );
@@ -588,7 +558,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         !trackToPlay.audioUrl.includes('mzstatic.com')
           ? trackToPlay.audioUrl
           : `./api/music/play?id=${encodeURIComponent(
-              trackToPlay.monoTrackId || ''
+              trackToPlay.monoTrackId || trackToPlay.id
             )}&title=${encodeURIComponent(trackToPlay.title)}&artist=${encodeURIComponent(
               trackToPlay.artist
             )}`;
@@ -613,8 +583,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         return [normalizedTrack, ...filtered].slice(0, 24);
       });
 
-      setIsBuffering(true);
-      setCurrentTime(0);
       setLyricOffsetSec(0);
       setUserScrolledLyrics(false);
       fullPlayheadRef.current = 0;
@@ -624,13 +592,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         loadLyricsForTrack(normalizedTrack);
       }
 
-      // Audio URL is routed through high-fidelity streaming proxy by default
-
-      setTimeout(() => {
-        setIsBuffering(false);
-        setIsPlaying(true);
-        startTrackPlayback(normalizedTrack, 0);
-      }, 60);
+      startTrackPlayback(normalizedTrack, 0);
     },
     [loadLyricsForTrack, startTrackPlayback]
   );
@@ -708,34 +670,25 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
   const togglePlay = useCallback(() => {
     if (isPlaying) {
-      setIsPlaying(false);
-      stopAllAudio();
+      globalAudio.pause();
     } else {
-      setIsBuffering(true);
-      setTimeout(() => {
-        setIsBuffering(false);
-        setIsPlaying(true);
-        startTrackPlayback(currentTrack, fullPlayheadRef.current);
-      }, 60);
+      if (currentTrack) {
+        if (globalAudio.getState().track?.id === currentTrack.id) {
+          globalAudio.resume();
+        } else {
+          startTrackPlayback(currentTrack, currentTime);
+        }
+      }
     }
-  }, [currentTrack, isPlaying, startTrackPlayback, stopAllAudio]);
+  }, [currentTrack, currentTime, isPlaying, startTrackPlayback]);
 
   const seekToSeconds = useCallback(
     (targetSec: number) => {
-      const clamped = Math.max(0, Math.min(currentTrack.duration, targetSec));
-      fullPlayheadRef.current = clamped;
-      setCurrentTime(clamped);
+      globalAudio.seek(targetSec);
+      setCurrentTime(targetSec);
       setUserScrolledLyrics(false);
-      if (audioElRef.current && currentTrack.audioUrl) {
-        const nativeDur = audioElRef.current.duration;
-        if (Number.isFinite(nativeDur) && nativeDur > 0) {
-          audioElRef.current.currentTime = Math.min(nativeDur - 0.2, clamped);
-        } else {
-          audioElRef.current.currentTime = clamped;
-        }
-      }
     },
-    [currentTrack.audioUrl, currentTrack.duration]
+    []
   );
 
   const nextTrack = useCallback(() => {
