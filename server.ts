@@ -955,6 +955,84 @@ Only output <os_action> if the user is asking to change an OS setting or open an
   });
 
   // -------------------------------------------------------------------------
+  // Live Mapple Movies API Endpoint
+  // -------------------------------------------------------------------------
+  app.get('/api/entertainment/mapple/movies', async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const q = String(req.query.q || '').trim();
+    const tmdbKey = 'a07e22bc18f5cb106bfe4cc1f83ad8ed';
+
+    try {
+      let rawItems: Array<{
+        id: number;
+        title?: string;
+        original_title?: string;
+        overview?: string;
+        poster_path?: string;
+        backdrop_path?: string;
+        release_date?: string;
+        vote_average?: number;
+      }> = [];
+
+      if (q) {
+        const searchUrl = `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(q)}&language=ja-JP&include_adult=false`;
+        const response = await fetch(searchUrl, { signal: AbortSignal.timeout(5000) });
+        if (response.ok) {
+          const data = (await response.json()) as { results?: typeof rawItems };
+          rawItems = data.results || [];
+        }
+      } else {
+        const [popRes, trendRes] = await Promise.all([
+          fetch(`https://api.themoviedb.org/3/movie/popular?api_key=${tmdbKey}&language=ja-JP&page=1`, {
+            signal: AbortSignal.timeout(4000),
+          }),
+          fetch(`https://api.themoviedb.org/3/trending/movie/day?api_key=${tmdbKey}&language=ja-JP`, {
+            signal: AbortSignal.timeout(4000),
+          }),
+        ]);
+        const popData = popRes.ok ? ((await popRes.json()) as { results?: typeof rawItems }) : { results: [] };
+        const trendData = trendRes.ok ? ((await trendRes.json()) as { results?: typeof rawItems }) : { results: [] };
+        const combined = [...(popData.results || []), ...(trendData.results || [])];
+        const seenIds = new Set<number>();
+        rawItems = combined.filter((item) => {
+          if (!item || !item.id || seenIds.has(item.id)) return false;
+          seenIds.add(item.id);
+          return true;
+        });
+      }
+
+      const formatted = rawItems.slice(0, 24).map((it) => {
+        const dateStr = it.release_date;
+        const year = dateStr ? new Date(dateStr).getFullYear() || 2024 : 2024;
+        const rating = Number((it.vote_average || 8.0).toFixed(1));
+        const posterUrl = it.poster_path
+          ? `https://image.tmdb.org/t/p/w500${it.poster_path}`
+          : 'https://image.tmdb.org/t/p/w500/1pdfLPo2kYGdPfLwIzvM0G2zYQw.jpg';
+        const backdropUrl = it.backdrop_path ? `https://image.tmdb.org/t/p/w1280${it.backdrop_path}` : undefined;
+
+        return {
+          id: `mapple-movie-${it.id}`,
+          title: it.title || it.original_title || 'Untitled Movie',
+          originalTitle: it.original_title || it.title,
+          type: 'movie',
+          year,
+          rating,
+          genre: ['映画', 'Mapple Stream', 'SF/アクション'],
+          posterUrl,
+          backdropUrl,
+          description: it.overview || 'mapple.fun 映画データベースからの作品詳細情報です。',
+          tmdbId: it.id,
+          embedUrl: `https://mapple.fun/embed/movie/${it.id}`,
+        };
+      });
+
+      res.json({ results: formatted, source: 'mapple.fun' });
+    } catch {
+      res.json({ results: [], source: 'mapple.fun' });
+    }
+  });
+
+  // -------------------------------------------------------------------------
   // Live TMDB & Mapple Entertainment Search Endpoints
   // -------------------------------------------------------------------------
   app.get('/api/entertainment/search', async (req, res) => {
@@ -1022,7 +1100,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
               : ['海外ドラマ', 'サスペンス', 'ドラマ'],
             posterUrl: it.poster_path
               ? `https://image.tmdb.org/t/p/w500${it.poster_path}`
-              : 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop&q=80',
+              : 'https://image.tmdb.org/t/p/w500/1pdfLPo2kYGdPfLwIzvM0G2zYQw.jpg',
             backdropUrl: it.backdrop_path ? `https://image.tmdb.org/t/p/w1280${it.backdrop_path}` : undefined,
             description: it.overview || '作品のあらすじ情報が準備中です。',
             episodesCount: isMovie ? undefined : 24,
@@ -1168,7 +1246,11 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         signal: AbortSignal.timeout(15000),
       });
 
-      res.setHeader('Content-Type', upstream.headers.get('content-type') || 'audio/mpeg');
+      const rawContentType = (upstream.headers.get('content-type') || '').toLowerCase();
+      const isAac = rawContentType.includes('aac') || targetStreamUrl.includes('.aac');
+      const cleanMime = isAac ? 'audio/aac' : 'audio/mpeg';
+
+      res.type(cleanMime);
       res.setHeader('Accept-Ranges', upstream.headers.get('accept-ranges') || 'bytes');
       const contentRange = upstream.headers.get('content-range');
       if (contentRange) res.setHeader('Content-Range', contentRange);
@@ -1197,7 +1279,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         nodeStream.pipe(res);
       } else {
         const ab = await upstream.arrayBuffer();
-        res.send(Buffer.from(ab));
+        res.end(Buffer.from(ab));
       }
     } catch (err) {
       if (!res.headersSent) {

@@ -85,7 +85,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2023,
     rating: 9.3,
     genre: ['ファンタジー', '冒険', 'ドラマ'],
-    posterUrl: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop&q=80',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/dqzenvhVVyv204vE0bK0Y9F7z3s.jpg',
     description: '魔王を倒した勇者一行のその後を描く後日譚ファンタジー。千年以上生きるエルフの魔法使いフリーレンが、人の心を知るための旅に出る。',
     episodesCount: 28,
     tmdbId: 209867,
@@ -101,7 +101,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2024,
     rating: 8.9,
     genre: ['ダークファンタジー', 'アクション', '時代劇'],
-    posterUrl: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=600&auto=format&fit=crop&q=80',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/xUfVStAEX3GjFvKJm1aZkZ9C7n.jpg',
     description: '鬼殺隊最高位の剣士「柱」たちによる合同強化訓練が始まる。宿敵・鬼舞辻無惨との最終決戦に向け、炭治郎たちの過酷な修業の幕が上がる。',
     episodesCount: 8,
     tmdbId: 85937,
@@ -117,7 +117,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2023,
     rating: 8.8,
     genre: ['オカルト', 'バトルアクション', 'ダークファンタジー'],
-    posterUrl: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=600&auto=format&fit=crop&q=80',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/hEuoGknVsnw226e6cE2k8.jpg',
     description: '五条悟と夏油傑の高専時代、そしてハロウィンの渋谷を舞台に繰り広げられる未曾有の呪霊テロ。特級呪術師たちの激突を描く。',
     episodesCount: 23,
     youtubeId: 'O6qVieflwqs',
@@ -130,7 +130,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2024,
     rating: 8.5,
     genre: ['異世界', 'アクション', 'ゲーム・ファンタジー'],
-    posterUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&auto=format&fit=crop&q=80',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr1viJuBDV4j6eb.jpg',
     description: '人類最弱兵器と呼ばれたE級ハンター水篠旬が、死の淵で手に入れた「自分だけが見えるクエスト画面」を通じて最強のS級へと成長していく。',
     episodesCount: 12,
     youtubeId: 'cR5gZk8G7nE',
@@ -143,7 +143,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2024,
     rating: 8.7,
     genre: ['サスペンス', '芸能界', 'ドラマ'],
-    posterUrl: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/1X6Y4sK8n9Z6E035e.jpg',
     description: '伝説のアイドル・アイの死の真相を追うアクアとルビー。2.5次元舞台「東京ブレイド」編を舞台に役者たちの熱き演技バトルが幕を開ける。',
     episodesCount: 13,
     youtubeId: '1n_k_0t_WpM',
@@ -156,7 +156,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2024,
     rating: 8.6,
     genre: ['グルメ', 'ファンタジー', 'コメディ'],
-    posterUrl: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&auto=format&fit=crop&q=80',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/1pdfLPo2kYGdPfLwIzvM0G2zYQw.jpg',
     description: 'レッドドラゴンに食べられた妹を救うため、魔物を狩って自給自足で料理しながら深層を目指す異色グルメファンタジー。',
     episodesCount: 24,
     youtubeId: 'c1uY1b-7Vjg',
@@ -171,7 +171,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2024,
     rating: 8.6,
     genre: ['SF', 'アドベンチャー', 'アクション'],
-    posterUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/1pdfLPo2kYGdPfLwIzvM0G2zYQw.jpg',
     description: '宇宙の命運を握る砂の惑星アラキス。ポール・アトレイデスがチャニやフレメンたちと手を組み、一族を滅ぼした宿敵ハルコンネン家への復讐に立ち向かう。',
     youtubeId: 'Way9Dexny3w',
     featured: true,
@@ -184,7 +184,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2023,
     rating: 8.9,
     genre: ['伝記', '歴史', 'サスペンス'],
-    posterUrl: 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=600&auto=format&fit=crop&q=80',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGvF8Z1nOHb.jpg',
     description: 'クリストファー・ノーラン監督作品。マンハッタン計画を指揮し原子爆弾を生み出した天才物理学者J・ロバート・オッペンハイマーの光と影。',
     youtubeId: 'uYPbbksJxIg',
   },
@@ -196,7 +196,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2014,
     rating: 8.7,
     genre: ['SF', 'ドラマ', 'アドベンチャー'],
-    posterUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&auto=format&fit=crop&q=80',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg',
     description: '地球の寿命が尽きかけ、人類滅亡の危機に瀕した近未来。愛する家族を残し、人類の居住可能な新たな惑星を探すためワームホールを越える探査チームの旅。',
     youtubeId: 'zSWdZVtXT7E',
   },
@@ -208,7 +208,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2023,
     rating: 8.7,
     genre: ['アニメーション', 'アクション', 'SF'],
-    posterUrl: 'https://images.unsplash.com/photo-1635805737707-575885ab0820?w=600&auto=format&fit=crop&q=80',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/8Vt6mWEReuy4Of61Lnj5Xj7sfs8.jpg',
     description: 'マルチバースを自在に渡り歩くスパイダー・ソサエティに出会ったマイルス・モラレス。自らの愛する人を救うか、マルチバースの秩序を守るかの選択を迫られる。',
     youtubeId: 'cqGjhVJWtEg',
   },
@@ -222,7 +222,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2024,
     rating: 8.7,
     genre: ['時代劇', '歴史ドラマ', 'アドベンチャー'],
-    posterUrl: 'https://images.unsplash.com/photo-1528164344705-475426879c0d?w=600&auto=format&fit=crop&q=80',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/7O4iVfJ9YwYHQ1vbgVzM32D3P1s.jpg',
     description: '天下分け目の関ヶ原前夜。戦国最強の武将・吉井虎長と、難破して日本に漂着した英国人航海士ジョン・ブラックソーンの運命が交錯する超大作戦国ドラマ。',
     episodesCount: 10,
     youtubeId: 'yBLHX-pE_V4',
@@ -236,7 +236,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2024,
     rating: 8.4,
     genre: ['SF', 'ブラックコメディ', 'ポストアポカリプス'],
-    posterUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=600&auto=format&fit=crop&q=80',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/27278272.jpg',
     description: '核戦争から200年後の荒廃したロサンゼルス。地下シェルター「Vault 33」から初めて過酷なウェイストランドへ飛び出したルーシーの波乱に満ちたサバイバル。',
     episodesCount: 8,
     youtubeId: 'V-mugKDQDlg',
@@ -249,7 +249,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2022,
     rating: 8.7,
     genre: ['SFホラー', 'ミステリー', '80sレトロ'],
-    posterUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/xUfVStAEX3GjFvKJm1aZkZ9C7n.jpg',
     description: '1980年代のインディアナ州ホーキンス。少年の失踪事件をきっかけに、町に潜む秘密研究所、超能力を持つ謎の少女、そして「裏側の世界」の脅威が姿を現す。',
     episodesCount: 34,
     youtubeId: 'b9EkMc79ZSU',
@@ -262,7 +262,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2022,
     rating: 8.6,
     genre: ['サイバーパンク', 'クライム', 'SFアクション'],
-    posterUrl: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&auto=format&fit=crop&q=80',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/dqzenvhVVyv204vE0bK0Y9F7z3s.jpg',
     description: 'テクノロジーと身体改造に狂乱したメガシティ・ナイトシティ。すべてを失ったストリートキッドのデイビッドが傭兵「エッジランナー」として頂点を目指す。',
     episodesCount: 10,
     youtubeId: 'JtqIas3bYhg',
@@ -274,7 +274,7 @@ const CURATED_YOUTUBE_VIDEOS: YouTubeVideoItem[] = [
     id: 'W3_n7wE4vY4',
     title: 'テレビアニメ「鬼滅の刃」柱稽古編 公式本予告 PV',
     channelTitle: 'アニプレックス チャンネル',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=600&auto=format&fit=crop&q=80',
+    thumbnailUrl: 'https://img.youtube.com/vi/W3_n7wE4vY4/hqdefault.jpg',
     views: '450万回視聴',
     category: 'anime',
   },
@@ -282,7 +282,7 @@ const CURATED_YOUTUBE_VIDEOS: YouTubeVideoItem[] = [
     id: 'qgQunxD0qMo',
     title: 'TVアニメ『葬送のフリーレン』本PV／主題歌：YOASOBI「勇者」',
     channelTitle: 'TOHO animation チャンネル',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=600&auto=format&fit=crop&q=80',
+    thumbnailUrl: 'https://img.youtube.com/vi/qgQunxD0qMo/hqdefault.jpg',
     views: '890万回視聴',
     category: 'anime',
   },
@@ -290,7 +290,7 @@ const CURATED_YOUTUBE_VIDEOS: YouTubeVideoItem[] = [
     id: 'mNEUkkoUoIA',
     title: 'YOASOBI「夜に駆ける」Official Music Video',
     channelTitle: 'Ayase / YOASOBI',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80',
+    thumbnailUrl: 'https://img.youtube.com/vi/mNEUkkoUoIA/hqdefault.jpg',
     views: '2.8億回視聴',
     category: 'music',
   },
@@ -298,7 +298,7 @@ const CURATED_YOUTUBE_VIDEOS: YouTubeVideoItem[] = [
     id: 'jfKfPfyJRdk',
     title: 'lofi hip hop radio - beats to relax/study to',
     channelTitle: 'Lofi Girl',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&auto=format&fit=crop&q=80',
+    thumbnailUrl: 'https://img.youtube.com/vi/jfKfPfyJRdk/hqdefault.jpg',
     views: 'LIVE · 4.8万人視聴中',
     category: 'lofi',
   },
@@ -306,7 +306,7 @@ const CURATED_YOUTUBE_VIDEOS: YouTubeVideoItem[] = [
     id: 'Way9Dexny3w',
     title: '映画『デューン 砂の惑星PART2』本予告 3分特別映像',
     channelTitle: 'ワーナー ブラザース 公式',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?w=600&auto=format&fit=crop&q=80',
+    thumbnailUrl: 'https://img.youtube.com/vi/Way9Dexny3w/hqdefault.jpg',
     views: '320万回視聴',
     category: 'tech',
   },
@@ -314,7 +314,7 @@ const CURATED_YOUTUBE_VIDEOS: YouTubeVideoItem[] = [
     id: 'c1uY1b-7Vjg',
     title: 'TVアニメ『ダンジョン飯』第1シーズン OPノンクレジット「Sleep Walking Orchestra」BUMP OF CHICKEN',
     channelTitle: 'KADOKAWAanime',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&auto=format&fit=crop&q=80',
+    thumbnailUrl: 'https://img.youtube.com/vi/c1uY1b-7Vjg/hqdefault.jpg',
     views: '610万回視聴',
     category: 'anime',
   },
@@ -322,7 +322,7 @@ const CURATED_YOUTUBE_VIDEOS: YouTubeVideoItem[] = [
     id: '8yvGCAvOAfM',
     title: 'Unreal Engine 5.4 - Next-Gen Photorealism Realtime Tech Showcase',
     channelTitle: 'Unreal Engine',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=600&auto=format&fit=crop&q=80',
+    thumbnailUrl: 'https://img.youtube.com/vi/8yvGCAvOAfM/hqdefault.jpg',
     views: '230万回視聴',
     category: 'gaming',
   },
@@ -330,7 +330,7 @@ const CURATED_YOUTUBE_VIDEOS: YouTubeVideoItem[] = [
     id: 'yBLHX-pE_V4',
     title: '『SHOGUN 将軍』公式本予告編 (真田広之 主演・プロデュース)',
     channelTitle: 'ディズニープラス公式',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1528164344705-475426879c0d?w=600&auto=format&fit=crop&q=80',
+    thumbnailUrl: 'https://img.youtube.com/vi/yBLHX-pE_V4/hqdefault.jpg',
     views: '1,200万回視聴',
     category: 'tech',
   },
@@ -438,7 +438,36 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
   const isWatchlisted = (id: string) => watchlist.includes(id);
 
   const [onlineSearchResults, setOnlineSearchResults] = useState<MediaItem[]>([]);
+  const [mappleMovies, setMappleMovies] = useState<MediaItem[]>([]);
   const [isSearchingOnline, setIsSearchingOnline] = useState(false);
+
+  // Fetch movies from mapple.fun API
+  const fetchMappleMovies = useCallback(async (q?: string) => {
+    setIsSearchingOnline(true);
+    try {
+      const res = await fetch(`./api/entertainment/mapple/movies?q=${encodeURIComponent(q || '')}`);
+      if (res.ok) {
+        const data = (await res.json()) as { results?: MediaItem[] };
+        if (Array.isArray(data.results) && data.results.length > 0) {
+          setMappleMovies(data.results);
+          if (!isPlayingCinema && activeTab === 'movies') {
+            setSelectedMedia(data.results[0]);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch mapple movies:', err);
+    } finally {
+      setIsSearchingOnline(false);
+    }
+  }, [activeTab, isPlayingCinema]);
+
+  // Initial fetch for Mapple movies on mount or when tab becomes 'movies'
+  useEffect(() => {
+    if (activeTab === 'movies' && mappleMovies.length === 0) {
+      fetchMappleMovies();
+    }
+  }, [activeTab, mappleMovies.length, fetchMappleMovies]);
 
   // Debounced live TMDB / Mapple search fetch
   useEffect(() => {
@@ -452,7 +481,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     const timer = setTimeout(async () => {
       setIsSearchingOnline(true);
       try {
-        const res = await fetch(`./api/entertainment/search?q=${encodeURIComponent(q)}`);
+        const res = await fetch(`./api/entertainment/mapple/movies?q=${encodeURIComponent(q)}`);
         if (res.ok) {
           const data = (await res.json()) as { results?: MediaItem[] };
           if (Array.isArray(data.results) && data.results.length > 0) {
@@ -487,10 +516,10 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     }
   }, [selectedMedia?.tmdbId, selectedMedia?.type]);
 
-  // Filter media based on tab, genre, and search (combining local catalog + live TMDB search)
+  // Filter media based on tab, genre, and search (combining mapple movies + live TMDB search + local catalog)
   const filteredCatalog = useMemo(() => {
-    let list = [...onlineSearchResults, ...CURATED_MEDIA_CATALOG];
-    // Deduplicate by tmdbId or title
+    let list = [...onlineSearchResults, ...mappleMovies, ...CURATED_MEDIA_CATALOG];
+    // Deduplicate by tmdbId or title or id
     const seen = new Set<string>();
     list = list.filter((m) => {
       const key = m.tmdbId ? `tmdb-${m.tmdbId}` : m.id;
@@ -520,7 +549,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
       );
     }
     return list;
-  }, [onlineSearchResults, activeTab, selectedGenre, searchQuery]);
+  }, [onlineSearchResults, mappleMovies, activeTab, selectedGenre, searchQuery]);
 
   // Compute embed URL for current player & provider (mapple.fun, StreameX, FlixHD, Maple TV, YouTube)
   const currentEmbedUrl = useMemo(() => {
