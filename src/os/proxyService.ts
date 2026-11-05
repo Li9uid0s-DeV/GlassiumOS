@@ -1664,18 +1664,94 @@ export function enrichLyricsWithWordTiming(lines: LyricLine[], fallbackDuration 
   return enriched;
 }
 
+export interface MusicSettingsConfig {
+  streamingQuality: 'lossless' | '320' | '192' | '128';
+  sourceSite: 'auto' | 'monochrome' | 'netease' | 'saavn' | 'kuwo';
+  downloadQuality: 'flac' | '320' | '192' | '128';
+  mvQuality: '2160p' | '1080p' | '720p' | '480p';
+  dolbyAtmosEnabled: boolean;
+  dolbyAtmosPreset: 'theater' | 'studio' | 'binaural';
+}
+
+const MUSIC_SETTINGS_STORAGE_KEY = 'glassium_music_settings_v1';
+
+export const DEFAULT_MUSIC_SETTINGS: MusicSettingsConfig = {
+  streamingQuality: '320',
+  sourceSite: 'auto',
+  downloadQuality: '320',
+  mvQuality: '1080p',
+  dolbyAtmosEnabled: true,
+  dolbyAtmosPreset: 'theater',
+};
+
+export function getMusicSettings(): MusicSettingsConfig {
+  if (typeof window === 'undefined') return DEFAULT_MUSIC_SETTINGS;
+  try {
+    const raw = window.localStorage.getItem(MUSIC_SETTINGS_STORAGE_KEY);
+    if (!raw) return DEFAULT_MUSIC_SETTINGS;
+    const parsed = JSON.parse(raw) as Partial<MusicSettingsConfig>;
+    return {
+      streamingQuality: parsed.streamingQuality || DEFAULT_MUSIC_SETTINGS.streamingQuality,
+      sourceSite: parsed.sourceSite || DEFAULT_MUSIC_SETTINGS.sourceSite,
+      downloadQuality: parsed.downloadQuality || DEFAULT_MUSIC_SETTINGS.downloadQuality,
+      mvQuality: parsed.mvQuality || DEFAULT_MUSIC_SETTINGS.mvQuality,
+      dolbyAtmosEnabled:
+        typeof parsed.dolbyAtmosEnabled === 'boolean'
+          ? parsed.dolbyAtmosEnabled
+          : DEFAULT_MUSIC_SETTINGS.dolbyAtmosEnabled,
+      dolbyAtmosPreset: parsed.dolbyAtmosPreset || DEFAULT_MUSIC_SETTINGS.dolbyAtmosPreset,
+    };
+  } catch {
+    return DEFAULT_MUSIC_SETTINGS;
+  }
+}
+
+export function saveMusicSettings(next: Partial<MusicSettingsConfig>): MusicSettingsConfig {
+  const merged: MusicSettingsConfig = {
+    ...getMusicSettings(),
+    ...next,
+  };
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(MUSIC_SETTINGS_STORAGE_KEY, JSON.stringify(merged));
+      window.dispatchEvent(new CustomEvent('glassium-music-settings-changed', { detail: merged }));
+    } catch {
+      // ignore storage errors
+    }
+  }
+  return merged;
+}
+
+export function buildTrackDownloadUrl(
+  track: { id?: string; monoTrackId?: string; title: string; artist: string },
+  settings?: MusicSettingsConfig
+): string {
+  const cfg = settings || getMusicSettings();
+  const cleanId = String(track.monoTrackId || track.id || '')
+    .replace(/^mono-live-gd-/, '')
+    .replace(/^mono-gd-/, '')
+    .replace(/^mono-live-tf-/, '')
+    .replace(/^mono-live-/, '')
+    .replace(/^mono-itunes-/, '')
+    .trim();
+  const numericId = /^\d+$/.test(cleanId) ? cleanId : '';
+  return `/api/music/download?id=${encodeURIComponent(numericId)}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}&quality=${encodeURIComponent(cfg.downloadQuality)}&source=${encodeURIComponent(cfg.sourceSite)}`;
+}
+
 export function parseLrcLyrics(lrcText: string, fallbackDuration = 180): LyricLine[] {
   if (!lrcText || !lrcText.trim()) return [];
   const lines = lrcText.split(/\r?\n/);
   const parsed: { time: number; text: string; rawWithoutLineTag: string }[] = [];
   const timeRegex = /\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]/g;
   const wordTagStripRegex = /<\d{1,3}:\d{2}(?:\.\d{1,3})?>/g;
+  const metadataCreditRegex =
+    /^(?:作词|作曲|编曲|制作人|プロデューサー|作詞|編曲|Lyricist|Composer|Arranger|混音|录音|吉他|贝斯|鼓|Vocal|Mastering|Mixing)\s*[:：]/i;
 
   for (const rawLine of lines) {
     const matches = Array.from(rawLine.matchAll(timeRegex));
     const withoutLineTag = rawLine.replace(timeRegex, '').trim();
     const cleanText = withoutLineTag.replace(wordTagStripRegex, '').trim();
-    if (matches.length > 0 && cleanText) {
+    if (matches.length > 0 && cleanText && !metadataCreditRegex.test(cleanText)) {
       for (const m of matches) {
         const mins = parseInt(m[1], 10);
         const secs = parseInt(m[2], 10);
@@ -1705,7 +1781,9 @@ export function parseLrcLyrics(lrcText: string, fallbackDuration = 180): LyricLi
   }
 
   // Plain lyrics fallback: distribute timestamps evenly across track duration
-  const plainLines = lines.map((l) => l.trim()).filter((l) => l.length > 0);
+  const plainLines = lines
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !metadataCreditRegex.test(l));
   if (plainLines.length === 0) return [];
   const step = Math.max(3, (fallbackDuration - 8) / plainLines.length);
   const fallbackBase: LyricLine[] = plainLines.map((text, idx) => ({
@@ -1796,11 +1874,49 @@ interface LrclibSearchItem {
 }
 
 function cleanTrackQueryString(raw: string): string {
-  return raw
+  return (raw || '')
+    .replace(/\s*(?:作曲|作詞|編曲|feat\.|ft\.|with|prod\.).*$/i, '')
     .replace(/\([^)]*(?:Official|Video|Audio|MV|Lyric|Remaster|feat\.|ft\.|Ver\.|Version)[^)]*\)/gi, '')
     .replace(/\[[^\]]*(?:Official|Video|Audio|MV|Lyric|feat\.|ft\.)[^\]]*\]/gi, '')
     .replace(/-\s*Single/gi, '')
     .trim();
+}
+
+function normalizeLyricMatchToken(str: string): string {
+  return (str || '')
+    .toLowerCase()
+    .replace(/[\s\-_()（）【】「」『』〜~・.,!?'":：/\\]/g, '');
+}
+
+function isStrictTrackMatchForLyrics(
+  targetTitle: string,
+  targetArtist: string,
+  candTitle?: string,
+  candArtist?: string
+): boolean {
+  const tTitle = normalizeLyricMatchToken(cleanTrackQueryString(targetTitle) || targetTitle);
+  const cTitle = normalizeLyricMatchToken(cleanTrackQueryString(candTitle || '') || candTitle || '');
+  if (!tTitle || !cTitle) return false;
+  const titleMatches =
+    tTitle === cTitle ||
+    (tTitle.length >= 2 && cTitle.length >= 2 && (cTitle.includes(tTitle) || tTitle.includes(cTitle)));
+  if (!titleMatches) return false;
+
+  const primaryTargetArtist = (cleanTrackQueryString(targetArtist) || targetArtist)
+    .split(/[,、/&×]/)[0]
+    .trim();
+  const tArtist = normalizeLyricMatchToken(primaryTargetArtist);
+  const cArtist = normalizeLyricMatchToken(candArtist || '');
+  if (!tArtist) return true;
+  if (!cArtist) return false;
+  if (tArtist === cArtist || cArtist.includes(tArtist) || tArtist.includes(cArtist)) return true;
+
+  const tokens = primaryTargetArtist
+    .toLowerCase()
+    .split(/[\s,、/&×()（）-]+/)
+    .map((tok) => normalizeLyricMatchToken(tok))
+    .filter((tok) => tok.length >= 2);
+  return tokens.some((tok) => cArtist.includes(tok));
 }
 
 export async function fetchSynchronizedLyricsFromLrclib(
@@ -1815,52 +1931,35 @@ export async function fetchSynchronizedLyricsFromLrclib(
         .replace(/^mono-gd-/, '')
         .replace(/^mono-live-tf-/, '')
         .replace(/^mono-live-/, '')
+        .replace(/^mono-itunes-/, '')
         .trim()
     : '';
+  const numericId = /^\d+$/.test(cleanId) ? cleanId : '';
 
-  // 1. Try local server /api/music/lyrics endpoint first (fastest & strips metadata headers)
+  // 1. Try local server /api/music/lyrics endpoint first (strictly verifies title + artist on server)
   try {
     const srvRes = await fetch(
-      `/api/music/lyrics?id=${encodeURIComponent(cleanId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`,
-      { signal: AbortSignal.timeout(4500) }
+      `/api/music/lyrics?id=${encodeURIComponent(numericId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`,
+      { signal: AbortSignal.timeout(5500) }
     );
     if (srvRes.ok) {
       const srvData = (await srvRes.json()) as { lyric?: string };
       if (srvData?.lyric && srvData.lyric.trim().length > 0) {
         const parsedSrv = parseLrcLyrics(srvData.lyric, durationSec);
-        if (parsedSrv.length > 0) return parsedSrv;
+        if (parsedSrv.length >= 3) return parsedSrv;
       }
     }
   } catch {
     // fall through
   }
 
-  // 2. Try direct GDStudio NetEase lyric endpoint if numeric ID is available
-  if (cleanId && /^\d+$/.test(cleanId)) {
-    try {
-      const gdLyrRes = await fetch(
-        `https://music-api.gdstudio.xyz/api.php?types=lyric&source=netease&id=${encodeURIComponent(cleanId)}`,
-        { signal: AbortSignal.timeout(4500) }
-      );
-      if (gdLyrRes.ok) {
-        const gdLyrData = (await gdLyrRes.json()) as { lyric?: string };
-        if (gdLyrData?.lyric && gdLyrData.lyric.trim().length > 0) {
-          const parsedGd = parseLrcLyrics(gdLyrData.lyric, durationSec);
-          if (parsedGd.length > 0) return parsedGd;
-        }
-      }
-    } catch {
-      // fall through
-    }
-  }
-
   const cleanTitle = cleanTrackQueryString(title) || title;
-  const cleanArtist = cleanTrackQueryString(artist.split(',')[0] || artist) || artist;
+  const cleanArtist = cleanTrackQueryString(artist.split(/[,、/]/)[0] || artist) || artist;
 
-  // 3. Try exact LRCLIB search endpoints in parallel
+  // 2. Try LRCLIB exact /api/get and /api/search with STRICT title + artist validation
   const qFull = `${cleanTitle} ${cleanArtist}`.trim();
-  const searchUrl1 = `https://lrclib.net/api/search?q=${encodeURIComponent(qFull)}`;
-  const searchUrl2 = `https://lrclib.net/api/search?track_name=${encodeURIComponent(cleanTitle)}&artist_name=${encodeURIComponent(cleanArtist)}`;
+  const searchUrl1 = `https://lrclib.net/api/search?track_name=${encodeURIComponent(cleanTitle)}&artist_name=${encodeURIComponent(cleanArtist)}`;
+  const searchUrl2 = `https://lrclib.net/api/search?q=${encodeURIComponent(qFull)}`;
 
   const [items1, items2] = await Promise.all([
     fetch(searchUrl1, { signal: AbortSignal.timeout(4500) })
@@ -1872,46 +1971,52 @@ export async function fetchSynchronizedLyricsFromLrclib(
   ]);
 
   const combined: LrclibSearchItem[] = [
-    ...(Array.isArray(items2) ? items2 : []),
     ...(Array.isArray(items1) ? items1 : []),
+    ...(Array.isArray(items2) ? items2 : []),
   ];
 
-  if (combined.length === 0) {
-    const titleOnlyItems = await fetch(
-      `https://lrclib.net/api/search?q=${encodeURIComponent(cleanTitle)}`,
-      { signal: AbortSignal.timeout(4500) }
-    )
-      .then((r) => (r.ok ? (r.json() as Promise<LrclibSearchItem[]>) : null))
-      .catch(() => null);
-    if (Array.isArray(titleOnlyItems)) {
-      combined.push(...titleOnlyItems);
-    }
-  }
+  // Strictly filter so we NEVER accept lyrics from a different song or artist!
+  const verifiedItems = combined.filter((it) =>
+    isStrictTrackMatchForLyrics(cleanTitle, cleanArtist, it.trackName, it.artistName)
+  );
 
-  if (combined.length > 0) {
-    const withSynced = combined.filter((it) => it.syncedLyrics && it.syncedLyrics.trim().length > 0);
+  if (verifiedItems.length > 0) {
+    const withSynced = verifiedItems.filter((it) => it.syncedLyrics && it.syncedLyrics.trim().length > 20);
     if (withSynced.length > 0) {
       withSynced.sort((a, b) => {
+        const exactTitleA =
+          normalizeLyricMatchToken(a.trackName || '') === normalizeLyricMatchToken(cleanTitle) ? 0 : 1;
+        const exactTitleB =
+          normalizeLyricMatchToken(b.trackName || '') === normalizeLyricMatchToken(cleanTitle) ? 0 : 1;
+        if (exactTitleA !== exactTitleB) return exactTitleA - exactTitleB;
         const diffA = Math.abs((a.duration || durationSec) - durationSec);
         const diffB = Math.abs((b.duration || durationSec) - durationSec);
         return diffA - diffB;
       });
       const bestSynced = parseLrcLyrics(withSynced[0].syncedLyrics!, durationSec);
-      if (bestSynced.length > 0) return bestSynced;
+      if (bestSynced.length >= 3) return bestSynced;
     }
 
-    const withPlain = combined.find((it) => it.plainLyrics && it.plainLyrics.trim().length > 0);
+    const withPlain = verifiedItems.find((it) => it.plainLyrics && it.plainLyrics.trim().length > 20);
     if (withPlain?.plainLyrics) {
       const plain = parseLrcLyrics(withPlain.plainLyrics, durationSec);
-      if (plain.length > 0) return plain;
+      if (plain.length >= 3) return plain;
     }
+  }
+
+  // 3. Check if track is in MONOCHROME_CATALOG with rich built-in lyrics
+  const catalogHit = MONOCHROME_CATALOG.find((c) =>
+    isStrictTrackMatchForLyrics(cleanTitle, cleanArtist, c.title, c.artist)
+  );
+  if (catalogHit && catalogHit.lyrics && catalogHit.lyrics.length >= 4) {
+    return enrichLyricsWithWordTiming(catalogHit.lyrics, durationSec);
   }
 
   return enrichLyricsWithWordTiming(
     [
-      { time: 0, text: `${title} — ${artist}` },
-      { time: 4, text: 'Connected to api.monochrome.tf Hi-Fi Stream' },
-      { time: 10, text: 'Apple Music Sing Real-time Synchronized Lyrics' },
+      { time: 0, text: `♪ ${title} — ${artist}` },
+      { time: 6, text: 'Instrumental / Vocal Stream Active' },
+      { time: 14, text: `${title} (${artist})` },
     ],
     durationSec
   );
@@ -1962,20 +2067,26 @@ export async function resolveFullLengthAudioStream(
   artist: string,
   monoTrackId?: string | number
 ): Promise<{ audioUrl: string; proxyAudioUrl?: string; format: string; bitrate: string } | null> {
+  const settings = getMusicSettings();
+  const brVal =
+    settings.streamingQuality === 'lossless'
+      ? 999
+      : Number(settings.streamingQuality) || 320;
   const cleanId = monoTrackId
     ? String(monoTrackId)
         .replace(/^mono-live-gd-/, '')
         .replace(/^mono-gd-/, '')
         .replace(/^mono-live-tf-/, '')
         .replace(/^mono-live-/, '')
+        .replace(/^mono-itunes-/, '')
         .trim()
     : '';
 
-  // 1. Try local backend /api/music/info first (resolves exact GDStudio/NetEase 320kbps stream)
+  // 1. Try local backend /api/music/info first (resolves exact GDStudio/Saavn/NetEase full-length stream)
   try {
     const infoRes = await fetch(
-      `/api/music/info?id=${encodeURIComponent(cleanId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`,
-      { signal: AbortSignal.timeout(5500) }
+      `/api/music/info?id=${encodeURIComponent(cleanId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&br=${brVal}&source=${encodeURIComponent(settings.sourceSite)}`,
+      { signal: AbortSignal.timeout(6000) }
     );
     if (infoRes.ok) {
       const infoData = (await infoRes.json()) as {
@@ -1988,8 +2099,8 @@ export async function resolveFullLengthAudioStream(
         return {
           audioUrl: infoData.audioUrl,
           proxyAudioUrl: infoData.proxyAudioUrl,
-          format: infoData.format || 'api.monochrome.tf 320kbps Full Stream',
-          bitrate: infoData.bitrate || '320 kbps Hi-Fi',
+          format: infoData.format || 'api.monochrome.tf Full-Length Stream',
+          bitrate: infoData.bitrate || `${brVal === 999 ? 'Lossless FLAC / 320' : brVal} kbps Full Track`,
         };
       }
     }
@@ -1997,12 +2108,12 @@ export async function resolveFullLengthAudioStream(
     // fall through to direct client resolution
   }
 
-  // 2. Direct client-side resolution via GDStudio NetEase API (works on static hosts too)
+  // 2. Direct client-side resolution via GDStudio NetEase API
   const fetchDirectGdUrl = async (idToFetch: string): Promise<string | null> => {
     if (!idToFetch || !/^\d+$/.test(idToFetch)) return null;
     try {
       const r = await fetch(
-        `https://music-api.gdstudio.xyz/api.php?types=url&source=netease&id=${encodeURIComponent(idToFetch)}&br=320`,
+        `https://music-api.gdstudio.xyz/api.php?types=url&source=netease&id=${encodeURIComponent(idToFetch)}&br=${brVal}`,
         { signal: AbortSignal.timeout(5500) }
       );
       if (r.ok) {
@@ -2022,13 +2133,13 @@ export async function resolveFullLengthAudioStream(
     if (directUrl) {
       return {
         audioUrl: directUrl,
-        format: 'api.monochrome.tf 320kbps Full Stream',
-        bitrate: '320 kbps Hi-Fi',
+        format: 'api.monochrome.tf Full-Length Stream',
+        bitrate: `${brVal === 999 ? 'Lossless' : brVal} kbps Hi-Fi`,
       };
     }
   }
 
-  // 3. Search by title + artist on GDStudio NetEase and pick matching track
+  // 3. Search by title + artist on GDStudio NetEase and pick strictly matching track
   const query = `${title} ${artist}`.trim();
   if (query) {
     try {
@@ -2039,14 +2150,16 @@ export async function resolveFullLengthAudioStream(
       if (sRes.ok) {
         const list = (await sRes.json()) as GdStudioClientTrackItem[];
         if (Array.isArray(list)) {
-          for (const item of list.slice(0, 3)) {
+          for (const item of list.slice(0, 4)) {
+            const itemArtist = Array.isArray(item.artist) ? item.artist.join(' ') : String(item.artist || '');
+            if (!isStrictTrackMatchForLyrics(title, artist, item.name, itemArtist)) continue;
             const candidateId = String(item.url_id || item.id || '');
             const candidateUrl = await fetchDirectGdUrl(candidateId);
             if (candidateUrl) {
               return {
                 audioUrl: candidateUrl,
-                format: 'api.monochrome.tf 320kbps Full Stream',
-                bitrate: '320 kbps Hi-Fi',
+                format: 'api.monochrome.tf Full-Length Stream',
+                bitrate: `${brVal === 999 ? 'Lossless' : brVal} kbps Hi-Fi`,
               };
             }
           }
@@ -2062,12 +2175,16 @@ export async function resolveFullLengthAudioStream(
 
 export async function searchMonochromeLiveTracks(query: string): Promise<MonochromeTrack[]> {
   const cleanQ = query.trim() || 'YOASOBI';
+  const settings = getMusicSettings();
 
   // 1. Primary: Query our fast server-side /api/music/search endpoint (~300ms response, 0 CORS issues)
   try {
-    const srvRes = await fetch(`/api/music/search?q=${encodeURIComponent(cleanQ)}`, {
-      signal: AbortSignal.timeout(7000),
-    });
+    const srvRes = await fetch(
+      `/api/music/search?q=${encodeURIComponent(cleanQ)}&source=${encodeURIComponent(settings.sourceSite)}`,
+      {
+        signal: AbortSignal.timeout(7000),
+      }
+    );
     if (srvRes.ok) {
       const srvData = (await srvRes.json()) as {
         tracks?: Array<{

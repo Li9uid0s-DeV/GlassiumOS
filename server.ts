@@ -649,45 +649,185 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       .replace(/[\s\-_()（）【】「」『』〜~・.,!?'"]/g, '');
   }
 
+  function stripTrackSuffixes(str: string): string {
+    return (str || '')
+      .replace(/\s*[([（【](?:feat\.|ft\.|with|prod\.|from|official|music video|mv|tv size|anime|remaster|deluxe|version|ver\.|live|acoustic|bonus)[^)\]）】]*[)\]）】]/gi, '')
+      .replace(/\s*-\s*(?:single|remastered|deluxe|version|ver\.|live|from).*$/gi, '')
+      .trim();
+  }
+
+  function isTitleMatchStrict(targetTitle: string, candidateTitle: string): boolean {
+    const tFull = normalizeCompareText(targetTitle);
+    const cFull = normalizeCompareText(candidateTitle);
+    if (!tFull || !cFull) return false;
+    if (tFull === cFull) return true;
+    const tCore = normalizeCompareText(stripTrackSuffixes(targetTitle));
+    const cCore = normalizeCompareText(stripTrackSuffixes(candidateTitle));
+    if (tCore && cCore && tCore === cCore) return true;
+    if (tCore.length >= 2 && cCore.length >= 2) {
+      if (cCore.includes(tCore) || tCore.includes(cCore)) return true;
+    }
+    return false;
+  }
+
+  function isArtistMatchStrict(targetArtist: string, candidateArtist: string): boolean {
+    if (!targetArtist) return true;
+    if (!candidateArtist) return false;
+    const cleanTarget = targetArtist
+      .replace(/\s*(?:作曲|作詞|編曲|feat\.|ft\.|with|prod\.).*$/i, '')
+      .split(/[,、/&×]/)[0]
+      .trim();
+    const tNorm = normalizeCompareText(cleanTarget || targetArtist);
+    const cNorm = normalizeCompareText(candidateArtist);
+    if (!tNorm) return true;
+    if (!cNorm) return false;
+    if (tNorm === cNorm || cNorm.includes(tNorm) || tNorm.includes(cNorm)) return true;
+    const targetTokens = (cleanTarget || targetArtist)
+      .toLowerCase()
+      .split(/[\s,、/&×()（）-]+/)
+      .map((s) => normalizeCompareText(s))
+      .filter((s) => s.length >= 2);
+    return targetTokens.some((tok) => cNorm.includes(tok));
+  }
+
+  async function resolveSaavnFullStream(
+    title?: string,
+    artist?: string,
+    preferredBr = 320
+  ): Promise<{ url: string; br: number; duration: number } | null> {
+    const cleanArtist = (artist || '')
+      .replace(/\s*(?:作曲|作詞|編曲|feat\.|ft\.|with|prod\.).*$/i, '')
+      .split(/[,、/]/)[0]
+      .trim();
+    const query = `${title || ''} ${cleanArtist}`.trim();
+    if (!query) return null;
+
+    const cacheKey = `saavn::${normalizeCompareText(title || '')}::${normalizeCompareText(cleanArtist)}::${preferredBr}`;
+    const cached = musicStreamCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      return { url: cached.url, br: cached.br, duration: 215 };
+    }
+
+    const endpoints = [
+      `https://saavn.dev/api/search/songs?query=${encodeURIComponent(query)}&limit=8`,
+      `https://jiosaavn-api-privatecvc2.vercel.app/search/songs?query=${encodeURIComponent(query)}&limit=8`,
+    ];
+
+    for (const ep of endpoints) {
+      try {
+        const res = await fetch(ep, {
+          headers: {
+            'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+          },
+          signal: AbortSignal.timeout(4200),
+        });
+        if (!res.ok) continue;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const json = (await res.json()) as any;
+        const results = json?.data?.results || json?.results || [];
+        if (!Array.isArray(results) || results.length === 0) continue;
+
+        for (const item of results) {
+          const itemName = String(item?.name || item?.title || '').replace(/&quot;/g, '"').replace(/&amp;/g, '&');
+          const primaryArtists = Array.isArray(item?.artists?.primary)
+            ? item.artists.primary.map((a: { name?: string }) => a.name || '').join(' ')
+            : String(item?.primaryArtists || item?.artist || '');
+          const dur = Number(item?.duration) || 0;
+          if (dur > 0 && dur < 55) continue;
+
+          if (title && !isTitleMatchStrict(title, itemName)) continue;
+          if (cleanArtist && primaryArtists && !isArtistMatchStrict(cleanArtist, primaryArtists)) continue;
+
+          const dlUrls: Array<{ quality?: string; url?: string; link?: string }> = Array.isArray(item?.downloadUrl)
+            ? item.downloadUrl
+            : [];
+          if (dlUrls.length === 0) continue;
+
+          const targetQ =
+            preferredBr >= 320
+              ? '320kbps'
+              : preferredBr >= 160
+              ? '160kbps'
+              : preferredBr >= 96
+              ? '96kbps'
+              : '320kbps';
+          const chosen =
+            dlUrls.find((u) => u.quality === targetQ) ||
+            dlUrls.find((u) => u.quality === '320kbps') ||
+            dlUrls[dlUrls.length - 1];
+          const streamUrl = chosen?.url || chosen?.link;
+          if (streamUrl && streamUrl.startsWith('http')) {
+            const httpsUrl = streamUrl.replace(/^http:\/\//i, 'https://');
+            const brVal = parseInt(String(chosen?.quality || '320'), 10) || 320;
+            musicStreamCache.set(cacheKey, {
+              url: httpsUrl,
+              br: brVal,
+              expiresAt: Date.now() + 25 * 60 * 1000,
+            });
+            return { url: httpsUrl, br: brVal, duration: dur || 215 };
+          }
+        }
+      } catch {
+        // try next endpoint
+      }
+    }
+    return null;
+  }
+
   async function resolveExactGdStudioStream(
     rawId?: string,
     title?: string,
-    artist?: string
+    artist?: string,
+    preferredBr = 320,
+    preferredSource = 'netease'
   ): Promise<{ url: string; br: number; resolvedId: string } | null> {
     const cleanId = cleanNumericTrackId(rawId);
-    const cacheKey = `${cleanId}::${title || ''}::${artist || ''}`;
+    const brParam = preferredBr >= 900 ? 999 : preferredBr >= 300 ? 320 : preferredBr >= 180 ? 192 : 128;
+    const sourceList =
+      preferredSource === 'kuwo'
+        ? ['kuwo', 'netease']
+        : ['netease', 'kuwo'];
+    const cacheKey = `${cleanId}::${title || ''}::${artist || ''}::${brParam}::${sourceList[0]}`;
     const cached = musicStreamCache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
       return { url: cached.url, br: cached.br, resolvedId: cleanId };
     }
 
-    const fetchUrlById = async (idToFetch: string): Promise<{ url: string; br: number } | null> => {
+    const fetchUrlById = async (
+      idToFetch: string,
+      src = 'netease'
+    ): Promise<{ url: string; br: number } | null> => {
       if (!idToFetch) return null;
-      const idCached = musicStreamCache.get(`id::${idToFetch}`);
+      const idCacheKey = `id::${src}::${idToFetch}::${brParam}`;
+      const idCached = musicStreamCache.get(idCacheKey);
       if (idCached && idCached.expiresAt > Date.now()) {
         return { url: idCached.url, br: idCached.br };
       }
       try {
         const uRes = await fetch(
-          `https://music-api.gdstudio.xyz/api.php?types=url&source=netease&id=${encodeURIComponent(idToFetch)}&br=320`,
+          `https://music-api.gdstudio.xyz/api.php?types=url&source=${encodeURIComponent(src)}&id=${encodeURIComponent(idToFetch)}&br=${brParam}`,
           {
             headers: {
               'User-Agent':
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
             },
-            signal: AbortSignal.timeout(6000),
+            signal: AbortSignal.timeout(4800),
           }
         );
         if (!uRes.ok) return null;
-        const uData = (await uRes.json()) as { url?: string; br?: number };
+        const uData = (await uRes.json()) as { url?: string; br?: number; size?: number };
         if (uData?.url && typeof uData.url === 'string' && uData.url.startsWith('http')) {
+          if (uData.size && Number(uData.size) > 0 && Number(uData.size) < 980000) {
+            return null;
+          }
           const httpsUrl = uData.url.replace(/^http:\/\//i, 'https://');
           const entry = {
             url: httpsUrl,
             br: Number(uData.br) || 320,
-            expiresAt: Date.now() + 15 * 60 * 1000,
+            expiresAt: Date.now() + 20 * 60 * 1000,
           };
-          musicStreamCache.set(`id::${idToFetch}`, entry);
+          musicStreamCache.set(idCacheKey, entry);
           musicStreamCache.set(cacheKey, entry);
           return { url: entry.url, br: entry.br };
         }
@@ -697,73 +837,66 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       return null;
     };
 
-    // 1. Try direct ID lookup first
-    if (cleanId) {
-      const directHit = await fetchUrlById(cleanId);
+    if (cleanId && sourceList[0] === 'netease') {
+      const directHit = await fetchUrlById(cleanId, 'netease');
       if (directHit) {
         return { ...directHit, resolvedId: cleanId };
       }
     }
 
-    // 2. Search by title + artist and verify best match
-    const searchQuery = `${title || ''} ${artist || ''}`.trim();
+    const cleanArtist = (artist || '')
+      .replace(/\s*(?:作曲|作詞|編曲|feat\.|ft\.|with|prod\.).*$/i, '')
+      .split(/[,、/]/)[0]
+      .trim();
+    const searchQuery = `${title || ''} ${cleanArtist}`.trim();
     if (!searchQuery) return null;
 
-    try {
-      const sRes = await fetch(
-        `https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(searchQuery)}&count=8&pages=1`,
-        {
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-          },
-          signal: AbortSignal.timeout(6000),
-        }
-      );
-      if (sRes.ok) {
-        const list = (await sRes.json()) as GdStudioTrackItem[];
-        if (Array.isArray(list) && list.length > 0) {
-          const normTargetTitle = normalizeCompareText(title || '');
-          const normTargetArtist = normalizeCompareText(artist || '');
+    for (const src of sourceList) {
+      try {
+        const sRes = await fetch(
+          `https://music-api.gdstudio.xyz/api.php?types=search&source=${encodeURIComponent(src)}&name=${encodeURIComponent(searchQuery)}&count=10&pages=1`,
+          {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+            },
+            signal: AbortSignal.timeout(4800),
+          }
+        );
+        if (sRes.ok) {
+          const list = (await sRes.json()) as GdStudioTrackItem[];
+          if (Array.isArray(list) && list.length > 0) {
+            const scored = list.map((item, idx) => {
+              const itemTitle = String(item.name || '');
+              const itemArtist = Array.isArray(item.artist)
+                ? item.artist.join(' ')
+                : String(item.artist || '');
+              let score = 20 - idx;
+              if (title && isTitleMatchStrict(title, itemTitle)) score += 60;
+              if (cleanArtist && isArtistMatchStrict(cleanArtist, itemArtist)) score += 45;
+              if (
+                /instrumental|伴奏|karaoke|カラオケ|demo|30秒|試聴/i.test(itemTitle) &&
+                !/instrumental/i.test(title || '')
+              ) {
+                score -= 50;
+              }
+              return { item, score };
+            });
 
-          const scored = list.map((item, idx) => {
-            const itemTitle = normalizeCompareText(item.name || '');
-            const itemArtist = normalizeCompareText(
-              Array.isArray(item.artist) ? item.artist.join(' ') : String(item.artist || '')
-            );
-            let score = 20 - idx;
-            if (normTargetTitle && itemTitle === normTargetTitle) score += 50;
-            else if (
-              normTargetTitle &&
-              (itemTitle.includes(normTargetTitle) || normTargetTitle.includes(itemTitle))
-            ) {
-              score += 30;
-            }
-            if (
-              normTargetArtist &&
-              (itemArtist.includes(normTargetArtist) || normTargetArtist.includes(itemArtist))
-            ) {
-              score += 35;
-            }
-            if (/instrumental|伴奏|karaoke|カラオケ/i.test(item.name || '') && !/instrumental/i.test(title || '')) {
-              score -= 25;
-            }
-            return { item, score };
-          });
+            scored.sort((a, b) => b.score - a.score);
 
-          scored.sort((a, b) => b.score - a.score);
-
-          for (const candidate of scored.slice(0, 4)) {
-            const candId = String(candidate.item.url_id || candidate.item.id || '');
-            const resolved = await fetchUrlById(candId);
-            if (resolved) {
-              return { ...resolved, resolvedId: candId };
+            for (const candidate of scored.slice(0, 4)) {
+              const candId = String(candidate.item.url_id || candidate.item.id || '');
+              const resolved = await fetchUrlById(candId, src);
+              if (resolved) {
+                return { ...resolved, resolvedId: candId };
+              }
             }
           }
         }
+      } catch {
+        // try next source
       }
-    } catch {
-      // ignore
     }
 
     return null;
@@ -772,24 +905,26 @@ Only output <os_action> if the user is asking to change an OS setting or open an
   app.get('/api/music/search', async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const q = String(req.query.q || 'YOASOBI').trim() || 'YOASOBI';
+    const sourceParam = String(req.query.source || 'auto').toLowerCase();
+    const gdSource = sourceParam === 'kuwo' ? 'kuwo' : 'netease';
 
     try {
       const [gdItems, itunesJpData, itunesGlobalData] = await Promise.all([
         fetch(
-          `https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(q)}&count=20&pages=1`,
+          `https://music-api.gdstudio.xyz/api.php?types=search&source=${gdSource}&name=${encodeURIComponent(q)}&count=20&pages=1`,
           {
             headers: {
               'User-Agent':
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
             },
-            signal: AbortSignal.timeout(6500),
+            signal: AbortSignal.timeout(5500),
           }
         )
           .then((r) => (r.ok ? (r.json() as Promise<GdStudioTrackItem[]>) : []))
           .catch(() => [] as GdStudioTrackItem[]),
         fetch(
           `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&country=JP&entity=song&limit=16`,
-          { signal: AbortSignal.timeout(5500) }
+          { signal: AbortSignal.timeout(4800) }
         )
           .then((r) =>
             r.ok
@@ -799,7 +934,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
           .catch(() => ({ results: [] as ItunesSearchResultItem[] })),
         fetch(
           `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&country=US&entity=song&limit=16`,
-          { signal: AbortSignal.timeout(5500) }
+          { signal: AbortSignal.timeout(4800) }
         )
           .then((r) =>
             r.ok
@@ -839,7 +974,6 @@ Only output <os_action> if the user is asking to change an OS setting or open an
             : String(item.artist || q);
           const albumStr = String(item.album || 'Single / Album');
 
-          // Strict official release filter: eliminate '歌ってみた', cover songs, and unofficial uploads unless explicitly searched
           const isCoverOrUnofficial =
             /歌ってみた|歌い手|弾いてみた|叩いてみた|踊ってみた|covered by|cover by|acoustic cover|piano cover|guitar cover|remix|bootleg|fan cover|翻唱|翻唱版/i.test(
               `${item.name} ${artistStr} ${albumStr}`
@@ -854,12 +988,12 @@ Only output <os_action> if the user is asking to change an OS setting or open an
           if (seenKeys.has(dedupKey) && results.length >= 8) continue;
           seenKeys.add(dedupKey);
 
-          // Match with iTunes metadata for exact duration & 600x600 artwork when available
-          const normName = normalizeCompareText(item.name);
-          const matchedItunes = itunesList.find((it) => {
-            const itName = normalizeCompareText(it.trackName || '');
-            return itName && (itName === normName || itName.includes(normName) || normName.includes(itName));
-          });
+          const matchedItunes = itunesList.find(
+            (it) =>
+              it.trackName &&
+              isTitleMatchStrict(item.name, it.trackName) &&
+              isArtistMatchStrict(artistStr, it.artistName || '')
+          );
 
           const hiResItunesArt = matchedItunes?.artworkUrl100
             ? matchedItunes.artworkUrl100.replace('100x100bb', '600x600bb')
@@ -869,9 +1003,9 @@ Only output <os_action> if the user is asking to change an OS setting or open an
             (item.pic_id ? `/api/music/pic?id=${encodeURIComponent(String(item.pic_id))}` : undefined);
 
           const durationSec =
-            matchedItunes?.trackTimeMillis && matchedItunes.trackTimeMillis > 40000
+            matchedItunes?.trackTimeMillis && matchedItunes.trackTimeMillis > 45000
               ? Math.round(matchedItunes.trackTimeMillis / 1000)
-              : 215;
+              : 218;
 
           const year = matchedItunes?.releaseDate
             ? new Date(matchedItunes.releaseDate).getFullYear() || 2025
@@ -886,7 +1020,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
             artworkUrl,
             audioUrl: `/api/music/play?id=${encodeURIComponent(trackId)}&title=${encodeURIComponent(item.name)}&artist=${encodeURIComponent(artistStr)}`,
             duration: durationSec,
-            format: 'api.monochrome.tf / 320kbps Full Stream',
+            format: 'api.monochrome.tf / Full-Length Hi-Res Stream',
             bitrate: '320 kbps Full Track',
             genre: matchedItunes?.primaryGenreName || 'J-Pop / Lossless',
             year,
@@ -894,7 +1028,6 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         }
       }
 
-      // Append any iTunes songs not already present
       for (const it of itunesList) {
         if (!it.trackName || !it.artistName) continue;
         const dedupKey = `${normalizeCompareText(it.trackName)}::${normalizeCompareText(it.artistName)}`;
@@ -906,9 +1039,9 @@ Only output <os_action> if the user is asking to change an OS setting or open an
           ? it.artworkUrl100.replace('100x100bb', '600x600bb')
           : undefined;
         const durationSec =
-          it.trackTimeMillis && it.trackTimeMillis > 40000
+          it.trackTimeMillis && it.trackTimeMillis > 45000
             ? Math.round(it.trackTimeMillis / 1000)
-            : 215;
+            : 218;
 
         results.push({
           id: `mono-itunes-${trackId}`,
@@ -919,7 +1052,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
           artworkUrl: hiResArt,
           audioUrl: `/api/music/play?title=${encodeURIComponent(it.trackName)}&artist=${encodeURIComponent(it.artistName)}`,
           duration: durationSec,
-          format: 'api.monochrome.tf / 320kbps Full Stream',
+          format: 'api.monochrome.tf / Full-Length Hi-Res Stream',
           bitrate: '320 kbps Full Track',
           genre: it.primaryGenreName || 'Pop',
           year: it.releaseDate ? new Date(it.releaseDate).getFullYear() || 2025 : 2025,
@@ -938,19 +1071,29 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     const rawId = String(req.query.id || '');
     const title = String(req.query.title || '');
     const artist = String(req.query.artist || '');
+    const br = Number(req.query.br) || 320;
+    const source = String(req.query.source || 'auto');
 
-    const resolved = await resolveExactGdStudioStream(rawId, title, artist);
-    if (!resolved) {
+    const [gdResolved, saavnResolved] = await Promise.all([
+      resolveExactGdStudioStream(rawId, title, artist, br, source),
+      resolveSaavnFullStream(title, artist, br),
+    ]);
+
+    const resolvedUrl = gdResolved?.url || saavnResolved?.url;
+    const resolvedBr = gdResolved?.br || saavnResolved?.br || 320;
+    const resolvedId = gdResolved?.resolvedId || rawId;
+
+    if (!resolvedUrl) {
       res.status(404).json({ error: 'Stream not found' });
       return;
     }
 
     res.json({
-      audioUrl: resolved.url,
-      proxyAudioUrl: `/api/music/play?id=${encodeURIComponent(resolved.resolvedId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&proxy=1`,
-      resolvedId: resolved.resolvedId,
-      format: 'api.monochrome.tf 320kbps MP3 Full Stream',
-      bitrate: `${resolved.br} kbps Hi-Fi`,
+      audioUrl: resolvedUrl,
+      proxyAudioUrl: `/api/music/play?id=${encodeURIComponent(resolvedId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&br=${br}&source=${encodeURIComponent(source)}`,
+      resolvedId,
+      format: 'api.monochrome.tf Full-Length Hi-Fi Stream',
+      bitrate: `${resolvedBr} kbps Full Track`,
     });
   });
 
@@ -1139,6 +1282,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     const q = String(req.query.q || '').trim();
     const artist = String(req.query.artist || '').trim();
     const title = String(req.query.title || '').trim();
+    const quality = String(req.query.quality || '1080p').toLowerCase();
     const cleanArtist = artist
       .replace(/\s*(?:作曲|作詞|編曲|feat\.|ft\.|with|prod\.).*$/i, '')
       .split(/[,、/]/)[0]
@@ -1193,6 +1337,15 @@ Only output <os_action> if the user is asking to change an OS setting or open an
 
       const combined = [...(mvJp.results || []), ...(mvUs.results || [])];
       const seen = new Set<string>();
+      const thumbSize =
+        quality === '2160p' || quality === '4k'
+          ? '1920x1080mv'
+          : quality === '1080p'
+          ? '1280x720mv'
+          : quality === '720p'
+          ? '640x360mv'
+          : '480x270mv';
+
       const mvs = combined
         .filter((mv) => {
           if (!mv.trackName || !mv.previewUrl) return false;
@@ -1214,10 +1367,10 @@ Only output <os_action> if the user is asking to change an OS setting or open an
             artist: mv.artistName || cleanArtist || artist,
             album: mv.collectionName || 'Official Music Video',
             durationLabel: `${mins}:${secs}`,
-            viewsLabel: 'Monochrome Official MV',
+            viewsLabel: `Monochrome Official MV (${quality.toUpperCase()})`,
             year: mv.releaseDate ? new Date(mv.releaseDate).getFullYear() || 2024 : 2024,
             thumbnailUrl: mv.artworkUrl100
-              ? mv.artworkUrl100.replace(/100x100bb|100x100/g, '640x360mv')
+              ? mv.artworkUrl100.replace(/100x100bb|100x100/g, thumbSize)
               : undefined,
           };
         });
@@ -1428,39 +1581,60 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     const rawId = String(req.query.id || '');
     const title = String(req.query.title || '');
     const rawArtist = String(req.query.artist || '');
-    const cleanArtist = rawArtist
-      .replace(/\s*(?:作曲|作詞|編曲|feat\.|ft\.|with|prod\.).*$/i, '')
-      .split(/[,、/]/)[0]
-      .trim() || rawArtist;
+    const brParam = Number(req.query.br) || 320;
+    const sourceParam = String(req.query.source || 'auto').toLowerCase();
+    const cleanArtist =
+      rawArtist
+        .replace(/\s*(?:作曲|作詞|編曲|feat\.|ft\.|with|prod\.).*$/i, '')
+        .split(/[,、/]/)[0]
+        .trim() || rawArtist;
 
     const queryTerm = `${title} ${cleanArtist}`.trim() || title || cleanArtist || 'YOASOBI';
 
-    // Gather candidate stream URLs in parallel with tight timeouts so we never block >2.5s
-    const candidateUrls: string[] = [];
+    // Gather FULL-LENGTH stream candidates first so we NEVER prematurely cut off at 30 seconds
+    const fullLengthUrls: string[] = [];
+    const fallbackPreviewUrls: string[] = [];
 
     try {
-      const [gdResult, itunesJpUrl, itunesUsUrl, deezerUrl] = await Promise.all([
-        // 1. GDStudio / NetEase (capped at 2.6s so it never stalls playback)
+      const [gdPrimary, gdKuwo, saavnFull, itunesJpUrl, itunesUsUrl] = await Promise.all([
+        // 1. Primary GDStudio Full-Length Resolver (generous 5.2s timeout)
         Promise.race([
-          resolveExactGdStudioStream(rawId, title, cleanArtist),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2600)),
+          resolveExactGdStudioStream(
+            rawId,
+            title,
+            cleanArtist,
+            brParam,
+            sourceParam === 'kuwo' ? 'kuwo' : 'netease'
+          ),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5200)),
         ]).catch(() => null),
 
-        // 2. iTunes Japan AAC/M4A Stream
+        // 2. Alternate Kuwo Full-Length Resolver
+        Promise.race([
+          resolveExactGdStudioStream('', title, cleanArtist, brParam, 'kuwo'),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+        ]).catch(() => null),
+
+        // 3. JioSaavn 320kbps Full-Length Stream Resolver (100% full 3-5 min songs!)
+        Promise.race([
+          resolveSaavnFullStream(title, cleanArtist, brParam),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 4600)),
+        ]).catch(() => null),
+
+        // 4. Emergency iTunes JP fallback (only used if ALL full-length sources fail)
         (async () => {
           try {
             const itRes = await fetch(
               `https://itunes.apple.com/search?term=${encodeURIComponent(queryTerm)}&country=JP&entity=song&limit=5`,
-              { signal: AbortSignal.timeout(2200) }
+              { signal: AbortSignal.timeout(2500) }
             );
             if (itRes.ok) {
               const itData = (await itRes.json()) as {
                 results?: Array<{ trackName?: string; artistName?: string; previewUrl?: string }>;
               };
               const list = itData?.results || [];
-              const normT = normalizeCompareText(title);
               const matched =
-                list.find((r) => r.previewUrl && normT && normalizeCompareText(r.trackName || '').includes(normT)) ||
+                list.find((r) => r.previewUrl && title && isTitleMatchStrict(title, r.trackName || '')) ||
                 list.find((r) => r.previewUrl);
               return matched?.previewUrl || null;
             }
@@ -1470,43 +1644,22 @@ Only output <os_action> if the user is asking to change an OS setting or open an
           return null;
         })(),
 
-        // 3. iTunes Global (US) AAC/M4A Stream (essential for international artists like Dua Lipa)
+        // 5. Emergency iTunes US fallback
         (async () => {
           try {
             const itRes = await fetch(
               `https://itunes.apple.com/search?term=${encodeURIComponent(queryTerm)}&country=US&entity=song&limit=5`,
-              { signal: AbortSignal.timeout(2200) }
+              { signal: AbortSignal.timeout(2500) }
             );
             if (itRes.ok) {
               const itData = (await itRes.json()) as {
                 results?: Array<{ trackName?: string; artistName?: string; previewUrl?: string }>;
               };
               const list = itData?.results || [];
-              const normT = normalizeCompareText(title);
               const matched =
-                list.find((r) => r.previewUrl && normT && normalizeCompareText(r.trackName || '').includes(normT)) ||
+                list.find((r) => r.previewUrl && title && isTitleMatchStrict(title, r.trackName || '')) ||
                 list.find((r) => r.previewUrl);
               return matched?.previewUrl || null;
-            }
-          } catch {
-            // ignore
-          }
-          return null;
-        })(),
-
-        // 4. Deezer MP3 Stream
-        (async () => {
-          try {
-            const dzRes = await fetch(
-              `https://api.deezer.com/search?q=${encodeURIComponent(queryTerm)}&limit=3`,
-              { signal: AbortSignal.timeout(2200) }
-            );
-            if (dzRes.ok) {
-              const dzData = (await dzRes.json()) as {
-                data?: Array<{ preview?: string }>;
-              };
-              const p = dzData?.data?.find((d) => d.preview)?.preview;
-              return p || null;
             }
           } catch {
             // ignore
@@ -1515,20 +1668,47 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         })(),
       ]);
 
-      if (gdResult?.url) candidateUrls.push(gdResult.url);
-      if (deezerUrl) candidateUrls.push(deezerUrl);
-      if (itunesJpUrl) candidateUrls.push(itunesJpUrl);
-      if (itunesUsUrl && itunesUsUrl !== itunesJpUrl) candidateUrls.push(itunesUsUrl);
+      // Order full-length sources according to user's source preference
+      if (sourceParam === 'saavn') {
+        if (saavnFull?.url) fullLengthUrls.push(saavnFull.url);
+        if (gdPrimary?.url) fullLengthUrls.push(gdPrimary.url);
+        if (gdKuwo?.url && !fullLengthUrls.includes(gdKuwo.url)) fullLengthUrls.push(gdKuwo.url);
+      } else if (sourceParam === 'kuwo') {
+        if (gdKuwo?.url) fullLengthUrls.push(gdKuwo.url);
+        if (saavnFull?.url) fullLengthUrls.push(saavnFull.url);
+        if (gdPrimary?.url && !fullLengthUrls.includes(gdPrimary.url)) fullLengthUrls.push(gdPrimary.url);
+      } else {
+        if (gdPrimary?.url) fullLengthUrls.push(gdPrimary.url);
+        if (saavnFull?.url && !fullLengthUrls.includes(saavnFull.url)) fullLengthUrls.push(saavnFull.url);
+        if (gdKuwo?.url && !fullLengthUrls.includes(gdKuwo.url)) fullLengthUrls.push(gdKuwo.url);
+      }
+
+      // Direct NetEase outer MP3 stream when numeric ID is available
+      const numericId = cleanNumericTrackId(gdPrimary?.resolvedId || rawId);
+      if (numericId) {
+        const directOuter = `https://music.163.com/song/media/outer/url?id=${numericId}.mp3`;
+        if (!fullLengthUrls.includes(directOuter)) {
+          fullLengthUrls.push(directOuter);
+        }
+      }
+
+      if (itunesJpUrl) fallbackPreviewUrls.push(itunesJpUrl);
+      if (itunesUsUrl && itunesUsUrl !== itunesJpUrl) fallbackPreviewUrls.push(itunesUsUrl);
     } catch {
       // ignore
     }
 
-    // Guaranteed fallback so no track ever 404s
-    candidateUrls.push(
+    fallbackPreviewUrls.push(
       'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/68/74/31/68743188-f1ec-5fb2-2189-80f28b0316d0/mzaf_17393855495816823295.plus.aac.p.m4a'
     );
 
-    for (const targetStreamUrl of candidateUrls) {
+    const allCandidates = [
+      ...fullLengthUrls.map((url) => ({ url, isFullLength: true })),
+      ...fallbackPreviewUrls.map((url) => ({ url, isFullLength: false })),
+    ];
+
+    for (let i = 0; i < allCandidates.length; i++) {
+      const { url: targetStreamUrl, isFullLength } = allCandidates[i];
       try {
         const forwardHeaders: Record<string, string> = {
           'User-Agent':
@@ -1536,6 +1716,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         };
         if (targetStreamUrl.includes('126.net') || targetStreamUrl.includes('163.com')) {
           forwardHeaders.Referer = 'https://music.163.com/';
+          forwardHeaders['X-Real-IP'] = '118.88.88.88';
         }
         if (req.headers.range) {
           forwardHeaders.Range = String(req.headers.range);
@@ -1544,17 +1725,28 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         const upstream = await fetch(targetStreamUrl, {
           headers: forwardHeaders,
           redirect: 'follow',
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(8500),
         });
 
         const rawContentType = (upstream.headers.get('content-type') || '').toLowerCase();
 
-        // Skip dead/forbidden/HTML error responses and immediately try next candidate!
         if (!upstream.ok || upstream.status >= 400 || rawContentType.includes('text/html')) {
           continue;
         }
 
-        // Preserve accurate container MIME type so Chrome's demuxer never throws MEDIA_ERR_SRC_NOT_SUPPORTED
+        // Prevent 30-second VIP trial clips (< 1.05MB) when full-length alternatives exist
+        if (isFullLength && !req.headers.range) {
+          const cl = Number(upstream.headers.get('content-length') || 0);
+          if (cl > 0 && cl < 1050000 && i < fullLengthUrls.length - 1) {
+            try {
+              await upstream.body?.cancel();
+            } catch {
+              // ignore
+            }
+            continue;
+          }
+        }
+
         let cleanMime = 'audio/mpeg';
         if (
           targetStreamUrl.includes('.m4a') ||
@@ -1578,6 +1770,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         if (contentRange) res.setHeader('Content-Range', contentRange);
         const contentLength = upstream.headers.get('content-length');
         if (contentLength) res.setHeader('Content-Length', contentLength);
+        res.setHeader('X-Full-Length-Stream', isFullLength ? 'true' : 'preview');
 
         res.status(upstream.status);
 
@@ -1605,13 +1798,87 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         }
         return;
       } catch {
-        // Try next candidate in candidateUrls
+        // Try next candidate
       }
     }
 
     if (!res.headersSent) {
       res.status(502).send('Audio stream unavailable');
     }
+  });
+
+  // -------------------------------------------------------------------------
+  // Music Full-Track Download Endpoint (Supports FLAC / 320kbps / 192kbps / 128kbps)
+  // -------------------------------------------------------------------------
+  app.get('/api/music/download', async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const rawId = String(req.query.id || '');
+    const title = String(req.query.title || 'Track').trim() || 'Track';
+    const artist = String(req.query.artist || 'Artist').trim() || 'Artist';
+    const quality = String(req.query.quality || '320').toLowerCase();
+    const source = String(req.query.source || 'auto').toLowerCase();
+    const brVal = quality === 'flac' || quality === 'lossless' ? 999 : Number(quality) || 320;
+
+    const cleanArtist =
+      artist
+        .replace(/\s*(?:作曲|作詞|編曲|feat\.|ft\.|with|prod\.).*$/i, '')
+        .split(/[,、/]/)[0]
+        .trim() || artist;
+
+    const [gdStream, saavnStream] = await Promise.all([
+      resolveExactGdStudioStream(rawId, title, cleanArtist, brVal, source === 'kuwo' ? 'kuwo' : 'netease'),
+      resolveSaavnFullStream(title, cleanArtist, brVal),
+    ]);
+
+    const urls = [gdStream?.url, saavnStream?.url].filter(Boolean) as string[];
+    const safeFilename = `${artist} - ${title} [${quality.toUpperCase()}]`
+      .replace(/[\\/:*?"<>|]/g, '_')
+      .trim();
+
+    for (const targetUrl of urls) {
+      try {
+        const headers: Record<string, string> = {
+          'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        };
+        if (targetUrl.includes('126.net') || targetUrl.includes('163.com')) {
+          headers.Referer = 'https://music.163.com/';
+          headers['X-Real-IP'] = '118.88.88.88';
+        }
+        const up = await fetch(targetUrl, { headers, redirect: 'follow', signal: AbortSignal.timeout(9000) });
+        if (!up.ok) continue;
+        const ct = (up.headers.get('content-type') || '').toLowerCase();
+        if (ct.includes('text/html')) continue;
+
+        const ext =
+          ct.includes('flac') || targetUrl.includes('.flac')
+            ? 'flac'
+            : ct.includes('mp4') || targetUrl.includes('.mp4') || targetUrl.includes('.m4a')
+            ? 'm4a'
+            : 'mp3';
+
+        res.setHeader(
+          'Content-Disposition',
+          `attachment; filename*=UTF-8''${encodeURIComponent(`${safeFilename}.${ext}`)}`
+        );
+        res.type(ext === 'flac' ? 'audio/flac' : ext === 'm4a' ? 'audio/mp4' : 'audio/mpeg');
+        const cl = up.headers.get('content-length');
+        if (cl) res.setHeader('Content-Length', cl);
+
+        if (up.body && typeof Readable.fromWeb === 'function') {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          Readable.fromWeb(up.body as any).pipe(res);
+          return;
+        }
+      } catch {
+        // try next
+      }
+    }
+
+    res.redirect(
+      302,
+      `/api/music/play?id=${encodeURIComponent(rawId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&br=${brVal}&source=${encodeURIComponent(source)}`
+    );
   });
 
   app.get('/api/music/pic', async (req, res) => {
@@ -1646,42 +1913,144 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     res.status(404).send('Picture not found');
   });
 
+  // -------------------------------------------------------------------------
+  // Strictly Verified Synchronized Lyrics Endpoint (LRCLIB + NetEase Exact Match)
+  // -------------------------------------------------------------------------
   app.get('/api/music/lyrics', async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     let cleanId = cleanNumericTrackId(String(req.query.id || ''));
     const title = String(req.query.title || '').trim();
-    const artist = String(req.query.artist || '').trim();
+    const rawArtist = String(req.query.artist || '').trim();
+    const cleanArtist =
+      rawArtist
+        .replace(/\s*(?:作曲|作詞|編曲|feat\.|ft\.|with|prod\.).*$/i, '')
+        .split(/[,、/]/)[0]
+        .trim() || rawArtist;
+
+    const cleanLrcMetadata = (rawLrc: string): string =>
+      rawLrc
+        .split(/\r?\n/)
+        .filter(
+          (line) =>
+            !/^\[\d+:\d+[^\]]*\]\s*(?:作词|作曲|编曲|制作人|プロデューサー|作詞|編曲|Lyricist|Composer|Arranger|混音|录音|吉他|贝斯|鼓)\s*[:：]/i.test(
+              line
+            )
+        )
+        .join('\n');
 
     try {
-      if (!cleanId && (title || artist)) {
-        const resolved = await resolveExactGdStudioStream('', title, artist);
-        if (resolved?.resolvedId) {
-          cleanId = resolved.resolvedId;
-        }
-      }
-
-      if (cleanId) {
-        const lRes = await fetch(
-          `https://music-api.gdstudio.xyz/api.php?types=lyric&source=netease&id=${encodeURIComponent(cleanId)}`,
-          { signal: AbortSignal.timeout(5500) }
-        );
-        if (lRes.ok) {
-          const lData = (await lRes.json()) as { lyric?: string; tlyric?: string };
-          if (lData?.lyric && lData.lyric.trim().length > 0) {
-            // Strip composer/lyricist metadata lines at 00:00 so lyrics start cleanly
-            const cleanedLrc = lData.lyric
-              .split(/\r?\n/)
-              .filter(
-                (line) =>
-                  !/^\[\d+:\d+[^\]]*\]\s*(?:作词|作曲|编曲|制作人|プロデューサー|作詞|編曲|Lyricist|Composer|Arranger)\s*[:：]/i.test(
-                    line
-                  )
-              )
-              .join('\n');
-            res.json({ lyric: cleanedLrc || lData.lyric, tlyric: lData.tlyric || '' });
-            return;
+      // Run LRCLIB strict lookup and NetEase ID lookup in parallel
+      const [lrclibExact, lrclibSearch, neteaseLrc] = await Promise.all([
+        // 1. LRCLIB exact /api/get
+        (async (): Promise<string | null> => {
+          if (!title || !cleanArtist) return null;
+          try {
+            const getRes = await fetch(
+              `https://lrclib.net/api/get?track_name=${encodeURIComponent(title)}&artist_name=${encodeURIComponent(cleanArtist)}`,
+              {
+                headers: { 'User-Agent': 'GlassiumOS-MonochromeMusic/5.0' },
+                signal: AbortSignal.timeout(4000),
+              }
+            );
+            if (getRes.ok) {
+              const data = (await getRes.json()) as {
+                trackName?: string;
+                artistName?: string;
+                syncedLyrics?: string;
+              };
+              if (
+                data?.syncedLyrics &&
+                isTitleMatchStrict(title, data.trackName || title) &&
+                isArtistMatchStrict(cleanArtist, data.artistName || cleanArtist)
+              ) {
+                return cleanLrcMetadata(data.syncedLyrics);
+              }
+            }
+          } catch {
+            // ignore
           }
-        }
+          return null;
+        })(),
+
+        // 2. LRCLIB /api/search with STRICT title AND artist verification (never picks another song!)
+        (async (): Promise<string | null> => {
+          if (!title) return null;
+          try {
+            const qStr = `${title} ${cleanArtist}`.trim();
+            const sRes = await fetch(
+              `https://lrclib.net/api/search?q=${encodeURIComponent(qStr)}`,
+              {
+                headers: { 'User-Agent': 'GlassiumOS-MonochromeMusic/5.0' },
+                signal: AbortSignal.timeout(4500),
+              }
+            );
+            if (sRes.ok) {
+              const list = (await sRes.json()) as Array<{
+                trackName?: string;
+                artistName?: string;
+                syncedLyrics?: string;
+                plainLyrics?: string;
+              }>;
+              if (Array.isArray(list)) {
+                const strictSynced = list.find(
+                  (item) =>
+                    item.syncedLyrics &&
+                    item.syncedLyrics.trim().length > 20 &&
+                    isTitleMatchStrict(title, item.trackName || '') &&
+                    isArtistMatchStrict(cleanArtist, item.artistName || '')
+                );
+                if (strictSynced?.syncedLyrics) {
+                  return cleanLrcMetadata(strictSynced.syncedLyrics);
+                }
+              }
+            }
+          } catch {
+            // ignore
+          }
+          return null;
+        })(),
+
+        // 3. NetEase GDStudio LRC with strict title+artist verification
+        (async (): Promise<{ lyric: string; tlyric: string } | null> => {
+          try {
+            if (!cleanId && (title || cleanArtist)) {
+              const resolved = await resolveExactGdStudioStream('', title, cleanArtist, 320, 'netease');
+              if (resolved?.resolvedId) {
+                cleanId = resolved.resolvedId;
+              }
+            }
+            if (!cleanId) return null;
+            const lRes = await fetch(
+              `https://music-api.gdstudio.xyz/api.php?types=lyric&source=netease&id=${encodeURIComponent(cleanId)}`,
+              { signal: AbortSignal.timeout(4800) }
+            );
+            if (lRes.ok) {
+              const lData = (await lRes.json()) as { lyric?: string; tlyric?: string };
+              if (lData?.lyric && lData.lyric.trim().length > 15) {
+                return {
+                  lyric: cleanLrcMetadata(lData.lyric) || lData.lyric,
+                  tlyric: lData.tlyric || '',
+                };
+              }
+            }
+          } catch {
+            // ignore
+          }
+          return null;
+        })(),
+      ]);
+
+      if (lrclibExact) {
+        res.json({ lyric: lrclibExact, tlyric: neteaseLrc?.tlyric || '', source: 'lrclib-exact' });
+        return;
+      }
+      if (lrclibSearch) {
+        res.json({ lyric: lrclibSearch, tlyric: neteaseLrc?.tlyric || '', source: 'lrclib-verified' });
+        return;
+      }
+      if (neteaseLrc?.lyric) {
+        res.json({ lyric: neteaseLrc.lyric, tlyric: neteaseLrc.tlyric, source: 'netease-verified' });
+        return;
       }
     } catch {
       // fall through

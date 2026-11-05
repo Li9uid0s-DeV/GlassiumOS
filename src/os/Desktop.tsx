@@ -239,6 +239,49 @@ export function Desktop() {
     palette?: { c1: string; c2: string; c3: string; c4: string };
   } | null>(null);
   const [pillDismissed, setPillDismissed] = useState(false);
+  const [desktopPillMinimized, setDesktopPillMinimized] = useState(false);
+  const [desktopPillOffset, setDesktopPillOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDraggingDesktopPill, setIsDraggingDesktopPill] = useState(false);
+  const desktopPillDragRef = useRef<{
+    startX: number;
+    startY: number;
+    origX: number;
+    origY: number;
+  } | null>(null);
+
+  const handleDesktopPillPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button, [data-no-dock-drag="true"]')) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setIsDraggingDesktopPill(true);
+    desktopPillDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: desktopPillOffset.x,
+      origY: desktopPillOffset.y,
+    };
+  };
+
+  const handleDesktopPillPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!desktopPillDragRef.current) return;
+    const dx = e.clientX - desktopPillDragRef.current.startX;
+    const dy = e.clientY - desktopPillDragRef.current.startY;
+    setDesktopPillOffset({
+      x: Math.max(-520, Math.min(520, desktopPillDragRef.current.origX + dx)),
+      y: Math.max(-680, Math.min(40, desktopPillDragRef.current.origY + dy)),
+    });
+  };
+
+  const handleDesktopPillPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!desktopPillDragRef.current) return;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+    desktopPillDragRef.current = null;
+    setIsDraggingDesktopPill(false);
+  };
 
   useEffect(() => {
     const onMusicState = (e: Event) => {
@@ -1839,171 +1882,255 @@ export function Desktop() {
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 50, opacity: 0, scale: 0.92 }}
             transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-            className="fixed bottom-14 sm:bottom-16 left-1/2 -translate-x-1/2 z-[4200] max-w-[94vw] w-auto pointer-events-auto"
+            className="fixed bottom-14 sm:bottom-16 left-1/2 z-[4200] max-w-[94vw] w-auto pointer-events-auto"
+            style={{
+              transform: `translate3d(calc(-50% + ${desktopPillOffset.x}px), ${desktopPillOffset.y}px, 0)`,
+              transition: isDraggingDesktopPill ? 'none' : undefined,
+            }}
           >
-            <div className="relative group px-4 py-2.5 rounded-2xl liquid-glass-music-dock liquid-glass-window overflow-hidden flex flex-col gap-1.5 transition">
-              {/* Real-Time Moving Artwork-Pattern Gradient Behind the Liquid Glass Dock */}
-              <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-70">
-                <div
-                  className="absolute -inset-6 blur-2xl opacity-60 artwork-dock-underglow transition-all duration-1000"
-                  style={{
-                    background: `linear-gradient(125deg, ${
-                      musicState.palette?.c1 || '#fa243c'
-                    } 0%, ${musicState.palette?.c2 || '#8b5cf6'} 35%, ${
-                      musicState.palette?.c3 || '#06b6d4'
-                    } 70%, ${musicState.palette?.c4 || '#f59e0b'} 100%)`,
-                  }}
-                />
-                {musicState.artworkUrl && (
-                  <>
-                    <img
-                      src={musicState.artworkUrl}
-                      alt=""
-                      className="absolute -top-1/2 -left-1/4 w-[85%] h-[220%] object-cover blur-[32px] saturate-[2.4] opacity-45 artwork-fluid-orb-1"
-                    />
-                    <img
-                      src={musicState.artworkUrl}
-                      alt=""
-                      className="absolute -bottom-1/2 -right-1/4 w-[85%] h-[220%] object-cover blur-[36px] saturate-[2.4] opacity-40 artwork-fluid-orb-2 mix-blend-screen"
-                    />
-                  </>
-                )}
-                <div className="absolute inset-0 bg-slate-950/45" />
-              </div>
-
-              <div className="relative z-10 flex items-center gap-3.5">
-                {/* Artwork Thumbnail / Clickable to open SynthVisualizer */}
+            {desktopPillMinimized ? (
+              <div
+                onPointerDown={handleDesktopPillPointerDown}
+                onPointerMove={handleDesktopPillPointerMove}
+                onPointerUp={handleDesktopPillPointerUp}
+                onPointerCancel={handleDesktopPillPointerUp}
+                className="relative group px-3 py-1.5 rounded-2xl liquid-glass-music-dock liquid-glass-window overflow-hidden flex items-center gap-2.5 cursor-grab active:cursor-grabbing shadow-2xl"
+                title="ドラッグして移動 / 展開ボタンで元のサイズへ"
+              >
+                <span className="material-symbols-rounded text-xs text-white/50 select-none">
+                  drag_indicator
+                </span>
                 <button
                   type="button"
+                  data-no-dock-drag="true"
                   onClick={() => openApp('synth')}
-                  title="Music プレイヤーを開く"
-                  className="relative z-10 w-10 h-10 rounded-xl overflow-hidden bg-slate-800 border border-white/25 shrink-0 shadow-[0_6px_16px_rgba(0,0,0,0.5)] group-hover:scale-105 transition flex items-center justify-center cursor-pointer"
+                  className="w-7 h-7 rounded-lg overflow-hidden bg-slate-800 border border-white/25 shrink-0"
                 >
                   {musicState.artworkUrl ? (
-                    <img
-                      src={musicState.artworkUrl}
-                      alt={musicState.title || 'Track Artwork'}
-                      className="w-full h-full object-cover"
-                    />
+                    <img src={musicState.artworkUrl} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="material-symbols-rounded text-cyan-400 text-lg">music_note</span>
+                    <span className="material-symbols-rounded text-cyan-400 text-sm">music_note</span>
                   )}
                 </button>
-
-                {/* Title, Artist, & Realtime Synchronized Lyric Line */}
-                <div
-                  onClick={() => openApp('synth')}
-                  className="relative z-10 min-w-0 max-w-[180px] sm:max-w-[290px] cursor-pointer flex flex-col justify-center"
+                <span className="text-xs font-bold text-white truncate max-w-[130px]">
+                  {musicState.title || 'Playing'}
+                </span>
+                <button
+                  type="button"
+                  data-no-dock-drag="true"
+                  onClick={() =>
+                    window.dispatchEvent(
+                      new CustomEvent('glassium-music-command', { detail: { action: 'toggle-play' } })
+                    )
+                  }
+                  className="w-7 h-7 rounded-lg bg-white text-slate-950 flex items-center justify-center"
                 >
-                  <div className="flex items-center gap-1.5 truncate">
-                    <span className="text-xs font-bold text-white tracking-tight truncate">
-                      {musicState.title || 'Playing Track'}
-                    </span>
+                  <span className="material-symbols-rounded text-base">
+                    {musicState.isPlaying ? 'pause' : 'play_arrow'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  data-no-dock-drag="true"
+                  onClick={() => setDesktopPillMinimized(false)}
+                  className="w-6 h-6 rounded-lg bg-white/15 hover:bg-white/25 text-white flex items-center justify-center"
+                  title="展開"
+                >
+                  <span className="material-symbols-rounded text-xs">open_in_full</span>
+                </button>
+              </div>
+            ) : (
+              <div
+                onPointerDown={handleDesktopPillPointerDown}
+                onPointerMove={handleDesktopPillPointerMove}
+                onPointerUp={handleDesktopPillPointerUp}
+                onPointerCancel={handleDesktopPillPointerUp}
+                className="relative group px-4 py-2.5 rounded-2xl liquid-glass-music-dock liquid-glass-window overflow-hidden flex flex-col gap-1.5 transition cursor-grab active:cursor-grabbing"
+              >
+                {/* Real-Time Moving Artwork-Pattern Gradient Behind the Liquid Glass Dock */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-70">
+                  <div
+                    className="absolute -inset-6 blur-2xl opacity-60 artwork-dock-underglow transition-all duration-1000"
+                    style={{
+                      background: `linear-gradient(125deg, ${
+                        musicState.palette?.c1 || '#fa243c'
+                      } 0%, ${musicState.palette?.c2 || '#8b5cf6'} 35%, ${
+                        musicState.palette?.c3 || '#06b6d4'
+                      } 70%, ${musicState.palette?.c4 || '#f59e0b'} 100%)`,
+                    }}
+                  />
+                  {musicState.artworkUrl && (
+                    <>
+                      <img
+                        src={musicState.artworkUrl}
+                        alt=""
+                        className="absolute -top-1/2 -left-1/4 w-[85%] h-[220%] object-cover blur-[32px] saturate-[2.4] opacity-45 artwork-fluid-orb-1"
+                      />
+                      <img
+                        src={musicState.artworkUrl}
+                        alt=""
+                        className="absolute -bottom-1/2 -right-1/4 w-[85%] h-[220%] object-cover blur-[36px] saturate-[2.4] opacity-40 artwork-fluid-orb-2 mix-blend-screen"
+                      />
+                    </>
+                  )}
+                  <div className="absolute inset-0 bg-slate-950/45" />
+                </div>
+
+                <div className="relative z-10 flex items-center gap-3">
+                  <span
+                    className="material-symbols-rounded text-sm text-white/45 select-none"
+                    title="ドラッグしてピルを移動"
+                  >
+                    drag_indicator
+                  </span>
+
+                  {/* Artwork Thumbnail / Clickable to open SynthVisualizer */}
+                  <button
+                    type="button"
+                    data-no-dock-drag="true"
+                    onClick={() => openApp('synth')}
+                    title="Music プレイヤーを開く"
+                    className="relative z-10 w-10 h-10 rounded-xl overflow-hidden bg-slate-800 border border-white/25 shrink-0 shadow-[0_6px_16px_rgba(0,0,0,0.5)] group-hover:scale-105 transition flex items-center justify-center cursor-pointer"
+                  >
+                    {musicState.artworkUrl ? (
+                      <img
+                        src={musicState.artworkUrl}
+                        alt={musicState.title || 'Track Artwork'}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="material-symbols-rounded text-cyan-400 text-lg">music_note</span>
+                    )}
+                  </button>
+
+                  {/* Title, Artist, & Realtime Synchronized Lyric Line */}
+                  <div
+                    data-no-dock-drag="true"
+                    onClick={() => openApp('synth')}
+                    className="relative z-10 min-w-0 max-w-[180px] sm:max-w-[290px] cursor-pointer flex flex-col justify-center"
+                  >
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className="text-xs font-bold text-white tracking-tight truncate">
+                        {musicState.title || 'Playing Track'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openApp('synth', { payload: { tab: 'artist' } });
+                          setTimeout(() => {
+                            window.dispatchEvent(
+                              new CustomEvent('glassium-music-command', {
+                                detail: {
+                                  action: 'open-artist',
+                                  artist: musicState.artist || 'YOASOBI',
+                                },
+                              })
+                            );
+                          }, 80);
+                        }}
+                        className="text-[11px] text-white/85 hover:text-[#fa243c] hover:underline truncate font-semibold"
+                        title="アーティストページを開く"
+                      >
+                        · {musicState.artist || 'Official Artist'}
+                      </button>
+                    </div>
+                    {musicState.lyricLine ? (
+                      <span className="text-[10px] text-white/90 font-medium truncate block">
+                        ♪ {musicState.lyricLine}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-white/60 truncate block">
+                        {musicState.album || 'Lossless Hi-Fi Stream'}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Transport Buttons inside Liquid Glass Dock */}
+                  <div
+                    data-no-dock-drag="true"
+                    className="relative z-10 flex items-center gap-1 shrink-0 border-l border-white/20 pl-2.5"
+                  >
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openApp('synth', { payload: { tab: 'artist' } });
-                        setTimeout(() => {
-                          window.dispatchEvent(
-                            new CustomEvent('glassium-music-command', {
-                              detail: {
-                                action: 'open-artist',
-                                artist: musicState.artist || 'YOASOBI',
-                              },
-                            })
-                          );
-                        }, 80);
-                      }}
-                      className="text-[11px] text-white/85 hover:text-[#fa243c] hover:underline truncate font-semibold"
-                      title="アーティストページを開く"
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new CustomEvent('glassium-music-command', { detail: { action: 'prev' } })
+                        )
+                      }
+                      title="前の曲"
+                      className="w-8 h-8 rounded-xl flex items-center justify-center text-white/85 hover:text-white hover:bg-white/15 active:scale-90 transition cursor-pointer"
                     >
-                      · {musicState.artist || 'Official Artist'}
+                      <span className="material-symbols-rounded text-lg">skip_previous</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new CustomEvent('glassium-music-command', { detail: { action: 'toggle-play' } })
+                        )
+                      }
+                      title={musicState.isPlaying ? '一時停止' : '再生'}
+                      className="w-8 h-8 rounded-xl bg-white text-slate-950 flex items-center justify-center font-bold shadow-[0_6px_18px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-95 transition cursor-pointer"
+                    >
+                      <span className="material-symbols-rounded text-xl leading-none">
+                        {musicState.isPlaying ? 'pause' : 'play_arrow'}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new CustomEvent('glassium-music-command', { detail: { action: 'next' } })
+                        )
+                      }
+                      title="次の曲"
+                      className="w-8 h-8 rounded-xl flex items-center justify-center text-white/85 hover:text-white hover:bg-white/15 active:scale-90 transition cursor-pointer"
+                    >
+                      <span className="material-symbols-rounded text-lg">skip_next</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setDesktopPillMinimized(true)}
+                      title="ミニピルに最小化"
+                      className="ml-0.5 w-6 h-6 rounded-lg flex items-center justify-center text-white/65 hover:text-white hover:bg-white/15 transition cursor-pointer"
+                    >
+                      <span className="material-symbols-rounded text-sm">close_fullscreen</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setPillDismissed(true)}
+                      title="ドックを隠す (バックグラウンド再生は継続)"
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-white/50 hover:text-white hover:bg-white/15 transition cursor-pointer"
+                    >
+                      <span className="material-symbols-rounded text-sm">close</span>
                     </button>
                   </div>
-                  {musicState.lyricLine ? (
-                    <span className="text-[10px] text-white/90 font-medium truncate block">
-                      ♪ {musicState.lyricLine}
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-white/60 truncate block">
-                      {musicState.album || 'Lossless Hi-Fi Stream'}
-                    </span>
-                  )}
                 </div>
 
-                {/* Transport Buttons inside Liquid Glass Dock */}
-                <div className="relative z-10 flex items-center gap-1 shrink-0 border-l border-white/20 pl-2.5">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      window.dispatchEvent(
-                        new CustomEvent('glassium-music-command', { detail: { action: 'prev' } })
-                      )
-                    }
-                    title="前の曲"
-                    className="w-8 h-8 rounded-xl flex items-center justify-center text-white/85 hover:text-white hover:bg-white/15 active:scale-90 transition cursor-pointer"
-                  >
-                    <span className="material-symbols-rounded text-lg">skip_previous</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      window.dispatchEvent(
-                        new CustomEvent('glassium-music-command', { detail: { action: 'toggle-play' } })
-                      )
-                    }
-                    title={musicState.isPlaying ? '一時停止' : '再生'}
-                    className="w-8 h-8 rounded-xl bg-white text-slate-950 flex items-center justify-center font-bold shadow-[0_6px_18px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-95 transition cursor-pointer"
-                  >
-                    <span className="material-symbols-rounded text-xl leading-none">
-                      {musicState.isPlaying ? 'pause' : 'play_arrow'}
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      window.dispatchEvent(
-                        new CustomEvent('glassium-music-command', { detail: { action: 'next' } })
-                      )
-                    }
-                    title="次の曲"
-                    className="w-8 h-8 rounded-xl flex items-center justify-center text-white/85 hover:text-white hover:bg-white/15 active:scale-90 transition cursor-pointer"
-                  >
-                    <span className="material-symbols-rounded text-lg">skip_next</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setPillDismissed(true)}
-                    title="ドックを隠す (バックグラウンド再生は継続)"
-                    className="ml-1 w-6 h-6 rounded-lg flex items-center justify-center text-white/50 hover:text-white hover:bg-white/15 transition cursor-pointer"
-                  >
-                    <span className="material-symbols-rounded text-sm">close</span>
-                  </button>
+                {/* Liquid Glass Dock Progress Bar */}
+                <div className="relative z-10 w-full h-1 rounded-full bg-white/15 overflow-hidden">
+                  <div
+                    className="h-full transition-all duration-150"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        ((musicState.currentTime || 0) / Math.max(1, musicState.duration || 210)) * 100
+                      )}%`,
+                      background: `linear-gradient(90deg, ${
+                        musicState.palette?.c1 || '#fa243c'
+                      }, ${musicState.palette?.c2 || '#a855f7'}, ${
+                        musicState.palette?.c3 || '#06b6d4'
+                      })`,
+                    }}
+                  />
                 </div>
               </div>
-
-              {/* Liquid Glass Dock Progress Bar */}
-              <div className="relative z-10 w-full h-1 rounded-full bg-white/15 overflow-hidden">
-                <div
-                  className="h-full transition-all duration-150"
-                  style={{
-                    width: `${Math.min(
-                      100,
-                      ((musicState.currentTime || 0) / Math.max(1, musicState.duration || 210)) * 100
-                    )}%`,
-                    background: `linear-gradient(90deg, ${
-                      musicState.palette?.c1 || '#fa243c'
-                    }, ${musicState.palette?.c2 || '#a855f7'}, ${
-                      musicState.palette?.c3 || '#06b6d4'
-                    })`,
-                  }}
-                />
-              </div>
-            </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
