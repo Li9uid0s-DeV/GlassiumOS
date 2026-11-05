@@ -45,6 +45,7 @@ export type AppId =
   | 'sudoku'
   | 'periodic'
   | 'dictionary'
+  | 'entertainment'
   | 'sysinfo';
 
 // Custom installed apps use a string ID prefixed with 'custom:'
@@ -351,6 +352,18 @@ export const STORE_CATALOG: StoreApp[] = [
     size: '4.8 MB',
     version: '4.7.0',
     builtInAppId: 'ai',
+  },
+  {
+    id: 'entertainment',
+    name: 'Entertainment (動画・アニメ・映画)',
+    description: 'Prime Shows, StreameX, FlixHD, Maple TV, YouTube & Shorts multi-source streaming hub.',
+    category: 'utilities',
+    icon: 'Tv',
+    author: 'Glassium Media',
+    rating: 5.0,
+    size: '3.4 MB',
+    version: '5.0.0',
+    builtInAppId: 'entertainment',
   },
   { id: 'paint', name: 'Spect Studio (お絵かき)', description: 'GlasispectUI digital canvas with brushes, layers, color palette, and PNG export.', category: 'utilities', icon: 'Palette', author: 'Glasispect Creative', rating: 4.9, size: '1.4 MB', version: '5.0 u1', builtInAppId: 'paint' },
   { id: 'pomodoro', name: 'Pomodoro Timer (集中タイマー)', description: '25/5 focus and break timer for deep productivity.', category: 'utilities', icon: 'Clock', author: 'Glassium Core', rating: 4.9, size: '920 KB', version: '4.7.0', builtInAppId: 'pomodoro' },

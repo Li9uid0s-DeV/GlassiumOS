@@ -11,7 +11,6 @@ import {
   enrichLyricsWithWordTiming,
   parseSyncedLyricsUniversal,
   searchMonochromeLiveTracks,
-  resolveFullLengthAudioStream,
   fetchSynchronizedLyricsFromLrclib,
   fetchHtmlViaProxyCascade,
   getServiceWorkerProxyUrl,
@@ -625,45 +624,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         loadLyricsForTrack(normalizedTrack);
       }
 
-      // If audioUrl is not yet resolved or needs direct CDN verification, resolve in background for this exact track
-      if (!normalizedTrack.audioUrl || !normalizedTrack.isFullLengthStream) {
-        resolveFullLengthAudioStream(
-          normalizedTrack.title,
-          normalizedTrack.artist,
-          normalizedTrack.monoTrackId
-        )
-          .then((resolved) => {
-            if (resolved && resolved.audioUrl) {
-              const updater = (list: MonochromeTrack[]) =>
-                list.map((t) =>
-                  t.id === normalizedTrack.id
-                    ? {
-                        ...t,
-                        audioUrl: resolved.audioUrl,
-                        isFullLengthStream: true,
-                        format: resolved.format,
-                        bitrate: resolved.bitrate,
-                      }
-                    : t
-                );
-              setTracks(updater);
-              setFavoriteTracks(updater);
-              setRecentTracks(updater);
-              setActiveTrackOverride((prev) =>
-                prev && prev.id === normalizedTrack.id
-                  ? {
-                      ...prev,
-                      audioUrl: resolved.audioUrl,
-                      isFullLengthStream: true,
-                      format: resolved.format,
-                      bitrate: resolved.bitrate,
-                    }
-                  : prev
-              );
-            }
-          })
-          .catch(() => {});
-      }
+      // Audio URL is routed through high-fidelity streaming proxy by default
 
       setTimeout(() => {
         setIsBuffering(false);
@@ -872,18 +833,21 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       const targetFullDuration = Math.max(60, currentTrack.duration || 210);
       let activeSec = fullPlayheadRef.current;
 
-      // Read directly from HTML5 <audio> element at 60fps when streaming a full-length track
-      if (
-        currentTrack.audioUrl &&
-        audio &&
-        !audio.paused &&
-        Number.isFinite(audio.duration) &&
-        audio.duration > 35
-      ) {
-        activeSec = audio.currentTime;
-        fullPlayheadRef.current = activeSec;
+      // Read directly from HTML5 <audio> element at 60fps when streaming a track
+      if (currentTrack.audioUrl && audio) {
+        if (!audio.paused && Number.isFinite(audio.currentTime)) {
+          activeSec = audio.currentTime;
+          fullPlayheadRef.current = activeSec;
+        } else {
+          // While buffering or holding, keep the stable current playhead
+          activeSec = fullPlayheadRef.current;
+        }
       } else {
         activeSec += dtSec * playbackRate;
+        if (activeSec >= targetFullDuration) {
+          nextTrack();
+          return;
+        }
         fullPlayheadRef.current = activeSec;
       }
 
@@ -926,11 +890,12 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         }
       }
 
-      if (activeSec >= targetFullDuration - 0.1) {
+      // Advance only when audio has truly completed (audio.ended is true) or time exceeded
+      if (audio && audio.ended) {
         if (isRepeat) {
           fullPlayheadRef.current = 0;
           setCurrentTime(0);
-          if (audio && currentTrack.audioUrl) {
+          if (currentTrack.audioUrl) {
             audio.currentTime = 0;
             audio.play().catch(() => {});
           }
@@ -1529,6 +1494,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       {/* Hidden HTML5 Audio Element for Full-Length 320kbps Streams */}
       <audio
         ref={audioElRef}
+        preload="auto"
         onLoadedMetadata={(e) => {
           const nativeDur = e.currentTarget.duration;
           if (Number.isFinite(nativeDur) && nativeDur >= 40) {
@@ -1539,6 +1505,15 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             setActiveTrackOverride((prev) =>
               prev && prev.id === currentTrack.id ? { ...prev, duration: exactSecs } : prev
             );
+          }
+        }}
+        onError={(e) => {
+          console.warn('Audio stream glitch, auto-recovering:', e);
+          const audio = audioElRef.current;
+          if (audio && currentTrack.audioUrl && isPlaying) {
+            setTimeout(() => {
+              audio.play().catch(() => {});
+            }, 500);
           }
         }}
         onEnded={() => {

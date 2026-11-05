@@ -319,6 +319,7 @@ const APP_DEFAULTS: Record<AppId, { title: string; icon: string; width: number; 
   sysmon: { title: 'System Monitor', icon: 'Activity', width: 740, height: 520 },
   calendar: { title: 'Calendar', icon: 'Calendar', width: 820, height: 550 },
   synth: { title: 'Music', icon: 'Music', width: 880, height: 580 },
+  entertainment: { title: 'Entertainment (動画・アニメ・映画)', icon: 'Tv', width: 940, height: 620 },
   weather: { title: 'Weather', icon: 'CloudSun', width: 840, height: 580 },
   clock: { title: 'Clock', icon: 'Clock', width: 780, height: 540 },
   ai: { title: 'AI Assistant', icon: 'Sparkles', width: 860, height: 600 },

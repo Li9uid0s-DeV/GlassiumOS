@@ -23,6 +23,7 @@ import { AIAssistantApp } from './apps/AIAssistantApp';
 import { Calculator } from './apps/Calculator';
 import { TaskManager } from './apps/TaskManager';
 import { SynthVisualizerApp } from './apps/SynthVisualizer';
+import { EntertainmentApp } from './apps/Entertainment';
 import { GlassiumStudioApp } from './apps/GlassiumStudio';
 import { RetroCadeApp } from './apps/RetroCade';
 import { renderExtraApp } from './apps/ExtraAppsSuite';
@@ -72,6 +73,8 @@ function renderApp(appId: string, payload?: unknown) {
     case 'drumpad':
     case 'tuner':
       return <SynthVisualizerApp initialTab={appId} />;
+    case 'entertainment':
+      return <EntertainmentApp initialTab={appId} payload={payload as { videoId?: string; mode?: string }} />;
     case 'weather':
       return <WeatherApp />;
     case 'clock':
@@ -379,6 +382,7 @@ export function Desktop() {
     { id: 'settings', label: 'Settings', icon: 'settings' },
     { id: 'game', label: 'Games', icon: 'game' },
     { id: 'synth', label: 'Music', icon: 'synth' },
+    { id: 'entertainment', label: 'Entertainment', icon: 'entertainment' },
     { id: 'calendar', label: 'Calendar', icon: 'calendar' },
     { id: 'weather', label: 'Weather', icon: 'weather' },
     { id: 'clock', label: 'Clock', icon: 'clock' },

@@ -774,9 +774,9 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     const q = String(req.query.q || 'YOASOBI').trim() || 'YOASOBI';
 
     try {
-      const [gdItems, itunesData] = await Promise.all([
+      const [gdItems, itunesJpData, itunesGlobalData] = await Promise.all([
         fetch(
-          `https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(q)}&count=18&pages=1`,
+          `https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(q)}&count=20&pages=1`,
           {
             headers: {
               'User-Agent':
@@ -788,7 +788,17 @@ Only output <os_action> if the user is asking to change an OS setting or open an
           .then((r) => (r.ok ? (r.json() as Promise<GdStudioTrackItem[]>) : []))
           .catch(() => [] as GdStudioTrackItem[]),
         fetch(
-          `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&country=JP&entity=song&limit=15`,
+          `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&country=JP&entity=song&limit=16`,
+          { signal: AbortSignal.timeout(5500) }
+        )
+          .then((r) =>
+            r.ok
+              ? (r.json() as Promise<{ results?: ItunesSearchResultItem[] }>)
+              : { results: [] }
+          )
+          .catch(() => ({ results: [] as ItunesSearchResultItem[] })),
+        fetch(
+          `https://itunes.apple.com/search?term=${encodeURIComponent(q)}&country=US&entity=song&limit=16`,
           { signal: AbortSignal.timeout(5500) }
         )
           .then((r) =>
@@ -799,7 +809,10 @@ Only output <os_action> if the user is asking to change an OS setting or open an
           .catch(() => ({ results: [] as ItunesSearchResultItem[] })),
       ]);
 
-      const itunesList = Array.isArray(itunesData?.results) ? itunesData.results : [];
+      const itunesList = [
+        ...(Array.isArray(itunesJpData?.results) ? itunesJpData.results : []),
+        ...(Array.isArray(itunesGlobalData?.results) ? itunesGlobalData.results : []),
+      ];
       const results: Array<{
         id: string;
         monoTrackId: string;
@@ -1004,14 +1017,30 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       if (upstream.body && typeof Readable.fromWeb === 'function') {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const nodeStream = Readable.fromWeb(upstream.body as any);
+        nodeStream.on('error', () => {
+          try {
+            nodeStream.destroy();
+          } catch {
+            // ignore
+          }
+        });
+        res.on('close', () => {
+          try {
+            nodeStream.destroy();
+          } catch {
+            // ignore
+          }
+        });
         nodeStream.pipe(res);
       } else {
         const ab = await upstream.arrayBuffer();
         res.send(Buffer.from(ab));
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Audio stream failed';
-      res.status(502).send(msg);
+      if (!res.headersSent) {
+        const msg = err instanceof Error ? err.message : 'Audio stream failed';
+        res.status(502).send(msg);
+      }
     }
   });
 
@@ -1561,9 +1590,19 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`GlassiumOS 5 Server running on http://localhost:${PORT}`);
+  app.listen(3000, '0.0.0.0', () => {
+    console.log('GlassiumOS 5 Server running on http://localhost:3000');
   });
+
+  if (PORT !== 3000) {
+    try {
+      app.listen(PORT, '0.0.0.0', () => {
+        console.log(`GlassiumOS 5 Server also listening on http://localhost:${PORT}`);
+      });
+    } catch {
+      // ignore
+    }
+  }
 }
 
 startServer();

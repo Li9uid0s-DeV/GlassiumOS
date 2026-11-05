@@ -121,10 +121,19 @@ import {
   CheckCircle2,
   RotateCcw,
   MousePointer,
+  Tv,
+  Film,
+  Video,
+  Clapperboard,
 } from 'lucide-react';
 import { FluentAppIcon, resolveFluentIconType } from './FluentAppIcon';
 
 const map = {
+  entertainment: Tv,
+  Tv,
+  Film,
+  Video,
+  Clapperboard,
   CloudSun,
   CloudRain,
   Cloud,

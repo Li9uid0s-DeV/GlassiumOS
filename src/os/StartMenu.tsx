@@ -39,6 +39,7 @@ const PINNED: PinnedEntry[] = [
   { uid: 'pin-settings', appId: 'settings', label: 'Settings', icon: 'settings' },
   { uid: 'pin-game', appId: 'game', label: 'Games', icon: 'game' },
   { uid: 'pin-synth', appId: 'synth', label: 'Music', icon: 'synth' },
+  { uid: 'pin-entertainment', appId: 'entertainment', label: 'Entertainment', icon: 'entertainment' },
   { uid: 'pin-calendar', appId: 'calendar', label: 'Calendar', icon: 'calendar' },
   { uid: 'pin-weather', appId: 'weather', label: 'Weather', icon: 'weather' },
   { uid: 'pin-clock', appId: 'clock', label: 'Clock', icon: 'clock' },
