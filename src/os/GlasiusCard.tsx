@@ -277,10 +277,20 @@ export function GlasiusCard({ onClose }: { onClose?: () => void }) {
           <button
             type="button"
             onClick={() => setShowFontPicker(!showFontPicker)}
-            className="px-2.5 py-0.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 backdrop-blur-xl border border-cyan-300/40 text-[11px] font-bold text-cyan-200 transition"
+            className="px-2.5 py-0.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 backdrop-blur-xl border border-cyan-300/40 text-[11px] font-bold text-cyan-200 transition cursor-pointer"
           >
             フォント切替
           </button>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1 rounded-xl bg-white/10 hover:bg-rose-500/80 text-white/70 hover:text-white transition cursor-pointer"
+              title="時計ウィジェットを閉じる"
+            >
+              <Icon name="X" size={12} />
+            </button>
+          )}
         </div>
 
         {showFontPicker && (

@@ -235,7 +235,9 @@ export function Desktop() {
   const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [draggingNote, setDraggingNote] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [showGlasiusWidget, setShowGlasiusWidget] = useState<boolean>(true);
+  const [showGlasiusWidget, setShowGlasiusWidget] = useState<boolean>(() => {
+    return localStorage.getItem('glassium_show_desktop_widget') === 'true';
+  });
   const [showWhatsNewModal, setShowWhatsNewModal] = useState<boolean>(() => {
     const dismissed = localStorage.getItem('glassium_v5.0_u2_whats_new_dismissed');
     return !dismissed;
@@ -1454,6 +1456,26 @@ export function Desktop() {
               <Icon name="Columns" size={14} className="text-sky-500" />
               <span>ウィンドウを左右に並べる</span>
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                const next = !showGlasiusWidget;
+                setShowGlasiusWidget(next);
+                localStorage.setItem('glassium_show_desktop_widget', next ? 'true' : 'false');
+                setContextMenu(null);
+              }}
+              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition ${
+                theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-white/10'
+              }`}
+            >
+              <span className="flex items-center gap-2.5">
+                <Icon name="Clock" size={14} className="text-cyan-400" />
+                <span>デスクトップ時計ウィジェット</span>
+              </span>
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${showGlasiusWidget ? 'os-accent-soft' : 'opacity-45'}`}>
+                {showGlasiusWidget ? 'ON' : 'OFF'}
+              </span>
+            </button>
             <div className={`my-1 border-t ${theme === 'light' ? 'border-slate-200' : 'border-white/10'}`} />
             <button
               type="button"
@@ -1585,7 +1607,12 @@ export function Desktop() {
 
       {/* Signature GlasiusCard Spatial HUD (Top-Left Weather/Info, Bottom-Left Liquid Glass Clock & Volume, Right-Side Notifications & Pure Chat AI) */}
       {showGlasiusWidget && (
-        <GlasiusCard onClose={() => setShowGlasiusWidget(false)} />
+        <GlasiusCard
+          onClose={() => {
+            setShowGlasiusWidget(false);
+            localStorage.setItem('glassium_show_desktop_widget', 'false');
+          }}
+        />
       )}
 
       {/* ========================================================
