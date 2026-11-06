@@ -8,12 +8,10 @@ import {
   ClockFontId,
   CLOCK_FONT_OPTIONS,
 } from './LiquidGlassClock';
+import { LiquidGlassMusicWidget } from './LiquidGlassMusicWidget';
 import {
   getMusicState,
   subscribeMusicState,
-  toggleMusicPlay,
-  nextMusicTrack,
-  prevMusicTrack,
   setMusicVolume,
   MusicPlayerState,
 } from './musicBridge';
@@ -619,68 +617,14 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             MEDIA PLAYER — SHOWN ONLY WHEN MEDIA IS ACTIVELY PLAYING!
         ===================================================================== */}
         <AnimatePresence>
-          {isMediaPlaying && musicState?.currentTrack && (
+          {isMediaPlaying && (
             <motion.div
               initial={{ opacity: 0, y: 28, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 28, scale: 0.95 }}
-              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3.5 px-4 py-3 rounded-3xl bg-white/[0.12] backdrop-blur-3xl border border-white/25 shadow-[0_20px_60px_rgba(0,0,0,0.65)] min-w-[300px] max-w-[440px]"
+              className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40"
             >
-              <div className="relative w-11 h-11 rounded-2xl overflow-hidden bg-slate-900 border border-white/20 shrink-0">
-                {musicState.currentTrack.cover ? (
-                  <img
-                    src={musicState.currentTrack.cover}
-                    alt={musicState.currentTrack.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-cyan-300">
-                    <Icon name="Music" size={18} />
-                  </div>
-                )}
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="ios27-liquid-circle-dot scale-75" />
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-cyan-300 font-bold">
-                    NOW PLAYING
-                  </span>
-                </div>
-                <div className="text-xs font-black text-white truncate">
-                  {musicState.currentTrack.title}
-                </div>
-                <div className="text-[11px] text-white/70 truncate">
-                  {musicState.currentTrack.artist}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => prevMusicTrack()}
-                  className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition cursor-pointer"
-                  title="前の曲へ"
-                >
-                  <Icon name="SkipBack" size={14} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toggleMusicPlay()}
-                  className="w-9 h-9 rounded-2xl bg-white text-slate-950 hover:scale-105 flex items-center justify-center font-bold shadow transition cursor-pointer"
-                  title="一時停止 / 再生"
-                >
-                  <Icon name={musicState.isPlaying ? 'Pause' : 'Play'} size={15} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => nextMusicTrack()}
-                  className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition cursor-pointer"
-                  title="次の曲にスキップ"
-                >
-                  <Icon name="SkipForward" size={14} />
-                </button>
-              </div>
+              <LiquidGlassMusicWidget />
             </motion.div>
           )}
         </AnimatePresence>

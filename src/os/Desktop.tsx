@@ -31,6 +31,7 @@ import { Icon } from './Icon';
 import { AppId, TASKBAR_APPS, DESKTOP_ICON_SIZE_PRESETS, DesktopIconSize } from './types';
 import { AppLogo } from './AppLogo';
 import { GlasiusCard } from './GlasiusCard';
+import { InitialSetupWizard, InitialSetupResult } from './InitialSetupWizard';
 
 function renderApp(appId: string, payload?: unknown) {
   switch (appId) {
@@ -173,6 +174,11 @@ export function Desktop() {
     lockSystem,
     unlockSystem,
     user,
+    setUser,
+    setTheme,
+    setAccentColor,
+    setUiStyle,
+    triggerDynamicIsland,
     showWelcome,
     setWelcome,
     shellMode,
@@ -215,6 +221,16 @@ export function Desktop() {
 
   const [time, setTime] = useState(new Date());
   const [notifCenterOpen, setNotifCenterOpen] = useState(false);
+  const [setupWizardOpen, setSetupWizardOpen] = useState<boolean>(() => {
+    const done = localStorage.getItem('glassium_setup_completed');
+    return !done || !user;
+  });
+
+  useEffect(() => {
+    const handleReopenSetup = () => setSetupWizardOpen(true);
+    window.addEventListener('open-glassium-setup', handleReopenSetup);
+    return () => window.removeEventListener('open-glassium-setup', handleReopenSetup);
+  }, []);
   const [draggingIcon, setDraggingIcon] = useState<{ id: string; x: number; y: number } | null>(null);
   const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -2227,6 +2243,27 @@ export function Desktop() {
         expectedPassword={user?.password}
         userName={user?.name}
       />
+
+      {/* Initial Setup Wizard (First Launch Account, Theme, UI Style, Accent, & Password) */}
+      <AnimatePresence>
+        {setupWizardOpen && (
+          <InitialSetupWizard
+            initialUser={user}
+            initialUiStyle={uiStyle}
+            initialTheme={theme}
+            initialAccent={accentColor}
+            onComplete={(result: InitialSetupResult) => {
+              setUser(result.user);
+              setUiStyle(result.uiStyle);
+              setTheme(result.theme);
+              setAccentColor(result.accentColor);
+              localStorage.setItem('glassium_setup_completed', 'true');
+              setSetupWizardOpen(false);
+              triggerDynamicIsland('Setup Complete', `ようこそ、${result.user.name}さん`, 'Sparkles');
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -27,6 +27,9 @@ export function generateSvgLauncher() {
   const cssMatches = [...html.matchAll(/<link[^>]+href="([^"]+\.css)"[^>]*>/g)].map(m => m[0]);
   const scriptMatches = [...html.matchAll(/<script[^>]+src="([^"]+\.js)"[^>]*><\/script>/g)].map(m => m[0]);
 
+  // Extract embedded SVG filter definitions
+  const svgFilterMatches = html.match(/<svg style="position:\s*absolute;[\s\S]*?<\/svg>/gi) || [];
+
   // Generate SVG with XHTML foreignObject wrapping the app
   const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xhtml="http://www.w3.org/1999/xhtml" width="100%" height="100%">
   <foreignObject width="100%" height="100%" requiredExtensions="http://www.w3.org/1999/xhtml">
@@ -51,6 +54,7 @@ export function generateSvgLauncher() {
         </style>
       </head>
       <body>
+        ${svgFilterMatches.join('\n        ')}
         <div id="root"></div>
         ${scriptMatches.join('\n        ')}
       </body>

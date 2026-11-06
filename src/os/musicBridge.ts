@@ -99,3 +99,12 @@ export function setMusicVolume(volume0to1: number): void {
     })
   );
 }
+
+export function seekMusicTrack(timeSecs: number): void {
+  window.dispatchEvent(
+    new CustomEvent('glassium-music-command', {
+      detail: { action: 'seek', time: timeSecs },
+    })
+  );
+}
+
