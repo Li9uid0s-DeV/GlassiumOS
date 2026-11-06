@@ -10,7 +10,7 @@ import {
   saveMusicSettings,
   resolveFullLengthAudioStream,
 } from './proxyService';
-import { resolveBackendUrl, isStaticHostWithoutBackend } from './backendConfig';
+import { resolveBackendUrl } from './backendConfig';
 
 export interface GlobalAudioState {
   isPlaying: boolean;
@@ -600,37 +600,43 @@ class GlobalAudioManager {
 
     this.syncMediaSessionMetadata(track);
 
-    // Stage 1: Primary server stream proxy (/api/music/play on Koyeb or local server)
-    if (!isStaticHostWithoutBackend()) {
-      try {
-        this.audio.src = resolvedUrl;
-        this.playPromise = this.audio.play();
-        await this.playPromise;
-        this.playPromise = null;
-        if (this.pendingTrack === track) {
-          this.updateState({
-            isPlaying: true,
-            isBuffering: false,
-            error: null,
-            statusMessage: `フル尺再生中: ${track.title} — ${cleanArtist}`,
-          });
-        }
-        return;
-      } catch (err: unknown) {
-        this.playPromise = null;
-        if ((err as Error)?.name === 'AbortError' || this.pendingTrack !== track) {
-          return;
-        }
-        console.warn('Stage 1 (/api/music/play) fallback to Stage 2 direct CDN:', (err as Error)?.message);
+    // Stage 1: Server Full-Length Stream Proxy (/api/music/play)
+    try {
+      this.audio.src = resolvedUrl;
+      this.playPromise = this.audio.play();
+      await this.playPromise;
+      this.playPromise = null;
+      if (this.pendingTrack === track) {
+        const realDur =
+          Number.isFinite(this.audio.duration) && this.audio.duration > 45
+            ? Math.round(this.audio.duration)
+            : track.duration;
+        this.updateState({
+          isPlaying: true,
+          isBuffering: false,
+          duration: realDur,
+          error: null,
+          statusMessage: `フル尺再生中 (Server 320kbps): ${track.title} — ${cleanArtist}`,
+        });
       }
+      return;
+    } catch (err: unknown) {
+      this.playPromise = null;
+      if ((err as Error)?.name === 'AbortError' || this.pendingTrack !== track) {
+        return;
+      }
+      console.warn('Stage 1 (/api/music/play) retrying via server /api/music/info:', (err as Error)?.message);
     }
 
-    // Stage 2: Resolve direct NetEase / Monochrome / GDStudio full-length CDN stream URL
+    // Stage 2: Resolve via Server /api/music/info and stream through server proxy
     if (this.pendingTrack === track) {
       try {
         const directStream = await resolveFullLengthAudioStream(track.title, cleanArtist, numericId);
-        if (directStream?.audioUrl && this.pendingTrack === track) {
-          this.audio.src = directStream.audioUrl;
+        const targetSrc = directStream?.proxyAudioUrl
+          ? resolveBackendUrl(directStream.proxyAudioUrl)
+          : directStream?.audioUrl;
+        if (targetSrc && this.pendingTrack === track) {
+          this.audio.src = targetSrc;
           this.playPromise = this.audio.play();
           await this.playPromise;
           this.playPromise = null;
@@ -638,7 +644,7 @@ class GlobalAudioManager {
             isPlaying: true,
             isBuffering: false,
             error: null,
-            statusMessage: `フル尺再生中 (Direct Stream): ${track.title} — ${cleanArtist}`,
+            statusMessage: `フル尺再生中 (Server Direct Stream): ${track.title} — ${cleanArtist}`,
           });
           return;
         }
@@ -650,47 +656,12 @@ class GlobalAudioManager {
       }
     }
 
-    // Stage 3: Direct client-side iTunes JP/US AAC stream fallback
-    if (this.pendingTrack === track) {
-      try {
-        const itunesRes = await fetch(
-          `https://itunes.apple.com/search?term=${encodeURIComponent(
-            `${track.title} ${cleanArtist}`
-          )}&country=JP&entity=song&limit=5`
-        );
-        if (itunesRes.ok && this.pendingTrack === track) {
-          const itunesData = (await itunesRes.json()) as {
-            results?: { previewUrl?: string }[];
-          };
-          const previewUrl = itunesData.results?.find((r) => r.previewUrl)?.previewUrl;
-          if (previewUrl) {
-            this.audio.src = previewUrl;
-            this.playPromise = this.audio.play();
-            await this.playPromise;
-            this.playPromise = null;
-            this.updateState({
-              isPlaying: true,
-              isBuffering: false,
-              error: null,
-              statusMessage: `再生中 (AAC Stream): ${track.title} — ${cleanArtist}`,
-            });
-            return;
-          }
-        }
-      } catch (err3: unknown) {
-        this.playPromise = null;
-        if ((err3 as Error)?.name === 'AbortError' || this.pendingTrack !== track) {
-          return;
-        }
-      }
-    }
-
     if (this.pendingTrack === track) {
       this.updateState({
         isPlaying: false,
         isBuffering: false,
         error: null,
-        statusMessage: `${track.title} — 再生ボタンを押して開始`,
+        statusMessage: `${track.title} — サーバーストリーム準備完了`,
       });
     }
   }

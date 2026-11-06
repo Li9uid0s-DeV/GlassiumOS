@@ -387,7 +387,32 @@ async function generateSmartLocalFallback(userPrompt: string): Promise<AIChatRes
     });
   }
 
-  // 5. App Launchers
+  // 5. AI Game Creation & Cloud Game Hub Commands
+  if (
+    (lower.includes('ゲーム') || lower.includes('game') || lower.includes('シューティング') || lower.includes('レーシング')) &&
+    (lower.includes('作') || lower.includes('生成') || lower.includes('create') || lower.includes('make') || lower.includes('build'))
+  ) {
+    return withNormalizedAction({
+      reply:
+        '**Game アプリ（🤖 AI ゲーム制作スタジオ）** を起動しました！\n自然言語で「宇宙弾幕シューティング」「ヴァンサバ風魔法RPG」「黄金ブロック崩し」などを指示するだけで、AIとサーバーがその場で遊べるHTML5ゲームを生成・改造します。',
+      action: makeAction('open_app', 'game', 'AI ゲーム制作スタジオを開く'),
+      model: 'glassium-5-game-studio',
+    });
+  }
+
+  if (
+    ['github', 'jsdelivr', 'eaglercraft', 'tglsc', 'lumin', 'cloudmoon', 'cloud gaming', 'ultimate game stash'].some((k) =>
+      lower.includes(k)
+    )
+  ) {
+    return {
+      reply:
+        'Game アプリ（🌐 GitHub / jsDelivr / クラウドゲームHub）では、GitHub・jsDelivr・Eaglercraft・TGLSC・Lumin・CloudMoon・Ultimate Game Stash からHTML5ゲームを取得してiframe内で直接プレイできます。',
+      model: 'glassium-5-game-hub',
+    };
+  }
+
+  // 6. App Launchers
   const appKeywords: Array<{ keys: string[]; id: string; name: string }> = [
     { keys: ['設定', 'settings', 'カスタマイズ'], id: 'settings', name: '設定 (Settings)' },
     { keys: ['ブラウザ', 'browser', '検索', 'ネット'], id: 'browser', name: 'ブラウザ (Browser)' },

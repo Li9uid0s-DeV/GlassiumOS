@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useOS, AuroraColor, Wallpaper } from './OSContext';
+import { useOS } from './OSContext';
 import { Icon } from './Icon';
-import { AppId, ShellMode } from './types';
 import { requestAIChat } from './aiClient';
 
 interface ChatMessage {
@@ -17,27 +16,14 @@ interface ChatMessage {
 
 const QUICK_PROMPTS = [
   { label: 'ブラックホールとは？', query: 'ブラックホールとは何か、わかりやすく教えて' },
-  { label: 'ペイントを起動', query: 'ペイントを開いて' },
+  { label: '量子コンピュータの仕組み', query: '量子コンピュータの仕組みを初心者向けに解説して' },
   { label: 'Reactの書き方', query: 'ReactとTypeScriptの基本的なコンポーネント例を教えて' },
-  { label: 'Windows 10モードに', query: 'Windows 10 モードに切り替えて' },
-  { label: 'ウィンドウ整列', query: 'ウィンドウを並べて整列して' },
+  { label: '集中力を高めるコツ', query: '勉強や開発の集中力を高める科学的な方法を教えて' },
+  { label: '相対性理論について', query: 'アインシュタインの相対性理論を3行で要約して' },
 ];
 
 export function AIAssistant() {
-  const {
-    windows,
-    openApp,
-    updateWindowRect,
-    setTheme,
-    setShellMode,
-    setWallpaper,
-    setAuroraColor,
-    setGlassCurvature,
-    setGlassWobble,
-    lockSystem,
-    applyThemeConfig,
-    playSound,
-  } = useOS();
+  const { openApp, playSound } = useOS();
 
   const [expanded, setExpanded] = useState(false);
   const [chatInput, setChatInput] = useState('');
@@ -46,7 +32,7 @@ export function AIAssistant() {
     {
       id: 'welcome-1',
       sender: 'ai',
-      text: 'こんにちは。質問や計算、コード作成、オーロラ・3Dガラス設定の変更、アプリの起動など何でもお任せください。',
+      text: 'こんにちは。純粋なチャット専用AIアシスタントです（OS操作機能は無効化されています）。質問や調べもの、プログラミング、アイデア出しなど何でもお気軽に話しかけてください。',
       timestamp: Date.now(),
     },
   ]);
@@ -58,69 +44,6 @@ export function AIAssistant() {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [chatMessages, isThinking, expanded]);
-
-  const executeAction = useCallback(
-    (action: { type: string; target?: string; value?: string; label?: string }) => {
-      if (!action || !action.type || action.type === 'none') return;
-      const targetVal = action.target || action.value;
-
-      if ((action.type === 'open_app' || action.type === 'openApp') && targetVal) {
-        openApp(targetVal as AppId);
-      } else if ((action.type === 'set_shell' || action.type === 'setShellMode') && targetVal) {
-        setShellMode(targetVal as ShellMode);
-      } else if ((action.type === 'set_theme' || action.type === 'setTheme') && targetVal) {
-        setTheme(targetVal === 'light' ? 'light' : 'dark');
-      } else if (action.type === 'apply_theme' && targetVal) {
-        applyThemeConfig(targetVal);
-      } else if ((action.type === 'set_wallpaper' || action.type === 'setWallpaper') && targetVal) {
-        setWallpaper(targetVal as Wallpaper);
-      } else if (action.type === 'set_aurora' && targetVal) {
-        setWallpaper('live2d');
-        setAuroraColor(targetVal as AuroraColor);
-      } else if (action.type === 'set_glass' && targetVal) {
-        const val = Number(targetVal) || 75;
-        setGlassCurvature(val);
-        setGlassWobble(Math.min(100, val + 10));
-      } else if (action.type === 'lock_system') {
-        lockSystem();
-      } else if (action.type === 'snap_windows') {
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        const TASKBAR_H = 56;
-        const GAP = 8;
-        const nonMin = windows.filter((w) => !w.minimized);
-        if (nonMin.length >= 2) {
-          updateWindowRect(nonMin[0].id, {
-            x: GAP,
-            y: GAP,
-            width: vw / 2 - GAP * 1.5,
-            height: vh - TASKBAR_H - GAP * 1.5,
-          });
-          updateWindowRect(nonMin[1].id, {
-            x: vw / 2 + GAP * 0.5,
-            y: GAP,
-            width: vw / 2 - GAP * 1.5,
-            height: vh - TASKBAR_H - GAP * 1.5,
-          });
-        }
-      } else if (action.type === 'play_music') {
-        openApp('synth');
-      }
-    },
-    [
-      openApp,
-      setShellMode,
-      setTheme,
-      applyThemeConfig,
-      setWallpaper,
-      setAuroraColor,
-      setGlassCurvature,
-      setGlassWobble,
-      lockSystem,
-      windows,
-      updateWindowRect,
-    ]
-  );
 
   const sendMessage = async (textToSend: string) => {
     const trimmed = textToSend.trim();
@@ -141,15 +64,6 @@ export function AIAssistant() {
     try {
       const data = await requestAIChat({ message: trimmed });
       const aiReply = data.reply || '応答を受信しました。';
-      let actionCallback: (() => void) | undefined;
-      let actionBtnLabel: string | undefined;
-
-      if (data.action && data.action.type && data.action.type !== 'none') {
-        const act = data.action;
-        actionCallback = () => executeAction(act);
-        actionBtnLabel = '実行する';
-        setTimeout(() => executeAction(act), 250);
-      }
 
       setChatMessages((prev) => [
         ...prev,
@@ -157,8 +71,6 @@ export function AIAssistant() {
           id: `ai-${Date.now()}`,
           sender: 'ai',
           text: aiReply,
-          action: actionCallback,
-          actionLabel: actionBtnLabel,
           timestamp: Date.now(),
         },
       ]);

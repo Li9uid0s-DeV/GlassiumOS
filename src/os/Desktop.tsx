@@ -1567,11 +1567,9 @@ export function Desktop() {
         </div>
       )}
 
-      {/* Signature GlasiusCard Widget (Desktop Layer) */}
+      {/* Signature GlasiusCard Spatial HUD (Top-Left Weather/Info, Bottom-Left Liquid Glass Clock & Volume, Right-Side Notifications & Pure Chat AI) */}
       {showGlasiusWidget && (
-        <div className="absolute top-12 right-6 z-20 pointer-events-auto">
-          <GlasiusCard onClose={() => setShowGlasiusWidget(false)} />
-        </div>
+        <GlasiusCard onClose={() => setShowGlasiusWidget(false)} />
       )}
 
       {/* ========================================================

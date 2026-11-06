@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { Icon } from '../Icon';
 import { PuzzleGamesView } from './ExtraAppsSuite';
+import { CloudAndAIGameHub } from './CloudAndAIGameHub';
 import {
   QualityPreset,
   ShaderMode,
@@ -23,7 +24,7 @@ import {
   WallTorchInstance,
 } from './glasiaDungeonsEngine';
 
-export type GameMode = 'velocity' | 'maze' | '2048' | 'puzzles' | 'gameboy';
+export type GameMode = 'cloudhub' | 'aistudio' | 'velocity' | 'maze' | '2048' | 'puzzles' | 'gameboy';
 
 interface GameAppProps {
   initialTab?: string;
@@ -31,7 +32,13 @@ interface GameAppProps {
 }
 
 function mapPayloadToMode(gameId?: string): GameMode {
-  if (!gameId || gameId === 'game') return 'velocity';
+  if (!gameId || gameId === 'game') return 'cloudhub';
+  if (['cloud', 'github', 'jsdelivr', 'eaglercraft', 'tglsc', 'lumin', 'cloudmoon', 'stash'].some((k) => gameId.includes(k))) {
+    return 'cloudhub';
+  }
+  if (['ai', 'maker', 'studio', 'create'].some((k) => gameId.includes(k))) {
+    return 'aistudio';
+  }
   if (['minesweeper', 'tictactoe', 'memory', 'typing', 'sudoku', 'puzzles'].some((k) => gameId.includes(k))) {
     return 'puzzles';
   }
@@ -4387,6 +4394,8 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
   };
 
   const GAME_TABS: { id: GameMode; label: string; icon: string }[] = [
+    { id: 'cloudhub', label: '🌐 GitHub & jsDelivr クラウドHub (Eaglercraft / Slope2 / TGLSC / Lumin / CloudMoon / Stash)', icon: 'Cloud' },
+    { id: 'aistudio', label: '🤖 AIゲーム制作スタジオ', icon: 'Sparkles' },
     { id: 'velocity', label: 'Slope (3D Glider)', icon: 'Flame' },
     { id: 'maze', label: 'Glasia Dungeons', icon: 'Compass' },
     { id: '2048', label: '2048', icon: 'LayoutGrid' },
@@ -5458,6 +5467,21 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
                 </label>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Cloud & Unblocked Game Hub (GB-Math, TGLSC, Lumin, CloudMoon, Ultimate Game Stash) & AI Game Maker Studio */}
+        {(mode === 'cloudhub' || mode === 'aistudio') && (
+          <div className="absolute inset-0 z-30 bg-slate-950 overflow-hidden">
+            <CloudAndAIGameHub
+              mode={mode}
+              currentScore={score}
+              discoveredWeaponsCount={discoveredWeapons.length}
+              mazeBestFloor={dailyBestFloor}
+              onUnlockEverything={() => {
+                setLunaticCleared(true);
+              }}
+            />
           </div>
         )}
 

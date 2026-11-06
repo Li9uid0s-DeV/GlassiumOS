@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOS } from './OSContext';
-import { TASKBAR_APPS, AppId, Wallpaper, AccentColorId } from './types';
+import { TASKBAR_APPS, AppId } from './types';
 import { Icon } from './Icon';
 import { StartMenu } from './StartMenu';
 import { AIAssistant } from './AIAssistant';
@@ -87,13 +87,6 @@ export function Taskbar(_props?: TaskbarProps) {
     setTaskViewOpen,
     toggleTaskView,
     theme,
-    setTheme,
-    setWallpaper,
-    setAuroraColor,
-    setShellMode,
-    setAccentColor,
-    lockSystem,
-    snapAllWindows5050,
   } = useOS();
   const isLight = theme === 'light';
 
@@ -127,28 +120,6 @@ export function Taskbar(_props?: TaskbarProps) {
     try {
       const res = await requestAIChat({ message: q });
       setAiOmniReply(res.reply);
-      const act = res.action || res.osAction;
-      if (act) {
-        const targetVal = String(act.target ?? act.value ?? '');
-        if (act.type === 'theme' || act.type === 'set_theme' || act.type === 'setTheme') {
-          setTheme(targetVal === 'light' ? 'light' : 'dark');
-        } else if (act.type === 'wallpaper' || act.type === 'set_wallpaper') {
-          setWallpaper(targetVal as Wallpaper);
-        } else if (act.type === 'set_aurora') {
-          setWallpaper('live2d');
-          setAuroraColor(targetVal as Parameters<typeof setAuroraColor>[0]);
-        } else if (act.type === 'set_shell' || act.type === 'setShellMode') {
-          setShellMode(targetVal as Parameters<typeof setShellMode>[0]);
-        } else if (act.type === 'accent') {
-          setAccentColor(targetVal as AccentColorId);
-        } else if (act.type === 'openApp' || act.type === 'open_app') {
-          openApp(targetVal as AppId);
-        } else if (act.type === 'lock_system') {
-          lockSystem();
-        } else if (act.type === 'snap_windows') {
-          snapAllWindows5050();
-        }
-      }
       setAiOmniInput('');
     } catch {
       setAiOmniReply('応答を取得できませんでした。');

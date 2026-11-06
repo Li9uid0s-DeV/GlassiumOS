@@ -1287,12 +1287,13 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           coverGradient: currentTrack.coverGradient,
           currentTime,
           duration: currentTrack.duration,
+          volume: isMuted ? 0 : volume,
           lyricLine: activeLyricText,
           palette: artworkPalette,
         },
       })
     );
-  }, [isPlaying, currentTrack, currentTime, currentLyricIndex, artworkPalette]);
+  }, [isPlaying, currentTrack, currentTime, currentLyricIndex, artworkPalette, volume, isMuted]);
 
   useEffect(() => {
     return () => {
@@ -1306,7 +1307,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
   useEffect(() => {
     const onMusicCommand = (e: Event) => {
-      const detail = (e as CustomEvent<{ action?: string; artist?: string }>).detail;
+      const detail = (e as CustomEvent<{ action?: string; artist?: string; volume?: number }>).detail;
       const cmd = detail?.action;
       if (cmd === 'toggle-play') {
         togglePlay();
@@ -1314,6 +1315,11 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         nextTrack();
       } else if (cmd === 'prev') {
         prevTrack();
+      } else if (cmd === 'set-volume' && typeof detail?.volume === 'number') {
+        const v = Math.max(0, Math.min(1, detail.volume));
+        setVolume(v);
+        setIsMuted(v === 0);
+        globalAudio.setVolume(v);
       } else if (cmd === 'open-artist' && detail?.artist) {
         const clean = cleanPrimaryArtistName(detail.artist);
         setSelectedArtistName(clean);
@@ -2212,7 +2218,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             const fav = isFavorite(track.id);
             return (
               <div
-                key={track.id}
+                key={`${track.id}-${idx}`}
                 onClick={() => playTrack(track)}
                 className={`grid grid-cols-[36px_minmax(160px,2fr)_minmax(105px,1.2fr)_minmax(100px,1fr)_168px_52px] items-center px-4 py-2.5 cursor-pointer transition rounded-lg ${
                   isCurrent ? 'bg-[#fa243c]/18 text-white' : 'hover:bg-white/[0.05]'
@@ -3224,6 +3230,64 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 </form>
               </div>
 
+              {/* 12-Genre Full-Length Server Music Category Bar */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-white/80">
+                    🎵 ジャンル別フル尺ストリーミング (Server 320kbps Master)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setLastSearchedQuery('');
+                      setTracks(INITIAL_ENRICHED_CATALOG);
+                      setStatusBanner(
+                        `全ジャンル統合フル尺カタログ (${INITIAL_ENRICHED_CATALOG.length}曲) — 30秒制限なし・サーバー直結フル再生`
+                      );
+                    }}
+                    className="text-[11px] text-[#fa243c] hover:underline font-semibold"
+                  >
+                    全ジャンル表示に戻す
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { label: '🌟 すべて (All Genres)', query: '' },
+                    { label: '🎤 J-POP トップヒット', query: 'YOASOBI 米津玄師 Mrs. GREEN APPLE' },
+                    { label: '🎹 ボカロ / Vocaloid', query: '初音ミク DECO*27 ピノキオピー Kanaria' },
+                    { label: '⚔️ アニソン / Anime OST', query: 'アニメ 主題歌 LiSA 結束バンド' },
+                    { label: '🔥 Phonk / Drift', query: 'KORDHELL INTERWORLD DVRST Phonk' },
+                    { label: '💎 K-POP', query: 'NewJeans ILLIT LE SSERAFIM aespa' },
+                    { label: '🎧 EDM / Future Bass', query: 'Alan Walker Avicii Marshmello EDM' },
+                    { label: '🎸 J-Rock / バンド', query: 'King Gnu Official髭男dism RADWIMPS' },
+                    { label: '🎙️ Hip-Hop / J-Rap', query: 'Creepy Nuts Travis Scott Hip Hop' },
+                    { label: '🌃 シティポップ / 80s', query: '松原みき 竹内まりや シティポップ' },
+                    { label: '☕ Lo-Fi Chill / Jazz', query: 'Nujabes Lo-Fi Chillhop Jazz' },
+                    { label: '🎮 ゲームOST / Boss', query: 'Undertale Toby Fox HOYO-MiX 原神' },
+                    { label: '🎻 クラシック / ピアノ', query: '久石譲 坂本龍一 Piano Classical' },
+                  ].map((g) => (
+                    <button
+                      key={g.label}
+                      type="button"
+                      onClick={() => {
+                        if (!g.query) {
+                          setSearchQuery('');
+                          setLastSearchedQuery('');
+                          setTracks(INITIAL_ENRICHED_CATALOG);
+                        } else {
+                          setSearchQuery(g.query);
+                          handleOnlineMusicSearch(g.query);
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-full bg-white/[0.06] hover:bg-[#fa243c] border border-white/10 hover:border-[#fa243c] text-xs font-semibold text-white transition"
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {POPULAR_ARTIST_SHORTCUTS.map((artist) => (
                   <div
@@ -3426,7 +3490,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   <span className="text-white/60 font-mono text-[11px]">Instance:</span>
                   {MONOCHROME_INSTANCES.map((inst) => (
                     <button
-                      key={inst.url}
+                      key={inst.name}
                       onClick={() => {
                         setMonoWebUrl(inst.url);
                         loadMonochromeWebProxy(inst.url, relayNode, proxyEngine);

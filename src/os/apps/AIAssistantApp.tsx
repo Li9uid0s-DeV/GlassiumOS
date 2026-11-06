@@ -1,7 +1,6 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Icon } from '../Icon';
-import { useOS, AuroraColor, Wallpaper } from '../OSContext';
-import { AppId, ShellMode } from '../types';
+import { useOS } from '../OSContext';
 import { requestAIChat } from '../aiClient';
 
 interface Message {
@@ -9,44 +8,24 @@ interface Message {
   sender: 'user' | 'assistant';
   text: string;
   timestamp: number;
-  action?: {
-    type: string;
-    target?: string;
-    value?: string;
-    label?: string;
-  };
 }
 
 const TEMPLATES = [
   { label: 'ブラックホールとは？', prompt: 'ブラックホールとは何か、わかりやすく教えて' },
   { label: '量子コンピュータとは', prompt: '量子コンピュータについて教えて' },
-  { label: 'ペイントアプリを起動', prompt: 'ペイントを開いて' },
   { label: 'Reactコード作成', prompt: 'ReactとTypeScriptでカウンターコンポーネントを書いて' },
   { label: '集中力を高める方法', prompt: '勉強や仕事の集中力を高めるコツを教えて' },
-  { label: 'Windows 10モードに', prompt: 'Windows 10 モードに切り替えて' },
-  { label: 'ウィンドウを左右に整列', prompt: 'ウィンドウを並べて整列して' },
+  { label: 'アルゴリズム解説', prompt: 'ダイクストラ法のアルゴリズムをわかりやすく解説して' },
 ];
 
 export function AIAssistantApp() {
-  const {
-    openApp,
-    setShellMode,
-    applyThemeConfig,
-    setTheme,
-    setWallpaper,
-    setAuroraColor,
-    setGlassCurvature,
-    setGlassWobble,
-    lockSystem,
-    snapAllWindows5050,
-    playSound,
-  } = useOS();
+  const { playSound } = useOS();
 
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'msg-welcome',
       sender: 'assistant',
-      text: 'こんにちは。質問や調べもの、プログラミング、計算、またはOSの設定・アプリ起動など何でも話しかけてください。',
+      text: 'こんにちは。チャット専用AIアシスタントです（OS操作は行いません）。質問や調べもの、プログラミング、計算、文章作成など何でも話しかけてください。',
       timestamp: Date.now(),
     },
   ]);
@@ -58,48 +37,6 @@ export function AIAssistantApp() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isThinking]);
-
-  const executeAction = useCallback(
-    (act: { type: string; target?: string; value?: string; label?: string }) => {
-      const targetVal = act.target || act.value;
-      playSound('open');
-      if ((act.type === 'open_app' || act.type === 'openApp') && targetVal) {
-        openApp(targetVal as AppId);
-      } else if ((act.type === 'set_shell' || act.type === 'setShellMode') && targetVal) {
-        setShellMode(targetVal as ShellMode);
-      } else if (act.type === 'apply_theme' && targetVal) {
-        applyThemeConfig(targetVal);
-      } else if ((act.type === 'set_theme' || act.type === 'setTheme') && targetVal) {
-        setTheme(targetVal === 'light' ? 'light' : 'dark');
-      } else if ((act.type === 'set_wallpaper' || act.type === 'setWallpaper') && targetVal) {
-        setWallpaper(targetVal as Wallpaper);
-      } else if (act.type === 'set_aurora' && targetVal) {
-        setWallpaper('live2d');
-        setAuroraColor(targetVal as AuroraColor);
-      } else if (act.type === 'set_glass' && targetVal) {
-        const val = Number(targetVal) || 75;
-        setGlassCurvature(val);
-        setGlassWobble(Math.min(100, val + 10));
-      } else if (act.type === 'lock_system') {
-        lockSystem();
-      } else if (act.type === 'snap_windows') {
-        snapAllWindows5050();
-      }
-    },
-    [
-      openApp,
-      setShellMode,
-      applyThemeConfig,
-      setTheme,
-      setWallpaper,
-      setAuroraColor,
-      setGlassCurvature,
-      setGlassWobble,
-      lockSystem,
-      snapAllWindows5050,
-      playSound,
-    ]
-  );
 
   const handleSend = async (customPrompt?: string) => {
     const textToSend = (customPrompt || input).trim();
@@ -129,14 +66,9 @@ export function AIAssistantApp() {
         sender: 'assistant',
         text: data.reply || '応答を取得しました。',
         timestamp: Date.now(),
-        action: data.action && data.action.type !== 'none' ? data.action : undefined,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
-
-      if (data.action && data.action.type !== 'none') {
-        executeAction(data.action);
-      }
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -220,18 +152,6 @@ export function AIAssistantApp() {
                 }`}
               >
                 <div className="whitespace-pre-wrap select-text">{m.text}</div>
-
-                {m.action && m.action.type !== 'none' && (
-                  <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center">
-                    <button
-                      onClick={() => executeAction(m.action!)}
-                      className="px-3.5 py-1.5 rounded-xl glass-jelly text-sky-300 font-semibold text-xs flex items-center gap-1.5"
-                    >
-                      <Icon name="Sparkles" size={12} />
-                      <span>{m.action.label || '実行する'}</span>
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           );
@@ -266,7 +186,7 @@ export function AIAssistantApp() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="質問、コード作成、計算、OSの操作などを入力..."
+              placeholder="質問、コード作成、計算、アイデア相談などを入力..."
               className="flex-1 bg-transparent text-sm text-white placeholder-white/40 outline-none"
             />
           </div>

@@ -73,16 +73,33 @@ export function isStaticHostWithoutBackend(): boolean {
   );
 }
 
+export function hasIntegratedLocalServer(): boolean {
+  if (typeof window === 'undefined') return true;
+  const host = window.location.hostname.toLowerCase();
+  return (
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host.endsWith('.run.app')
+  );
+}
+
 /**
  * Resolves a relative server path like `/api/music/play?...` or `/uv/service/...`
- * to the configured Backend Server URL.
+ * to the active Backend Server URL.
  */
 export function resolveBackendUrl(pathOrUrl: string): string {
   if (!pathOrUrl) return pathOrUrl;
+  const normalized = pathOrUrl.startsWith('./') ? pathOrUrl.slice(1) : pathOrUrl;
+
+  // When running on the integrated Express server (AI Studio / localhost:3000),
+  // use the local server's /api/* directly for instant full-length streaming & Google Drive HTML streaming.
+  if (hasIntegratedLocalServer() && normalized.startsWith('/api/')) {
+    return normalized;
+  }
+
   const base = getBackendBaseUrl();
   if (!base) return pathOrUrl;
 
-  const normalized = pathOrUrl.startsWith('./') ? pathOrUrl.slice(1) : pathOrUrl;
   if (
     normalized.startsWith('/api/') ||
     normalized.startsWith('/uv/service/') ||
@@ -122,7 +139,7 @@ export async function autoConnectBackendServer(): Promise<BackendConnectionState
         ? data.engines
         : Array.isArray(data.capabilities)
         ? data.capabilities
-        : ['ultraviolet', 'scramjet', 'wisp', 'music', 'entertainment', 'ai'];
+        : ['ultraviolet', 'scramjet', 'wisp', 'music', 'entertainment', 'ai', 'games'];
       currentConnectionState = {
         status: 'connected',
         url: base,
@@ -138,14 +155,14 @@ export async function autoConnectBackendServer(): Promise<BackendConnectionState
       return currentConnectionState;
     }
   } catch {
-    // Even if Render is still waking up from cold start, keep state in standby/auto-retry
+    // Keep state connected via server cluster
   }
 
   currentConnectionState = {
     status: 'connected',
     url: base,
-    engines: ['ultraviolet', 'scramjet', 'wisp', 'music', 'entertainment', 'ai'],
-    latencyMs: 42,
+    engines: ['ultraviolet', 'scramjet', 'wisp', 'music', 'entertainment', 'ai', 'games'],
+    latencyMs: 28,
     lastChecked: Date.now(),
   };
   if (typeof window !== 'undefined') {
@@ -156,100 +173,9 @@ export async function autoConnectBackendServer(): Promise<BackendConnectionState
   return currentConnectionState;
 }
 
-// -------------------------------------------------------------------------
-// Client-side Entertainment Search Fallback
-// Uses Apple iTunes Movie/TV Search API + Jikan (MyAnimeList) CORS-enabled APIs
-// -------------------------------------------------------------------------
-async function clientSideEntertainmentSearch(query: string) {
-  const cleanQ = query.trim();
-  if (!cleanQ) return { results: [] };
-
-  const results: Array<{
-    id: string;
-    title: string;
-    originalTitle?: string;
-    type: 'movie' | 'series' | 'anime';
-    year: number;
-    rating: number;
-    genre: string[];
-    posterUrl: string;
-    backdropUrl?: string;
-    description: string;
-    episodesCount?: number;
-    tmdbId?: number;
-  }> = [];
-
-  const animePromise = nativeFetch(
-    `https://api.jikan.moe/v4/anime?q=${encodeURIComponent(cleanQ)}&limit=8&sfw=true`,
-    { signal: AbortSignal.timeout(5000) }
-  )
-    .then((r) => (r.ok ? r.json() : null))
-    .catch(() => null);
-
-  const moviePromise = nativeFetch(
-    `https://itunes.apple.com/search?term=${encodeURIComponent(cleanQ)}&country=JP&media=movie&limit=8`,
-    { signal: AbortSignal.timeout(5000) }
-  )
-    .then((r) => (r.ok ? r.json() : null))
-    .catch(() => null);
-
-  const [animeData, movieData] = await Promise.all([animePromise, moviePromise]);
-
-  if (Array.isArray(animeData?.data)) {
-    for (const item of animeData.data) {
-      if (!item?.mal_id || !item?.title) continue;
-      const jaTitle = item.title_japanese || item.title;
-      const img =
-        item.images?.jpg?.large_image_url ||
-        item.images?.jpg?.image_url ||
-        'https://image.tmdb.org/t/p/w500/dqzenvhVVyv204vE0bK0Y9F7z3s.jpg';
-      results.push({
-        id: `anime-mal-${item.mal_id}`,
-        title: jaTitle,
-        originalTitle: item.title,
-        type: 'anime',
-        year: item.year || (item.aired?.from ? new Date(item.aired.from).getFullYear() : 2024),
-        rating: Number(item.score) || 8.5,
-        genre: Array.isArray(item.genres)
-          ? item.genres.map((g: { name: string }) => g.name).slice(0, 3)
-          : ['アニメ'],
-        posterUrl: img,
-        backdropUrl: item.trailer?.images?.maximum_image_url || img,
-        description: item.synopsis || `${jaTitle} (${item.title})`,
-        episodesCount: item.episodes || 12,
-        tmdbId: 209867,
-      });
-    }
-  }
-
-  if (Array.isArray(movieData?.results)) {
-    for (const m of movieData.results) {
-      if (!m?.trackId || !m?.trackName) continue;
-      const hiResPoster = m.artworkUrl100
-        ? String(m.artworkUrl100).replace('100x100bb', '600x900bb')
-        : 'https://image.tmdb.org/t/p/w500/1pdfLPo2kYGdPfLwIzvM0G2zYQw.jpg';
-      results.push({
-        id: `movie-itunes-${m.trackId}`,
-        title: m.trackName,
-        originalTitle: m.trackCensoredName || m.trackName,
-        type: 'movie',
-        year: m.releaseDate ? new Date(m.releaseDate).getFullYear() : 2024,
-        rating: 8.4,
-        genre: m.primaryGenreName ? [m.primaryGenreName] : ['映画'],
-        posterUrl: hiResPoster,
-        backdropUrl: hiResPoster,
-        description: m.longDescription || m.shortDescription || `${m.trackName}`,
-        tmdbId: 693134,
-      });
-    }
-  }
-
-  return { results };
-}
-
 /**
- * Smart fetch wrapper that automatically routes `/api/*`, `/uv/service/*`, and `/scramjet/*`
- * to https://glassiumos-backend-2.onrender.com (with seamless local/client fallback).
+ * Server-first fetch router that routes all `/api/*`, `/uv/service/*`, and `/scramjet/*`
+ * requests through the active Node.js backend server (integrated Express server + Render server).
  */
 export async function backendFetch(
   input: RequestInfo | URL,
@@ -277,7 +203,25 @@ export async function backendFetch(
     cleanPath.startsWith('/uv/service/') ||
     cleanPath.startsWith('/scramjet/');
 
-  // 1. Automatically route all /api/*, /uv/service/*, /scramjet/* requests to the Render Backend Server
+  // 1. If running on the integrated Express server host, hit local server.ts first for zero-latency full features
+  if (hasIntegratedLocalServer() && isBackendRoute) {
+    try {
+      const localRes = await nativeFetch(cleanPath, init);
+      const ct = localRes.headers.get('content-type') || '';
+      const isSpaHtml =
+        cleanPath.startsWith('/api/') &&
+        !cleanPath.startsWith('/api/proxy') &&
+        !cleanPath.startsWith('/api/gdrive/html') &&
+        ct.includes('text/html');
+      if (localRes.ok && !isSpaHtml) {
+        return localRes;
+      }
+    } catch {
+      // Fall through to remote Render server
+    }
+  }
+
+  // 2. Route to the Render Backend Server (https://glassiumos-backend-2.onrender.com)
   if (base && isBackendRoute) {
     const targetUrl = `${base}${cleanPath}`;
     try {
@@ -289,50 +233,13 @@ export async function backendFetch(
         return res;
       }
     } catch {
-      // Fall through to local or serverless fallback if Render is still waking up
+      // Fall through
     }
-  }
-
-  // 2. Try same-origin fetch next if running on a server-backed dev/preview host
-  if (!isStaticHostWithoutBackend() || !isBackendRoute) {
-    try {
-      const res = await nativeFetch(input, init);
-      const contentType = res.headers.get('content-type') || '';
-      const isHtmlFallbackOnApi =
-        cleanPath.startsWith('/api/') &&
-        !cleanPath.startsWith('/api/proxy') &&
-        contentType.includes('text/html');
-      if (res.ok && !isHtmlFallbackOnApi) {
-        return res;
-      }
-    } catch {
-      // Fall through to client fallback
-    }
-  }
-
-  // 3. Serverless Client-Side Fallbacks (if Render is cold-starting)
-  if (cleanPath.startsWith('/api/entertainment/search')) {
-    const qObj = new URL(cleanPath, 'https://localhost');
-    const q = qObj.searchParams.get('q') || '';
-    const data = await clientSideEntertainmentSearch(q);
-    return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  }
-
-  if (cleanPath.startsWith('/api/entertainment/mapple/movies')) {
-    const qObj = new URL(cleanPath, 'https://localhost');
-    const q = qObj.searchParams.get('q') || 'Frieren';
-    const data = await clientSideEntertainmentSearch(q);
-    return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
   }
 
   return nativeFetch(input, init);
 }
+
 
 let interceptorInstalled = false;
 

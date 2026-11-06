@@ -2,6 +2,122 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================================
+   GlassiumOS Bespoke Composite Font System ("Glassium Sans")
+   - English / Latin: Elegant, refined geometric-humanist curves (Quicksand / Comfortaa / Outfit)
+   - Japanese: Soft, gentle rounded curves with maximum legibility (M PLUS Rounded 1c / Zen Maru Gothic)
+   ============================================================================ */
+:root {
+  --font-os-sans: 'Quicksand', 'Outfit', 'Comfortaa', 'M PLUS Rounded 1c', 'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'Noto Sans JP', system-ui, -apple-system, sans-serif;
+  --font-os-mono: 'JetBrains Mono', 'Comfortaa', 'M PLUS Rounded 1c', ui-monospace, SFMono-Regular, monospace;
+}
+
+body,
+.font-sans {
+  font-family: var(--font-os-sans) !important;
+  font-feature-settings: 'palt' 1, 'kern' 1, 'cv02' 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  letter-spacing: 0.015em;
+}
+
+/* Switchable Clock Font Presets (All enforce strict tabular-nums & small uniform circles) */
+.clock-font-glassium-round {
+  font-family: 'Comfortaa', 'Quicksand', 'M PLUS Rounded 1c', monospace !important;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1, 'zero' 0;
+}
+
+.clock-font-hyperos-tall {
+  font-family: 'Outfit', 'Plus Jakarta Sans', 'Zen Maru Gothic', sans-serif !important;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+.clock-font-ios27-liquid {
+  font-family: 'Quicksand', 'Comfortaa', 'M PLUS Rounded 1c', sans-serif !important;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+.clock-font-win-hello {
+  font-family: 'Plus Jakarta Sans', 'Outfit', 'M PLUS Rounded 1c', sans-serif !important;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+.clock-font-cyber-mono {
+  font-family: 'Chakra Petch', 'Orbitron', 'JetBrains Mono', monospace !important;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+.clock-font-zen-maru {
+  font-family: 'Zen Maru Gothic', 'M PLUS Rounded 1c', 'Quicksand', sans-serif !important;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* iOS 27 Liquid Glass Equal-Width & Equal-Height Numeral Cell:
+   Every digit (0-9) occupies the exact same width and height, and refracts the background */
+.ios27-liquid-digit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.72em;
+  height: 1.06em;
+  min-width: 0.72em;
+  max-width: 0.72em;
+  min-height: 1.06em;
+  max-height: 1.06em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  border-radius: 0.22em;
+  position: relative;
+  color: rgba(255, 255, 255, 0.88);
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.26) 0%,
+    rgba(255, 255, 255, 0.06) 48%,
+    rgba(186, 230, 253, 0.18) 100%
+  );
+  backdrop-filter: blur(18px) saturate(220%) brightness(1.14);
+  -webkit-backdrop-filter: blur(18px) saturate(220%) brightness(1.14);
+  box-shadow:
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.68),
+    inset 0 -1.5px 2px rgba(255, 255, 255, 0.18),
+    inset 1px 0 1px rgba(255, 255, 255, 0.28),
+    0 12px 28px rgba(0, 0, 0, 0.28);
+  text-shadow:
+    0 2px 12px rgba(255, 255, 255, 0.35),
+    0 4px 18px rgba(0, 0, 0, 0.35);
+  user-select: none;
+}
+
+/* Small, perfectly uniform circular dots for clock colon & indicators (all circles identical size) */
+.ios27-liquid-circle-dot {
+  width: 9px;
+  height: 9px;
+  min-width: 9px;
+  min-height: 9px;
+  max-width: 9px;
+  max-height: 9px;
+  border-radius: 9999px;
+  display: inline-block;
+  background: radial-gradient(
+    circle at 32% 32%,
+    rgba(255, 255, 255, 0.96) 0%,
+    rgba(255, 255, 255, 0.48) 55%,
+    rgba(125, 211, 252, 0.36) 100%
+  );
+  backdrop-filter: blur(12px) saturate(200%);
+  -webkit-backdrop-filter: blur(12px) saturate(200%);
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.85),
+    0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
 :root,
 [data-theme='dark'] {
   --os-accent: #06b6d4;

@@ -1,154 +1,474 @@
 import React, { useState, useEffect } from 'react';
-import { useOS } from './OSContext';
 import { Icon } from './Icon';
+import { requestAIChat } from './aiClient';
+import {
+  CLOCK_FONT_OPTIONS,
+  ClockFontId,
+  LockScreenCustomInfo,
+} from './LockScreen';
+import {
+  getMusicState,
+  subscribeMusicState,
+  setMusicVolume,
+} from './musicBridge';
+
+const DEFAULT_CUSTOM_INFO: LockScreenCustomInfo = {
+  city: 'Tokyo · Shibuya',
+  condition: '晴れ時々オーロラ微風',
+  tempC: 21,
+  highC: 24,
+  lowC: 15,
+  rainChance: 10,
+  customHeadline: '今日の目標: クリエイティブ集中 & 音楽制作',
+  customSubNote: '16:00 クラウドサーバー同期 / 19:00 フレンドとマルチプレイ',
+  depthScene: 'alpine',
+  depthEffectEnabled: true,
+};
 
 export function GlasiusCard({ onClose }: { onClose?: () => void }) {
-  const { openApp, calendarTasks } = useOS();
   const [time, setTime] = useState(new Date());
-  const [cpuUsage, setCpuUsage] = useState(24);
-  const [ramUsage, setRamUsage] = useState(38);
-  const [quickPrompt, setQuickPrompt] = useState('');
+
+  // Synced Clock Font
+  const [clockFont, setClockFont] = useState<ClockFontId>(() => {
+    const saved = localStorage.getItem('glassium_clock_font') as ClockFontId | null;
+    return saved && CLOCK_FONT_OPTIONS.some((o) => o.id === saved)
+      ? saved
+      : 'clock-font-ios27-liquid';
+  });
+  const [showFontPicker, setShowFontPicker] = useState(false);
+
+  // Synced Top-Left Weather & User Info
+  const [customInfo, setCustomInfo] = useState<LockScreenCustomInfo>(() => {
+    try {
+      const raw = localStorage.getItem('glassium_lock_custom_info');
+      if (raw) return { ...DEFAULT_CUSTOM_INFO, ...JSON.parse(raw) };
+    } catch {
+      // ignore
+    }
+    return DEFAULT_CUSTOM_INFO;
+  });
+  const [editingInfo, setEditingInfo] = useState(false);
+
+  // Bottom-Left Volume Control
+  const [volume, setVolume] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('glassium_system_volume'));
+    return Number.isFinite(saved) && saved >= 0 && saved <= 100 ? saved : 75;
+  });
+  const [muted, setMuted] = useState(false);
+
+  // Right-Side Notifications + Pure Chat-Only AI
+  const [rightCollapsed, setRightCollapsed] = useState(false);
+  const [notifications, setNotifications] = useState([
+    {
+      id: 'dn-1',
+      title: 'iOS 27 Liquid Glass & 深度効果有効',
+      body: '左下の時計が背景を屈折透過し、前景シルエットの後ろに重なります',
+      time: '今',
+    },
+    {
+      id: 'dn-2',
+      title: '純粋チャットAI (OS操作なし)',
+      body: '右側のAIはシステム設定を変更せず会話のみを行います',
+      time: '1分前',
+    },
+  ]);
+  const [chatHistory, setChatHistory] = useState<
+    Array<{ id: string; role: 'user' | 'assistant'; text: string }>
+  >([
+    {
+      id: 'init',
+      role: 'assistant',
+      text: 'こんにちは！OS操作を行わない会話専用のAIチャットです。何でも気軽に話しかけてください。',
+    },
+  ]);
+  const [chatInput, setChatInput] = useState('');
+  const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setTime(new Date());
-      setCpuUsage(Math.floor(18 + Math.random() * 15));
-      setRamUsage(Math.floor(35 + Math.random() * 8));
-    }, 2000);
-    return () => clearInterval(timer);
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    const onFontChange = (e: Event) => {
+      const custom = e as CustomEvent<ClockFontId>;
+      if (custom.detail) setClockFont(custom.detail);
+    };
+    window.addEventListener('glassium-clock-font-change', onFontChange);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('glassium-clock-font-change', onFontChange);
+    };
   }, []);
 
-  const timeStr = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const dateStr = time.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+  useEffect(() => {
+    const initial = getMusicState();
+    if (initial && typeof initial.volume === 'number') {
+      setVolume(Math.round(initial.volume * 100));
+    }
+    return subscribeMusicState((st) => {
+      if (st && typeof st.volume === 'number') {
+        setVolume(Math.round(st.volume * 100));
+      }
+    });
+  }, []);
 
-  const handleLaunchAI = (e: React.FormEvent) => {
+  const handleFontChange = (id: ClockFontId) => {
+    setClockFont(id);
+    localStorage.setItem('glassium_clock_font', id);
+    window.dispatchEvent(new CustomEvent('glassium-clock-font-change', { detail: id }));
+  };
+
+  const handleSaveCustomInfo = (next: LockScreenCustomInfo) => {
+    setCustomInfo(next);
+    localStorage.setItem('glassium_lock_custom_info', JSON.stringify(next));
+  };
+
+  const handleVolumeSlider = (val: number) => {
+    const clamped = Math.max(0, Math.min(100, val));
+    setVolume(clamped);
+    setMuted(clamped === 0);
+    localStorage.setItem('glassium_system_volume', String(clamped));
+    setMusicVolume(clamped / 100);
+    window.dispatchEvent(
+      new CustomEvent('glassium-music-command', {
+        detail: { action: 'set-volume', volume: clamped / 100 },
+      })
+    );
+  };
+
+  const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (quickPrompt.trim()) {
-      openApp('ai');
+    const trimmed = chatInput.trim();
+    if (!trimmed || isSending) return;
+    const userMsg = { id: `u-${Date.now()}`, role: 'user' as const, text: trimmed };
+    setChatHistory((prev) => [...prev, userMsg]);
+    setChatInput('');
+    setIsSending(true);
+    try {
+      const reply = await requestAIChat(
+        [...chatHistory, userMsg].map((m) => ({ role: m.role, content: m.text }))
+      );
+      setChatHistory((prev) => [
+        ...prev,
+        { id: `a-${Date.now()}`, role: 'assistant', text: reply },
+      ]);
+    } catch {
+      setChatHistory((prev) => [
+        ...prev,
+        {
+          id: `e-${Date.now()}`,
+          role: 'assistant',
+          text: 'サーバー通信エラーが発生しました。',
+        },
+      ]);
+    } finally {
+      setIsSending(false);
     }
   };
 
+  const hoursStr = time.getHours().toString().padStart(2, '0');
+  const minutesStr = time.getMinutes().toString().padStart(2, '0');
+  const dateStr = time.toLocaleDateString('ja-JP', {
+    month: 'short',
+    day: 'numeric',
+    weekday: 'short',
+  });
+
   return (
-    <div className="relative w-80 sm:w-88 rounded-3xl bg-slate-950/80 backdrop-blur-2xl border border-white/20 shadow-[0_24px_64px_rgba(0,0,0,0.6),inset_0_1px_1px_rgba(255,255,255,0.25)] p-4 text-white flex flex-col gap-3 font-sans select-none overflow-hidden group">
-      {/* Ambient Glass Highlight Glow */}
-      <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full bg-cyan-500/20 blur-2xl pointer-events-none" />
-      <div className="absolute -bottom-12 -left-12 w-32 h-32 rounded-full bg-indigo-500/15 blur-2xl pointer-events-none" />
+    <>
+      {/* =================================================================
+          1. TOP-LEFT (左上): CUSTOMIZABLE WEATHER FORECAST & USER INFO
+      ================================================================= */}
+      <div className="fixed top-4 left-28 sm:left-32 z-20 pointer-events-auto max-w-xs sm:max-w-sm">
+        <div className="p-3.5 rounded-3xl bg-white/[0.08] backdrop-blur-3xl border border-white/20 shadow-[0_16px_40px_rgba(0,0,0,0.45)] text-white space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-sky-400/30 to-amber-300/30 border border-white/25 flex items-center justify-center text-amber-200">
+                <Icon name="Sun" size={18} />
+              </div>
+              <div>
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-cyan-200">
+                  <span>{customInfo.city}</span>
+                  <span className="px-1.5 py-0.5 rounded bg-white/10 text-[10px] text-white/80">
+                    降水 {customInfo.rainChance}%
+                  </span>
+                </div>
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-lg font-black">{customInfo.tempC}°C</span>
+                  <span className="text-[11px] text-white/80">{customInfo.condition}</span>
+                </div>
+              </div>
+            </div>
 
-      {/* Widget Header */}
-      <div className="flex items-center justify-between border-b border-white/10 pb-2.5 relative z-10">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center shadow-md">
-            <span className="material-symbols-rounded text-sm text-slate-950 font-bold">widgets</span>
-          </div>
-          <div>
-            <h3 className="text-xs font-bold tracking-tight text-white flex items-center gap-1.5">
-              GlasiusCard Widget
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-            </h3>
-            <p className="text-[10px] text-white/50 font-mono">GlasispectUI OS Desk</p>
-          </div>
-        </div>
-        {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-6 h-6 rounded-lg bg-white/10 hover:bg-rose-500 text-white/70 hover:text-white flex items-center justify-center transition"
-            title="ウィジェットを閉じる"
-          >
-            <span className="material-symbols-rounded text-sm">close</span>
-          </button>
-        )}
-      </div>
-
-      {/* Clock & Calendar Quick Glance */}
-      <div className="grid grid-cols-2 gap-2 relative z-10">
-        <div
-          onClick={() => openApp('clock')}
-          className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition cursor-pointer flex flex-col justify-between"
-        >
-          <div className="flex items-center justify-between text-white/60">
-            <Icon name="Clock" size={14} className="text-cyan-400" />
-            <span className="text-[9px] font-mono text-cyan-300">LIVE</span>
-          </div>
-          <div className="mt-2">
-            <div className="text-2xl font-bold font-mono tracking-tight text-white">{timeStr}</div>
-            <div className="text-[10px] text-white/60 truncate">{dateStr}</div>
-          </div>
-        </div>
-
-        <div
-          onClick={() => openApp('calendar')}
-          className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition cursor-pointer flex flex-col justify-between"
-        >
-          <div className="flex items-center justify-between text-white/60">
-            <Icon name="Calendar" size={14} className="text-indigo-400" />
-            <span className="text-[9px] font-mono text-indigo-300">{calendarTasks.length} TASKS</span>
-          </div>
-          <div className="mt-2">
-            <div className="text-xs font-bold text-white truncate">カレンダー＆天気</div>
-            <div className="text-[10px] text-cyan-300 font-medium truncate flex items-center gap-1 mt-0.5">
-              <span className="material-symbols-rounded text-xs">umbrella</span>
-              <span>48時間降水マップ</span>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setEditingInfo(!editingInfo)}
+                className="px-2 py-1 rounded-xl bg-white/10 hover:bg-white/20 text-[10px] font-bold text-white/85"
+                title="天気とマイ情報をカスタマイズ"
+              >
+                {editingInfo ? '完了' : '設定'}
+              </button>
+              {onClose && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="p-1 rounded-xl bg-white/10 hover:bg-rose-500/80 text-white/70 hover:text-white"
+                  title="HUDを非表示"
+                >
+                  <Icon name="X" size={12} />
+                </button>
+              )}
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Telemetry Row: CPU & RAM Gauges */}
-      <div className="grid grid-cols-2 gap-2 relative z-10 text-[11px]">
-        <div className="px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-white/70">
-            <Icon name="Cpu" size={13} className="text-cyan-400" />
-            <span>CPU</span>
+          <div className="pt-1.5 border-t border-white/15 text-[11px]">
+            <div className="font-bold text-white flex items-center gap-1.5 truncate">
+              <span className="ios27-liquid-circle-dot scale-75" />
+              <span className="truncate">{customInfo.customHeadline}</span>
+            </div>
+            <div className="text-[10px] text-white/65 pl-3.5 truncate">
+              {customInfo.customSubNote}
+            </div>
           </div>
-          <span className="font-mono font-bold text-cyan-300">{cpuUsage}%</span>
+
+          {editingInfo && (
+            <div className="pt-2 border-t border-white/15 space-y-2 text-[11px]">
+              <div className="grid grid-cols-2 gap-1.5">
+                <input
+                  type="text"
+                  value={customInfo.city}
+                  onChange={(e) => handleSaveCustomInfo({ ...customInfo, city: e.target.value })}
+                  placeholder="都市名"
+                  className="px-2 py-1 rounded-lg bg-black/50 border border-white/15 text-white outline-none"
+                />
+                <input
+                  type="text"
+                  value={customInfo.condition}
+                  onChange={(e) =>
+                    handleSaveCustomInfo({ ...customInfo, condition: e.target.value })
+                  }
+                  placeholder="天気"
+                  className="px-2 py-1 rounded-lg bg-black/50 border border-white/15 text-white outline-none"
+                />
+              </div>
+              <input
+                type="text"
+                value={customInfo.customHeadline}
+                onChange={(e) =>
+                  handleSaveCustomInfo({ ...customInfo, customHeadline: e.target.value })
+                }
+                placeholder="自分の設定した情報・目標"
+                className="w-full px-2 py-1 rounded-lg bg-black/50 border border-white/15 text-white outline-none"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* =================================================================
+          2. BOTTOM-LEFT (左下):
+             iOS 27 LIQUID GLASS CLOCK (Uniform width/height digits + small equal circles + Depth Effect)
+             + QUICK VOLUME SLIDER UI
+      ================================================================= */}
+      <div className="fixed bottom-16 left-5 z-20 pointer-events-auto flex flex-col items-start select-none">
+        {/* Date & Font Switcher Pill */}
+        <div className="relative z-30 flex items-center gap-1.5 mb-1.5">
+          <span className="px-2.5 py-0.5 rounded-xl bg-white/10 backdrop-blur-xl border border-white/20 text-[11px] font-bold text-white/95">
+            {dateStr}
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowFontPicker(!showFontPicker)}
+            className="px-2.5 py-0.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 backdrop-blur-xl border border-cyan-300/40 text-[11px] font-bold text-cyan-200 transition"
+          >
+            フォント切替
+          </button>
         </div>
 
-        <div className="px-3 py-2 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-white/70">
-            <Icon name="Activity" size={13} className="text-indigo-400" />
-            <span>RAM</span>
+        {showFontPicker && (
+          <div className="relative z-40 mb-2 p-2.5 rounded-2xl bg-slate-950/90 backdrop-blur-2xl border border-white/20 shadow-2xl grid grid-cols-2 gap-1.5 w-64">
+            {CLOCK_FONT_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                onClick={() => handleFontChange(opt.id)}
+                className={`px-2 py-1.5 rounded-xl border text-left text-[11px] transition ${
+                  clockFont === opt.id
+                    ? 'bg-cyan-400 text-slate-950 border-cyan-200 font-black'
+                    : 'bg-white/5 hover:bg-white/10 border-white/10 text-white'
+                }`}
+              >
+                <div className={opt.id}>{opt.label}</div>
+              </button>
+            ))}
           </div>
-          <span className="font-mono font-bold text-indigo-300">{ramUsage}%</span>
+        )}
+
+        {/* Liquid Glass Clock with Depth Foreground Ridge Overlay */}
+        <div className="relative py-1 pr-2">
+          <div
+            className={`relative z-10 flex items-center gap-1.5 text-[52px] sm:text-[64px] leading-none ${clockFont}`}
+          >
+            <span className="ios27-liquid-digit">{hoursStr[0]}</span>
+            <span className="ios27-liquid-digit">{hoursStr[1]}</span>
+
+            <div className="flex flex-col items-center justify-center gap-2 px-0.5">
+              <span className="ios27-liquid-circle-dot" />
+              <span className="ios27-liquid-circle-dot" />
+            </div>
+
+            <span className="ios27-liquid-digit">{minutesStr[0]}</span>
+            <span className="ios27-liquid-digit">{minutesStr[1]}</span>
+          </div>
+
+          {/* Foreground Depth Subject Layer (z-20 over z-10 clock) */}
+          {customInfo.depthEffectEnabled && (
+            <svg
+              viewBox="0 0 400 60"
+              preserveAspectRatio="none"
+              className="pointer-events-none absolute -bottom-1 left-0 w-full h-[24px] sm:h-[28px] z-20 drop-shadow-[0_-6px_12px_rgba(0,0,0,0.6)]"
+            >
+              <path
+                d="M0,60 L0,32 L55,12 L115,36 L185,8 L260,34 L335,12 L400,28 L400,60 Z"
+                fill="rgba(15, 23, 42, 0.84)"
+                stroke="rgba(125, 211, 252, 0.4)"
+                strokeWidth="1.2"
+              />
+            </svg>
+          )}
+        </div>
+
+        {/* Bottom-Left Quick Volume Bar */}
+        <div className="relative z-30 mt-1.5 flex items-center gap-2.5 px-3 py-2 rounded-2xl bg-black/45 backdrop-blur-2xl border border-white/20 shadow-lg w-64 sm:w-72 text-white">
+          <button
+            type="button"
+            onClick={() => {
+              const nextMute = !muted;
+              setMuted(nextMute);
+              setMusicVolume(nextMute ? 0 : volume / 100);
+            }}
+            className="w-7 h-7 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-cyan-200 shrink-0"
+            title="ミュート切替"
+          >
+            <Icon
+              name={muted || volume === 0 ? 'VolumeX' : volume < 50 ? 'Volume1' : 'Volume2'}
+              size={14}
+            />
+          </button>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={muted ? 0 : volume}
+            onChange={(e) => handleVolumeSlider(Number(e.target.value))}
+            className="flex-1 h-1.5 accent-cyan-400 cursor-pointer"
+          />
+          <span className="text-[11px] font-mono font-bold text-cyan-300 w-9 text-right">
+            {muted ? '0%' : `${volume}%`}
+          </span>
         </div>
       </div>
 
-      {/* Quick AI & Entertainment Shortcuts */}
-      <form onSubmit={handleLaunchAI} className="relative z-10 flex items-center gap-1.5">
-        <input
-          type="text"
-          value={quickPrompt}
-          onChange={(e) => setQuickPrompt(e.target.value)}
-          placeholder="AIアシスタントに質問..."
-          className="flex-1 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white placeholder-white/40 focus:outline-none focus:border-cyan-400/60 focus:bg-white/10 transition"
-        />
-        <button
-          type="submit"
-          className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 font-bold text-xs shadow-md transition active:scale-95"
-        >
-          質問
-        </button>
-      </form>
+      {/* =================================================================
+          3. RIGHT SIDE (右側):
+             NOTIFICATIONS + PURE CHAT-ONLY AI (WITH ZERO OS OPERATIONS)
+      ================================================================= */}
+      <div className="fixed top-4 right-5 z-20 pointer-events-auto hidden xl:flex flex-col gap-2.5 w-80">
+        <div className="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-black/45 backdrop-blur-2xl border border-white/20 text-white text-xs">
+          <div className="flex items-center gap-2 font-bold">
+            <span className="ios27-liquid-circle-dot scale-75" />
+            <span>通知 & 純粋AIチャット</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setRightCollapsed(!rightCollapsed)}
+            className="text-[11px] text-cyan-300 hover:underline"
+          >
+            {rightCollapsed ? '展開' : '最小化'}
+          </button>
+        </div>
 
-      {/* Action Footer */}
-      <div className="flex items-center justify-between pt-1 border-t border-white/10 relative z-10 text-[10px]">
-        <button
-          type="button"
-          onClick={() => openApp('entertainment')}
-          className="text-white/60 hover:text-rose-400 flex items-center gap-1 transition"
-        >
-          <span className="material-symbols-rounded text-xs">tv</span>
-          <span>Entertainment</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => openApp('weather')}
-          className="text-white/60 hover:text-cyan-300 flex items-center gap-1 transition"
-        >
-          <span className="material-symbols-rounded text-xs">cloud_sun</span>
-          <span>Cosmic Weather</span>
-        </button>
+        {!rightCollapsed && (
+          <>
+            {/* Notifications List */}
+            <div className="space-y-1.5">
+              {notifications.map((n) => (
+                <div
+                  key={n.id}
+                  className="p-3 rounded-2xl bg-white/[0.08] backdrop-blur-2xl border border-white/15 text-white shadow"
+                >
+                  <div className="flex items-center justify-between text-[10px] text-cyan-200 font-bold">
+                    <span>{n.title}</span>
+                    <span className="text-white/55">{n.time}</span>
+                  </div>
+                  <div className="text-[11px] text-white/75 mt-0.5 leading-relaxed">{n.body}</div>
+                </div>
+              ))}
+              {notifications.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setNotifications([])}
+                  className="text-[10px] text-white/50 hover:text-white pl-1"
+                >
+                  通知をすべてクリア
+                </button>
+              )}
+            </div>
+
+            {/* Pure Chat-Only AI Box */}
+            <div className="rounded-3xl bg-white/[0.08] backdrop-blur-3xl border border-white/20 shadow-2xl overflow-hidden flex flex-col h-72 text-white">
+              <div className="px-3.5 py-2 bg-black/35 border-b border-white/15 flex items-center justify-between text-[11px]">
+                <span className="font-black text-cyan-200">💬 Pure Chat AI (OS操作なし)</span>
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10">
+                  CHAT ONLY
+                </span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-3 space-y-2 text-xs">
+                {chatHistory.map((m) => (
+                  <div
+                    key={m.id}
+                    className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[85%] px-2.5 py-1.5 rounded-2xl ${
+                        m.role === 'user'
+                          ? 'bg-cyan-400 text-slate-950 font-bold'
+                          : 'bg-black/50 border border-white/15 text-white/90'
+                      }`}
+                    >
+                      {m.text}
+                    </div>
+                  </div>
+                ))}
+                {isSending && (
+                  <div className="text-[10px] text-cyan-200 font-mono animate-pulse">
+                    返信を生成中...
+                  </div>
+                )}
+              </div>
+
+              <form
+                onSubmit={handleSendChat}
+                className="p-2 bg-black/45 border-t border-white/15 flex items-center gap-1.5"
+              >
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="AIと会話する..."
+                  className="flex-1 px-2.5 py-1.5 rounded-xl bg-white/10 border border-white/15 text-xs text-white outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={isSending}
+                  className="px-3 py-1.5 rounded-xl bg-cyan-400 text-slate-950 font-black text-xs"
+                >
+                  送信
+                </button>
+              </form>
+            </div>
+          </>
+        )}
       </div>
-    </div>
+    </>
   );
 }
