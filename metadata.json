@@ -1,6 +1,6 @@
 {
   "name": "GlassiumOS 5",
-  "description": "GlassiumOS 5 — Web operating system featuring multi-shell desktop environments, Surface Material Engine, 2D/3D live wallpapers, and integrated AI assistant.",
+  "description": "GlassiumOS is an educational web-based operating system interface for learning computer science, system architecture, and web development.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

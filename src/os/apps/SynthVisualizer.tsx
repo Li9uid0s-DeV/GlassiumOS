@@ -24,6 +24,7 @@ import {
 } from '../proxyService';
 import { useOS } from '../OSContext';
 import { globalAudio } from '../globalAudioManager';
+import { backendFetch } from '../backendConfig';
 import { DrumPadTunerView } from './ExtraAppsSuite';
 
 type AppleMusicNavId =
@@ -1873,7 +1874,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       const currentSettings = getMusicSettings();
       setIsFetchingMv(true);
       try {
-        const resp = await fetch(
+        const resp = await backendFetch(
           `/api/music/mv?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(cleanArtist)}&q=${encodeURIComponent(`${cleanArtist} ${title}`.trim())}&quality=${encodeURIComponent(currentSettings.mvQuality)}`
         );
         if (resp.ok) {
@@ -1933,7 +1934,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     setSelectedArtistAlbum(album);
     setIsLoadingAlbumTracks(true);
     try {
-      const resp = await fetch(
+      const resp = await backendFetch(
         `/api/music/album?collectionId=${encodeURIComponent(album.collectionId)}&album=${encodeURIComponent(album.title)}&artist=${encodeURIComponent(album.artist)}`
       );
       if (resp.ok) {
@@ -1984,7 +1985,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     const cleanArtist = cleanPrimaryArtistName(artistName);
     setIsFetchingArtist(true);
     try {
-      const resp = await fetch(`/api/music/artist?name=${encodeURIComponent(cleanArtist)}`);
+      const resp = await backendFetch(`/api/music/artist?name=${encodeURIComponent(cleanArtist)}`);
       if (resp.ok) {
         const data = await resp.json();
         const apiMvs: MusicVideoItem[] = Array.isArray(data.mvs)

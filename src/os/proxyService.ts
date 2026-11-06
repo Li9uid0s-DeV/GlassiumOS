@@ -1,3 +1,5 @@
+import { getBackendBaseUrl, backendFetch } from './backendConfig';
+
 // -------------------------------------------------------------------------
 // LiquidOS Proxy Engine Service (Scramjet & Ultraviolet) & Monochrome Music
 // -------------------------------------------------------------------------
@@ -124,6 +126,14 @@ export interface WispServerPreset {
 
 export const WISP_SERVER_PRESETS: WispServerPreset[] = [
   {
+    id: 'wisp-glassium-render',
+    name: 'GlassiumOS Official Server (Render)',
+    wispUrl: 'wss://glassiumos-backend-2.onrender.com/wisp/',
+    region: 'GlassiumOS Dedicated Cloud',
+    protocol: 'Wisp v1 + UV/Scramjet Server',
+    description: 'GlassiumOS専用のRender常時接続サーバー (Ultraviolet / Scramjet / Wisp / 音楽 / 映画 / AI 直結)',
+  },
+  {
     id: 'wisp-mercury',
     name: 'Mercury Workshop Wisp v1',
     wispUrl: 'wss://wisp.mercurywork.shop/',
@@ -175,6 +185,14 @@ export function getServiceWorkerProxyUrl(
     cleanUrl = 'https://storage.googleapis.com/' + cleanUrl.replace(/^gcs:\/+/i, '');
   } else if (!/^https?:\/\//i.test(cleanUrl)) {
     cleanUrl = 'https://' + cleanUrl;
+  }
+
+  const backendBase = getBackendBaseUrl();
+  if (backendBase) {
+    if (engine === 'ultraviolet') {
+      return `${backendBase}/uv/service/${encodeUltravioletRaw(cleanUrl)}`;
+    }
+    return `${backendBase}/scramjet/${encodeScramjetRaw(cleanUrl)}`;
   }
 
   if (engine === 'ultraviolet') {
@@ -1941,7 +1959,7 @@ export async function fetchSynchronizedLyricsFromLrclib(
 
   // 1. Try local server /api/music/lyrics endpoint first (strictly verifies title + artist on server)
   try {
-    const srvRes = await fetch(
+    const srvRes = await backendFetch(
       `/api/music/lyrics?id=${encodeURIComponent(numericId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}`,
       { signal: AbortSignal.timeout(5500) }
     );
@@ -2087,7 +2105,7 @@ export async function resolveFullLengthAudioStream(
 
   // 1. Try local backend /api/music/info first (resolves exact GDStudio/Saavn/NetEase full-length stream)
   try {
-    const infoRes = await fetch(
+    const infoRes = await backendFetch(
       `/api/music/info?id=${encodeURIComponent(cleanId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&br=${brVal}&source=${encodeURIComponent(settings.sourceSite)}`,
       { signal: AbortSignal.timeout(6000) }
     );
@@ -2182,7 +2200,7 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
 
   // 1. Primary: Query our fast server-side /api/music/search endpoint (~300ms response, 0 CORS issues)
   try {
-    const srvRes = await fetch(
+    const srvRes = await backendFetch(
       `/api/music/search?q=${encodeURIComponent(cleanQ)}&source=${encodeURIComponent(settings.sourceSite)}`,
       {
         signal: AbortSignal.timeout(7000),

@@ -1,3 +1,5 @@
+import { backendFetch } from './backendConfig';
+
 export interface AIAction {
   type: string;
   target?: string;
@@ -486,7 +488,7 @@ export async function requestAIChat(
   const lastUserMsg = messages[messages.length - 1]?.content || '';
 
   try {
-    const res = await fetch('/api/ai/chat', {
+    const res = await backendFetch('/api/ai/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ messages, systemContext }),

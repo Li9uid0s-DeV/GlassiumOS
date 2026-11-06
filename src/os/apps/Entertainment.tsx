@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
+import { backendFetch } from '../backendConfig';
 
 export type EntertainmentTab = 'movies' | 'anime' | 'youtube' | 'shorts';
 export type StreamingProvider = 'mapple-fun' | 'streamex' | 'flixhd' | 'mapletv' | 'youtube';
@@ -467,7 +468,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     }
     setIsSearchingOnline(true);
     try {
-      const res = await fetch(`/api/entertainment/mapple/movies?q=${encodeURIComponent(q || '')}`);
+      const res = await backendFetch(`/api/entertainment/mapple/movies?q=${encodeURIComponent(q || '')}`);
       if (res.ok) {
         const data = (await res.json()) as { results?: MediaItem[] };
         if (Array.isArray(data.results) && data.results.length > 0) {
@@ -532,7 +533,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     const timer = setTimeout(async () => {
       setIsSearchingOnline(true);
       try {
-        const res = await fetch(`/api/entertainment/search?q=${encodeURIComponent(q)}`);
+        const res = await backendFetch(`/api/entertainment/search?q=${encodeURIComponent(q)}`);
         if (res.ok) {
           const data = (await res.json()) as { results?: MediaItem[] };
           if (Array.isArray(data.results) && data.results.length > 0) {
@@ -565,7 +566,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
         );
         return;
       }
-      fetch(`/api/entertainment/tv?id=${tmdbId}`)
+      backendFetch(`/api/entertainment/tv?id=${tmdbId}`)
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
           if (data?.episodesCount) {

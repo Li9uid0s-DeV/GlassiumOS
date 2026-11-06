@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOS, Wallpaper, AuroraColor } from '../OSContext';
 import {
@@ -17,6 +17,13 @@ import {
 import { WALLPAPERS } from '../wallpapers';
 import { Icon } from '../Icon';
 import { requestAIChat } from '../aiClient';
+import {
+  getBackendBaseUrl,
+  setBackendBaseUrl,
+  resolveBackendUrl,
+  autoConnectBackendServer,
+  getBackendConnectionState,
+} from '../backendConfig';
 
 const WALLPAPER_KEYS = Object.keys(WALLPAPERS) as Wallpaper[];
 
@@ -819,11 +826,33 @@ export function SettingsApp() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  // AI Assistant state
+  // AI Assistant & Koyeb Backend state
   const [aiResponseStyle, setAiResponseStyle] = useState<'balanced' | 'concise' | 'detailed'>('balanced');
   const [aiAutoExecute, setAiAutoExecute] = useState(true);
   const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [aiTestMessage, setAiTestMessage] = useState('');
+  const [koyebUrlInput, setKoyebUrlInput] = useState<string>(() => getBackendBaseUrl());
+  const [koyebTestStatus, setKoyebTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('success');
+  const [koyebTestMessage, setKoyebTestMessage] = useState<string>(() => {
+    const st = getBackendConnectionState();
+    return `自動接続済み (${st.url}) — 稼働エンジン: ${st.engines.join(', ')}`;
+  });
+
+  useEffect(() => {
+    let mounted = true;
+    autoConnectBackendServer().then((st) => {
+      if (!mounted) return;
+      setKoyebTestStatus('success');
+      setKoyebTestMessage(
+        language === 'ja'
+          ? `自動接続済み (${st.url}) — 稼働エンジン: ${st.engines.join(', ')}`
+          : `Auto-Connected (${st.url}) — Active engines: ${st.engines.join(', ')}`
+      );
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [language]);
 
   // Accounts state
   const [profileName, setProfileName] = useState(user?.name || 'Administrator');
@@ -884,6 +913,42 @@ export function SettingsApp() {
     } catch (err: unknown) {
       setAiTestStatus('error');
       setAiTestMessage(`確認エラー: ${err instanceof Error ? err.message : '再試行してください'}`);
+    }
+  };
+
+  const handleSaveAndTestKoyebUrl = async () => {
+    const cleaned = koyebUrlInput.trim().replace(/\/+$/, '');
+    setBackendBaseUrl(cleaned);
+    setKoyebUrlInput(cleaned);
+    setKoyebTestStatus('testing');
+    setKoyebTestMessage(isJa ? 'Koyeb サーバー (/api/health) へ接続テスト中...' : 'Testing Koyeb server (/api/health)...');
+    playSound('click');
+
+    try {
+      const target = resolveBackendUrl('/api/health');
+      const res = await fetch(target, { mode: 'cors' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setKoyebTestStatus('success');
+      const engineList = Array.isArray(data.engines) ? data.engines.join(', ') : 'uv, scramjet, music, movie, ai';
+      setKoyebTestMessage(
+        isJa
+          ? `接続成功！稼働エンジン: ${engineList}`
+          : `Connected! Active engines: ${engineList}`
+      );
+      addNotification({
+        title: 'Koyeb Server Connected',
+        message: isJa
+          ? 'Koyeb バックエンドサーバーに接続しました。UV / Scramjet / 音楽 / 映画 / AI がサーバー経由で動作します。'
+          : 'Connected to Koyeb backend server.',
+      });
+    } catch (err: unknown) {
+      setKoyebTestStatus('error');
+      setKoyebTestMessage(
+        isJa
+          ? `接続エラー: ${err instanceof Error ? err.message : 'URLまたはKoyebの稼働状態を確認してください'}`
+          : `Connection failed: ${err instanceof Error ? err.message : 'Check URL and Koyeb service status'}`
+      );
     }
   };
 
@@ -1143,6 +1208,80 @@ export function SettingsApp() {
                         </div>
                       </button>
                     ))}
+                  </div>
+
+                  {/* Backend Server Connection Card (Render / Koyeb / Railway) */}
+                  <div className={`${cardSurfaceClass} p-4 space-y-3`}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3.5 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500/25 via-cyan-500/15 to-blue-600/10 border border-emerald-400/30 flex items-center justify-center shrink-0 shadow-inner text-emerald-300">
+                          <Icon name="Server" size={19} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-bold tracking-tight">
+                            {isJa ? 'バックエンドサーバー接続 (Render / Koyeb)' : 'Backend Server (Render / Koyeb)'}
+                          </div>
+                          <div className="text-[11px] opacity-50 mt-0.5 leading-relaxed">
+                            {isJa
+                              ? 'GitHub Pages / 独自ドメイン運用時にサーバーURL（Render / Koyeb 等）を設定すると、Ultraviolet・Scramjet・フル尺音楽・映画・AIがサーバー経由で動作します'
+                              : 'Connect your Render or Koyeb server URL for Ultraviolet, Scramjet, Full Music, Movie & AI APIs'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                      <input
+                        type="url"
+                        value={koyebUrlInput}
+                        onChange={(e) => setKoyebUrlInput(e.target.value)}
+                        placeholder="https://glassiumos-backend-2.onrender.com"
+                        className={`flex-1 px-3.5 py-2 rounded-xl text-xs font-mono border outline-none transition ${
+                          isLight
+                            ? 'bg-white border-slate-300 text-slate-900 focus:border-sky-500'
+                            : 'bg-black/40 border-white/15 text-white focus:border-cyan-400'
+                        }`}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleSaveAndTestKoyebUrl}
+                        className="px-4 py-2 rounded-xl bg-[var(--os-accent)] text-black text-xs font-bold shadow hover:brightness-110 shrink-0"
+                      >
+                        {isJa ? '保存して接続テスト' : 'Save & Test'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setBackendBaseUrl('https://glassiumos-backend-2.onrender.com');
+                          setKoyebUrlInput('https://glassiumos-backend-2.onrender.com');
+                          setKoyebTestStatus('idle');
+                          setKoyebTestMessage(
+                            isJa
+                              ? '標準サーバー (https://glassiumos-backend-2.onrender.com) に設定しました'
+                              : 'Reset to default server (https://glassiumos-backend-2.onrender.com)'
+                          );
+                        }}
+                        className={`px-3 py-2 rounded-xl text-xs font-semibold shrink-0 ${
+                          isLight ? 'bg-slate-200 text-slate-700' : 'bg-white/10 text-white/80 hover:bg-white/15'
+                        }`}
+                      >
+                        {isJa ? '初期値に戻す' : 'Reset'}
+                      </button>
+                    </div>
+
+                    {koyebTestMessage && (
+                      <div
+                        className={`p-2.5 rounded-xl text-[11px] font-medium border-l-2 ${
+                          koyebTestStatus === 'success'
+                            ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400'
+                            : koyebTestStatus === 'error'
+                            ? 'border-rose-500 bg-rose-500/10 text-rose-400'
+                            : 'border-sky-500 bg-sky-500/10 text-sky-400'
+                        }`}
+                      >
+                        {koyebTestMessage}
+                      </div>
+                    )}
                   </div>
                 </>
               ) : systemSubView === 'display' ? (

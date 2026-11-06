@@ -8,7 +8,9 @@ import {
   MusicSettingsConfig,
   getMusicSettings,
   saveMusicSettings,
+  resolveFullLengthAudioStream,
 } from './proxyService';
+import { resolveBackendUrl, isStaticHostWithoutBackend } from './backendConfig';
 
 export interface GlobalAudioState {
   isPlaying: boolean;
@@ -557,18 +559,19 @@ class GlobalAudioManager {
           .trim();
     const numericId = /^\d+$/.test(strippedId) ? strippedId : '';
 
-    const resolvedUrl = `/api/music/play?id=${encodeURIComponent(
-      numericId
-    )}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(
-      cleanArtist
-    )}&br=${brVal}&source=${encodeURIComponent(settings.sourceSite)}`;
+    const resolvedUrl = resolveBackendUrl(
+      `/api/music/play?id=${encodeURIComponent(
+        numericId
+      )}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(
+        cleanArtist
+      )}&br=${brVal}&source=${encodeURIComponent(settings.sourceSite)}`
+    );
 
     try {
       this.audio.pause();
     } catch {
       // ignore
     }
-    this.audio.src = resolvedUrl;
     this.audio.volume = this.state.isMuted ? 0 : this.state.volume;
     this.audio.playbackRate = this.state.playbackRate;
 
@@ -597,53 +600,47 @@ class GlobalAudioManager {
 
     this.syncMediaSessionMetadata(track);
 
-    // Stage 1: Primary server stream proxy (/api/music/play)
-    try {
-      this.playPromise = this.audio.play();
-      await this.playPromise;
-      this.playPromise = null;
-      if (this.pendingTrack === track) {
-        this.updateState({
-          isPlaying: true,
-          isBuffering: false,
-          error: null,
-          statusMessage: `フル尺再生中: ${track.title} — ${cleanArtist}`,
-        });
-      }
-      return;
-    } catch (err: unknown) {
-      this.playPromise = null;
-      if ((err as Error)?.name === 'AbortError' || this.pendingTrack !== track) {
+    // Stage 1: Primary server stream proxy (/api/music/play on Koyeb or local server)
+    if (!isStaticHostWithoutBackend()) {
+      try {
+        this.audio.src = resolvedUrl;
+        this.playPromise = this.audio.play();
+        await this.playPromise;
+        this.playPromise = null;
+        if (this.pendingTrack === track) {
+          this.updateState({
+            isPlaying: true,
+            isBuffering: false,
+            error: null,
+            statusMessage: `フル尺再生中: ${track.title} — ${cleanArtist}`,
+          });
+        }
         return;
+      } catch (err: unknown) {
+        this.playPromise = null;
+        if ((err as Error)?.name === 'AbortError' || this.pendingTrack !== track) {
+          return;
+        }
+        console.warn('Stage 1 (/api/music/play) fallback to Stage 2 direct CDN:', (err as Error)?.message);
       }
-      console.warn('Stage 1 (/api/music/play) fallback to Stage 2 direct CDN:', (err as Error)?.message);
     }
 
-    // Stage 2: Resolve direct NetEase / Monochrome CDN stream URL (/api/music/info) with Access-Control-Allow-Origin: *
+    // Stage 2: Resolve direct NetEase / Monochrome / GDStudio full-length CDN stream URL
     if (this.pendingTrack === track) {
       try {
-        const infoRes = await fetch(
-          `/api/music/info?id=${encodeURIComponent(numericId)}&title=${encodeURIComponent(
-            track.title
-          )}&artist=${encodeURIComponent(cleanArtist)}&br=${brVal}&source=${encodeURIComponent(
-            settings.sourceSite
-          )}`
-        );
-        if (infoRes.ok && this.pendingTrack === track) {
-          const infoJson = (await infoRes.json()) as { url?: string };
-          if (infoJson.url && infoJson.url.startsWith('http')) {
-            this.audio.src = infoJson.url;
-            this.playPromise = this.audio.play();
-            await this.playPromise;
-            this.playPromise = null;
-            this.updateState({
-              isPlaying: true,
-              isBuffering: false,
-              error: null,
-              statusMessage: `フル尺再生中 (Direct CDN): ${track.title} — ${cleanArtist}`,
-            });
-            return;
-          }
+        const directStream = await resolveFullLengthAudioStream(track.title, cleanArtist, numericId);
+        if (directStream?.audioUrl && this.pendingTrack === track) {
+          this.audio.src = directStream.audioUrl;
+          this.playPromise = this.audio.play();
+          await this.playPromise;
+          this.playPromise = null;
+          this.updateState({
+            isPlaying: true,
+            isBuffering: false,
+            error: null,
+            statusMessage: `フル尺再生中 (Direct Stream): ${track.title} — ${cleanArtist}`,
+          });
+          return;
         }
       } catch (err2: unknown) {
         this.playPromise = null;

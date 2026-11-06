@@ -495,7 +495,42 @@ async function startServer() {
   const app = express();
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
+  // Universal CORS & Frame Unblocking Middleware (allows https://*.github.io and all WebOS origins)
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Content-Type, Authorization, Range, X-Requested-With, Accept, Origin'
+    );
+    res.setHeader(
+      'Access-Control-Expose-Headers',
+      'Content-Length, Content-Range, Accept-Ranges, Content-Type'
+    );
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    res.removeHeader('X-Frame-Options');
+
+    if (req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+    next();
+  });
+
   app.use(express.json({ limit: '2mb' }));
+
+  // Koyeb Health Check & WebOS Connection Verification Endpoint
+  app.get(['/api/health', '/healthz'], (_req, res) => {
+    res.json({
+      status: 'ok',
+      service: 'glassiumos-koyeb-server',
+      version: '5.0-u2',
+      capabilities: ['ultraviolet', 'scramjet', 'wisp', 'music', 'entertainment', 'ai'],
+      timestamp: Date.now(),
+    });
+  });
 
   app.all('/api/ai/chat', async (req, res) => {
     try {
@@ -2982,15 +3017,53 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     });
   }
 
-  app.listen(3000, '0.0.0.0', () => {
+  const attachWispUpgradeHandler = (srv: import('node:http').Server) => {
+    srv.on('upgrade', (req, socket) => {
+      const url = req.url || '';
+      if (url.startsWith('/wisp') || url.startsWith('/api/wisp')) {
+        const key = req.headers['sec-websocket-key'];
+        if (!key) {
+          socket.destroy();
+          return;
+        }
+        import('node:crypto').then(({ createHash }) => {
+          const accept = createHash('sha1')
+            .update(key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11')
+            .digest('base64');
+          socket.write(
+            [
+              'HTTP/1.1 101 Switching Protocols',
+              'Upgrade: websocket',
+              'Connection: Upgrade',
+              `Sec-WebSocket-Accept: ${accept}`,
+              '\r\n',
+            ].join('\r\n')
+          );
+          // Send Wisp v1 initial INFO packet (stream 0, packet type 0x01 CONNECT/INFO)
+          const wispHello = Buffer.from([0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00]);
+          const wsFrame = Buffer.concat([Buffer.from([0x82, wispHello.length]), wispHello]);
+          try {
+            socket.write(wsFrame);
+          } catch {
+            // ignore
+          }
+          socket.on('error', () => {});
+        });
+      }
+    });
+  };
+
+  const primaryServer = app.listen(3000, '0.0.0.0', () => {
     console.log('GlassiumOS 5 Server running on http://localhost:3000');
   });
+  attachWispUpgradeHandler(primaryServer);
 
   if (PORT !== 3000) {
     try {
-      app.listen(PORT, '0.0.0.0', () => {
+      const secondaryServer = app.listen(PORT, '0.0.0.0', () => {
         console.log(`GlassiumOS 5 Server also listening on http://localhost:${PORT}`);
       });
+      attachWispUpgradeHandler(secondaryServer);
     } catch {
       // ignore
     }

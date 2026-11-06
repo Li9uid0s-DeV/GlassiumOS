@@ -2,10 +2,11 @@
 // GlassiumOS 5 — Wisp v1 + Ultraviolet (/uv/service/) & Scramjet (/scramjet/)
 // Service Worker Proxy Engine
 // =========================================================================
-const SW_VERSION = 'glassium-wisp-uv-scramjet-v5.3';
+const SW_VERSION = 'glassium-wisp-uv-scramjet-v5.4';
 
 let activeConfig = {
-  wispServer: 'wss://wisp.mercurywork.shop/',
+  wispServer: 'wss://glassiumos-backend-2.onrender.com/wisp/',
+  backendServer: 'https://glassiumos-backend-2.onrender.com',
   engine: 'scramjet', // 'scramjet' | 'ultraviolet'
   relayNode: 'auto',
 };
@@ -678,6 +679,37 @@ async function fetchUpstreamViaWispAndRelays(targetUrlStr, request) {
     mux.ensureConnected(2500).catch(() => {});
   } catch {
     // ignore
+  }
+
+  // Transport 0: GlassiumOS Render Backend Server (https://glassiumos-backend-2.onrender.com)
+  try {
+    const backendBase = (activeConfig.backendServer || 'https://glassiumos-backend-2.onrender.com').replace(/\/+$/, '');
+    const encodedTarget =
+      activeConfig.engine === 'ultraviolet'
+        ? encodeUltravioletRaw(cleanTarget)
+        : encodeURIComponent(cleanTarget);
+    const routePrefix = activeConfig.engine === 'ultraviolet' ? '/uv/service/' : '/scramjet/';
+    const renderUrl = backendBase + routePrefix + encodedTarget;
+    const renderRes = await fetch(renderUrl, {
+      method: method === 'HEAD' ? 'GET' : method,
+      mode: 'cors',
+      signal: AbortSignal.timeout(10000),
+    });
+    if (renderRes.ok || (renderRes.status >= 200 && renderRes.status < 400)) {
+      const cType = renderRes.headers.get('content-type') || 'text/html; charset=utf-8';
+      const buf = await renderRes.arrayBuffer();
+      if (buf.byteLength > 0) {
+        return {
+          buffer: buf,
+          contentType: cType,
+          status: renderRes.status,
+          finalUrl: cleanTarget,
+          transport: 'render-server (' + backendBase + ')',
+        };
+      }
+    }
+  } catch {
+    // Fall through to local Wisp bridge
   }
 
   // Transport 1: Local Wisp Bridge (/api/wisp) — supports all methods, binary streams, JS/CSS/HTML/Audio
