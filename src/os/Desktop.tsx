@@ -2242,6 +2242,7 @@ export function Desktop() {
         onUnlock={unlockSystem}
         expectedPassword={user?.password}
         userName={user?.name}
+        userAvatar={user?.avatar}
       />
 
       {/* Initial Setup Wizard (First Launch Account, Theme, UI Style, Accent, & Password) */}

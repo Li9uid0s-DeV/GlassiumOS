@@ -9,6 +9,7 @@ import {
   CLOCK_FONT_OPTIONS,
 } from './LiquidGlassClock';
 import { LiquidGlassMusicWidget } from './LiquidGlassMusicWidget';
+import { AvatarRenderer } from './avatarIcons';
 import {
   getMusicState,
   subscribeMusicState,
@@ -59,6 +60,7 @@ export interface LockScreenProps {
   onUnlock: () => void;
   expectedPassword?: string;
   userName?: string;
+  userAvatar?: string;
   clockStyle?: string;
 }
 
@@ -67,6 +69,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   onUnlock,
   expectedPassword,
   userName = 'Glassium User',
+  userAvatar,
 }) => {
   const [passwordMode, setPasswordMode] = useState(false);
   const [pinInput, setPinInput] = useState('');
@@ -299,8 +302,8 @@ export const LockScreen: React.FC<LockScreenProps> = ({
           {/* Authentic Glassium Unlock Bar */}
           <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-2xl bg-black/45 backdrop-blur-2xl border border-white/15 shadow-xl">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-cyan-500/20 border border-cyan-300/50 flex items-center justify-center text-cyan-300">
-                <Icon name="Lock" size={15} />
+              <div className="relative w-8 h-8 rounded-full overflow-hidden shrink-0 border border-white/25 shadow-md">
+                <AvatarRenderer avatar={userAvatar} size={32} />
               </div>
               <div>
                 <div className="text-[10px] font-mono uppercase tracking-wider text-white/60 flex items-center gap-1.5">

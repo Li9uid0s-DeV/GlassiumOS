@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Icon } from './Icon';
 import { soundService } from './soundService';
 import { UserProfile, UIStyle, Theme } from './types';
+import { DEFAULT_VECTOR_AVATARS, AvatarRenderer } from './avatarIcons';
 
 export interface InitialSetupResult {
   user: UserProfile;
@@ -18,18 +19,6 @@ export interface InitialSetupWizardProps {
   initialTheme?: Theme;
   initialAccent?: string;
 }
-
-const AVATAR_PRESETS = [
-  { id: 'av-glass', label: 'Liquid Glass', emoji: '💎' },
-  { id: 'av-astronaut', label: 'Astronaut', emoji: '🚀' },
-  { id: 'av-galaxy', label: 'Cosmos', emoji: '🌌' },
-  { id: 'av-neon', label: 'Cyber Spark', emoji: '⚡' },
-  { id: 'av-music', label: 'Audiophile', emoji: '🎧' },
-  { id: 'av-gamer', label: 'Game Master', emoji: '🎮' },
-  { id: 'av-creator', label: 'Creator', emoji: '🎨' },
-  { id: 'av-planet', label: 'Saturn', emoji: '🪐' },
-  { id: 'av-cat', label: 'Cyber Cat', emoji: '🐱' },
-];
 
 const ACCENT_PRESETS = [
   { hex: '#06b6d4', name: 'Glassium Cyan (標準)' },
@@ -115,12 +104,15 @@ export const InitialSetupWizard: React.FC<InitialSetupWizardProps> = ({
 }) => {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
-  // Step 1: Account & Password
+  // Step 1: Account, Avatar & Password
   const [name, setName] = useState(initialUser?.name || 'Glassium User');
-  const [selectedAvatar, setSelectedAvatar] = useState(initialUser?.avatar || '💎');
+  const [selectedAvatar, setSelectedAvatar] = useState(
+    initialUser?.avatar || DEFAULT_VECTOR_AVATARS[0].id
+  );
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Step 2: UI Style
   const [chosenUiStyle, setChosenUiStyle] = useState<UIStyle>(initialUiStyle);
@@ -128,6 +120,37 @@ export const InitialSetupWizard: React.FC<InitialSetupWizardProps> = ({
   // Step 3: Theme & Accent Color
   const [chosenTheme, setChosenTheme] = useState<Theme>(initialTheme);
   const [chosenAccent, setChosenAccent] = useState<string>(initialAccent);
+
+  // Handle custom image upload and resize to clean 128x128 thumbnail
+  const handleCustomAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      soundService.playNotify();
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const minDim = Math.min(img.width, img.height);
+        const sx = (img.width - minDim) / 2;
+        const sy = (img.height - minDim) / 2;
+        ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, 128, 128);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        setSelectedAvatar(dataUrl);
+        soundService.playOpen();
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const handleNextStep1 = (e: React.FormEvent) => {
     e.preventDefault();
@@ -170,6 +193,15 @@ export const InitialSetupWizard: React.FC<InitialSetupWizardProps> = ({
         style={{ background: chosenAccent }}
       />
       <div className="fixed -bottom-32 -right-32 w-96 h-96 rounded-full blur-[110px] opacity-40 bg-fuchsia-600 pointer-events-none" />
+
+      {/* Hidden file input for uploading custom images */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="image/*"
+        onChange={handleCustomAvatarUpload}
+        className="hidden"
+      />
 
       {/* Main Setup Card */}
       <motion.div
@@ -228,30 +260,53 @@ export const InitialSetupWizard: React.FC<InitialSetupWizardProps> = ({
               onSubmit={handleNextStep1}
               className="space-y-5"
             >
-              {/* Avatar selection */}
+              {/* Avatar Selection & Custom Upload */}
               <div>
-                <label className="block text-xs font-bold text-white/80 mb-2">
-                  アバターを選択
-                </label>
-                <div className="flex flex-wrap gap-2.5">
-                  {AVATAR_PRESETS.map((av) => (
-                    <button
-                      key={av.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedAvatar(av.emoji);
-                        soundService.playClick();
-                      }}
-                      className={`w-11 h-11 rounded-2xl text-xl flex items-center justify-center border transition cursor-pointer ${
-                        selectedAvatar === av.emoji
-                          ? 'bg-white/20 border-cyan-400 scale-110 shadow-lg'
-                          : 'bg-white/5 hover:bg-white/10 border-white/10'
-                      }`}
-                      title={av.label}
-                    >
-                      {av.emoji}
-                    </button>
-                  ))}
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-white/80">
+                    アイコンを選択または画像アップロード
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-1 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-300/40 text-cyan-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Icon name="Upload" size={13} />
+                    <span>自分の画像をアップロード</span>
+                  </button>
+                </div>
+
+                {/* Current Avatar Preview & Vector Presets Grid */}
+                <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-black/40 border border-white/15">
+                  <div className="relative shrink-0">
+                    <AvatarRenderer avatar={selectedAvatar} size={54} />
+                    <div className="absolute -bottom-1 -right-1 px-1.5 py-0.5 rounded-full bg-cyan-400 text-slate-950 text-[9px] font-black uppercase">
+                      Active
+                    </div>
+                  </div>
+
+                  <div className="flex-1 overflow-x-auto py-1">
+                    <div className="flex items-center gap-2">
+                      {DEFAULT_VECTOR_AVATARS.map((av) => (
+                        <button
+                          key={av.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedAvatar(av.id);
+                            soundService.playClick();
+                          }}
+                          className={`w-11 h-11 rounded-2xl p-1.5 border transition shrink-0 cursor-pointer ${
+                            selectedAvatar === av.id
+                              ? 'bg-white/20 border-cyan-400 scale-105 shadow-md'
+                              : 'bg-white/5 hover:bg-white/10 border-white/10'
+                          }`}
+                          title={`${av.name} (${av.sub})`}
+                        >
+                          {av.svg}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -515,11 +570,8 @@ export const InitialSetupWizard: React.FC<InitialSetupWizardProps> = ({
             >
               <div className="p-5 rounded-3xl bg-white/[0.05] border border-white/15 space-y-4">
                 <div className="flex items-center gap-4">
-                  <div
-                    className="w-16 h-16 rounded-2xl text-3xl flex items-center justify-center shadow-xl border border-white/30"
-                    style={{ background: chosenAccent }}
-                  >
-                    {selectedAvatar}
+                  <div className="relative">
+                    <AvatarRenderer avatar={selectedAvatar} size={64} />
                   </div>
                   <div>
                     <div className="text-base font-black text-white">{name}</div>
