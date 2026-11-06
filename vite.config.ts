@@ -8,7 +8,7 @@ import { fileURLToPath, URL } from 'node:url';
 export default defineConfig({
   plugins: [react()],
 
-  base: process.env.NODE_ENV === 'production' || process.env.VITE_GH_PAGES === 'true' ? './' : '/',
+  base: './',
 
   resolve: {
     alias: {
