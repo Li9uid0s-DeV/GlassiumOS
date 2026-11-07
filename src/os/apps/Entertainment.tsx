@@ -76,6 +76,48 @@ const PROVIDER_METADATA: Record<
   },
 };
 
+function MediaPoster({
+  src,
+  alt,
+  title,
+  year,
+  className = 'w-full h-full object-cover',
+}: {
+  src: string;
+  alt: string;
+  title: string;
+  year?: number;
+  className?: string;
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError || !src) {
+    return (
+      <div className="w-full h-full bg-gradient-to-br from-slate-900 via-zinc-900 to-indigo-950 flex flex-col items-center justify-center p-3 text-center border border-white/10 select-none relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(244,63,94,0.15),transparent)]" />
+        <div className="w-10 h-10 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center mb-2 text-rose-400 shadow-md border border-rose-500/20">
+          <span className="material-symbols-rounded text-2xl">movie</span>
+        </div>
+        <span className="text-xs font-bold text-white line-clamp-2 leading-tight relative z-10">
+          {title}
+        </span>
+        {year && <span className="text-[10px] text-white/50 mt-1 relative z-10">{year}年</span>}
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setHasError(true)}
+      className={className}
+      loading="lazy"
+      decoding="async"
+    />
+  );
+}
+
 const CURATED_MEDIA_CATALOG: MediaItem[] = [
   // Anime
   {
@@ -118,7 +160,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2023,
     rating: 8.8,
     genre: ['オカルト', 'バトルアクション', 'ダークファンタジー'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/hEuoGknVsnw226e6cE2k8.jpg',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/eP1WwP9n0C06iS0lFwXf.jpg',
     description: '五条悟と夏油傑の高専時代、そしてハロウィンの渋谷を舞台に繰り広げられる未曾有の呪霊テロ。特級呪術師たちの激突を描く。',
     episodesCount: 23,
     youtubeId: 'O6qVieflwqs',
@@ -144,7 +186,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2024,
     rating: 8.7,
     genre: ['サスペンス', '芸能界', 'ドラマ'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/1X6Y4sK8n9Z6E035e.jpg',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/dqzenvhVVyv204vE0bK0Y9F7z3s.jpg',
     description: '伝説のアイドル・アイの死の真相を追うアクアとルビー。2.5次元舞台「東京ブレイド」編を舞台に役者たちの熱き演技バトルが幕を開ける。',
     episodesCount: 13,
     youtubeId: '1n_k_0t_WpM',
@@ -157,7 +199,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2024,
     rating: 8.6,
     genre: ['グルメ', 'ファンタジー', 'コメディ'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/1pdfLPo2kYGdPfLwIzvM0G2zYQw.jpg',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr1viJuBDV4j6eb.jpg',
     description: 'レッドドラゴンに食べられた妹を救うため、魔物を狩って自給自足で料理しながら深層を目指す異色グルメファンタジー。',
     episodesCount: 24,
     youtubeId: 'c1uY1b-7Vjg',
@@ -172,7 +214,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2024,
     rating: 8.6,
     genre: ['SF', 'アドベンチャー', 'アクション'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/1pdfLPo2kYGdPfLwIzvM0G2zYQw.jpg',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/8b8R8W88QjeTdn9OE8PY05Nxl1X.jpg',
     description: '宇宙の命運を握る砂の惑星アラキス。ポール・アトレイデスがチャニやフレメンたちと手を組み、一族を滅ぼした宿敵ハルコンネン家への復讐に立ち向かう。',
     youtubeId: 'Way9Dexny3w',
     featured: true,
@@ -237,7 +279,7 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2024,
     rating: 8.4,
     genre: ['SF', 'ブラックコメディ', 'ポストアポカリプス'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/27278272.jpg',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/AnsZu445bO2tB2h9.jpg',
     description: '核戦争から200年後の荒廃したロサンゼルス。地下シェルター「Vault 33」から初めて過酷なウェイストランドへ飛び出したルーシーの波乱に満ちたサバイバル。',
     episodesCount: 8,
     youtubeId: 'V-mugKDQDlg',
@@ -1029,12 +1071,11 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
                     }`}
                   >
                     <div className="aspect-[2/3] w-full relative overflow-hidden bg-zinc-800">
-                      <img
+                      <MediaPoster
                         src={optimizePosterUrl(item.posterUrl)}
                         alt={item.title}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        decoding="async"
+                        title={item.title}
+                        year={item.year}
                       />
                       <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-center justify-center">
                         <div className="w-11 h-11 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-md">
@@ -1141,9 +1182,10 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
                   }`}
                 >
                   <div className="aspect-video relative overflow-hidden bg-zinc-800">
-                    <img
+                    <MediaPoster
                       src={vid.thumbnailUrl}
                       alt={vid.title}
+                      title={vid.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                     />
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">

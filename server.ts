@@ -1964,9 +1964,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         const dateStr = it.release_date;
         const year = dateStr ? new Date(dateStr).getFullYear() || 2024 : 2024;
         const rating = Number((it.vote_average || 8.0).toFixed(1));
-        const posterUrl = it.poster_path
-          ? `https://image.tmdb.org/t/p/w500${it.poster_path}`
-          : 'https://image.tmdb.org/t/p/w500/1pdfLPo2kYGdPfLwIzvM0G2zYQw.jpg';
+        const posterUrl = it.poster_path ? `https://image.tmdb.org/t/p/w500${it.poster_path}` : '';
         const backdropUrl = it.backdrop_path ? `https://image.tmdb.org/t/p/w1280${it.backdrop_path}` : undefined;
 
         return {
@@ -2057,9 +2055,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
               : isAnime
               ? ['アニメ', 'ファンタジー', '冒険']
               : ['海外ドラマ', 'サスペンス', 'ドラマ'],
-            posterUrl: it.poster_path
-              ? `https://image.tmdb.org/t/p/w500${it.poster_path}`
-              : 'https://image.tmdb.org/t/p/w500/1pdfLPo2kYGdPfLwIzvM0G2zYQw.jpg',
+            posterUrl: it.poster_path ? `https://image.tmdb.org/t/p/w500${it.poster_path}` : '',
             backdropUrl: it.backdrop_path ? `https://image.tmdb.org/t/p/w1280${it.backdrop_path}` : undefined,
             description: it.overview || '作品のあらすじ情報が準備中です。',
             episodesCount: isMovie ? undefined : 24,
