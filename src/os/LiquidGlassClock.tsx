@@ -148,19 +148,33 @@ export const LiquidGlassClock: React.FC<LiquidGlassClockProps> = ({
                 height: 220,
               }}
             >
-              <div className="liquid-number-slot hour-1">
+              <div className="liquid-number-slot hour-1 flex items-center justify-center relative">
+                <span className="ios27-liquid-digit text-[90px] text-white/95 drop-shadow-[0_0_14px_rgba(56,189,248,0.6)] leading-none select-none">
+                  {hoursStr[0]}
+                </span>
                 <div className={`liquid-glass-svg-canvas glass-${hoursStr[0]}`} />
               </div>
-              <div className="liquid-number-slot hour-2">
+              <div className="liquid-number-slot hour-2 flex items-center justify-center relative">
+                <span className="ios27-liquid-digit text-[90px] text-white/95 drop-shadow-[0_0_14px_rgba(56,189,248,0.6)] leading-none select-none">
+                  {hoursStr[1]}
+                </span>
                 <div className={`liquid-glass-svg-canvas glass-${hoursStr[1]}`} />
               </div>
-              <div className="liquid-separator-slot separator">
+              <div className="liquid-separator-slot separator flex flex-col items-center justify-center gap-3">
+                <span className="ios27-liquid-circle-dot scale-125" />
+                <span className="ios27-liquid-circle-dot scale-125" />
                 <div className="liquid-glass-svg-canvas glass-points" />
               </div>
-              <div className="liquid-number-slot minute-1">
+              <div className="liquid-number-slot minute-1 flex items-center justify-center relative">
+                <span className="ios27-liquid-digit text-[90px] text-white/95 drop-shadow-[0_0_14px_rgba(56,189,248,0.6)] leading-none select-none">
+                  {minutesStr[0]}
+                </span>
                 <div className={`liquid-glass-svg-canvas glass-${minutesStr[0]}`} />
               </div>
-              <div className="liquid-number-slot minute-2">
+              <div className="liquid-number-slot minute-2 flex items-center justify-center relative">
+                <span className="ios27-liquid-digit text-[90px] text-white/95 drop-shadow-[0_0_14px_rgba(56,189,248,0.6)] leading-none select-none">
+                  {minutesStr[1]}
+                </span>
                 <div className={`liquid-glass-svg-canvas glass-${minutesStr[1]}`} />
               </div>
             </div>

@@ -130,9 +130,39 @@ export function generateSvgLauncher() {
     if (fs.existsSync(distAssetsDir)) {
       fs.cpSync(distAssetsDir, publicAssetsDir, { recursive: true, force: true });
     }
+    // Generate single-file standalone.html & standalone.txt for Google Apps Script
+    try {
+      let standalone = fs.readFileSync(distIndexPath, 'utf-8');
+      const assetsDir = path.join(distDir, 'assets');
+      if (fs.existsSync(assetsDir)) {
+        const files = fs.readdirSync(assetsDir);
+        let cssContent = '';
+        let jsContent = '';
+        for (const file of files) {
+          if (file.endsWith('.css')) {
+            cssContent += fs.readFileSync(path.join(assetsDir, file), 'utf-8') + '\n';
+            standalone = standalone.replace(new RegExp(`<link[^>]+href="[^"]*${file}"[^>]*>`, 'g'), '');
+          } else if (file.endsWith('.js')) {
+            jsContent += fs.readFileSync(path.join(assetsDir, file), 'utf-8') + '\n';
+            standalone = standalone.replace(new RegExp(`<script[^>]+src="[^"]*${file}"[^>]*><\\/script>`, 'g'), '');
+          }
+        }
+        if (cssContent) {
+          standalone = standalone.replace('</head>', `<style>\n${cssContent}\n</style>\n</head>`);
+        }
+        const rootDivTag = '<div id="root"></div>';
+        if (standalone.includes(rootDivTag)) {
+          standalone = standalone.replace(rootDivTag, `${rootDivTag}\n<script>\n${jsContent}\n</script>`);
+        }
+        fs.writeFileSync(path.join(publicDir, 'standalone.html'), standalone, 'utf-8');
+        fs.writeFileSync(path.join(publicDir, 'standalone.txt'), standalone, 'utf-8');
+      }
+    } catch (err) {
+      console.warn('[svg-launcher] Standalone HTML generation warning:', err);
+    }
   }
 
-  console.log('[svg-launcher] Successfully created site.svg, index.svg, and して.svg across dist, root, and public!');
+  console.log('[svg-launcher] Successfully created site.svg, index.svg, standalone.html, and standalone.txt!');
 }
 
 // Auto-run if executed directly

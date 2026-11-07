@@ -1,4 +1,5 @@
 import express from 'express';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI } from '@google/genai';
 import path from 'path';
@@ -3321,6 +3322,33 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     }
   });
 
+  // Serve built static assets & SVG launchers directly so preview server never 500s on built SVG launchers
+  const distPath = path.join(__dirname, 'dist');
+  const publicPath = path.join(__dirname, 'public');
+
+  app.use('/assets', express.static(path.join(distPath, 'assets')));
+  app.use('/dist', express.static(distPath));
+
+  app.get(['/site.svg', '/index.svg', '/して.svg'], (_req, res) => {
+    const svgPath = path.join(distPath, 'site.svg');
+    if (fs.existsSync(svgPath)) {
+      res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+      res.sendFile(svgPath);
+    } else {
+      res.status(404).send('SVG launcher not generated');
+    }
+  });
+
+  app.get(['/dist.zip', '/dist.tar.gz'], (req, res) => {
+    const fileName = req.path.replace(/^\//, '');
+    const fp = path.join(publicPath, fileName);
+    if (fs.existsSync(fp)) {
+      res.sendFile(fp);
+    } else {
+      res.status(404).send('Archive file not found');
+    }
+  });
+
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
       server: { middlewareMode: true, hmr: false },
@@ -3328,7 +3356,6 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(__dirname, 'dist');
     app.use(express.static(distPath));
     app.get('*all', (_req, res) => {
       res.sendFile(path.join(distPath, 'index.html'));
