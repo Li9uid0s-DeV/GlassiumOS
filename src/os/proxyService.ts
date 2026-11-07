@@ -2645,7 +2645,7 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
         coverAccent: palette.accent,
         artworkUrl: hiResArt,
         audioUrl: `/api/music/play?id=${encodeURIComponent(trackId)}&title=${encodeURIComponent(item.name)}&artist=${encodeURIComponent(artistStr)}`,
-        isFullLengthStream: false,
+        isFullLengthStream: true,
         sourceUrl: `https://music-api.gdstudio.xyz/api.php?types=url&source=netease&id=${encodeURIComponent(trackId)}&br=320`,
         duration: fullDuration,
         format: 'api.monochrome.tf 320kbps Full Stream',

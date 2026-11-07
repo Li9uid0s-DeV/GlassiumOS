@@ -458,6 +458,44 @@ export function Desktop() {
     { id: 'recycle', label: 'Trash', icon: 'recycle' },
   ];
 
+  if (locked) {
+    return (
+      <div
+        data-theme={theme}
+        data-accent={accentColor}
+        data-ui-style={uiStyle}
+        className="relative h-full w-full overflow-hidden select-none"
+      >
+        <LockScreen
+          locked={locked}
+          onUnlock={unlockSystem}
+          expectedPassword={user?.password}
+          userName={user?.name}
+          userAvatar={user?.avatar}
+        />
+        <AnimatePresence>
+          {setupWizardOpen && (
+            <InitialSetupWizard
+              initialUser={user}
+              initialUiStyle={uiStyle}
+              initialTheme={theme}
+              initialAccent={accentColor}
+              onComplete={(result: InitialSetupResult) => {
+                setUser(result.user);
+                setUiStyle(result.uiStyle);
+                setTheme(result.theme);
+                setAccentColor(result.accentColor);
+                localStorage.setItem('glassium_setup_completed', 'true');
+                setSetupWizardOpen(false);
+                triggerDynamicIsland('Setup Complete', `ようこそ、${result.user.name}さん`, 'Sparkles');
+              }}
+            />
+          )}
+        </AnimatePresence>
+      </div>
+    );
+  }
+
   return (
     <div
       data-theme={theme}

@@ -33,7 +33,7 @@ export function GlasiusCard({ onClose }: { onClose?: () => void }) {
     const saved = localStorage.getItem('glassium_clock_font') as ClockFontId | null;
     return saved && CLOCK_FONT_OPTIONS.some((o) => o.id === saved)
       ? saved
-      : 'clock-font-ios27-liquid';
+      : 'clock-displacement-liquid';
   });
   const [showFontPicker, setShowFontPicker] = useState(false);
 

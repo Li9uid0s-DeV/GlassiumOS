@@ -8,7 +8,7 @@
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&amp;family=Comfortaa:wght@500;600;700&amp;family=JetBrains+Mono:wght@400;500;600;700&amp;family=M+PLUS+Rounded+1c:wght@400;500;700;800&amp;family=Noto+Sans+JP:wght@400;500;600;700&amp;family=Orbitron:wght@500;600;700;800&amp;family=Outfit:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;family=Quicksand:wght@500;600;700&amp;family=Zen+Maru+Gothic:wght@400;500;700&amp;display=swap" rel="stylesheet" />
-        <link rel="stylesheet" crossorigin href="./assets/index-CNrmWFDX.css">
+        <link rel="stylesheet" crossorigin="anonymous" href="./dist/assets/index-CNrmWFDX.css" />
         <style>
           html, body, #root {
             width: 100%;
@@ -378,7 +378,7 @@
   </mask>
 </svg>
         <div id="root"></div>
-        <script type="module" crossorigin src="./assets/index-C3JpI3UU.js"></script>
+        <script type="module" crossorigin="anonymous" src="./dist/assets/index-D_r-YRrP.js"></script>
       </body>
     </html>
   </foreignObject>

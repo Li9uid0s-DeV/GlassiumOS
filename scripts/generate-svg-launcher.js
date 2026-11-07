@@ -21,9 +21,21 @@ export function generateSvgLauncher() {
   html = html.replace(/src="\/assets\//g, 'src="./assets/');
   fs.writeFileSync(distIndexPath, html, 'utf-8');
 
+  // Helper to ensure strict XML compliance for SVG foreignObject
+  const sanitizeXmlTag = (tag) => {
+    let clean = tag
+      .replace(/\bcrossorigin\b(?!\s*=)/g, 'crossorigin="anonymous"')
+      .replace(/\bdefer\b(?!\s*=)/g, 'defer="defer"')
+      .replace(/\basync\b(?!\s*=)/g, 'async="async"');
+    if (clean.startsWith('<link') && !clean.endsWith('/>')) {
+      clean = clean.replace(/>$/, ' />');
+    }
+    return clean;
+  };
+
   // Extract head tags (css links, fonts, meta)
-  const cssMatches = [...html.matchAll(/<link[^>]+href="([^"]+\.css)"[^>]*>/g)].map(m => m[0]);
-  const scriptMatches = [...html.matchAll(/<script[^>]+src="([^"]+\.js)"[^>]*><\/script>/g)].map(m => m[0]);
+  const cssMatches = [...html.matchAll(/<link[^>]+href="([^"]+\.css)"[^>]*>/g)].map(m => sanitizeXmlTag(m[0]));
+  const scriptMatches = [...html.matchAll(/<script[^>]+src="([^"]+\.js)"[^>]*><\/script>/g)].map(m => sanitizeXmlTag(m[0]));
 
   // Extract embedded SVG filter definitions
   const svgFilterMatches = html.match(/<svg style="position:\s*absolute;[\s\S]*?<\/svg>/gi) || [];
