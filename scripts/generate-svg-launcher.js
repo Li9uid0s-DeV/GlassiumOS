@@ -118,12 +118,18 @@ export function generateSvgLauncher() {
   fs.writeFileSync(path.join(rootDir, 'index.svg'), svgContentRoot, 'utf-8');
   fs.writeFileSync(path.join(rootDir, 'して.svg'), svgContentRoot, 'utf-8');
 
-  // Write files in public/
+  // Write files in public/ and sync assets so SVG launchers work directly on server
   const publicDir = path.join(rootDir, 'public');
   if (fs.existsSync(publicDir)) {
     fs.writeFileSync(path.join(publicDir, 'site.svg'), svgContentDist, 'utf-8');
     fs.writeFileSync(path.join(publicDir, 'index.svg'), svgContentDist, 'utf-8');
     fs.writeFileSync(path.join(publicDir, 'して.svg'), svgContentDist, 'utf-8');
+
+    const publicAssetsDir = path.join(publicDir, 'assets');
+    const distAssetsDir = path.join(distDir, 'assets');
+    if (fs.existsSync(distAssetsDir)) {
+      fs.cpSync(distAssetsDir, publicAssetsDir, { recursive: true, force: true });
+    }
   }
 
   console.log('[svg-launcher] Successfully created site.svg, index.svg, and して.svg across dist, root, and public!');
