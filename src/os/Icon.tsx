@@ -85,9 +85,85 @@ import {
   HelpCircle,
   Hash,
   Binary,
+  SkipForward,
+  SkipBack,
+  Repeat,
+  Shuffle,
+  Mic2,
+  Volume1,
+  ShieldCheck,
+  Server,
+  ListMusic,
+  Disc,
+  CloudSun,
+  CloudRain,
+  Cloud,
+  Wind,
+  Droplets,
+  Thermometer,
+  Timer,
+  Bell,
+  Bot,
+  AlarmClock,
+  Navigation,
+  Flashlight,
+  Camera,
+  Hand,
+  Calculator,
+  BookOpen,
+  List,
+  History,
+  XCircle,
+  BatteryCharging,
+  Mic,
+  Square,
+  AppWindow,
+  CheckCircle2,
+  RotateCcw,
+  MousePointer,
+  Tv,
+  Film,
+  Video,
+  Clapperboard,
+  Key,
+  Code2,
 } from 'lucide-react';
+import { FluentAppIcon, resolveFluentIconType } from './FluentAppIcon';
 
 const map = {
+  entertainment: Tv,
+  Tv,
+  Film,
+  Video,
+  Clapperboard,
+  Key,
+  Code2,
+  CloudSun,
+  CloudRain,
+  Cloud,
+  Wind,
+  Droplets,
+  Thermometer,
+  Timer,
+  Bell,
+  Bot,
+  AlarmClock,
+  Navigation,
+  Flashlight,
+  Camera,
+  Hand,
+  Calculator,
+  BookOpen,
+  List,
+  History,
+  XCircle,
+  BatteryCharging,
+  Mic,
+  Square,
+  AppWindow,
+  CheckCircle2,
+  RotateCcw,
+  MousePointer,
   FolderOpen,
   Globe,
   SquareTerminal,
@@ -174,6 +250,16 @@ const map = {
   HelpCircle,
   Hash,
   Binary,
+  SkipForward,
+  SkipBack,
+  Repeat,
+  Shuffle,
+  Mic2,
+  Volume1,
+  ShieldCheck,
+  Server,
+  ListMusic,
+  Disc,
 };
 
 export type IconName = keyof typeof map;
@@ -182,11 +268,20 @@ export function Icon({
   name,
   className,
   size = 16,
+  onClick,
+  fluent = true,
+  strokeWidth = 1.65,
 }: {
   name: string;
   className?: string;
   size?: number;
+  onClick?: () => void;
+  fluent?: boolean;
+  strokeWidth?: number;
 }) {
+  if (fluent && resolveFluentIconType(name)) {
+    return <FluentAppIcon name={name} size={size} className={className} onClick={onClick} />;
+  }
   const C = (map as Record<string, typeof FolderOpen>)[name] ?? File;
-  return <C className={className} size={size} />;
+  return <C className={className} size={size} strokeWidth={strokeWidth} onClick={onClick} />;
 }

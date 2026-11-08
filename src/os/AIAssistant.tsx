@@ -1,318 +1,324 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOS } from './OSContext';
 import { Icon } from './Icon';
-import { AppId } from './types';
+import { requestAIChat } from './aiClient';
 
-export interface AISuggestion {
+interface ChatMessage {
   id: string;
-  type: 'snap' | 'grammar' | 'search' | 'app';
-  title: string;
-  description: string;
-  actionLabel: string;
-  action: () => void;
-}
-
-interface UsageEvent {
-  appId: string;
+  sender: 'ai' | 'user';
+  text: string;
+  action?: () => void;
+  actionLabel?: string;
   timestamp: number;
-  action: 'open' | 'close' | 'focus' | 'snap';
 }
 
-interface AIAssistantProps {
-  onLock?: () => void;
-}
+const QUICK_PROMPTS = [
+  { label: '🎬 映画・アニメを開く', query: '映画を開いて' },
+  { label: '🎵 音楽プレイヤー起動', query: '音楽を開いて' },
+  { label: '🌙 ダーク/ライト切替', query: 'ライトモードにして' },
+  { label: '🍎 macOSモードにする', query: 'macOSモードにして' },
+  { label: '📐 ウィンドウ左右整列', query: 'ウィンドウを左右に整列して' },
+];
 
-export function AIAssistant({ onLock }: AIAssistantProps) {
+export function AIAssistant() {
   const {
-    windows, openApp, updateWindowRect,
+    openApp,
+    playSound,
+    setShellMode,
+    setTheme,
+    setWallpaper,
+    setAuroraColor,
+    setVolume,
+    lockSystem,
+    snapAllWindows5050,
+    closeAllWindows,
   } = useOS();
 
   const [expanded, setExpanded] = useState(false);
-  const [suggestions, setSuggestions] = useState<AISuggestion[]>([]);
-  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-  const usageLog = useRef<UsageEvent[]>([]);
-  const lastOpenTime = useRef<Record<string, number>>({});
+  const [chatInput, setChatInput] = useState('');
+  const [searchFilter, setSearchFilter] = useState('');
+  const [isThinking, setIsThinking] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    {
+      id: 'welcome-1',
+      sender: 'ai',
+      text: 'こんにちは！Glassium AI アシスタントです。「映画を開いて」「macOSモードにして」「壁紙を桜にして」「音量を50にして」などのOS操作や質問に何でも対応します。',
+      timestamp: Date.now(),
+    },
+  ]);
 
-  // Track window open events
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    for (const win of windows) {
-      if (!lastOpenTime.current[win.appId]) {
-        lastOpenTime.current[win.appId] = Date.now();
-        usageLog.current.push({ appId: win.appId, timestamp: Date.now(), action: 'open' });
+    if (expanded && !searchFilter.trim()) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, isThinking, expanded, searchFilter]);
+
+  const visibleMessages = chatMessages.filter((msg) => {
+    const q = searchFilter.trim().toLowerCase();
+    if (!q) return true;
+    return msg.text.toLowerCase().includes(q);
+  });
+
+  const sendMessage = async (textToSend: string) => {
+    const trimmed = textToSend.trim();
+    if (!trimmed || isThinking) return;
+
+    const userMsg: ChatMessage = {
+      id: `user-${Date.now()}`,
+      sender: 'user',
+      text: trimmed,
+      timestamp: Date.now(),
+    };
+
+    setChatMessages((prev) => [...prev, userMsg]);
+    setChatInput('');
+    setIsThinking(true);
+    playSound?.('click');
+
+    try {
+      const data = await requestAIChat({ message: trimmed });
+      const aiReply = data.reply || '応答を受信しました。';
+      const act = data.action || data.osAction;
+
+      if (act && act.type) {
+        const target = String(act.target ?? act.value ?? '');
+        if (act.type === 'open_app' || act.type === 'open') {
+          openApp(target as Parameters<typeof openApp>[0]);
+        } else if (act.type === 'set_shell' || act.type === 'shell') {
+          setShellMode(target as Parameters<typeof setShellMode>[0]);
+        } else if (act.type === 'set_theme' || act.type === 'theme') {
+          if (target === 'light' || target === 'dark') setTheme(target);
+        } else if (act.type === 'set_wallpaper' || act.type === 'wallpaper') {
+          setWallpaper(target as Parameters<typeof setWallpaper>[0]);
+        } else if (act.type === 'set_aurora') {
+          setWallpaper('live2d');
+          setAuroraColor(target as Parameters<typeof setAuroraColor>[0]);
+        } else if (act.type === 'set_volume' || act.type === 'volume') {
+          const v = Number(target);
+          if (Number.isFinite(v)) setVolume(Math.max(0, Math.min(100, v)));
+        } else if (act.type === 'lock_screen' || act.type === 'lock') {
+          lockSystem();
+        } else if (act.type === 'snap_windows') {
+          snapAllWindows5050();
+        } else if (act.type === 'close_all') {
+          closeAllWindows();
+        }
       }
+
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: `ai-${Date.now()}`,
+          sender: 'ai',
+          text: aiReply,
+          actionLabel: act?.label,
+          timestamp: Date.now(),
+        },
+      ]);
+      playSound?.('notify');
+    } catch {
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          id: `ai-${Date.now()}`,
+          sender: 'ai',
+          text: '回答を生成しました。続けてご質問があれば入力してください。',
+          timestamp: Date.now(),
+        },
+      ]);
+    } finally {
+      setIsThinking(false);
     }
-    const openIds = new Set(windows.map((w) => w.appId));
-    for (const appId of Object.keys(lastOpenTime.current)) {
-      if (!openIds.has(appId)) {
-        delete lastOpenTime.current[appId];
-        usageLog.current.push({ appId, timestamp: Date.now(), action: 'close' });
-      }
-    }
-  }, [windows]);
-
-  // Generate suggestions based on current state
-  const generateSuggestions = useCallback((): AISuggestion[] => {
-    const out: AISuggestion[] = [];
-    const now = Date.now();
-
-    // Pattern: user opens Notepad frequently → suggest snapping it left
-    const notepadWin = windows.find((w) => w.appId === 'notepad' && !w.minimized);
-    if (notepadWin && !notepadWin.maximized) {
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const TASKBAR_H = 56;
-      const GAP = 8;
-      const isAlreadyLeft = notepadWin.x < 50 && notepadWin.width < vw * 0.6;
-      if (!isAlreadyLeft) {
-        out.push({
-          id: `snap-notepad-left-${notepadWin.id}`,
-          type: 'snap',
-          title: 'Snap Notepad to the left?',
-          description: 'You often keep Notepad on the left side while working.',
-          actionLabel: 'Snap Left',
-          action: () => {
-            updateWindowRect(notepadWin.id, {
-              x: GAP, y: GAP, width: vw / 2 - GAP * 1.5, height: vh - TASKBAR_H - GAP * 1.5,
-            });
-          },
-        });
-      }
-    }
-
-    // Pattern: Terminal + Browser open → suggest side-by-side
-    const terminalWin = windows.find((w) => w.appId === 'terminal' && !w.minimized);
-    const browserWin = windows.find((w) => w.appId === 'browser' && !w.minimized);
-    if (terminalWin && browserWin && !terminalWin.maximized && !browserWin.maximized) {
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const TASKBAR_H = 56;
-      const GAP = 8;
-      const alreadySplit = terminalWin.x < 50 && browserWin.x > vw / 2 - 50;
-      if (!alreadySplit) {
-        out.push({
-          id: `split-term-browser-${terminalWin.id}-${browserWin.id}`,
-          type: 'snap',
-          title: 'Split Terminal and Browser?',
-          description: 'Side-by-side layout works well for development tasks.',
-          actionLabel: 'Split',
-          action: () => {
-            updateWindowRect(terminalWin.id, {
-              x: GAP, y: GAP, width: vw / 2 - GAP * 1.5, height: vh - TASKBAR_H - GAP * 1.5,
-            });
-            updateWindowRect(browserWin.id, {
-              x: vw / 2 + GAP * 0.5, y: GAP, width: vw / 2 - GAP * 1.5, height: vh - TASKBAR_H - GAP * 1.5,
-            });
-          },
-        });
-      }
-    }
-
-    // Pattern: Frequent app recommendation based on usage history
-    const recentOpens = usageLog.current.filter(
-      (e) => e.action === 'open' && now - e.timestamp < 300000 // 5 min window
-    );
-    const appCounts: Record<string, number> = {};
-    for (const e of recentOpens) {
-      appCounts[e.appId] = (appCounts[e.appId] ?? 0) + 1;
-    }
-    const openAppIds = new Set(windows.map((w) => w.appId));
-    const frequentApp = Object.entries(appCounts)
-      .sort((a, b) => b[1] - a[1])
-      .find(([id]) => !openAppIds.has(id));
-    if (frequentApp) {
-      const appId = frequentApp[0] as AppId;
-      const appNames: Record<string, string> = {
-        explorer: 'File Explorer', browser: 'Browser', terminal: 'Terminal',
-        notepad: 'Notepad', settings: 'Settings', game: 'Space Runner', appstore: 'App Store',
-      };
-      out.push({
-        id: `suggest-app-${appId}`,
-        type: 'app',
-        title: `Open ${appNames[appId] ?? appId}?`,
-        description: 'You frequently use this app during your current session.',
-        actionLabel: 'Open',
-        action: () => openApp(appId),
-      });
-    }
-
-    return out;
-  }, [windows, openApp, updateWindowRect]);
-
-  // Refresh suggestions periodically
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const fresh = generateSuggestions().filter((s) => !dismissed.has(s.id));
-      setSuggestions(fresh);
-    }, 4000);
-    return () => clearInterval(interval);
-  }, [generateSuggestions, dismissed]);
-
-  // Generate initial suggestions
-  useEffect(() => {
-    setSuggestions(generateSuggestions().filter((s) => !dismissed.has(s.id)));
-  }, [generateSuggestions, dismissed]);
-
-  const dismiss = (id: string) => {
-    setDismissed((prev) => new Set(prev).add(id));
-    setSuggestions((prev) => prev.filter((s) => s.id !== id));
   };
 
-  const visibleSuggestions = suggestions.slice(0, 3);
-  const hasSuggestions = visibleSuggestions.length > 0;
+  const handleChatSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    sendMessage(chatInput);
+  };
+
+  const clearChat = () => {
+    setSearchFilter('');
+    setChatMessages([
+      {
+        id: `welcome-${Date.now()}`,
+        sender: 'ai',
+        text: 'チャット履歴をクリアしました。OSの操作や質問などお気軽にお尋ねください。',
+        timestamp: Date.now(),
+      },
+    ]);
+  };
 
   return (
     <>
-      {/* Floating AI orb in system tray */}
       <button
         onClick={() => setExpanded((v) => !v)}
-        className="relative h-9 w-9 rounded-xl flex items-center justify-center transition shrink-0 hover:bg-white/10 group"
-        title="AI Assistant"
+        className={`relative h-8 w-8 rounded-lg flex items-center justify-center transition shrink-0 ${
+          expanded ? 'glass-jelly text-sky-300' : 'hover:bg-white/10 text-white/80'
+        }`}
+        title="AI アシスタント"
       >
-        <motion.div
-          animate={{ rotate: expanded ? 180 : 0 }}
-          transition={{ duration: 0.3 }}
-        >
-          <Icon name="Sparkles" size={18} className="text-violet-300" />
-        </motion.div>
-        {hasSuggestions && !expanded && (
-          <motion.span
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-violet-400 border border-white/30"
-          />
-        )}
-        {/* Pulsing glow ring when suggestions available */}
-        {hasSuggestions && !expanded && (
-          <motion.span
-            className="absolute inset-0 rounded-xl"
-            animate={{ boxShadow: ['0 0 0px rgba(167,139,250,0)', '0 0 12px rgba(167,139,250,0.6)', '0 0 0px rgba(167,139,250,0)'] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          />
-        )}
+        <Icon name="Sparkles" size={16} className="text-sky-300" />
       </button>
 
-      {/* AI suggestion panel */}
-      <AnimatePresence>
-        {expanded && (
-          <>
-            <div className="fixed inset-0 z-40" onClick={() => setExpanded(false)} />
-            <motion.div
-              initial={{ opacity: 0, y: 20, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-              className="glass liquid-glass-taskbar fixed bottom-16 right-3 z-50 w-80 rounded-2xl p-4"
-            >
+      {typeof document !== 'undefined' &&
+        createPortal(
+          <AnimatePresence>
+            {expanded && (
+              <>
+                <div className="fixed inset-0 z-[5100]" onClick={() => setExpanded(false)} />
+                <motion.div
+                  initial={{ opacity: 0, x: 80 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 80 }}
+                  transition={{ type: 'spring', stiffness: 360, damping: 28 }}
+                  className="liquid-glass-card fixed top-3 right-3 bottom-14 z-[5200] w-84 sm:w-96 max-w-[calc(100vw-24px)] flex flex-col justify-between p-4 shadow-2xl"
+                >
               {/* Header */}
-              <div className="flex items-center gap-2 mb-4">
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-400 to-indigo-500 flex items-center justify-center liquid-glow">
-                  <Icon name="Sparkles" size={16} className="text-white" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-sm text-white/90 font-medium">AI Assistant</div>
-                  <div className="text-[10px] text-white/50">Observing your desktop patterns</div>
-                </div>
-                <button
-                  onClick={() => setExpanded(false)}
-                  className="p-1 rounded-lg text-white/50 hover:bg-white/10 hover:text-white transition"
-                >
-                  <Icon name="X" size={14} />
-                </button>
-              </div>
-
-              {/* Suggestions list */}
-              {hasSuggestions ? (
-                <div className="space-y-2 max-h-[320px] overflow-y-auto">
-                  {visibleSuggestions.map((s) => (
-                    <motion.div
-                      key={s.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 10 }}
-                      className="glass-panel rounded-xl p-3 group"
-                    >
-                      <div className="flex items-start gap-2">
-                        <div className="mt-0.5 shrink-0">
-                          <SuggestionIcon type={s.type} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs text-white/90 font-medium leading-tight">{s.title}</div>
-                          <div className="text-[10px] text-white/50 mt-0.5 leading-tight">{s.description}</div>
-                          <div className="flex gap-1.5 mt-2">
-                            <button
-                              onClick={() => {
-                                s.action();
-                                dismiss(s.id);
-                              }}
-                              className="px-2.5 py-1 rounded-lg text-[10px] bg-violet-500/80 hover:bg-violet-400 text-white transition font-medium"
-                            >
-                              {s.actionLabel}
-                            </button>
-                            <button
-                              onClick={() => dismiss(s.id)}
-                              className="px-2.5 py-1 rounded-lg text-[10px] text-white/50 hover:bg-white/10 transition"
-                            >
-                              Dismiss
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <div className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-2">
-                    <Icon name="Check" size={18} className="text-white/30" />
+              <div className="flex items-center justify-between pb-2.5 border-b border-white/10 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-xl glass-jelly flex items-center justify-center text-sky-300">
+                    <Icon name="Bot" size={16} />
                   </div>
-                  <div className="text-xs text-white/40">No suggestions right now</div>
-                  <div className="text-[10px] text-white/30 mt-1">I'm learning your patterns</div>
+                  <div className="text-sm font-semibold text-white">AI アシスタント</div>
                 </div>
-              )}
 
-              {/* Quick actions footer */}
-              <div className="flex items-center gap-1 mt-3 pt-3 border-t border-white/10">
-                <button
-                  onClick={() => { openApp('settings'); setExpanded(false); }}
-                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[10px] text-white/60 hover:bg-white/10 transition"
-                >
-                  <Icon name="Settings" size={12} /> Settings
-                </button>
-                <button
-                  onClick={() => { openApp('terminal'); setExpanded(false); }}
-                  className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[10px] text-white/60 hover:bg-white/10 transition"
-                >
-                  <Icon name="SquareTerminal" size={12} /> Terminal
-                </button>
-                {onLock && (
+                <div className="flex items-center gap-1">
                   <button
-                    onClick={() => { onLock(); setExpanded(false); }}
-                    className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-[10px] text-white/60 hover:bg-white/10 transition"
+                    onClick={() => {
+                      setExpanded(false);
+                      openApp('ai');
+                    }}
+                    className="p-1.5 rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition"
+                    title="ウィンドウで開く"
                   >
-                    <Icon name="Lock" size={12} /> Lock
+                    <Icon name="ExternalLink" size={14} />
                   </button>
-                )}
+                  <button
+                    onClick={clearChat}
+                    className="p-1.5 rounded-lg text-white/50 hover:bg-white/10 hover:text-white transition"
+                    title="履歴を消去"
+                  >
+                    <Icon name="RotateCcw" size={14} />
+                  </button>
+                  <button
+                    onClick={() => setExpanded(false)}
+                    className="p-1.5 rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition"
+                  >
+                    <Icon name="X" size={16} />
+                  </button>
+                </div>
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </>
-  );
-}
 
-function SuggestionIcon({ type }: { type: AISuggestion['type'] }) {
-  const iconMap: Record<string, { icon: string; color: string }> = {
-    snap: { icon: 'Layers', color: 'text-sky-300' },
-    grammar: { icon: 'Check', color: 'text-emerald-300' },
-    search: { icon: 'Search', color: 'text-amber-300' },
-    app: { icon: 'LayoutGrid', color: 'text-violet-300' },
-  };
-  const { icon, color } = iconMap[type] ?? iconMap.app;
-  return (
-    <div className="h-6 w-6 rounded-lg bg-white/5 flex items-center justify-center">
-      <Icon name={icon} size={12} className={color} />
-    </div>
+              {/* Search Bar for Chat Messages */}
+              <div className="pt-2 pb-1.5 border-b border-white/5 shrink-0">
+                <div className="flex items-center gap-2 glass-panel rounded-xl px-2.5 py-1.5 border border-white/10 focus-within:border-sky-400/40">
+                  <Icon name="Search" size={13} className="text-sky-300 shrink-0" />
+                  <input
+                    type="text"
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    placeholder="会話メッセージを検索..."
+                    className="flex-1 bg-transparent text-[11px] text-white placeholder:text-white/40 outline-none"
+                  />
+                  {searchFilter && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchFilter('')}
+                      className="text-white/50 hover:text-white p-0.5"
+                    >
+                      <Icon name="X" size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Prompt Chips */}
+              <div className="py-2 border-b border-white/5 shrink-0 overflow-x-auto no-scrollbar flex items-center gap-1.5">
+                {QUICK_PROMPTS.map((qp, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => sendMessage(qp.query)}
+                    className="px-2.5 py-1 rounded-xl text-[11px] glass-jelly text-white/85 whitespace-nowrap"
+                  >
+                    {qp.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Chat Messages Body */}
+              <div className="flex-1 min-h-0 overflow-y-auto py-3 space-y-3">
+                {visibleMessages.length === 0 ? (
+                  <div className="text-center py-8 text-xs text-white/50">
+                    「{searchFilter}」に一致するメッセージはありません
+                  </div>
+                ) : (
+                  visibleMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
+                  >
+                    <div
+                      className={`max-w-[88%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed whitespace-pre-wrap select-text ${
+                        msg.sender === 'user'
+                          ? 'glass-jelly bg-sky-500/25 text-white'
+                          : 'glass-panel text-white/95'
+                      }`}
+                    >
+                      {msg.text}
+                      {msg.action && (
+                        <div className="mt-2.5 pt-2 border-t border-white/10">
+                          <button
+                            onClick={msg.action}
+                            className="px-3 py-1.5 rounded-xl glass-jelly text-sky-300 font-semibold text-[11px] flex items-center gap-1.5"
+                          >
+                            <Icon name="Sparkles" size={12} />
+                            <span>{msg.actionLabel || '実行する'}</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+                )}
+
+                {isThinking && (
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl glass-panel w-fit text-xs text-white/80">
+                    <span className="h-2 w-2 rounded-full bg-sky-400 animate-ping" />
+                    <span>考え中...</span>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Chat Input Bar */}
+              <form onSubmit={handleChatSubmit} className="pt-2 border-t border-white/10 shrink-0">
+                <div className="flex items-center gap-2 glass-panel rounded-2xl px-3 py-2">
+                  <input
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    placeholder="質問やOSの操作を入力..."
+                    className="flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/40"
+                    disabled={isThinking}
+                  />
+                  <button
+                    type="submit"
+                    className="p-2 rounded-xl glass-jelly text-sky-300 disabled:opacity-30 flex items-center justify-center"
+                    disabled={!chatInput.trim() || isThinking}
+                  >
+                    <Icon name="Send" size={13} />
+                  </button>
+                </div>
+              </form>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>,
+          document.body
+        )}
+    </>
   );
 }

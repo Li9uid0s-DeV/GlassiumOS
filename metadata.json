@@ -1,6 +1,6 @@
 {
-  "name": "LiquidOS",
-  "description": "A web-based desktop operating system simulation with liquid glass UI, file system, apps, and window management.",
+  "name": "GlassiumOS 5",
+  "description": "GlassiumOS is an educational web-based operating system interface for learning computer science, system architecture, and web development.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
