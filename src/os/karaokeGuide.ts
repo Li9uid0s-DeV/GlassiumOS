@@ -295,25 +295,101 @@ export async function translateLyricsBatchViaServer(
     return result;
   }
 
+  const batchSlice = missing.slice(0, 90);
+  let resolvedCount = 0;
+
   try {
     const resp = await backendFetch('/api/music/translate-lyrics', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lines: missing.slice(0, 80) }),
+      body: JSON.stringify({ lines: batchSlice, engine: 'deepl' }),
     });
     if (resp.ok) {
       const data = await resp.json();
-      if (data && typeof data.translations === 'object' && data.translations !== null) {
+      // 1. Handle translationsMap: Record<string, string>
+      if (data && typeof data.translationsMap === 'object' && data.translationsMap !== null) {
+        for (const [orig, trans] of Object.entries(data.translationsMap)) {
+          if (typeof trans === 'string' && trans.trim()) {
+            memoryTranslationCache.set(orig, trans.trim());
+            result[orig] = trans.trim();
+            resolvedCount++;
+          }
+        }
+      }
+      // 2. Handle translations: Array<{ original, translated }> or Record<string, string>
+      if (data && Array.isArray(data.translations)) {
+        for (const item of data.translations) {
+          if (
+            item &&
+            typeof item.original === 'string' &&
+            typeof item.translated === 'string' &&
+            item.translated.trim()
+          ) {
+            memoryTranslationCache.set(item.original.trim(), item.translated.trim());
+            result[item.original.trim()] = item.translated.trim();
+            resolvedCount++;
+          }
+        }
+      } else if (data && typeof data.translations === 'object' && data.translations !== null) {
         for (const [orig, trans] of Object.entries(data.translations)) {
           if (typeof trans === 'string' && trans.trim()) {
             memoryTranslationCache.set(orig, trans.trim());
             result[orig] = trans.trim();
+            resolvedCount++;
           }
         }
       }
     }
   } catch {
-    // Fallback to local dictionary if offline
+    // Fall through to client-side neural translation bridge
+  }
+
+  // 3. Direct client-side neural translation fallback if server endpoint was unreachable
+  if (resolvedCount === 0 && batchSlice.length > 0) {
+    try {
+      const jaLines: string[] = [];
+      const otherLines: string[] = [];
+      for (const l of batchSlice) {
+        const info = detectLyricLanguage(l);
+        if (info.lang === 'ja') jaLines.push(l);
+        else otherLines.push(l);
+      }
+
+      const translateDirectGroup = async (groupLines: string[], tl: 'en' | 'ja') => {
+        if (groupLines.length === 0) return;
+        const sl = tl === 'en' ? 'ja' : 'auto';
+        const chunkSize = 20;
+        for (let i = 0; i < groupLines.length; i += chunkSize) {
+          const chunk = groupLines.slice(i, i + chunkSize);
+          const joined = chunk.join('\n');
+          const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${tl}&dt=t&q=${encodeURIComponent(joined)}`;
+          const r = await fetch(url).catch(() => null);
+          if (r && r.ok) {
+            const d = await r.json();
+            const fullText = Array.isArray(d?.[0])
+              ? d[0].map((part: [string]) => (Array.isArray(part) ? part[0] : '')).join('')
+              : '';
+            const split = fullText.split('\n');
+            if (split.length === chunk.length) {
+              chunk.forEach((orig, idx) => {
+                const tr = (split[idx] || '').trim();
+                if (tr) {
+                  memoryTranslationCache.set(orig, tr);
+                  result[orig] = tr;
+                }
+              });
+            }
+          }
+        }
+      };
+
+      await Promise.all([
+        translateDirectGroup(jaLines, 'en'),
+        translateDirectGroup(otherLines, 'ja'),
+      ]);
+    } catch {
+      // Fallback to local dictionary if offline
+    }
   }
 
   return result;

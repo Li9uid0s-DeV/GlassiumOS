@@ -165,7 +165,7 @@ export function AppStoreApp() {
       author: tsxAppAuthor.trim() || 'Developer',
       description: tsxAppDesc.trim() || 'GlassiumOS 用 .tsx アプリケーション',
       category: 'utilities',
-      icon: 'Code',
+      icon: 'tsxrunner',
       rating: 5.0,
       size: `${Math.max(1, Math.round(tsxSourceCode.length / 1024))} KB`,
       version: '5.0 u4',
@@ -350,12 +350,12 @@ export function AppStoreApp() {
           {(
             [
               { id: 'home', label: 'ホーム', icon: 'Home' },
-              { id: 'office', label: 'オフィス (Write/Sheet)', icon: 'FileText' },
-              { id: 'audio', label: '立体音響 & EQ', icon: 'Music' },
+              { id: 'office', label: 'オフィス (Sheet/Stage/Note)', icon: 'glassexcel' },
+              { id: 'audio', label: '立体音響 & EQ', icon: 'sonicstudio' },
               { id: 'apps', label: 'すべてのアプリ', icon: 'LayoutGrid' },
               { id: 'games', label: 'ゲーム', icon: 'Gamepad2' },
               { id: 'themes', label: 'テーマ & 外観', icon: 'Palette' },
-              { id: 'tsx', label: '.tsx アプリを公開/追加', icon: 'Code' },
+              { id: 'tsx', label: '.tsx アプリを公開/追加', icon: 'tsxrunner' },
               { id: 'custom', label: 'Webアプリ追加', icon: 'Globe' },
               { id: 'library', label: `ライブラリ (${installedApps.length})`, icon: 'FolderOpen' },
             ] as { id: StoreNavId; label: string; icon: string }[]
@@ -450,7 +450,7 @@ export function AppStoreApp() {
                     Glassium Office &amp; Sonic 3D スイート
                   </h1>
                   <p className="text-xs sm:text-sm text-white/80 leading-relaxed">
-                    文書作成「Glassium Write」、表計算「Glassium Sheet」、プレゼン「Glassium Stage」、デジタルノート「Glassium Note」、およびOS全体の音を立体音響・10バンドEQで調整する「Glassium Sonic 3D」を入手できます。
+                    表計算「Glassium Sheet」、プレゼン「Glassium Stage」、デジタルノート「Glassium Note」、およびOS全体の音を立体音響・10バンドEQで調整する「Glassium Sonic 3D」をApp Storeからプログレスバー付きでダウンロードして利用できます。
                   </p>
                   <div className="flex flex-wrap gap-2.5 pt-2">
                     <button
@@ -459,7 +459,7 @@ export function AppStoreApp() {
                       style={{ backgroundColor: resolvedAccentHex }}
                       className="px-5 py-2 rounded-xl text-white text-xs font-bold shadow-lg"
                     >
-                      オフィススイートを見る
+                      オフィススイートを入手
                     </button>
                     <button
                       type="button"
@@ -480,7 +480,7 @@ export function AppStoreApp() {
                       注目: オフィス &amp; 3Dオーディオ (GlassiumOS 5 u4)
                     </h2>
                     <p className="text-xs opacity-60">
-                      Word / Excel / PowerPoint / OneNote 互換アプリと OS全体立体音響・EQ
+                      Excel / PowerPoint / OneNote 互換スイートと OS全体立体音響・EQ（ダウンロード後にデスクトップとスタートメニューへ追加されます）
                     </p>
                   </div>
                 </div>
@@ -505,7 +505,7 @@ export function AppStoreApp() {
               <div>
                 <h1 className="text-xl font-extrabold">
                   {nav === 'office'
-                    ? 'Glassium Office (Write / Sheet / Stage / Note)'
+                    ? 'Glassium Office (Sheet / Stage / Note)'
                     : nav === 'audio'
                     ? '立体音響 & イコライザー (Glassium Sonic 3D)'
                     : nav === 'games'

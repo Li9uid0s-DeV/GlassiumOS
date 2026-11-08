@@ -230,7 +230,7 @@ export async function backendFetch(
         mode: 'cors',
         signal: AbortSignal.timeout(6000),
       });
-      if (res.ok || res.status < 500) {
+      if (res.ok) {
         return res;
       }
     } catch {

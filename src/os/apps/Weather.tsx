@@ -133,15 +133,106 @@ export function WeatherApp() {
     }
   }, [savedLocations]);
 
+  const fetchWeatherDirectFallback = useCallback(
+    async (loc: SavedWeatherLocation): Promise<WeatherApiResponse> => {
+      const meteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(loc.lat)}&longitude=${encodeURIComponent(loc.lon)}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,cloud_cover,surface_pressure,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,sunrise,sunset,uv_index_max&timezone=auto&forecast_days=7`;
+      const [meteoRes, radarRes] = await Promise.all([
+        fetch(meteoUrl),
+        fetch('https://api.rainviewer.com/public/weather-maps.json').catch(() => null),
+      ]);
+      if (!meteoRes.ok) {
+        throw new Error(`Open-Meteo HTTP ${meteoRes.status}`);
+      }
+      const meteo = await meteoRes.json();
+      let radarHost = 'https://tilecache.rainviewer.com';
+      let radarFrames: RadarFrame[] = [];
+      if (radarRes && radarRes.ok) {
+        try {
+          const rJson = await radarRes.json();
+          if (rJson?.host) radarHost = rJson.host;
+          const past = Array.isArray(rJson?.radar?.past) ? rJson.radar.past : [];
+          const nowcast = Array.isArray(rJson?.radar?.nowcast) ? rJson.radar.nowcast : [];
+          radarFrames = [
+            ...past.slice(-6).map((f: { time: number; path: string }) => ({ time: f.time, path: f.path, isForecast: false })),
+            ...nowcast.slice(0, 3).map((f: { time: number; path: string }) => ({ time: f.time, path: f.path, isForecast: true })),
+          ];
+        } catch {
+          // ignore radar parse errors
+        }
+      }
+      const nowMs = Date.now();
+      return {
+        location: { lat: loc.lat, lon: loc.lon, name: loc.name, timezone: meteo.timezone || 'Asia/Tokyo' },
+        updatedAt: nowMs,
+        nextUpdateAt: nowMs + FIVE_MINUTES_MS,
+        refreshIntervalMs: FIVE_MINUTES_MS,
+        cached: false,
+        current: meteo.current || {
+          temperature_2m: 20,
+          relative_humidity_2m: 55,
+          apparent_temperature: 20,
+          is_day: 1,
+          precipitation: 0,
+          weather_code: 1,
+          cloud_cover: 20,
+          surface_pressure: 1013,
+          wind_speed_10m: 8,
+          wind_direction_10m: 180,
+        },
+        hourly: meteo.hourly || {
+          time: [],
+          temperature_2m: [],
+          precipitation_probability: [],
+          precipitation: [],
+          weather_code: [],
+          wind_speed_10m: [],
+        },
+        daily: meteo.daily || {
+          time: [],
+          weather_code: [],
+          temperature_2m_max: [],
+          temperature_2m_min: [],
+          precipitation_sum: [],
+          precipitation_probability_max: [],
+          sunrise: [],
+          sunset: [],
+          uv_index_max: [],
+        },
+        radar: {
+          host: radarHost,
+          frames: radarFrames,
+        },
+      };
+    },
+    []
+  );
+
   const fetchWeatherForLocation = useCallback(
     async (loc: SavedWeatherLocation, force = false) => {
       setLoading(true);
       setErrorMsg(null);
       try {
-        const url = `/api/weather?lat=${encodeURIComponent(loc.lat)}&lon=${encodeURIComponent(loc.lon)}&name=${encodeURIComponent(loc.name)}${force ? '&force=1' : ''}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error('天気データの取得に失敗しました');
-        const data = (await res.json()) as WeatherApiResponse;
+        let data: WeatherApiResponse | null = null;
+        try {
+          const url = `/api/weather?lat=${encodeURIComponent(loc.lat)}&lon=${encodeURIComponent(loc.lon)}&name=${encodeURIComponent(loc.name)}${force ? '&force=1' : ''}`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const ct = res.headers.get('content-type') || '';
+            if (ct.includes('json')) {
+              const parsed = (await res.json()) as WeatherApiResponse;
+              if (parsed && parsed.current) {
+                data = parsed;
+              }
+            }
+          }
+        } catch {
+          // Fall through to direct Open-Meteo + RainViewer fetch
+        }
+
+        if (!data) {
+          data = await fetchWeatherDirectFallback(loc);
+        }
+
         setWeather(data);
         if (data.radar?.frames && data.radar.frames.length > 0) {
           setRadarFrameIdx(data.radar.frames.length - 1);
@@ -152,12 +243,12 @@ export function WeatherApp() {
         );
         setCountdownSec(remSec);
       } catch {
-        setErrorMsg('サーバーから天気情報を取得できませんでした。');
+        setErrorMsg('天気情報の取得に失敗しました。ネットワーク接続を確認してください。');
       } finally {
         setLoading(false);
       }
     },
-    []
+    [fetchWeatherDirectFallback]
   );
 
   // Initial fetch & 5-minute automatic server sync
@@ -199,11 +290,42 @@ export function WeatherApp() {
     if (!q) return;
     setSearching(true);
     try {
-      const res = await fetch(`/api/weather/search?q=${encodeURIComponent(q)}`);
-      if (res.ok) {
-        const data = (await res.json()) as { results?: SavedWeatherLocation[] };
-        setSearchResults(data.results || []);
+      let found: SavedWeatherLocation[] | null = null;
+      try {
+        const res = await fetch(`/api/weather/search?q=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          const ct = res.headers.get('content-type') || '';
+          if (ct.includes('json')) {
+            const data = (await res.json()) as { results?: SavedWeatherLocation[] };
+            if (Array.isArray(data.results)) {
+              found = data.results;
+            }
+          }
+        }
+      } catch {
+        // Fall back to direct Open-Meteo Geocoding API
       }
+
+      if (!found) {
+        const geoRes = await fetch(
+          `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=8&language=ja&format=json`
+        );
+        if (geoRes.ok) {
+          const geoData = await geoRes.json();
+          found = (geoData.results || []).map(
+            (r: { id: number; name: string; admin1?: string; country?: string; latitude: number; longitude: number }) => ({
+              id: String(r.id || `${r.latitude},${r.longitude}`),
+              name: r.name,
+              admin1: r.admin1 || '',
+              country: r.country || '',
+              lat: r.latitude,
+              lon: r.longitude,
+            })
+          );
+        }
+      }
+
+      setSearchResults(found || []);
     } catch {
       setSearchResults([]);
     } finally {

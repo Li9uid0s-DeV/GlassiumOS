@@ -367,12 +367,11 @@ const APP_DEFAULTS: Record<AppId, { title: string; icon: string; width: number; 
   periodic: { title: 'Glassium Elements (元素周期表)', icon: 'Sparkles', width: 720, height: 500 },
   dictionary: { title: 'Glassium Lexicon (IT・用語辞典)', icon: 'BookOpen', width: 640, height: 480 },
   sysinfo: { title: 'Glassium Diagnostics (システム診断)', icon: 'Cpu', width: 620, height: 480 },
-  sonicstudio: { title: 'Glassium Sonic 3D (立体音響 & システムEQ)', icon: 'Volume2', width: 860, height: 580 },
-  glassword: { title: 'Glassium Write (Word 文書作成)', icon: 'FileText', width: 880, height: 600 },
-  glassexcel: { title: 'Glassium Sheet (Excel 表計算)', icon: 'Grid3x3', width: 920, height: 600 },
-  glassppt: { title: 'Glassium Stage (PowerPoint スライド)', icon: 'Monitor', width: 940, height: 620 },
-  glassnote: { title: 'Glassium Note (OneNote デジタルノート)', icon: 'BookOpen', width: 900, height: 600 },
-  tsxrunner: { title: 'Glassium TSX App', icon: 'Code2', width: 840, height: 560 },
+  sonicstudio: { title: 'Glassium Sonic 3D (立体音響 & システムEQ)', icon: 'sonicstudio', width: 920, height: 620 },
+  glassexcel: { title: 'Glassium Sheet (Excel 表計算)', icon: 'glassexcel', width: 960, height: 640 },
+  glassppt: { title: 'Glassium Stage (PowerPoint スライド)', icon: 'glassppt', width: 980, height: 640 },
+  glassnote: { title: 'Glassium Note (OneNote デジタルノート)', icon: 'glassnote', width: 940, height: 620 },
+  tsxrunner: { title: 'Glassium TSX Studio', icon: 'tsxrunner', width: 900, height: 600 },
 };
 
 const INITIAL_TASKS: CalendarTask[] = [
@@ -382,7 +381,7 @@ const INITIAL_TASKS: CalendarTask[] = [
 ];
 
 const LS_KEY = 'glassium-os-v5.0-u1-settings';
-const LS_APPS_KEY = 'glassium-os-v5.0-u1-installed-apps';
+const LS_APPS_KEY = 'glassium-os-v5.0-u4-installed-apps';
 const LS_THEMES_KEY = 'glassium-os-v5.0-u1-installed-themes';
 const LS_CURRENT_THEME_KEY = 'glassium-os-v5.0-u1-current-theme';
 const LS_TASKS_KEY = 'glassium-os-v5.0-u1-calendar-tasks';
@@ -691,31 +690,14 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const [startOpen, setStartOpen] = useState(false);
 
   const [installedApps, setInstalledApps] = useState<InstalledApp[]>(() => {
-    const loaded = loadPersisted<InstalledApp[]>(LS_APPS_KEY, [
-      {
-        id: 'calendar',
-        appId: 'calendar',
-        name: 'Calendar & Tasks',
-        icon: 'Calendar',
-        description: 'Interactive agenda grid',
-        author: 'Glassium Core',
-        category: 'utilities',
-        installedAt: Date.now(),
-        builtInAppId: 'calendar',
-      },
-      {
-        id: 'synth',
-        appId: 'synth',
-        name: 'Monochrome Music',
-        icon: 'Music',
-        description: 'Hi-Fi music streaming and synced lyrics',
-        author: 'Monochrome Audio',
-        category: 'utilities',
-        installedAt: Date.now(),
-        builtInAppId: 'synth',
-      },
-    ]);
-    return loaded.filter((a) => a.id !== 'sysmon' && a.appId !== 'sysmon');
+    const loaded = loadPersisted<InstalledApp[]>(LS_APPS_KEY, []);
+    return loaded.filter(
+      (a) =>
+        a.id !== 'sysmon' &&
+        a.appId !== 'sysmon' &&
+        a.id !== 'glassword' &&
+        a.appId !== 'glassword'
+    );
   });
 
   const [installedThemeIds, setInstalledThemeIds] = useState<string[]>(() =>

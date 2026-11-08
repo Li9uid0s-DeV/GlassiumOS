@@ -23,7 +23,7 @@ import {
   testWispServerConnection,
 } from '../proxyService';
 import { useOS } from '../OSContext';
-import { globalAudio } from '../globalAudioManager';
+import { globalAudio, SpatialAudioDetails } from '../globalAudioManager';
 import { backendFetch } from '../backendConfig';
 import { DrumPadTunerView } from './ExtraAppsSuite';
 import { MusicEqualizerPanel } from './MusicEqualizerPanel';
@@ -638,6 +638,23 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const [importSourceUrlOrText, setImportSourceUrlOrText] = useState('');
   const [isImportingPlaylist, setIsImportingPlaylist] = useState(false);
 
+  // User Custom Playlist Creation & Track Management State
+  const [showCreatePlaylistModal, setShowCreatePlaylistModal] = useState(false);
+  const [newPlaylistTitle, setNewPlaylistTitle] = useState('');
+  const [newPlaylistDesc, setNewPlaylistDesc] = useState('');
+  const [includeCurrentTrackInNew, setIncludeCurrentTrackInNew] = useState(true);
+  const [trackForPlaylistPicker, setTrackForPlaylistPicker] = useState<MonochromeTrack | null>(null);
+
+  // Detailed 3D Spatial Audio State (Synced with globalAudio)
+  const [spatialDetails, setSpatialDetails] = useState<SpatialAudioDetails>(
+    () => globalAudio.getState().spatialDetails
+  );
+
+  const updateSpatialDetails = useCallback((patch: Partial<SpatialAudioDetails>) => {
+    globalAudio.setSpatialDetails(patch);
+    setSpatialDetails(globalAudio.getState().spatialDetails);
+  }, []);
+
   useEffect(() => {
     if (initialTab) setActiveNav(resolveInitialNav(initialTab));
   }, [initialTab]);
@@ -911,6 +928,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       setIsPlaying(aState.isPlaying);
       setIsBuffering(aState.isBuffering);
       setCurrentTime(aState.currentTime);
+      setSpatialDetails(aState.spatialDetails);
       if (aState.statusMessage) {
         setStatusBanner(aState.statusMessage);
       }
@@ -1086,6 +1104,20 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         setActiveTrackOverride((prev) =>
           prev && prev.id === track.id ? { ...prev, lyrics: synced } : prev
         );
+        // Immediately pipe fetched lyrics into DeepL automatic translation
+        const rawLines = synced
+          .filter((l) => !l.isInterlude && l.text && l.text.trim())
+          .map((l) => l.text.trim());
+        if (rawLines.length > 0) {
+          setIsTranslatingLyrics(true);
+          translateLyricsBatchViaServer(rawLines)
+            .then((map) => {
+              setServerLyricTranslations((prev) => ({ ...prev, ...map }));
+            })
+            .finally(() => {
+              setIsTranslatingLyrics(false);
+            });
+        }
       }
     } catch {
       // keep existing
@@ -1384,6 +1416,86 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       }
     },
     [activeNav, resolvedAccentHex]
+  );
+
+  // Create a User Custom Playlist
+  const handleCreateCustomPlaylist = useCallback(
+    (e?: React.FormEvent) => {
+      if (e) e.preventDefault();
+      const title = newPlaylistTitle.trim() || `マイプレイリスト #${userPlaylists.length + 1}`;
+      const subtitle = newPlaylistDesc.trim() || '自分で作成したカスタムプレイリスト';
+      const initialTracks = includeCurrentTrackInNew && currentTrack ? [currentTrack] : [];
+      const customPl: MusicCollectionViewData = {
+        id: `pl-user-${Date.now()}`,
+        kind: 'PLAYLIST',
+        title,
+        subtitle,
+        creator: 'あなた (Glassium User)',
+        year: new Date().getFullYear(),
+        artworkUrl:
+          initialTracks[0]?.artworkUrl ||
+          currentTrack?.artworkUrl ||
+          INITIAL_ENRICHED_CATALOG[0]?.artworkUrl ||
+          '',
+        coverGradient: 'from-cyan-600 via-blue-900 to-slate-950',
+        sourceService: 'カスタム作成',
+        tracks: initialTracks,
+      };
+      setUserPlaylists((prev) => [customPl, ...prev]);
+      setSelectedCollection(customPl);
+      setActiveNav('collection-detail');
+      setShowCreatePlaylistModal(false);
+      setNewPlaylistTitle('');
+      setNewPlaylistDesc('');
+      setStatusBanner(`プレイリスト「${title}」を作成しました`);
+    },
+    [currentTrack, includeCurrentTrackInNew, newPlaylistDesc, newPlaylistTitle, userPlaylists.length]
+  );
+
+  // Add a Track to a User Custom Playlist
+  const handleAddTrackToPlaylist = useCallback(
+    (playlistId: string, track: MonochromeTrack) => {
+      setUserPlaylists((prev) =>
+        prev.map((pl) => {
+          if (pl.id !== playlistId) return pl;
+          const exists = pl.tracks.some((t) => t.id === track.id);
+          const nextTracks = exists ? pl.tracks : [...pl.tracks, track];
+          const updated = {
+            ...pl,
+            artworkUrl: pl.artworkUrl || track.artworkUrl || '',
+            tracks: nextTracks,
+          };
+          if (selectedCollection.id === playlistId) {
+            setSelectedCollection(updated);
+          }
+          return updated;
+        })
+      );
+      setTrackForPlaylistPicker(null);
+      setStatusBanner(`「${track.title}」をプレイリストに追加しました`);
+    },
+    [selectedCollection.id]
+  );
+
+  // Remove a Track from a User Custom Playlist
+  const handleRemoveTrackFromPlaylist = useCallback(
+    (playlistId: string, trackId: string) => {
+      setUserPlaylists((prev) =>
+        prev.map((pl) => {
+          if (pl.id !== playlistId) return pl;
+          const updated = {
+            ...pl,
+            tracks: pl.tracks.filter((t) => t.id !== trackId),
+          };
+          if (selectedCollection.id === playlistId) {
+            setSelectedCollection(updated);
+          }
+          return updated;
+        })
+      );
+      setStatusBanner('プレイリストから曲を削除しました');
+    },
+    [selectedCollection.id]
   );
 
   // Import Playlist from External Service (Spotify / Apple Music / YouTube Music / Text)
@@ -2129,9 +2241,19 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
         {/* Translation Rule Info Bar */}
         {showLyricsTranslation && (
-          <div className="px-5 py-1.5 bg-white/[0.02] border-b border-white/[0.06] flex items-center justify-between text-[11px] text-white/60">
-            <span>自動翻訳ルール: 日本語 → 英語 / 英語 → 日本語 / その他の言語 → 日本語</span>
-            <span className="font-mono text-[10px] text-white/45">LRCLIB Sync</span>
+          <div className="px-5 py-1.5 bg-white/[0.03] border-b border-white/[0.06] flex items-center justify-between text-[11px] text-white/70">
+            <span className="flex items-center gap-1.5">
+              <span
+                style={{ backgroundColor: resolvedAccentHex }}
+                className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold text-white"
+              >
+                DeepL 自動通訳
+              </span>
+              <span>日本語 ↔ 英語 / 多言語 → 日本語</span>
+            </span>
+            <span className="font-mono text-[10px] text-white/50">
+              {isTranslatingLyrics ? 'DeepL 翻訳中...' : 'LRCLIB + DeepL Sync'}
+            </span>
           </div>
         )}
 
@@ -2271,7 +2393,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   </span>
                 </div>
 
-                {/* Translated Lyric Line (JA->EN, EN->JA, Other->JA) */}
+                {/* Translated Lyric Line via DeepL (JA->EN, EN->JA, Other->JA) */}
                 {showLyricsTranslation && translation && (
                   <div className="mt-1.5 flex items-start gap-2 text-xs sm:text-sm font-medium leading-relaxed">
                     <span
@@ -2281,7 +2403,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                       }}
                       className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/[0.06] border shrink-0 mt-0.5"
                     >
-                      {langInfo.badgeLabel}
+                      DeepL · {langInfo.badgeLabel}
                     </span>
                     <span className={isActive ? 'text-white/95' : 'text-white/65'}>
                       {translation}
@@ -2417,6 +2539,31 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   </button>
                   <button
                     type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setTrackForPlaylistPicker(track);
+                    }}
+                    title="自分のプレイリストに追加"
+                    className="px-2 py-0.5 rounded bg-white/[0.08] hover:bg-white/20 text-white/85 text-[10px] font-semibold transition border border-white/15"
+                  >
+                    +PL
+                  </button>
+                  {activeNav === 'collection-detail' &&
+                    selectedCollection.id.startsWith('pl-user-') && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveTrackFromPlaylist(selectedCollection.id, track.id);
+                        }}
+                        title="このプレイリストから削除"
+                        className="px-1.5 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/40 text-rose-200 text-[10px] font-semibold transition border border-rose-400/30"
+                      >
+                        削除
+                      </button>
+                    )}
+                  <button
+                    type="button"
                     onClick={(e) => toggleFavorite(track, e)}
                     style={
                       fav
@@ -2444,6 +2591,362 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               </div>
             );
           })}
+        </div>
+      </div>
+    );
+  };
+
+  // -----------------------------------------------------------------------
+  // Detailed 3D HRTF Spatial Audio & Soundstage Panel Renderer
+  // -----------------------------------------------------------------------
+  const renderSpatialAudioDetailPanel = () => {
+    const ROOM_MODELS: {
+      id: SpatialAudioDetails['roomModel'];
+      label: string;
+      desc: string;
+    }[] = [
+      { id: 'studio', label: 'Studio Nearfield', desc: '原音忠実・モニター室' },
+      { id: 'binaural', label: 'HRTF バイノーラル', desc: 'ヘッドホン3D頭部伝達関数' },
+      { id: 'theater', label: 'Cinema 7.1.4', desc: '映画館サラウンド音場' },
+      { id: 'concert-hall', label: 'Symphony Hall', desc: 'コンサートホール残響' },
+      { id: 'club-arena', label: 'Club Arena', desc: '重低音アリーナ空間' },
+      { id: 'cathedral', label: 'Cathedral Dome', desc: '大聖堂ロングディケイ' },
+    ];
+
+    return (
+      <div className="rounded-2xl apple-liquid-glass border border-white/15 p-5 space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-3">
+          <div>
+            <h3 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
+              <span className="material-symbols-rounded text-lg" style={{ color: resolvedAccentHex }}>
+                spatial_audio_off
+              </span>
+              <span>3D 立体音響 (HRTF Spatial Audio) 詳細設定</span>
+            </h3>
+            <p className="text-[11px] text-white/55 mt-0.5">
+              音源定位 (方位角・仰角・距離)、ルーム音響モデル、ステレオ幅、サブベース、残響をリアルタイム制御
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => updateSpatialDetails({ autoOrbit: !spatialDetails.autoOrbit })}
+              style={
+                spatialDetails.autoOrbit
+                  ? { backgroundColor: resolvedAccentHex }
+                  : undefined
+              }
+              className={`px-3 py-1.5 rounded-full text-xs font-bold transition ${
+                spatialDetails.autoOrbit
+                  ? 'text-white shadow-md'
+                  : 'bg-white/10 text-white/70 hover:bg-white/20'
+              }`}
+            >
+              360°自動回転: {spatialDetails.autoOrbit ? 'ON' : 'OFF'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                updateMusicSettings({ dolbyAtmosEnabled: true });
+                updateSpatialDetails({
+                  enabled: true,
+                  roomModel: 'binaural',
+                  azimuthDeg: 0,
+                  elevationDeg: 8,
+                  distanceMeters: 1.4,
+                  stereoWidth: 135,
+                  reverbWet: 28,
+                  roomDecaySec: 1.8,
+                  crossfeed: 25,
+                  subBassBoostDb: 3.5,
+                  vocalClarityDb: 2.5,
+                  airBrillianceDb: 3.0,
+                  autoOrbit: false,
+                });
+                setStatusBanner('立体音響パラメータを標準推奨値にリセットしました');
+              }}
+              className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-xs font-semibold text-white/80"
+            >
+              推奨値に戻す
+            </button>
+          </div>
+        </div>
+
+        {/* Room Acoustic Model Selector */}
+        <div className="space-y-2">
+          <div className="text-xs font-bold text-white/80">1. ルーム音響モデル (Room Acoustics)</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {ROOM_MODELS.map((rm) => {
+              const active = spatialDetails.roomModel === rm.id;
+              return (
+                <button
+                  key={rm.id}
+                  type="button"
+                  onClick={() => {
+                    updateMusicSettings({ dolbyAtmosEnabled: true });
+                    updateSpatialDetails({ enabled: true, roomModel: rm.id });
+                  }}
+                  style={
+                    active
+                      ? {
+                          backgroundColor: `${resolvedAccentHex}28`,
+                          borderColor: resolvedAccentHex,
+                        }
+                      : undefined
+                  }
+                  className={`p-2.5 rounded-xl border text-left transition ${
+                    active
+                      ? 'text-white shadow-sm'
+                      : 'bg-white/[0.04] border-white/10 text-white/70 hover:bg-white/[0.08]'
+                  }`}
+                >
+                  <div className="text-xs font-bold text-white">{rm.label}</div>
+                  <div className="text-[10px] text-white/50 mt-0.5">{rm.desc}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 3D Positioning (Azimuth, Elevation, Distance, Orbit Speed) */}
+        <div className="space-y-3 pt-1">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-white/80">
+              2. 3D サウンドステージ定位 (HRTF 音源位置)
+            </span>
+            <div className="flex items-center gap-1.5">
+              {[
+                { label: '正面', az: 0, el: 0, dist: 1.2 },
+                { label: '前方ワイド', az: 25, el: 12, dist: 1.6 },
+                { label: '頭上ドーム', az: 0, el: 40, dist: 1.8 },
+                { label: 'ライブ最前列', az: -15, el: 5, dist: 0.9 },
+              ].map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() =>
+                    updateSpatialDetails({
+                      azimuthDeg: p.az,
+                      elevationDeg: p.el,
+                      distanceMeters: p.dist,
+                      autoOrbit: false,
+                    })
+                  }
+                  className="px-2 py-0.5 rounded-md bg-white/[0.07] hover:bg-white/15 text-[10px] font-semibold text-white/80"
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-3 rounded-xl bg-black/30 border border-white/10 space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-white/70">水平方位角 (Azimuth 左右角度)</span>
+                <span className="font-mono font-bold text-white">{spatialDetails.azimuthDeg}°</span>
+              </div>
+              <input
+                type="range"
+                min={-180}
+                max={180}
+                step={1}
+                value={spatialDetails.azimuthDeg}
+                onChange={(e) =>
+                  updateSpatialDetails({ azimuthDeg: Number(e.target.value), autoOrbit: false })
+                }
+                style={{ accentColor: resolvedAccentHex }}
+                className="w-full cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-white/40 font-mono">
+                <span>-180° (左後方)</span>
+                <span>0° (正面)</span>
+                <span>+180° (右後方)</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-black/30 border border-white/10 space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-white/70">垂直仰角 (Elevation 高さ角度)</span>
+                <span className="font-mono font-bold text-white">{spatialDetails.elevationDeg}°</span>
+              </div>
+              <input
+                type="range"
+                min={-45}
+                max={45}
+                step={1}
+                value={spatialDetails.elevationDeg}
+                onChange={(e) => updateSpatialDetails({ elevationDeg: Number(e.target.value) })}
+                style={{ accentColor: resolvedAccentHex }}
+                className="w-full cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-white/40 font-mono">
+                <span>-45° (下方)</span>
+                <span>0° (耳の高さ)</span>
+                <span>+45° (頭上)</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-black/30 border border-white/10 space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-white/70">音源距離 (Distance 奥行き)</span>
+                <span className="font-mono font-bold text-white">
+                  {spatialDetails.distanceMeters.toFixed(1)} m
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0.5}
+                max={5.0}
+                step={0.1}
+                value={spatialDetails.distanceMeters}
+                onChange={(e) => updateSpatialDetails({ distanceMeters: Number(e.target.value) })}
+                style={{ accentColor: resolvedAccentHex }}
+                className="w-full cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-white/40 font-mono">
+                <span>0.5m (耳元)</span>
+                <span>2.0m (標準)</span>
+                <span>5.0m (ホール奥)</span>
+              </div>
+            </div>
+
+            <div className="p-3 rounded-xl bg-black/30 border border-white/10 space-y-1.5">
+              <div className="flex justify-between text-xs">
+                <span className="text-white/70">ステレオ拡張幅 (Stereo Width)</span>
+                <span className="font-mono font-bold text-white">{spatialDetails.stereoWidth}%</span>
+              </div>
+              <input
+                type="range"
+                min={50}
+                max={200}
+                step={5}
+                value={spatialDetails.stereoWidth}
+                onChange={(e) => updateSpatialDetails({ stereoWidth: Number(e.target.value) })}
+                style={{ accentColor: resolvedAccentHex }}
+                className="w-full cursor-pointer"
+              />
+              <div className="flex justify-between text-[10px] text-white/40 font-mono">
+                <span>50% (ナロー)</span>
+                <span>100% (原音)</span>
+                <span>200% (超ワイド)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Acoustic Character & Psychoacoustic Sliders */}
+        <div className="space-y-3 pt-1">
+          <div className="text-xs font-bold text-white/80">
+            3. 空間残響・低域LFE・ボーカル明瞭度・超高域Air調整
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="p-3 rounded-xl bg-black/30 border border-white/10 space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-white/70">空間リバーブ量 (Wet)</span>
+                <span className="font-mono text-white">{spatialDetails.reverbWet}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={spatialDetails.reverbWet}
+                onChange={(e) => updateSpatialDetails({ reverbWet: Number(e.target.value) })}
+                style={{ accentColor: resolvedAccentHex }}
+                className="w-full cursor-pointer"
+              />
+            </div>
+
+            <div className="p-3 rounded-xl bg-black/30 border border-white/10 space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-white/70">残響ディケイ時間</span>
+                <span className="font-mono text-white">{spatialDetails.roomDecaySec.toFixed(1)}s</span>
+              </div>
+              <input
+                type="range"
+                min={0.2}
+                max={6.0}
+                step={0.1}
+                value={spatialDetails.roomDecaySec}
+                onChange={(e) => updateSpatialDetails({ roomDecaySec: Number(e.target.value) })}
+                style={{ accentColor: resolvedAccentHex }}
+                className="w-full cursor-pointer"
+              />
+            </div>
+
+            <div className="p-3 rounded-xl bg-black/30 border border-white/10 space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-white/70">バイノーラル Crossfeed</span>
+                <span className="font-mono text-white">{spatialDetails.crossfeed}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={spatialDetails.crossfeed}
+                onChange={(e) => updateSpatialDetails({ crossfeed: Number(e.target.value) })}
+                style={{ accentColor: resolvedAccentHex }}
+                className="w-full cursor-pointer"
+              />
+            </div>
+
+            <div className="p-3 rounded-xl bg-black/30 border border-white/10 space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-white/70">LFE 重低音ブースト (55Hz)</span>
+                <span className="font-mono text-white">
+                  {spatialDetails.subBassBoostDb >= 0 ? `+${spatialDetails.subBassBoostDb}` : spatialDetails.subBassBoostDb} dB
+                </span>
+              </div>
+              <input
+                type="range"
+                min={-6}
+                max={12}
+                step={0.5}
+                value={spatialDetails.subBassBoostDb}
+                onChange={(e) => updateSpatialDetails({ subBassBoostDb: Number(e.target.value) })}
+                style={{ accentColor: resolvedAccentHex }}
+                className="w-full cursor-pointer"
+              />
+            </div>
+
+            <div className="p-3 rounded-xl bg-black/30 border border-white/10 space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-white/70">ボーカル定位明瞭度 (2.8kHz)</span>
+                <span className="font-mono text-white">
+                  {spatialDetails.vocalClarityDb >= 0 ? `+${spatialDetails.vocalClarityDb}` : spatialDetails.vocalClarityDb} dB
+                </span>
+              </div>
+              <input
+                type="range"
+                min={-6}
+                max={12}
+                step={0.5}
+                value={spatialDetails.vocalClarityDb}
+                onChange={(e) => updateSpatialDetails({ vocalClarityDb: Number(e.target.value) })}
+                style={{ accentColor: resolvedAccentHex }}
+                className="w-full cursor-pointer"
+              />
+            </div>
+
+            <div className="p-3 rounded-xl bg-black/30 border border-white/10 space-y-1">
+              <div className="flex justify-between text-xs">
+                <span className="text-white/70">超高域 Air 輝き (12kHz)</span>
+                <span className="font-mono text-white">
+                  {spatialDetails.airBrillianceDb >= 0 ? `+${spatialDetails.airBrillianceDb}` : spatialDetails.airBrillianceDb} dB
+                </span>
+              </div>
+              <input
+                type="range"
+                min={-6}
+                max={12}
+                step={0.5}
+                value={spatialDetails.airBrillianceDb}
+                onChange={(e) => updateSpatialDetails({ airBrillianceDb: Number(e.target.value) })}
+                style={{ accentColor: resolvedAccentHex }}
+                className="w-full cursor-pointer"
+              />
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -2605,6 +3108,188 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       )}
 
       {/* ===================================================================
+          USER CUSTOM PLAYLIST CREATION MODAL (自分でプレイリスト作成)
+         =================================================================== */}
+      {showCreatePlaylistModal && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-xl animate-fadeIn"
+          onClick={() => setShowCreatePlaylistModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-2xl apple-liquid-glass border border-white/20 p-6 shadow-2xl space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h2 className="text-lg font-bold text-white">新しいプレイリストを作成</h2>
+                <p className="text-xs text-white/55 mt-0.5">
+                  自分だけのオリジナルプレイリストを作成して楽曲を自由に追加できます
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCreatePlaylistModal(false)}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/75"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateCustomPlaylist} className="space-y-3.5">
+              <div>
+                <label className="text-xs text-white/75 block mb-1 font-semibold">
+                  プレイリスト名
+                </label>
+                <input
+                  value={newPlaylistTitle}
+                  onChange={(e) => setNewPlaylistTitle(e.target.value)}
+                  placeholder={`マイプレイリスト #${userPlaylists.length + 1}`}
+                  autoFocus
+                  className="w-full px-3.5 py-2 rounded-xl bg-black/50 border border-white/15 text-xs sm:text-sm text-white outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs text-white/75 block mb-1 font-semibold">
+                  説明・メモ (任意)
+                </label>
+                <input
+                  value={newPlaylistDesc}
+                  onChange={(e) => setNewPlaylistDesc(e.target.value)}
+                  placeholder="作業用BGM、ドライブ用、お気に入り曲など"
+                  className="w-full px-3.5 py-2 rounded-xl bg-black/50 border border-white/15 text-xs text-white outline-none"
+                />
+              </div>
+
+              {currentTrack && (
+                <label className="flex items-center gap-2.5 p-2.5 rounded-xl bg-white/[0.05] border border-white/10 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeCurrentTrackInNew}
+                    onChange={(e) => setIncludeCurrentTrackInNew(e.target.checked)}
+                    style={{ accentColor: resolvedAccentHex }}
+                    className="rounded"
+                  />
+                  <span className="text-xs text-white/85 truncate">
+                    現在選択中の曲「{currentTrack.title}」を最初の曲として追加する
+                  </span>
+                </label>
+              )}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePlaylistModal(false)}
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-semibold text-white/80"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  style={{ backgroundColor: resolvedAccentHex }}
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-white shadow-lg transition"
+                >
+                  作成する
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================
+          ADD TRACK TO USER PLAYLIST MODAL (+PL Picker)
+         =================================================================== */}
+      {trackForPlaylistPicker && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-xl animate-fadeIn"
+          onClick={() => setTrackForPlaylistPicker(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-2xl apple-liquid-glass border border-white/20 p-6 shadow-2xl space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div className="min-w-0">
+                <h2 className="text-base font-bold text-white truncate">
+                  プレイリストに曲を追加
+                </h2>
+                <p className="text-xs text-white/60 truncate mt-0.5">
+                  対象曲: {trackForPlaylistPicker.title} — {trackForPlaylistPicker.artist}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTrackForPlaylistPicker(null)}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/75"
+              >
+                ✕
+              </button>
+            </div>
+
+            {userPlaylists.length === 0 ? (
+              <div className="py-6 text-center space-y-3">
+                <p className="text-xs text-white/60">
+                  まだカスタムプレイリストがありません。新しく作成してこの曲を追加しましょう！
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const target = trackForPlaylistPicker;
+                    setTrackForPlaylistPicker(null);
+                    const customPl: MusicCollectionViewData = {
+                      id: `pl-user-${Date.now()}`,
+                      kind: 'PLAYLIST',
+                      title: 'マイプレイリスト #1',
+                      subtitle: '自分で作成したカスタムプレイリスト',
+                      creator: 'あなた (Glassium User)',
+                      year: new Date().getFullYear(),
+                      artworkUrl: target.artworkUrl || '',
+                      coverGradient: 'from-cyan-600 via-blue-900 to-slate-950',
+                      sourceService: 'カスタム作成',
+                      tracks: [target],
+                    };
+                    setUserPlaylists((prev) => [customPl, ...prev]);
+                    setSelectedCollection(customPl);
+                    setActiveNav('collection-detail');
+                    setStatusBanner(`「マイプレイリスト #1」を作成し、「${target.title}」を追加しました`);
+                  }}
+                  style={{ backgroundColor: resolvedAccentHex }}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold text-white shadow-lg"
+                >
+                  + 新規プレイリストを作成して追加
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {userPlaylists.map((pl) => (
+                  <button
+                    key={pl.id}
+                    type="button"
+                    onClick={() => handleAddTrackToPlaylist(pl.id, trackForPlaylistPicker)}
+                    className="w-full p-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.14] border border-white/10 flex items-center justify-between text-left transition"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-white truncate">{pl.title}</div>
+                      <div className="text-[10px] text-white/50">
+                        {pl.tracks.length}曲 · {pl.creator}
+                      </div>
+                    </div>
+                    <span
+                      style={{ backgroundColor: resolvedAccentHex }}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold text-white shrink-0"
+                    >
+                      + 追加
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================
           ARTWORK-ADAPTIVE MOVING GRADIENT ENGINE
          =================================================================== */}
       {showMaximizedArtworkBg && (
@@ -2744,44 +3429,70 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               })}
             </div>
 
-            {/* Your Library & Playlists Section (with External Service Import Button) */}
+            {/* Your Library & Playlists Section (with Create & External Service Import Buttons) */}
             <div className="pt-2 border-t border-white/[0.08] space-y-2">
               <div className="flex items-center justify-between px-2">
                 <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
                   マイライブラリ
                 </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreatePlaylistModal(true)}
+                    style={{ color: resolvedAccentHex }}
+                    className="text-[11px] font-bold hover:underline flex items-center gap-0.5"
+                    title="自分で新しいプレイリストを作成"
+                  >
+                    <span className="material-symbols-rounded text-[15px]">playlist_add</span>
+                    <span>作成</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowImportModal(true)}
+                    className="text-[11px] font-bold text-white/70 hover:text-white hover:underline flex items-center gap-0.5"
+                    title="Spotify / Apple Music / YouTube Music からプレイリストを取り込む"
+                  >
+                    <span className="material-symbols-rounded text-[15px]">add</span>
+                    <span>取込</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePlaylistModal(true)}
+                  className="py-2 px-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 text-left flex items-center gap-2 transition"
+                >
+                  <div
+                    style={{ backgroundColor: `${resolvedAccentHex}28`, color: resolvedAccentHex }}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                  >
+                    <span className="material-symbols-rounded text-[16px]">add</span>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold text-white truncate">新規作成</div>
+                    <div className="text-[9px] text-white/50 truncate">自作リスト</div>
+                  </div>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setShowImportModal(true)}
-                  style={{ color: resolvedAccentHex }}
-                  className="text-[11px] font-bold hover:underline flex items-center gap-0.5"
-                  title="Spotify / Apple Music / YouTube Music からプレイリストを取り込む"
+                  className="py-2 px-2.5 rounded-xl bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 text-left flex items-center gap-2 transition"
                 >
-                  <span className="material-symbols-rounded text-[15px]">add</span>
-                  <span>取込</span>
+                  <div
+                    style={{ backgroundColor: `${resolvedAccentHex}28`, color: resolvedAccentHex }}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
+                  >
+                    <span className="material-symbols-rounded text-[16px]">cloud_download</span>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold text-white truncate">外部取込</div>
+                    <div className="text-[9px] text-white/50 truncate">Spotify等</div>
+                  </div>
                 </button>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setShowImportModal(true)}
-                className="w-full py-2 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.12] border border-white/10 text-left flex items-center gap-2.5 transition"
-              >
-                <div
-                  style={{ backgroundColor: `${resolvedAccentHex}28`, color: resolvedAccentHex }}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                >
-                  <span className="material-symbols-rounded text-[18px]">cloud_download</span>
-                </div>
-                <div className="min-w-0">
-                  <div className="text-xs font-bold text-white truncate">
-                    プレイリスト取込
-                  </div>
-                  <div className="text-[10px] text-white/50 truncate">
-                    Spotify / Apple / YouTube
-                  </div>
-                </div>
-              </button>
 
               {/* Playlists, Albums, EPs, Singles quick list */}
               <div className="space-y-1 max-h-56 overflow-y-auto pr-0.5">
@@ -2899,11 +3610,20 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    onClick={() => setShowCreatePlaylistModal(true)}
+                    style={{ backgroundColor: resolvedAccentHex }}
+                    className="px-3.5 py-1.5 rounded-full text-xs font-bold text-white flex items-center gap-1.5 shadow-md transition"
+                  >
+                    <span className="material-symbols-rounded text-[16px]">playlist_add</span>
+                    <span>+ 自分でプレイリスト作成</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setShowImportModal(true)}
                     className="px-3.5 py-1.5 rounded-full bg-white/[0.08] hover:bg-white/[0.15] border border-white/15 text-xs font-semibold text-white flex items-center gap-1.5 transition"
                   >
                     <span className="material-symbols-rounded text-[16px]">cloud_download</span>
-                    <span>他サービスからプレイリスト取込</span>
+                    <span>他サービスから取込</span>
                   </button>
                   <button
                     type="button"
@@ -3196,6 +3916,27 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   title="シャッフル再生"
                 >
                   <span className="material-symbols-rounded text-xl">shuffle</span>
+                </button>
+
+                {selectedCollection.id.startsWith('pl-user-') && currentTrack && (
+                  <button
+                    type="button"
+                    onClick={() => handleAddTrackToPlaylist(selectedCollection.id, currentTrack)}
+                    style={{ backgroundColor: `${resolvedAccentHex}30`, borderColor: resolvedAccentHex }}
+                    className="px-4 py-2 rounded-full border text-xs font-bold text-white flex items-center gap-1.5 transition"
+                  >
+                    <span className="material-symbols-rounded text-sm">add</span>
+                    <span>再生中の曲「{currentTrack.title}」をここに追加</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowCreatePlaylistModal(true)}
+                  className="px-4 py-2 rounded-full bg-white/[0.06] hover:bg-white/[0.14] border border-white/15 text-xs font-semibold text-white flex items-center gap-1.5 transition"
+                >
+                  <span className="material-symbols-rounded text-sm">playlist_add</span>
+                  <span>新規プレイリスト作成</span>
                 </button>
 
                 <button
@@ -3523,6 +4264,9 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                     onStatusMessage={(msg) => setStatusBanner(msg)}
                   />
                 </section>
+
+                {/* Section 2.5: 3D 立体音響 (HRTF Spatial Audio) 詳細設定 */}
+                {renderSpatialAudioDetailPanel()}
 
                 {/* Section 3: 歌詞翻訳 & 外部プレイリスト連携 */}
                 <section className="rounded-2xl apple-liquid-glass border border-white/15 p-5 space-y-4">
@@ -3987,6 +4731,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 currentTrackGenre={currentTrack.genre}
                 onStatusMessage={(msg) => setStatusBanner(msg)}
               />
+              {renderSpatialAudioDetailPanel()}
             </div>
           )}
 

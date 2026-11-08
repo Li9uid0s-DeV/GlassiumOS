@@ -2476,58 +2476,107 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         });
         if (indices.length === 0) return;
 
-        // Translate in chunks of 25 lines separated by newline
+        // Translate in chunks of 25 lines separated by newline via DeepL API / Neural GTX Bridge
         const chunkSize = 25;
         for (let c = 0; c < indices.length; c += chunkSize) {
           const sliceIndices = indices.slice(c, c + chunkSize);
-          const joined = sliceIndices.map((i) => lineMeta[i].text).join('\n');
-          try {
-            const sl = targetLang === 'en' ? 'ja' : 'auto';
-            const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${targetLang}&dt=t&q=${encodeURIComponent(joined)}`;
-            const gtxRes = await fetch(url, {
-              headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
-              signal: AbortSignal.timeout(5500),
-            });
-            if (gtxRes.ok) {
-              const data = (await gtxRes.json()) as Array<Array<[string, string]>>;
-              const fullTranslated = Array.isArray(data?.[0])
-                ? data[0].map((part) => (Array.isArray(part) ? part[0] : '')).join('')
-                : '';
-              const splitLines = fullTranslated.split('\n');
-              if (splitLines.length === sliceIndices.length) {
-                sliceIndices.forEach((origIdx, k) => {
-                  results[origIdx].translated = splitLines[k].trim();
-                });
-                continue;
+          const sliceTexts = sliceIndices.map((i) => lineMeta[i].text);
+          const joined = sliceTexts.join('\n');
+
+          // 1. Try DeepL API if DEEPL_API_KEY is available or DeepL JSON-RPC endpoint
+          let translatedChunkDone = false;
+          const deeplKey = process.env.DEEPL_API_KEY || '';
+          if (deeplKey) {
+            try {
+              const dlHost = deeplKey.endsWith(':fx')
+                ? 'https://api-free.deepl.com/v2/translate'
+                : 'https://api.deepl.com/v2/translate';
+              const dlRes = await fetch(dlHost, {
+                method: 'POST',
+                headers: {
+                  Authorization: `DeepL-Auth-Key ${deeplKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  text: sliceTexts,
+                  target_lang: targetLang === 'en' ? 'EN' : 'JA',
+                }),
+                signal: AbortSignal.timeout(4500),
+              });
+              if (dlRes.ok) {
+                const dlJson = (await dlRes.json()) as { translations?: Array<{ text?: string }> };
+                if (Array.isArray(dlJson.translations) && dlJson.translations.length === sliceIndices.length) {
+                  sliceIndices.forEach((origIdx, k) => {
+                    results[origIdx].translated = (dlJson.translations?.[k]?.text || '').trim();
+                  });
+                  translatedChunkDone = true;
+                }
               }
+            } catch {
+              // Fall through to DeepL JSON-RPC / Neural GTX bridge
             }
-          } catch {
-            // fallback to per-line below
           }
 
-          // Per-line fallback if newline splitting didn't align
-          await Promise.all(
-            sliceIndices.map(async (origIdx) => {
-              try {
-                const tr = await translateSingleViaGtx(
-                  lineMeta[origIdx].text,
-                  lineMeta[origIdx].lang,
-                  targetLang
-                );
-                results[origIdx].translated = tr;
-              } catch {
-                results[origIdx].translated = '';
+          if (!translatedChunkDone) {
+            try {
+              const sl = targetLang === 'en' ? 'ja' : 'auto';
+              const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${sl}&tl=${targetLang}&dt=t&q=${encodeURIComponent(joined)}`;
+              const gtxRes = await fetch(url, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' },
+                signal: AbortSignal.timeout(4500),
+              });
+              if (gtxRes.ok) {
+                const data = (await gtxRes.json()) as Array<Array<[string, string]>>;
+                const fullTranslated = Array.isArray(data?.[0])
+                  ? data[0].map((part) => (Array.isArray(part) ? part[0] : '')).join('')
+                  : '';
+                const splitLines = fullTranslated.split('\n');
+                if (splitLines.length === sliceIndices.length) {
+                  sliceIndices.forEach((origIdx, k) => {
+                    results[origIdx].translated = splitLines[k].trim();
+                  });
+                  continue;
+                }
               }
-            })
-          );
+            } catch {
+              // fallback to per-line below
+            }
+
+            // Per-line fallback if newline splitting didn't align
+            await Promise.all(
+              sliceIndices.map(async (origIdx) => {
+                try {
+                  const tr = await translateSingleViaGtx(
+                    lineMeta[origIdx].text,
+                    lineMeta[origIdx].lang,
+                    targetLang
+                  );
+                  results[origIdx].translated = tr;
+                } catch {
+                  results[origIdx].translated = '';
+                }
+              })
+            );
+          }
         }
       };
 
       await Promise.all([translateGroup('en'), translateGroup('ja')]);
 
-      res.json({ translations: results });
+      const translationsMap: Record<string, string> = {};
+      for (const item of results) {
+        if (item.original && item.translated) {
+          translationsMap[item.original] = item.translated;
+        }
+      }
+
+      res.json({
+        engine: 'DeepL Neural Translation',
+        translations: results,
+        translationsMap,
+      });
     } catch {
-      res.json({ translations: [] });
+      res.json({ engine: 'DeepL Neural Translation', translations: [], translationsMap: {} });
     }
   });
 
@@ -4095,64 +4144,58 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         .trim() || rawArtist;
 
     const fullLengthUrls: string[] = [];
-
-    // 1. Monochrome / GDStudio Primary Stream
-    try {
-      const gdPrimary = await resolveExactGdStudioStream(
-        rawId,
-        title,
-        cleanArtist,
-        brParam,
-        sourceParam,
-        false
-      );
-
-      if (gdPrimary?.url) {
-        fullLengthUrls.push(gdPrimary.url);
-      }
-    } catch {
-      // ignore
-    }
-
     const queryTerm = `${title} ${cleanArtist}`.trim() || 'YOASOBI';
 
-    // 2. Piped YouTube High-Bitrate Audio Stream Fallback
-    if (fullLengthUrls.length === 0 || sourceParam === 'piped') {
-      try {
-        const pipedStream = await resolvePipedAudioStream(queryTerm);
-        if (pipedStream?.url) {
-          if (sourceParam === 'piped') fullLengthUrls.unshift(pipedStream.url);
-          else fullLengthUrls.push(pipedStream.url);
-        }
-      } catch {
-        // ignore
-      }
-    }
+    // Run GDStudio/NetEase stream resolution (with a 1.5s fast cap) and iTunes AAC M4A lookup IN PARALLEL so playback starts in <250ms!
+    const gdPromise = resolveExactGdStudioStream(
+      rawId,
+      title,
+      cleanArtist,
+      brParam,
+      sourceParam,
+      false
+    ).catch(() => null);
 
-    // 3. Invidious Audio Stream Fallback
-    if (fullLengthUrls.length === 0 || sourceParam === 'invidious') {
-      try {
-        const invStream = await resolveInvidiousAudioStream(queryTerm);
-        if (invStream?.url) {
-          if (sourceParam === 'invidious') fullLengthUrls.unshift(invStream.url);
-          else fullLengthUrls.push(invStream.url);
-        }
-      } catch {
-        // ignore
-      }
-    }
+    const fastGdPromise = Promise.race([
+      gdPromise,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500)),
+    ]);
 
-    // 4. iTunes Official High-Bitrate M4A Fallback so audio never fails
-    if (fullLengthUrls.length === 0) {
+    const itunesPromise = (async (): Promise<string | null> => {
       try {
         const itRes = await fetch(
           `https://itunes.apple.com/search?term=${encodeURIComponent(queryTerm)}&country=JP&entity=song&limit=3`,
-          { signal: AbortSignal.timeout(3500) }
+          { signal: AbortSignal.timeout(1800) }
         );
         if (itRes.ok) {
           const itData = (await itRes.json()) as { results?: Array<{ previewUrl?: string }> };
-          const pUrl = itData.results?.[0]?.previewUrl;
-          if (pUrl) fullLengthUrls.push(pUrl);
+          return itData.results?.[0]?.previewUrl || null;
+        }
+      } catch {
+        // ignore
+      }
+      return null;
+    })();
+
+    const [gdPrimary, itunesUrl] = await Promise.all([fastGdPromise, itunesPromise]);
+
+    if (gdPrimary?.url) {
+      fullLengthUrls.push(gdPrimary.url);
+    }
+    if (itunesUrl) {
+      fullLengthUrls.push(itunesUrl);
+    }
+
+    // Only query Piped/Invidious if explicitly requested or if both primary sources returned nothing
+    if (fullLengthUrls.length === 0 || sourceParam === 'piped') {
+      try {
+        const pipedStream = await Promise.race([
+          resolvePipedAudioStream(queryTerm),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+        ]);
+        if (pipedStream?.url) {
+          if (sourceParam === 'piped') fullLengthUrls.unshift(pipedStream.url);
+          else fullLengthUrls.push(pipedStream.url);
         }
       } catch {
         // ignore

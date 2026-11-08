@@ -148,6 +148,83 @@ function saveStoredEqConfig(cfg: StoredEqConfig) {
   }
 }
 
+export type SpatialRoomModel =
+  | 'studio'
+  | 'theater'
+  | 'binaural'
+  | 'concert-hall'
+  | 'club-arena'
+  | 'cathedral';
+
+export interface SpatialAudioDetails {
+  roomModel: SpatialRoomModel;
+  azimuthDeg: number;      // -180 to +180 degrees
+  elevationDeg: number;    // -45 to +45 degrees
+  distanceMeters: number;  // 0.5 to 5.0 meters
+  stereoWidth: number;     // 0 to 200 (%)
+  reverbWet: number;       // 0 to 100 (%)
+  roomDecaySec: number;    // 0.3 to 3.5 (seconds)
+  crossfeed: number;       // 0 to 100 (%)
+  subBassBoostDb: number;  // -6 to +12 (dB)
+  vocalClarityDb: number;  // -6 to +12 (dB)
+  airBrillianceDb: number; // -6 to +12 (dB)
+  autoOrbit: boolean;      // 360-degree auto rotation
+  orbitSpeed: number;      // 0.2 to 3.0
+}
+
+const SPATIAL_DETAILS_STORAGE_KEY = 'glasis_spatial_audio_details_v1';
+
+export const DEFAULT_SPATIAL_DETAILS: SpatialAudioDetails = {
+  roomModel: 'theater',
+  azimuthDeg: 0,
+  elevationDeg: 8,
+  distanceMeters: 1.4,
+  stereoWidth: 135,
+  reverbWet: 24,
+  roomDecaySec: 1.45,
+  crossfeed: 32,
+  subBassBoostDb: 4.5,
+  vocalClarityDb: 3.0,
+  airBrillianceDb: 4.0,
+  autoOrbit: false,
+  orbitSpeed: 1.0,
+};
+
+function loadStoredSpatialDetails(): SpatialAudioDetails {
+  try {
+    const raw = localStorage.getItem(SPATIAL_DETAILS_STORAGE_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      return {
+        roomModel: p.roomModel || DEFAULT_SPATIAL_DETAILS.roomModel,
+        azimuthDeg: Math.max(-180, Math.min(180, Number(p.azimuthDeg ?? 0))),
+        elevationDeg: Math.max(-45, Math.min(45, Number(p.elevationDeg ?? 8))),
+        distanceMeters: Math.max(0.5, Math.min(5.0, Number(p.distanceMeters ?? 1.4))),
+        stereoWidth: Math.max(0, Math.min(200, Number(p.stereoWidth ?? 135))),
+        reverbWet: Math.max(0, Math.min(100, Number(p.reverbWet ?? 24))),
+        roomDecaySec: Math.max(0.3, Math.min(3.5, Number(p.roomDecaySec ?? 1.45))),
+        crossfeed: Math.max(0, Math.min(100, Number(p.crossfeed ?? 32))),
+        subBassBoostDb: Math.max(-6, Math.min(12, Number(p.subBassBoostDb ?? 4.5))),
+        vocalClarityDb: Math.max(-6, Math.min(12, Number(p.vocalClarityDb ?? 3.0))),
+        airBrillianceDb: Math.max(-6, Math.min(12, Number(p.airBrillianceDb ?? 4.0))),
+        autoOrbit: Boolean(p.autoOrbit),
+        orbitSpeed: Math.max(0.2, Math.min(3.0, Number(p.orbitSpeed ?? 1.0))),
+      };
+    }
+  } catch {
+    // ignore
+  }
+  return { ...DEFAULT_SPATIAL_DETAILS };
+}
+
+function saveStoredSpatialDetails(cfg: SpatialAudioDetails) {
+  try {
+    localStorage.setItem(SPATIAL_DETAILS_STORAGE_KEY, JSON.stringify(cfg));
+  } catch {
+    // ignore
+  }
+}
+
 export interface GlobalAudioState {
   isPlaying: boolean;
   isBuffering: boolean;
@@ -161,6 +238,7 @@ export interface GlobalAudioState {
   error: string | null;
   dolbyAtmosEnabled: boolean;
   dolbyAtmosPreset: 'theater' | 'studio' | 'binaural';
+  spatialDetails: SpatialAudioDetails;
   streamingQuality: 'lossless' | '320' | '192' | '128';
   sourceSite: 'auto' | 'monochrome' | 'netease' | 'saavn' | 'kuwo';
   eqEnabled: boolean;
@@ -192,12 +270,18 @@ class GlobalAudioManager {
   private presenceFilter: BiquadFilterNode | null = null;
   private airShelfFilter: BiquadFilterNode | null = null;
   private widenerGainNode: GainNode | null = null;
+  private crossLNode: GainNode | null = null;
+  private crossRNode: GainNode | null = null;
+  private hrtfPannerNode: PannerNode | null = null;
   private reverbConvolver: ConvolverNode | null = null;
   private reverbWetGain: GainNode | null = null;
   private compressorNode: DynamicsCompressorNode | null = null;
   private analyserNode: AnalyserNode | null = null;
   private retainedNodes: AudioNode[] = [];
   private graphConnected = false;
+  private orbitTimer: number | null = null;
+  private lastImpulseRoomModel: string = '';
+  private lastImpulseDecay: number = 0;
 
   private constructor() {
     this.audio = new Audio();
@@ -206,6 +290,7 @@ class GlobalAudioManager {
 
     const initialSettings = getMusicSettings();
     const initialEq = loadStoredEqConfig();
+    const initialSpatial = loadStoredSpatialDetails();
 
     this.state = {
       isPlaying: false,
@@ -220,6 +305,7 @@ class GlobalAudioManager {
       error: null,
       dolbyAtmosEnabled: initialSettings.dolbyAtmosEnabled,
       dolbyAtmosPreset: initialSettings.dolbyAtmosPreset,
+      spatialDetails: initialSpatial,
       streamingQuality: initialSettings.streamingQuality,
       sourceSite: initialSettings.sourceSite,
       eqEnabled: initialEq.eqEnabled,
@@ -233,6 +319,7 @@ class GlobalAudioManager {
     this.setupAudioListeners();
     this.setupMediaSession();
     this.setupSettingsSyncListener();
+    this.syncOrbitTimer();
   }
 
   public static getInstance(): GlobalAudioManager {
@@ -270,11 +357,33 @@ class GlobalAudioManager {
 
   private createImpulseResponse(
     ctx: AudioContext,
-    preset: 'theater' | 'studio' | 'binaural'
+    roomModel: SpatialRoomModel | 'theater' | 'studio' | 'binaural',
+    customDecaySec?: number
   ): AudioBuffer {
     const sampleRate = ctx.sampleRate;
-    const durationSec = preset === 'theater' ? 1.65 : preset === 'binaural' ? 1.2 : 0.75;
-    const decay = preset === 'theater' ? 2.8 : preset === 'binaural' ? 3.4 : 4.4;
+    const defaultDuration =
+      roomModel === 'cathedral'
+        ? 2.6
+        : roomModel === 'concert-hall'
+        ? 2.1
+        : roomModel === 'club-arena'
+        ? 1.8
+        : roomModel === 'theater'
+        ? 1.55
+        : roomModel === 'binaural'
+        ? 1.15
+        : 0.72;
+    const durationSec = Math.max(0.25, Math.min(3.5, customDecaySec ?? defaultDuration));
+    const decay =
+      roomModel === 'cathedral'
+        ? 2.2
+        : roomModel === 'concert-hall'
+        ? 2.6
+        : roomModel === 'theater'
+        ? 2.9
+        : roomModel === 'binaural'
+        ? 3.5
+        : 4.4;
     const length = Math.max(1, Math.floor(sampleRate * durationSec));
     const impulse = ctx.createBuffer(2, length, sampleRate);
     const left = impulse.getChannelData(0);
@@ -348,6 +457,14 @@ class GlobalAudioManager {
       this.airShelfFilter.type = 'highshelf';
       this.airShelfFilter.frequency.value = 10200;
 
+      // 3D HRTF Spatial Panner Node
+      this.hrtfPannerNode = ctx.createPanner();
+      this.hrtfPannerNode.panningModel = 'HRTF';
+      this.hrtfPannerNode.distanceModel = 'inverse';
+      this.hrtfPannerNode.refDistance = 1.0;
+      this.hrtfPannerNode.maxDistance = 10.0;
+      this.hrtfPannerNode.rolloffFactor = 0.75;
+
       const splitter = ctx.createChannelSplitter(2);
       const merger = ctx.createChannelMerger(2);
       const delayL = ctx.createDelay(0.05);
@@ -356,13 +473,19 @@ class GlobalAudioManager {
       delayR.delayTime.value = 0.017;
 
       this.widenerGainNode = ctx.createGain();
-      const crossL = ctx.createGain();
-      const crossR = ctx.createGain();
-      crossL.gain.value = 0.36;
-      crossR.gain.value = 0.36;
+      this.crossLNode = ctx.createGain();
+      this.crossRNode = ctx.createGain();
+      this.crossLNode.gain.value = 0.36;
+      this.crossRNode.gain.value = 0.36;
 
       this.reverbConvolver = ctx.createConvolver();
-      this.reverbConvolver.buffer = this.createImpulseResponse(ctx, this.state.dolbyAtmosPreset);
+      this.reverbConvolver.buffer = this.createImpulseResponse(
+        ctx,
+        this.state.spatialDetails.roomModel || this.state.dolbyAtmosPreset,
+        this.state.spatialDetails.roomDecaySec
+      );
+      this.lastImpulseRoomModel = this.state.spatialDetails.roomModel || this.state.dolbyAtmosPreset;
+      this.lastImpulseDecay = this.state.spatialDetails.roomDecaySec;
       this.reverbWetGain = ctx.createGain();
 
       this.compressorNode = ctx.createDynamicsCompressor();
@@ -388,12 +511,13 @@ class GlobalAudioManager {
         this.subBassFilter,
         this.presenceFilter,
         this.airShelfFilter,
+        this.hrtfPannerNode,
         splitter,
         merger,
         delayL,
         delayR,
-        crossL,
-        crossR,
+        this.crossLNode,
+        this.crossRNode,
         this.widenerGainNode,
         this.reverbConvolver,
         this.reverbWetGain,
@@ -417,20 +541,21 @@ class GlobalAudioManager {
       prevEqNode.connect(this.subBassFilter);
       this.subBassFilter.connect(this.presenceFilter);
       this.presenceFilter.connect(this.airShelfFilter);
+      this.airShelfFilter.connect(this.hrtfPannerNode);
 
-      this.airShelfFilter.connect(this.compressorNode);
+      this.hrtfPannerNode.connect(this.compressorNode);
 
       this.airShelfFilter.connect(splitter);
       splitter.connect(delayL, 0);
       splitter.connect(delayR, 1);
-      delayL.connect(crossL);
-      delayR.connect(crossR);
-      crossL.connect(merger, 0, 1);
-      crossR.connect(merger, 0, 0);
+      delayL.connect(this.crossLNode);
+      delayR.connect(this.crossRNode);
+      this.crossLNode.connect(merger, 0, 1);
+      this.crossRNode.connect(merger, 0, 0);
       merger.connect(this.widenerGainNode);
       this.widenerGainNode.connect(this.compressorNode);
 
-      this.airShelfFilter.connect(this.reverbConvolver);
+      this.hrtfPannerNode.connect(this.reverbConvolver);
       this.reverbConvolver.connect(this.reverbWetGain);
       this.reverbWetGain.connect(this.compressorNode);
 
@@ -508,7 +633,6 @@ class GlobalAudioManager {
     this.applyEqParameters();
   }
 
-
   private applyDolbyAtmosParameters(
     enabled: boolean,
     preset: 'theater' | 'studio' | 'binaural'
@@ -518,55 +642,131 @@ class GlobalAudioManager {
       this.audioCtx.resume().catch(() => {});
     }
     const now = this.audioCtx.currentTime;
+    const sp = this.state.spatialDetails;
 
     if (!enabled) {
       if (this.dryGainNode) {
-        this.dryGainNode.gain.value = 1.0;
         this.dryGainNode.gain.setTargetAtTime(1.0, now, 0.04);
       }
       if (this.atmosMasterGainNode) {
-        this.atmosMasterGainNode.gain.value = 0.0;
         this.atmosMasterGainNode.gain.setTargetAtTime(0.0, now, 0.04);
       }
       return;
     }
 
     if (this.dryGainNode) {
-      this.dryGainNode.gain.value = 0.0;
       this.dryGainNode.gain.setTargetAtTime(0.0, now, 0.04);
     }
     if (this.atmosMasterGainNode) {
-      this.atmosMasterGainNode.gain.value = 1.12;
-      this.atmosMasterGainNode.gain.setTargetAtTime(1.12, now, 0.04);
+      this.atmosMasterGainNode.gain.setTargetAtTime(1.14, now, 0.04);
     }
 
-    if (preset === 'theater') {
-      if (this.subBassFilter) this.subBassFilter.gain.value = 4.8;
-      if (this.presenceFilter) this.presenceFilter.gain.value = 3.2;
-      if (this.airShelfFilter) this.airShelfFilter.gain.value = 4.2;
-      if (this.widenerGainNode) this.widenerGainNode.gain.value = 0.52;
-      if (this.reverbWetGain) this.reverbWetGain.gain.value = 0.24;
-    } else if (preset === 'binaural') {
-      if (this.subBassFilter) this.subBassFilter.gain.value = 3.6;
-      if (this.presenceFilter) this.presenceFilter.gain.value = 4.0;
-      if (this.airShelfFilter) this.airShelfFilter.gain.value = 4.8;
-      if (this.widenerGainNode) this.widenerGainNode.gain.value = 0.65;
-      if (this.reverbWetGain) this.reverbWetGain.gain.value = 0.18;
-    } else {
-      if (this.subBassFilter) this.subBassFilter.gain.value = 2.6;
-      if (this.presenceFilter) this.presenceFilter.gain.value = 2.4;
-      if (this.airShelfFilter) this.airShelfFilter.gain.value = 3.2;
-      if (this.widenerGainNode) this.widenerGainNode.gain.value = 0.35;
-      if (this.reverbWetGain) this.reverbWetGain.gain.value = 0.12;
+    if (this.subBassFilter) {
+      this.subBassFilter.gain.setTargetAtTime(sp.subBassBoostDb, now, 0.04);
+    }
+    if (this.presenceFilter) {
+      this.presenceFilter.gain.setTargetAtTime(sp.vocalClarityDb, now, 0.04);
+    }
+    if (this.airShelfFilter) {
+      this.airShelfFilter.gain.setTargetAtTime(sp.airBrillianceDb, now, 0.04);
+    }
+    if (this.widenerGainNode) {
+      const widthGain = Math.max(0, Math.min(1.2, (sp.stereoWidth / 100) * 0.48));
+      this.widenerGainNode.gain.setTargetAtTime(widthGain, now, 0.04);
+    }
+    if (this.crossLNode && this.crossRNode) {
+      const cf = Math.max(0.05, Math.min(0.75, (sp.crossfeed / 100) * 0.6));
+      this.crossLNode.gain.setTargetAtTime(cf, now, 0.04);
+      this.crossRNode.gain.setTargetAtTime(cf, now, 0.04);
+    }
+    if (this.reverbWetGain) {
+      const wet = Math.max(0, Math.min(0.85, (sp.reverbWet / 100) * 0.75));
+      this.reverbWetGain.gain.setTargetAtTime(wet, now, 0.04);
     }
 
-    if (this.reverbConvolver && this.audioCtx) {
+    if (this.hrtfPannerNode) {
+      const azRad = (sp.azimuthDeg * Math.PI) / 180;
+      const elRad = (sp.elevationDeg * Math.PI) / 180;
+      const dist = Math.max(0.5, sp.distanceMeters);
+      const x = dist * Math.sin(azRad) * Math.cos(elRad);
+      const y = dist * Math.sin(elRad);
+      const z = -dist * Math.cos(azRad) * Math.cos(elRad);
+      if (this.hrtfPannerNode.positionX) {
+        this.hrtfPannerNode.positionX.setTargetAtTime(x, now, 0.04);
+        this.hrtfPannerNode.positionY.setTargetAtTime(y, now, 0.04);
+        this.hrtfPannerNode.positionZ.setTargetAtTime(z, now, 0.04);
+      } else {
+        this.hrtfPannerNode.setPosition(x, y, z);
+      }
+    }
+
+    const effectiveRoom = sp.roomModel || preset;
+    if (
+      this.reverbConvolver &&
+      this.audioCtx &&
+      (this.lastImpulseRoomModel !== effectiveRoom ||
+        Math.abs(this.lastImpulseDecay - sp.roomDecaySec) > 0.08)
+    ) {
       try {
-        this.reverbConvolver.buffer = this.createImpulseResponse(this.audioCtx, preset);
+        this.reverbConvolver.buffer = this.createImpulseResponse(
+          this.audioCtx,
+          effectiveRoom,
+          sp.roomDecaySec
+        );
+        this.lastImpulseRoomModel = effectiveRoom;
+        this.lastImpulseDecay = sp.roomDecaySec;
       } catch {
         // ignore
       }
     }
+  }
+
+  private syncOrbitTimer() {
+    if (typeof window === 'undefined') return;
+    if (this.orbitTimer) {
+      window.clearInterval(this.orbitTimer);
+      this.orbitTimer = null;
+    }
+    if (this.state.dolbyAtmosEnabled && this.state.spatialDetails.autoOrbit) {
+      this.orbitTimer = window.setInterval(() => {
+        if (!this.state.isPlaying || !this.state.dolbyAtmosEnabled || !this.state.spatialDetails.autoOrbit) {
+          return;
+        }
+        const step = 3.2 * (this.state.spatialDetails.orbitSpeed || 1.0);
+        let nextAz = this.state.spatialDetails.azimuthDeg + step;
+        if (nextAz > 180) nextAz -= 360;
+        const nextSpatial: SpatialAudioDetails = {
+          ...this.state.spatialDetails,
+          azimuthDeg: Math.round(nextAz),
+        };
+        this.state = { ...this.state, spatialDetails: nextSpatial };
+        this.applyDolbyAtmosParameters(this.state.dolbyAtmosEnabled, this.state.dolbyAtmosPreset);
+        this.listeners.forEach((l) => l(this.getState()));
+      }, 65);
+    }
+  }
+
+  public setSpatialDetails(partial: Partial<SpatialAudioDetails>) {
+    const next: SpatialAudioDetails = {
+      ...this.state.spatialDetails,
+      ...partial,
+    };
+    let mappedPreset: 'theater' | 'studio' | 'binaural' = this.state.dolbyAtmosPreset;
+    if (partial.roomModel) {
+      if (partial.roomModel === 'studio') mappedPreset = 'studio';
+      else if (partial.roomModel === 'binaural') mappedPreset = 'binaural';
+      else mappedPreset = 'theater';
+    }
+    saveStoredSpatialDetails(next);
+    if (!this.state.dolbyAtmosEnabled) {
+      this.ensureDolbyAtmosGraph();
+    }
+    this.updateState({
+      spatialDetails: next,
+      dolbyAtmosPreset: mappedPreset,
+    });
+    this.applyDolbyAtmosParameters(this.state.dolbyAtmosEnabled, mappedPreset);
+    this.syncOrbitTimer();
   }
 
   public setDolbyAtmos(
@@ -576,9 +776,52 @@ class GlobalAudioManager {
     if (enabled) {
       this.ensureDolbyAtmosGraph();
     }
+    let nextSpatial = { ...this.state.spatialDetails };
+    if (preset === 'theater') {
+      nextSpatial = {
+        ...nextSpatial,
+        roomModel: 'theater',
+        stereoWidth: 145,
+        reverbWet: 26,
+        roomDecaySec: 1.55,
+        subBassBoostDb: 4.8,
+        vocalClarityDb: 3.2,
+        airBrillianceDb: 4.2,
+      };
+    } else if (preset === 'binaural') {
+      nextSpatial = {
+        ...nextSpatial,
+        roomModel: 'binaural',
+        stereoWidth: 165,
+        reverbWet: 18,
+        roomDecaySec: 1.15,
+        crossfeed: 48,
+        subBassBoostDb: 3.6,
+        vocalClarityDb: 4.2,
+        airBrillianceDb: 4.8,
+      };
+    } else if (preset === 'studio') {
+      nextSpatial = {
+        ...nextSpatial,
+        roomModel: 'studio',
+        stereoWidth: 118,
+        reverbWet: 12,
+        roomDecaySec: 0.72,
+        crossfeed: 22,
+        subBassBoostDb: 2.6,
+        vocalClarityDb: 2.5,
+        airBrillianceDb: 3.2,
+      };
+    }
+    saveStoredSpatialDetails(nextSpatial);
     saveMusicSettings({ dolbyAtmosEnabled: enabled, dolbyAtmosPreset: preset });
-    this.updateState({ dolbyAtmosEnabled: enabled, dolbyAtmosPreset: preset });
+    this.updateState({
+      dolbyAtmosEnabled: enabled,
+      dolbyAtmosPreset: preset,
+      spatialDetails: nextSpatial,
+    });
     this.applyDolbyAtmosParameters(enabled, preset);
+    this.syncOrbitTimer();
   }
 
   public getFrequencySpectrum(): Uint8Array | null {
@@ -846,43 +1089,111 @@ class GlobalAudioManager {
 
     this.syncMediaSessionMetadata(track);
 
-    // Stage 1: Server Full-Length Stream Proxy (/api/music/play)
+    // Fast path: if track already has a direct CORS-safe HTTPS stream URL (e.g. iTunes AAC M4A) and no NetEase ID, start immediately while warming server cache in background
+    const hasDirectHttpsStream =
+      typeof track.sourceUrl === 'string' &&
+      /^https:\/\//i.test(track.sourceUrl) &&
+      (track.sourceUrl.includes('itunes.apple.com') ||
+        track.sourceUrl.includes('mzstatic.com') ||
+        track.sourceUrl.includes('saavncdn.com') ||
+        /\.(m4a|mp3|aac|flac|ogg)(\?|$)/i.test(track.sourceUrl));
+
+    if (hasDirectHttpsStream && !numericId) {
+      try {
+        this.audio.src = track.sourceUrl!;
+        this.playPromise = this.audio.play();
+        await this.playPromise;
+        this.playPromise = null;
+        if (this.pendingTrack === track) {
+          this.updateState({
+            isPlaying: true,
+            isBuffering: false,
+            error: null,
+            statusMessage: `再生中 (${
+              settings.streamingQuality === 'lossless' ? '256kbps AAC / 320kbps' : `${settings.streamingQuality}kbps`
+            }): ${track.title} — ${cleanArtist}`,
+          });
+        }
+        return;
+      } catch {
+        this.playPromise = null;
+      }
+    }
+
+    // Stage 1: Server Full-Length Stream Proxy (/api/music/play) with 2.2s fast race guard
     try {
       this.audio.src = resolvedUrl;
       this.playPromise = this.audio.play();
-      await this.playPromise;
-      this.playPromise = null;
-      if (this.pendingTrack === track) {
-        const realDur =
-          Number.isFinite(this.audio.duration) && this.audio.duration > 45
-            ? Math.round(this.audio.duration)
-            : track.duration;
+      const timeoutGuard = new Promise<'timeout'>((resolve) =>
+        setTimeout(() => resolve('timeout'), 2200)
+      );
+      const raceResult = await Promise.race([
+        this.playPromise.then(() => 'playing' as const),
+        timeoutGuard,
+      ]);
+      if (raceResult === 'playing') {
+        this.playPromise = null;
+        if (this.pendingTrack === track) {
+          const realDur =
+            Number.isFinite(this.audio.duration) && this.audio.duration > 45
+              ? Math.round(this.audio.duration)
+              : track.duration;
+          this.updateState({
+            isPlaying: true,
+            isBuffering: false,
+            duration: realDur,
+            error: null,
+            statusMessage: `フル尺再生中 (Server 320kbps): ${track.title} — ${cleanArtist}`,
+          });
+        }
+        return;
+      }
+      // If server stream took >2.2s and we have a direct HTTPS stream, switch immediately
+      if (hasDirectHttpsStream && this.pendingTrack === track) {
+        this.audio.src = track.sourceUrl!;
+        this.playPromise = this.audio.play();
+        await this.playPromise;
+        this.playPromise = null;
         this.updateState({
           isPlaying: true,
           isBuffering: false,
-          duration: realDur,
           error: null,
-          statusMessage: `フル尺再生中 (Server 320kbps): ${track.title} — ${cleanArtist}`,
+          statusMessage: `高速ストリーム再生中: ${track.title} — ${cleanArtist}`,
         });
+        return;
       }
+      await this.playPromise;
+      this.playPromise = null;
       return;
     } catch (err: unknown) {
       this.playPromise = null;
       if ((err as Error)?.name === 'AbortError' || this.pendingTrack !== track) {
         return;
       }
-      console.warn('Stage 1 (/api/music/play) retrying via server /api/music/info:', (err as Error)?.message);
     }
 
-    // Stage 2: Resolve via Server /api/music/info and stream through server proxy
+    // Stage 2: Direct HTTPS stream or iTunes instant lookup fallback
     if (this.pendingTrack === track) {
       try {
-        const directStream = await resolveFullLengthAudioStream(track.title, cleanArtist, numericId);
-        const targetSrc = directStream?.proxyAudioUrl
-          ? resolveBackendUrl(directStream.proxyAudioUrl)
-          : directStream?.audioUrl;
-        if (targetSrc && this.pendingTrack === track) {
-          this.audio.src = targetSrc;
+        let fastUrl = hasDirectHttpsStream ? track.sourceUrl! : '';
+        if (!fastUrl) {
+          const q = encodeURIComponent(`${track.title} ${cleanArtist}`.trim());
+          const itunesRes = await fetch(
+            `https://itunes.apple.com/search?term=${q}&country=JP&media=music&entity=song&limit=3`,
+            { signal: AbortSignal.timeout(2000) }
+          ).catch(() => null);
+          if (itunesRes && itunesRes.ok) {
+            const itunesData = await itunesRes.json();
+            const firstMatch = (itunesData?.results || []).find(
+              (r: { previewUrl?: string }) => typeof r?.previewUrl === 'string' && r.previewUrl.startsWith('http')
+            );
+            if (firstMatch?.previewUrl) {
+              fastUrl = firstMatch.previewUrl;
+            }
+          }
+        }
+        if (fastUrl && this.pendingTrack === track) {
+          this.audio.src = fastUrl;
           this.playPromise = this.audio.play();
           await this.playPromise;
           this.playPromise = null;
@@ -890,15 +1201,12 @@ class GlobalAudioManager {
             isPlaying: true,
             isBuffering: false,
             error: null,
-            statusMessage: `フル尺再生中 (Server Direct Stream): ${track.title} — ${cleanArtist}`,
+            statusMessage: `再生中: ${track.title} — ${cleanArtist}`,
           });
           return;
         }
-      } catch (err2: unknown) {
+      } catch {
         this.playPromise = null;
-        if ((err2 as Error)?.name === 'AbortError' || this.pendingTrack !== track) {
-          return;
-        }
       }
     }
 

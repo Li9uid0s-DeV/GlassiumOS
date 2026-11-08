@@ -65,7 +65,12 @@ export type FluentIconType =
   | 'wind'
   | 'droplets'
   | 'cloud'
-  | 'entertainment';
+  | 'entertainment'
+  | 'sonicstudio'
+  | 'glassexcel'
+  | 'glassppt'
+  | 'glassnote'
+  | 'tsxrunner';
 
 const ICON_MAP: Record<string, FluentIconType> = {
   // Core Apps & Store IDs
@@ -99,12 +104,11 @@ const ICON_MAP: Record<string, FluentIconType> = {
   studio: 'pentool',
   paint: 'palette',
   'spect-studio': 'palette',
-  sonicstudio: 'volume',
-  glassword: 'notepad',
-  glassexcel: 'grid3x3',
-  glassppt: 'monitor',
-  glassnote: 'notepad',
-  tsxrunner: 'terminal',
+  sonicstudio: 'sonicstudio',
+  glassexcel: 'glassexcel',
+  glassppt: 'glassppt',
+  glassnote: 'glassnote',
+  tsxrunner: 'tsxrunner',
   ShoppingBag: 'appstore',
 
   // Lucide icon name mappings
@@ -1328,6 +1332,142 @@ export function FluentAppIcon({ name, size = 24, className = '', onClick }: Flue
           <circle cx="35" cy="22" r="1.8" fill="#38bdf8" />
           {/* TV Stand Base */}
           <path d="M19 37 L29 37 L26 41 L22 41 Z" fill="#475569" stroke="#ffffff" strokeOpacity="0.3" strokeWidth="0.5" />
+        </>
+      )}
+
+      {/* 60. GLASSIUM SONIC 3D (SPATIAL AUDIO & EQ) */}
+      {type === 'sonicstudio' && (
+        <>
+          <defs>
+            <linearGradient id={g1} x1="5" y1="5" x2="43" y2="43" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#06b6d4" />
+              <stop offset="50%" stopColor="#6366f1" />
+              <stop offset="100%" stopColor="#a855f7" />
+            </linearGradient>
+            <linearGradient id={g2} x1="12" y1="12" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#ffffff" />
+              <stop offset="100%" stopColor="#a5f3fc" />
+            </linearGradient>
+          </defs>
+          <rect x="5" y="5" width="38" height="38" rx="10" fill={`url(#${g1})`} filter={`url(#${sh})`} stroke={`url(#${rim})`} strokeWidth="1.2" />
+          {/* 3D Acoustic Orbit Rings */}
+          <ellipse cx="24" cy="24" rx="15" ry="7.5" transform="rotate(-24 24 24)" fill="none" stroke="#ffffff" strokeOpacity="0.45" strokeWidth="1.4" strokeDasharray="3 2" />
+          <ellipse cx="24" cy="24" rx="15" ry="7.5" transform="rotate(24 24 24)" fill="none" stroke="#38bdf8" strokeOpacity="0.65" strokeWidth="1.4" />
+          {/* Center Equalizer Bars */}
+          <rect x="14.5" y="21" width="3" height="8" rx="1.5" fill={`url(#${g2})`} />
+          <rect x="19.5" y="15" width="3" height="18" rx="1.5" fill={`url(#${g2})`} />
+          <rect x="24.5" y="12" width="3" height="24" rx="1.5" fill="#ffffff" filter={`url(#${bsh})`} />
+          <rect x="29.5" y="17" width="3" height="14" rx="1.5" fill={`url(#${g2})`} />
+          {/* 3D Spatial Node */}
+          <circle cx="36" cy="17" r="2.6" fill="#22d3ee" stroke="#ffffff" strokeWidth="1.2" />
+        </>
+      )}
+
+      {/* 61. GLASSIUM SHEET (EXCEL SPREADSHEET) */}
+      {type === 'glassexcel' && (
+        <>
+          <defs>
+            <linearGradient id={g1} x1="8" y1="5" x2="42" y2="43" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#34d399" />
+              <stop offset="50%" stopColor="#10b981" />
+              <stop offset="100%" stopColor="#047857" />
+            </linearGradient>
+            <linearGradient id={g2} x1="4" y1="13" x2="24" y2="35" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#059669" />
+              <stop offset="100%" stopColor="#064e3b" />
+            </linearGradient>
+          </defs>
+          {/* Main Spreadsheet Board */}
+          <rect x="12" y="6" width="30" height="36" rx="7" fill={`url(#${g1})`} filter={`url(#${sh})`} stroke={`url(#${rim})`} strokeWidth="1.2" />
+          {/* Spreadsheet Cells */}
+          <rect x="19" y="12" width="9" height="5.5" rx="1.5" fill="#ffffff" fillOpacity="0.35" />
+          <rect x="30" y="12" width="8" height="5.5" rx="1.5" fill="#ffffff" fillOpacity="0.65" />
+          <rect x="19" y="19.5" width="9" height="5.5" rx="1.5" fill="#ffffff" fillOpacity="0.5" />
+          <rect x="30" y="19.5" width="8" height="5.5" rx="1.5" fill="#ffffff" fillOpacity="0.85" />
+          <rect x="19" y="27" width="9" height="5.5" rx="1.5" fill="#ffffff" fillOpacity="0.35" />
+          <rect x="30" y="27" width="8" height="5.5" rx="1.5" fill="#a7f3d0" />
+          {/* Floating Glass Emblem */}
+          <rect x="5" y="13" width="20" height="22" rx="5.5" fill={`url(#${g2})`} filter={`url(#${bsh})`} stroke="#6ee7b7" strokeOpacity="0.6" strokeWidth="1.1" />
+          <path d="M11 19L19 29M19 19L11 29" stroke="#ffffff" strokeWidth="2.8" strokeLinecap="round" />
+        </>
+      )}
+
+      {/* 62. GLASSIUM STAGE (POWERPOINT PRESENTATION) */}
+      {type === 'glassppt' && (
+        <>
+          <defs>
+            <linearGradient id={g1} x1="8" y1="6" x2="42" y2="42" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#fb923c" />
+              <stop offset="50%" stopColor="#f97316" />
+              <stop offset="100%" stopColor="#be123c" />
+            </linearGradient>
+            <linearGradient id={g2} x1="4" y1="13" x2="24" y2="35" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#ea580c" />
+              <stop offset="100%" stopColor="#9a3412" />
+            </linearGradient>
+          </defs>
+          {/* Main Presentation Slide Deck */}
+          <rect x="11" y="7" width="32" height="34" rx="8" fill={`url(#${g1})`} filter={`url(#${sh})`} stroke={`url(#${rim})`} strokeWidth="1.2" />
+          {/* Pie Chart & Slide Bars */}
+          <circle cx="30" cy="20" r="7" fill="#ffffff" fillOpacity="0.3" />
+          <path d="M30 20V13A7 7 0 0 1 37 20Z" fill="#ffffff" />
+          <rect x="21" y="31" width="17" height="3" rx="1.5" fill="#ffffff" fillOpacity="0.85" />
+          <rect x="21" y="36" width="11" height="2.5" rx="1.25" fill="#fed7aa" fillOpacity="0.7" />
+          {/* Floating Glass P/Stage Badge */}
+          <rect x="5" y="13" width="19" height="22" rx="5.5" fill={`url(#${g2})`} filter={`url(#${bsh})`} stroke="#fdba74" strokeOpacity="0.6" strokeWidth="1.1" />
+          <path d="M11.5 29.5V18.5H15.8C17.8 18.5 19 19.7 19 21.6C19 23.5 17.8 24.7 15.8 24.7H11.5" fill="none" stroke="#ffffff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      )}
+
+      {/* 63. GLASSIUM NOTE (ONENOTE DIGITAL NOTEBOOK) */}
+      {type === 'glassnote' && (
+        <>
+          <defs>
+            <linearGradient id={g1} x1="8" y1="5" x2="40" y2="43" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#c084fc" />
+              <stop offset="50%" stopColor="#9333ea" />
+              <stop offset="100%" stopColor="#4c1d95" />
+            </linearGradient>
+            <linearGradient id={g2} x1="5" y1="13" x2="24" y2="35" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#7e22ce" />
+              <stop offset="100%" stopColor="#3b0764" />
+            </linearGradient>
+          </defs>
+          {/* Section Tabs on Right */}
+          <rect x="38" y="9" width="5" height="7" rx="2" fill="#f472b6" />
+          <rect x="38" y="18" width="5" height="7" rx="2" fill="#38bdf8" />
+          <rect x="38" y="27" width="5" height="7" rx="2" fill="#34d399" />
+          {/* Main Notebook Body */}
+          <rect x="11" y="6" width="29" height="36" rx="7" fill={`url(#${g1})`} filter={`url(#${sh})`} stroke={`url(#${rim})`} strokeWidth="1.2" />
+          <rect x="22" y="14" width="13" height="2.6" rx="1.3" fill="#ffffff" fillOpacity="0.85" />
+          <rect x="22" y="20" width="13" height="2.6" rx="1.3" fill="#ffffff" fillOpacity="0.65" />
+          <rect x="22" y="26" width="10" height="2.6" rx="1.3" fill="#ffffff" fillOpacity="0.65" />
+          <rect x="22" y="32" width="12" height="2.6" rx="1.3" fill="#e9d5ff" fillOpacity="0.8" />
+          {/* Floating Glass N Badge */}
+          <rect x="5" y="13" width="19" height="22" rx="5.5" fill={`url(#${g2})`} filter={`url(#${bsh})`} stroke="#d8b4fe" strokeOpacity="0.6" strokeWidth="1.1" />
+          <path d="M10.5 29.5V18.5L18.5 29.5V18.5" fill="none" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      )}
+
+      {/* 64. GLASSIUM TSX STUDIO (REACT / TSX COMPILER & SDK) */}
+      {type === 'tsxrunner' && (
+        <>
+          <defs>
+            <linearGradient id={g1} x1="6" y1="6" x2="42" y2="42" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#0f172a" />
+              <stop offset="50%" stopColor="#1e1b4b" />
+              <stop offset="100%" stopColor="#090d16" />
+            </linearGradient>
+          </defs>
+          <rect x="6" y="6" width="36" height="36" rx="9" fill={`url(#${g1})`} filter={`url(#${sh})`} stroke="#38bdf8" strokeOpacity="0.55" strokeWidth="1.3" />
+          {/* React/TSX Atom Orbitals */}
+          <ellipse cx="24" cy="22" rx="13" ry="5.2" transform="rotate(30 24 22)" fill="none" stroke="#38bdf8" strokeWidth="1.5" />
+          <ellipse cx="24" cy="22" rx="13" ry="5.2" transform="rotate(-30 24 22)" fill="none" stroke="#818cf8" strokeWidth="1.5" />
+          <ellipse cx="24" cy="22" rx="13" ry="5.2" fill="none" stroke="#22d3ee" strokeOpacity="0.7" strokeWidth="1.3" />
+          <circle cx="24" cy="22" r="2.6" fill="#38bdf8" />
+          {/* TSX Badge at Bottom */}
+          <rect x="13" y="32" width="22" height="6.5" rx="3" fill="#0284c7" />
+          <path d="M17 34.2H20M18.5 34.2V37.2M23 34.2L26 37.2M26 34.2L23 37.2M28.5 34.2L31 35.7L28.5 37.2" stroke="#ffffff" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
         </>
       )}
 

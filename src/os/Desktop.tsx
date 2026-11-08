@@ -29,7 +29,6 @@ import { GlassiumStudioApp } from './apps/GlassiumStudio';
 import { RetroCadeApp } from './apps/RetroCade';
 import {
   GlassiumSonicStudio,
-  GlassiumWriteApp,
   GlassiumSheetApp,
   GlassiumStageApp,
   GlassiumNoteApp,
@@ -105,8 +104,6 @@ function renderApp(appId: string, payload?: unknown) {
       return <RetroCadeApp />;
     case 'sonicstudio':
       return <GlassiumSonicStudio />;
-    case 'glassword':
-      return <GlassiumWriteApp />;
     case 'glassexcel':
       return <GlassiumSheetApp />;
     case 'glassppt':
@@ -377,6 +374,11 @@ export function Desktop() {
       openApp('explorer', { payload: { folderPath: ['Recycle Bin'] } });
       return;
     }
+    const installedMatch = installedApps.find((a) => a.id === appId || a.appId === appId);
+    if (installedMatch && (installedMatch.isCustom || installedMatch.tsxSource || installedMatch.url || installedMatch.builtInAppId)) {
+      launchInstalledApp(installedMatch.id);
+      return;
+    }
     const wins = windows.filter((w) => w.appId === appId);
     if (wins.length === 0) {
       openApp(appId as AppId);
@@ -476,7 +478,7 @@ export function Desktop() {
     window.addEventListener('pointercancel', onUp);
   };
 
-  const DESKTOP_APPS_LIST = [
+  const CORE_DESKTOP_APPS = [
     { id: 'browser', label: 'Browser', icon: 'browser' },
     { id: 'notepad', label: 'Editor', icon: 'notepad' },
     { id: 'terminal', label: 'Terminal', icon: 'terminal' },
@@ -491,15 +493,23 @@ export function Desktop() {
     { id: 'clock', label: 'Clock', icon: 'clock' },
     { id: 'ai', label: 'AI Assistant', icon: 'ai' },
     { id: 'studio', label: 'Glassium Studio', icon: 'studio' },
-    { id: 'sonicstudio', label: 'Sonic 3D', icon: 'sonicstudio' },
-    { id: 'glassword', label: 'Glassium Write', icon: 'glassword' },
-    { id: 'glassexcel', label: 'Glassium Sheet', icon: 'glassexcel' },
-    { id: 'glassppt', label: 'Glassium Stage', icon: 'glassppt' },
-    { id: 'glassnote', label: 'Glassium Note', icon: 'glassnote' },
-    { id: 'tsxrunner', label: 'TSX Studio', icon: 'tsxrunner' },
     { id: 'paint', label: 'Spect Studio', icon: 'paint' },
     { id: 'taskmanager', label: 'Task Manager', icon: 'taskmanager' },
     { id: 'appstore', label: 'App Store', icon: 'appstore' },
+  ];
+
+  const coreIds = new Set(CORE_DESKTOP_APPS.map((a) => a.id));
+  const downloadedDesktopApps = (installedApps || [])
+    .filter((a) => a && a.id !== 'glassword' && a.appId !== 'glassword' && !coreIds.has(a.id) && !coreIds.has(a.appId))
+    .map((a) => ({
+      id: a.builtInAppId || a.id,
+      label: a.name.replace(/\s*\(.*?\)\s*/g, ''),
+      icon: a.builtInAppId || a.icon || a.id,
+    }));
+
+  const DESKTOP_APPS_LIST = [
+    ...CORE_DESKTOP_APPS,
+    ...downloadedDesktopApps,
     { id: 'recycle', label: 'Trash', icon: 'recycle' },
   ];
 
@@ -1352,7 +1362,7 @@ export function Desktop() {
                     style={{ width: iconPreset.iconPx + 6, height: iconPreset.iconPx + 6 }}
                     className="flex items-center justify-center group-hover:scale-105 transition-transform duration-150 shrink-0 pointer-events-none"
                   >
-                    <Icon name={item.id} size={iconPreset.iconPx} />
+                    <Icon name={item.icon || item.id} size={iconPreset.iconPx} />
                   </div>
                   <span
                     className={`${iconPreset.fontClass} text-center truncate max-w-full px-1 leading-tight select-none pointer-events-none transition-colors duration-150 ${
@@ -2094,7 +2104,7 @@ export function Desktop() {
                     </div>
                   </div>
                   <p className="text-white/75 leading-relaxed">
-                    App StoreのUIを刷新し、ダウンロード時の進捗バー表示に対応。OS全体の音を立体音響化・EQ調整できる「Glassium Sonic 3D」、文書作成「Glassium Write」、表計算「Glassium Sheet」、プレゼン「Glassium Stage」、デジタルノート「Glassium Note」、および独自の.tsxアプリをアップロードして実行できる機能を追加しました。
+                    App StoreのUIを刷新し、ダウンロード時の進捗バー表示に対応。App StoreからOS全体の音を立体音響化・EQ調整できる「Glassium Sonic 3D」、表計算「Glassium Sheet」、プレゼン「Glassium Stage」、デジタルノート「Glassium Note」、および独自の.tsxアプリを開発・アップロードして実行できる「Glassium TSX Studio」をダウンロードできます。
                   </p>
                 </div>
 
