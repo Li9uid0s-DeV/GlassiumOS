@@ -73,15 +73,48 @@ export function wmoCodeToCondition(code: number): { condition: WeatherConditionK
 }
 
 // Map city coordinates
-export const CITY_COORDINATES: Record<string, { lat: number; lon: number; name: string; country: string }> = {
-  tokyo: { lat: 35.6762, lon: 139.6503, name: 'Tokyo', country: 'Japan' },
-  osaka: { lat: 34.6937, lon: 135.5023, name: 'Osaka', country: 'Japan' },
-  sapporo: { lat: 43.0618, lon: 141.3545, name: 'Sapporo', country: 'Japan' },
-  fukuoka: { lat: 33.5904, lon: 130.4017, name: 'Fukuoka', country: 'Japan' },
-  newyork: { lat: 40.7128, lon: -74.006, name: 'New York', country: 'United States' },
-  london: { lat: 51.5074, lon: -0.1278, name: 'London', country: 'United Kingdom' },
-  paris: { lat: 48.8566, lon: 2.3522, name: 'Paris', country: 'France' },
+export const CITY_COORDINATES: Record<
+  string,
+  {
+    lat: number;
+    lon: number;
+    name: string;
+    country: string;
+    defaultCondition?: WeatherConditionKey;
+    defaultTemp?: number;
+  }
+> = {
+  tokyo: { lat: 35.6762, lon: 139.6503, name: 'Tokyo', country: 'Japan', defaultCondition: 'Sunny', defaultTemp: 21 },
+  osaka: { lat: 34.6937, lon: 135.5023, name: 'Osaka', country: 'Japan', defaultCondition: 'Sunny', defaultTemp: 22 },
+  sapporo: { lat: 43.0618, lon: 141.3545, name: 'Sapporo', country: 'Japan', defaultCondition: 'Snow', defaultTemp: -2 },
+  fukuoka: { lat: 33.5904, lon: 130.4017, name: 'Fukuoka', country: 'Japan', defaultCondition: 'Cloudy', defaultTemp: 19 },
+  newyork: { lat: 40.7128, lon: -74.006, name: 'New York', country: 'United States', defaultCondition: 'Cloudy', defaultTemp: 16 },
+  london: { lat: 51.5074, lon: -0.1278, name: 'London', country: 'United Kingdom', defaultCondition: 'Rainy', defaultTemp: 14 },
+  paris: { lat: 48.8566, lon: 2.3522, name: 'Paris', country: 'France', defaultCondition: 'Cloudy', defaultTemp: 17 },
+  'neo-tokyo': { lat: 35.6895, lon: 139.6917, name: 'Neo-Tokyo', country: 'Cyber District', defaultCondition: 'Aurora', defaultTemp: 26 },
+  neotokyo: { lat: 35.6895, lon: 139.6917, name: 'Neo-Tokyo', country: 'Cyber District', defaultCondition: 'Aurora', defaultTemp: 26 },
+  gargantua: { lat: 64.1466, lon: -21.9426, name: 'Gargantua Colony', country: 'Deep Space Station', defaultCondition: 'Cosmic Dust', defaultTemp: 18 },
+  gargantuacolony: { lat: 64.1466, lon: -21.9426, name: 'Gargantua Colony', country: 'Deep Space Station', defaultCondition: 'Cosmic Dust', defaultTemp: 18 },
 };
+
+function conditionToMeta(cond: WeatherConditionKey): { labelJa: string; icon: string; rawCode: number } {
+  switch (cond) {
+    case 'Sunny':
+      return { labelJa: '快晴 (Clear Sky)', icon: 'Sun', rawCode: 0 };
+    case 'Cloudy':
+      return { labelJa: '曇天 (Overcast)', icon: 'Cloud', rawCode: 3 };
+    case 'Rainy':
+      return { labelJa: '降雨 (Rain Showers)', icon: 'CloudRain', rawCode: 61 };
+    case 'Thunderstorm':
+      return { labelJa: '雷雨・嵐 (Thunderstorm)', icon: 'Zap', rawCode: 95 };
+    case 'Snow':
+      return { labelJa: '降雪・吹雪 (Snowfall)', icon: 'Sparkles', rawCode: 71 };
+    case 'Aurora':
+      return { labelJa: '磁気嵐・オーロラ (Aurora)', icon: 'Sparkles', rawCode: 96 };
+    case 'Cosmic Dust':
+      return { labelJa: '星間塵・重力レンズ (Cosmic)', icon: 'Compass', rawCode: 45 };
+  }
+}
 
 /**
  * Fetch weather from multiple forecast models, tally the votes, and return consensus.
@@ -91,187 +124,234 @@ export async function fetchMultiSourceWeatherConsensus(
   customLat?: number,
   customLon?: number
 ): Promise<WeatherConsensusResult> {
-  const normKey = cityIdOrName.toLowerCase().replace(/\s+/g, '');
-  const preset = CITY_COORDINATES[normKey] || {
-    lat: customLat ?? 35.6762,
-    lon: customLon ?? 139.6503,
-    name: cityIdOrName,
-    country: 'Global',
-  };
+  const normKey = cityIdOrName.toLowerCase().replace(/[\s_-]+/g, '');
+  const preset =
+    CITY_COORDINATES[cityIdOrName.toLowerCase()] ||
+    CITY_COORDINATES[normKey] || {
+      lat: customLat ?? 35.6762,
+      lon: customLon ?? 139.6503,
+      name: cityIdOrName,
+      country: 'Global',
+      defaultCondition: 'Sunny' as WeatherConditionKey,
+      defaultTemp: 20,
+    };
 
   const lat = customLat ?? preset.lat;
   const lon = customLon ?? preset.lon;
 
   const predictions: WeatherModelPrediction[] = [];
+  const isSciFiCity =
+    preset.defaultCondition === 'Aurora' || preset.defaultCondition === 'Cosmic Dust';
 
-  // Query Open-Meteo multi-model API
-  try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,surface_pressure,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&models=jma_seamless,ecmwf_ifs025,gfs_seamless,dwd_icon,meteofrance_seamless&timezone=auto`;
-    const res = await fetch(url);
-    if (res.ok) {
-      const data = await res.json();
+  // Query Open-Meteo multi-model API for real Earth cities
+  if (!isSciFiCity) {
+    try {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,surface_pressure,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&models=jma_seamless,ecmwf_ifs025,gfs_seamless,dwd_icon,meteofrance_seamless&timezone=auto`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
 
-      const modelConfigs = [
-        {
-          id: 'jma',
-          name: 'JMA Seamless',
-          agency: '気象庁 (JMA Japan)',
-          country: '日本',
-          key: 'current_jma_seamless',
-        },
-        {
-          id: 'ecmwf',
-          name: 'ECMWF IFS',
-          agency: '欧州中期予報センター (ECMWF)',
-          country: '欧州',
-          key: 'current_ecmwf_ifs025',
-        },
-        {
-          id: 'gfs',
-          name: 'NOAA GFS',
-          agency: '米国海洋大気庁 (NOAA / GFS)',
-          country: 'アメリカ',
-          key: 'current_gfs_seamless',
-        },
-        {
-          id: 'dwd',
-          name: 'DWD ICON',
-          agency: 'ドイツ気象局 (DWD)',
-          country: 'ドイツ',
-          key: 'current_dwd_icon',
-        },
-        {
-          id: 'meteofrance',
-          name: 'Météo-France',
-          agency: 'フランス気象局 (Météo-France)',
-          country: 'フランス',
-          key: 'current_meteofrance_seamless',
-        },
-      ];
+        const modelConfigs = [
+          {
+            id: 'jma',
+            name: 'JMA Seamless',
+            agency: '気象庁 (JMA Japan)',
+            country: '日本',
+            key: 'current_jma_seamless',
+          },
+          {
+            id: 'ecmwf',
+            name: 'ECMWF IFS',
+            agency: '欧州中期予報センター (ECMWF)',
+            country: '欧州',
+            key: 'current_ecmwf_ifs025',
+          },
+          {
+            id: 'gfs',
+            name: 'NOAA GFS',
+            agency: '米国海洋大気庁 (NOAA / GFS)',
+            country: 'アメリカ',
+            key: 'current_gfs_seamless',
+          },
+          {
+            id: 'dwd',
+            name: 'DWD ICON',
+            agency: 'ドイツ気象局 (DWD)',
+            country: 'ドイツ',
+            key: 'current_dwd_icon',
+          },
+          {
+            id: 'meteofrance',
+            name: 'Météo-France',
+            agency: 'フランス気象局 (Météo-France)',
+            country: 'フランス',
+            key: 'current_meteofrance_seamless',
+          },
+        ];
 
-      for (const m of modelConfigs) {
-        const mData = data[m.key] || data.current;
-        if (mData) {
-          const rawCode = mData.weather_code ?? data.current?.weather_code ?? 0;
-          const { condition, labelJa, icon } = wmoCodeToCondition(rawCode);
+        for (const m of modelConfigs) {
+          const mData = data[m.key] || data.current;
+          if (mData) {
+            const rawCode = mData.weather_code ?? data.current?.weather_code ?? 0;
+            const { condition, labelJa, icon } = wmoCodeToCondition(rawCode);
+            predictions.push({
+              sourceId: m.id,
+              sourceName: m.name,
+              agencyLabel: m.agency,
+              country: m.country,
+              condition,
+              conditionLabelJa: labelJa,
+              temp: Math.round(mData.temperature_2m ?? data.current?.temperature_2m ?? (preset.defaultTemp || 20)),
+              humidity: Math.round(mData.relative_humidity_2m ?? data.current?.relative_humidity_2m ?? 50),
+              iconName: icon,
+              rawCode,
+            });
+          }
+        }
+      }
+    } catch {
+      // Open-Meteo multi-model request error, continue to fallback sources
+    }
+
+    // Query wttr.in as secondary independent data source
+    try {
+      const wttrUrl = `https://wttr.in/${encodeURIComponent(preset.name)}?format=j1`;
+      const wttrRes = await fetch(wttrUrl, { signal: AbortSignal.timeout(3500) });
+      if (wttrRes.ok) {
+        const wttrData = await wttrRes.json();
+        const current = wttrData.current_condition?.[0];
+        if (current) {
+          const desc = (current.weatherDesc?.[0]?.value || '').toLowerCase();
+          let cond: WeatherConditionKey = 'Sunny';
+          let lbl = '晴れ (Clear)';
+          let ic = 'Sun';
+
+          if (desc.includes('thunder') || desc.includes('storm')) {
+            cond = 'Thunderstorm';
+            lbl = '雷雨 (Thunderstorm)';
+            ic = 'Zap';
+          } else if (desc.includes('rain') || desc.includes('drizzle') || desc.includes('shower')) {
+            cond = 'Rainy';
+            lbl = '雨 (Rain)';
+            ic = 'CloudRain';
+          } else if (desc.includes('snow') || desc.includes('ice') || desc.includes('sleet')) {
+            cond = 'Snow';
+            lbl = '雪 (Snow)';
+            ic = 'Sparkles';
+          } else if (desc.includes('cloud') || desc.includes('overcast') || desc.includes('fog')) {
+            cond = 'Cloudy';
+            lbl = '曇り (Overcast)';
+            ic = 'Cloud';
+          }
+
           predictions.push({
-            sourceId: m.id,
-            sourceName: m.name,
-            agencyLabel: m.agency,
-            country: m.country,
-            condition,
-            conditionLabelJa: labelJa,
-            temp: Math.round(mData.temperature_2m ?? data.current?.temperature_2m ?? 20),
-            humidity: Math.round(mData.relative_humidity_2m ?? data.current?.relative_humidity_2m ?? 50),
-            iconName: icon,
-            rawCode,
+            sourceId: 'wttr',
+            sourceName: 'wttr.in Global Weather',
+            agencyLabel: 'wttr.in / WMO グローバル大気観測網',
+            country: 'グローバル',
+            condition: cond,
+            conditionLabelJa: lbl,
+            temp: parseInt(current.temp_C, 10) || (preset.defaultTemp ?? 20),
+            humidity: parseInt(current.humidity, 10) || 50,
+            iconName: ic,
+            rawCode: 0,
           });
         }
       }
+    } catch {
+      // wttr.in fallback ignored
     }
-  } catch {
-    // Open-Meteo multi-model request error, continue to fallback sources
   }
 
-  // Query wttr.in as secondary independent data source
-  try {
-    const wttrUrl = `https://wttr.in/${encodeURIComponent(preset.name)}?format=j1`;
-    const wttrRes = await fetch(wttrUrl, { signal: AbortSignal.timeout(4000) });
-    if (wttrRes.ok) {
-      const wttrData = await wttrRes.json();
-      const current = wttrData.current_condition?.[0];
-      if (current) {
-        const desc = (current.weatherDesc?.[0]?.value || '').toLowerCase();
-        let cond: WeatherConditionKey = 'Sunny';
-        let lbl = '晴れ (Clear)';
-        let ic = 'Sun';
-
-        if (desc.includes('thunder') || desc.includes('storm')) {
-          cond = 'Thunderstorm';
-          lbl = '雷雨 (Thunderstorm)';
-          ic = 'Zap';
-        } else if (desc.includes('rain') || desc.includes('drizzle') || desc.includes('shower')) {
-          cond = 'Rainy';
-          lbl = '雨 (Rain)';
-          ic = 'CloudRain';
-        } else if (desc.includes('snow') || desc.includes('ice') || desc.includes('sleet')) {
-          cond = 'Snow';
-          lbl = '雪 (Snow)';
-          ic = 'Sparkles';
-        } else if (desc.includes('cloud') || desc.includes('overcast') || desc.includes('fog')) {
-          cond = 'Cloudy';
-          lbl = '曇り (Overcast)';
-          ic = 'Cloud';
-        }
-
-        predictions.push({
-          sourceId: 'wttr',
-          sourceName: 'wttr.in Global Weather',
-          agencyLabel: 'wttr.in / WMO グローバル大気観測網',
-          country: 'グローバル',
-          condition: cond,
-          conditionLabelJa: lbl,
-          temp: parseInt(current.temp_C, 10) || 20,
-          humidity: parseInt(current.humidity, 10) || 50,
-          iconName: ic,
-          rawCode: 0,
-        });
-      }
-    }
-  } catch {
-    // wttr.in fallback ignored
-  }
-
-  // Fallback defaults if offline / network block
+  // Fallback defaults tailored to the city's meteorological profile if offline or Sci-Fi city
   if (predictions.length === 0) {
+    const baseCond: WeatherConditionKey = preset.defaultCondition || 'Sunny';
+    const baseTemp = preset.defaultTemp ?? 21;
+    const meta = conditionToMeta(baseCond);
+    const altCond: WeatherConditionKey =
+      baseCond === 'Rainy'
+        ? 'Cloudy'
+        : baseCond === 'Cloudy'
+        ? 'Rainy'
+        : baseCond === 'Snow'
+        ? 'Cloudy'
+        : baseCond === 'Aurora'
+        ? 'Thunderstorm'
+        : 'Cloudy';
+    const altMeta = conditionToMeta(altCond);
+
     predictions.push(
       {
         sourceId: 'jma-local',
         sourceName: 'JMA Japan (気象庁)',
         agencyLabel: '気象庁 高解像度数値予報',
         country: '日本',
-        condition: 'Sunny',
-        conditionLabelJa: '快晴 (Clear)',
-        temp: 21,
-        humidity: 48,
-        iconName: 'Sun',
-        rawCode: 0,
+        condition: baseCond,
+        conditionLabelJa: meta.labelJa,
+        temp: baseTemp,
+        humidity: baseCond === 'Rainy' ? 78 : 50,
+        iconName: meta.icon,
+        rawCode: meta.rawCode,
       },
       {
         sourceId: 'ecmwf-local',
         sourceName: 'ECMWF IFS',
         agencyLabel: '欧州中期気象予報センター',
         country: '欧州',
-        condition: 'Sunny',
-        conditionLabelJa: '晴れ / 良好',
-        temp: 22,
-        humidity: 50,
-        iconName: 'Sun',
-        rawCode: 0,
+        condition: baseCond,
+        conditionLabelJa: meta.labelJa,
+        temp: baseTemp + 1,
+        humidity: baseCond === 'Rainy' ? 80 : 52,
+        iconName: meta.icon,
+        rawCode: meta.rawCode,
       },
       {
         sourceId: 'gfs-local',
         sourceName: 'NOAA GFS',
         agencyLabel: '米国国立気象局 (NWS)',
         country: 'アメリカ',
-        condition: 'Sunny',
-        conditionLabelJa: '快晴',
-        temp: 21,
-        humidity: 46,
-        iconName: 'Sun',
-        rawCode: 0,
+        condition: baseCond,
+        conditionLabelJa: meta.labelJa,
+        temp: baseTemp,
+        humidity: baseCond === 'Rainy' ? 76 : 48,
+        iconName: meta.icon,
+        rawCode: meta.rawCode,
       },
       {
         sourceId: 'dwd-local',
         sourceName: 'DWD ICON',
         agencyLabel: 'ドイツ気象局 (DWD)',
         country: 'ドイツ',
-        condition: 'Cloudy',
-        conditionLabelJa: '一部薄曇り',
-        temp: 20,
-        humidity: 55,
-        iconName: 'Cloud',
-        rawCode: 2,
+        condition: altCond,
+        conditionLabelJa: altMeta.labelJa,
+        temp: baseTemp - 1,
+        humidity: 58,
+        iconName: altMeta.icon,
+        rawCode: altMeta.rawCode,
+      },
+      {
+        sourceId: 'meteofrance-local',
+        sourceName: 'Météo-France',
+        agencyLabel: 'フランス気象局 (ARPEGE)',
+        country: 'フランス',
+        condition: baseCond,
+        conditionLabelJa: meta.labelJa,
+        temp: baseTemp,
+        humidity: 54,
+        iconName: meta.icon,
+        rawCode: meta.rawCode,
+      },
+      {
+        sourceId: 'wttr-local',
+        sourceName: 'wttr.in Global',
+        agencyLabel: 'WMO グローバル観測網',
+        country: 'グローバル',
+        condition: baseCond,
+        conditionLabelJa: meta.labelJa,
+        temp: baseTemp,
+        humidity: 52,
+        iconName: meta.icon,
+        rawCode: meta.rawCode,
       }
     );
   }
@@ -294,7 +374,7 @@ export async function fetchMultiSourceWeatherConsensus(
   });
 
   // Pick condition with highest vote count
-  let winner: WeatherConditionKey = 'Sunny';
+  let winner: WeatherConditionKey = preset.defaultCondition || 'Sunny';
   let maxVotes = -1;
 
   (Object.keys(tally) as WeatherConditionKey[]).forEach((cond) => {
@@ -314,9 +394,7 @@ export async function fetchMultiSourceWeatherConsensus(
     predictions.reduce((acc, p) => acc + (p.humidity || 50), 0) / Math.max(1, predictions.length)
   );
 
-  const metaWinner = wmoCodeToCondition(
-    winner === 'Sunny' ? 0 : winner === 'Cloudy' ? 3 : winner === 'Rainy' ? 61 : winner === 'Thunderstorm' ? 95 : 71
-  );
+  const metaWinner = conditionToMeta(winner);
 
   return {
     city: preset.name,

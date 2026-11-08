@@ -12,6 +12,135 @@ import {
 } from './proxyService';
 import { resolveBackendUrl } from './backendConfig';
 
+export const EQ_BAND_FREQUENCIES = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000] as const;
+export const EQ_BAND_LABELS = [
+  '32Hz',
+  '64Hz',
+  '125Hz',
+  '250Hz',
+  '500Hz',
+  '1kHz',
+  '2kHz',
+  '4kHz',
+  '8kHz',
+  '16kHz',
+] as const;
+
+export interface EqPresetDefinition {
+  id: string;
+  name: string;
+  desc: string;
+  preampDb: number;
+  bands: number[]; // 10 bands (-12 to +12 dB)
+}
+
+export const BUILTIN_EQ_PRESETS: EqPresetDefinition[] = [
+  {
+    id: 'flat',
+    name: 'Flat (原音モニター)',
+    desc: '色付けなしのフラットなスタジオ原音特性',
+    preampDb: 0,
+    bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  },
+  {
+    id: 'harman',
+    name: 'Harman Target 2024',
+    desc: '人間の聴覚特性に最も心地よいサブベース＋高域の伸び',
+    preampDb: -1.5,
+    bands: [5.5, 4.5, 2.0, -0.5, -1.0, 0.5, 2.5, 3.8, 3.0, 2.5],
+  },
+  {
+    id: 'jpop-vocal',
+    name: 'J-Pop / Vocal Clear',
+    desc: 'ボーカルの息遣いとピアノ・ストリングスを前面に引き出す設定',
+    preampDb: -1.0,
+    bands: [2.0, 2.5, 1.0, -1.5, 1.5, 3.8, 4.2, 3.0, 2.5, 2.0],
+  },
+  {
+    id: 'bass-boost',
+    name: 'Deep Sub-Bass Boost',
+    desc: '32Hz〜125Hzの重低音とキックのアタックを力強く増強',
+    preampDb: -2.5,
+    bands: [7.5, 6.5, 4.5, 1.5, 0, -0.5, 0.5, 1.5, 2.0, 1.5],
+  },
+  {
+    id: 'edm-club',
+    name: 'Electronic / Arena EDM',
+    desc: 'ドンシャリ傾向のクラブサウンドと煌びやかなシンセ高域',
+    preampDb: -2.0,
+    bands: [6.5, 5.5, 2.5, -1.5, -2.0, 0, 2.5, 4.5, 5.5, 5.0],
+  },
+  {
+    id: 'rock-live',
+    name: 'Rock / Live Band',
+    desc: 'エレキギターのエッジ感とバスドラム・スネアの迫力を強調',
+    preampDb: -1.5,
+    bands: [4.5, 3.8, 2.5, -1.0, -0.5, 2.0, 3.8, 4.2, 3.5, 3.0],
+  },
+  {
+    id: 'acoustic-jazz',
+    name: 'Acoustic / Warm Jazz',
+    desc: 'ウッドベースの温かみとアコースティック楽器の自然な倍音',
+    preampDb: -0.5,
+    bands: [3.0, 3.5, 2.0, 1.0, 0.5, 1.0, 1.5, 2.0, 2.8, 2.2],
+  },
+  {
+    id: 'small-speaker-rescue',
+    name: '小型・内蔵スピーカー補正',
+    desc: 'ノートPCやスマホ・小型Bluetoothスピーカーの低域不足と箱鳴りを解消',
+    preampDb: -2.0,
+    bands: [6.0, 7.0, 4.5, -2.0, -2.5, 1.5, 3.2, 3.8, 4.0, 3.5],
+  },
+];
+
+const EQ_STORAGE_KEY = 'glasis_music_eq_v1';
+
+interface StoredEqConfig {
+  eqEnabled: boolean;
+  eqBands: number[];
+  eqPreampDb: number;
+  eqPresetName: string;
+  eqSpeakerModel: string;
+  eqAiAnalysis: string;
+}
+
+function loadStoredEqConfig(): StoredEqConfig {
+  try {
+    const raw = localStorage.getItem(EQ_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.eqBands) && parsed.eqBands.length === 10) {
+        return {
+          eqEnabled: Boolean(parsed.eqEnabled ?? true),
+          eqBands: parsed.eqBands.map((n: unknown) => Math.max(-12, Math.min(12, Number(n) || 0))),
+          eqPreampDb: Math.max(-12, Math.min(12, Number(parsed.eqPreampDb) || 0)),
+          eqPresetName: String(parsed.eqPresetName || 'Harman Target 2024'),
+          eqSpeakerModel: String(parsed.eqSpeakerModel || ''),
+          eqAiAnalysis: String(parsed.eqAiAnalysis || ''),
+        };
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return {
+    eqEnabled: true,
+    eqBands: [...BUILTIN_EQ_PRESETS[1].bands],
+    eqPreampDb: BUILTIN_EQ_PRESETS[1].preampDb,
+    eqPresetName: BUILTIN_EQ_PRESETS[1].name,
+    eqSpeakerModel: '',
+    eqAiAnalysis: '',
+  };
+}
+
+function saveStoredEqConfig(cfg: StoredEqConfig) {
+  try {
+    localStorage.setItem(EQ_STORAGE_KEY, JSON.stringify(cfg));
+  } catch {
+    // ignore
+  }
+}
+
 export interface GlobalAudioState {
   isPlaying: boolean;
   isBuffering: boolean;
@@ -27,6 +156,12 @@ export interface GlobalAudioState {
   dolbyAtmosPreset: 'theater' | 'studio' | 'binaural';
   streamingQuality: 'lossless' | '320' | '192' | '128';
   sourceSite: 'auto' | 'monochrome' | 'netease' | 'saavn' | 'kuwo';
+  eqEnabled: boolean;
+  eqBands: number[];
+  eqPreampDb: number;
+  eqPresetName: string;
+  eqSpeakerModel: string;
+  eqAiAnalysis: string;
 }
 
 type AudioListener = (state: GlobalAudioState) => void;
@@ -39,9 +174,11 @@ class GlobalAudioManager {
   private playPromise: Promise<void> | null = null;
   private pendingTrack: MonochromeTrack | null = null;
 
-  // Web Audio API Dolby Atmos 3D Spatial Audio Graph (retained to prevent V8 GC)
+  // Web Audio API Dolby Atmos 3D Spatial Audio + 10-Band Parametric EQ Graph
   private audioCtx: AudioContext | null = null;
   private sourceNode: MediaElementAudioSourceNode | null = null;
+  private eqPreampNode: GainNode | null = null;
+  private eqFilterNodes: BiquadFilterNode[] = [];
   private dryGainNode: GainNode | null = null;
   private atmosMasterGainNode: GainNode | null = null;
   private subBassFilter: BiquadFilterNode | null = null;
@@ -61,6 +198,7 @@ class GlobalAudioManager {
     this.audio.crossOrigin = 'anonymous';
 
     const initialSettings = getMusicSettings();
+    const initialEq = loadStoredEqConfig();
 
     this.state = {
       isPlaying: false,
@@ -77,6 +215,12 @@ class GlobalAudioManager {
       dolbyAtmosPreset: initialSettings.dolbyAtmosPreset,
       streamingQuality: initialSettings.streamingQuality,
       sourceSite: initialSettings.sourceSite,
+      eqEnabled: initialEq.eqEnabled,
+      eqBands: initialEq.eqBands,
+      eqPreampDb: initialEq.eqPreampDb,
+      eqPresetName: initialEq.eqPresetName,
+      eqSpeakerModel: initialEq.eqSpeakerModel,
+      eqAiAnalysis: initialEq.eqAiAnalysis,
     };
 
     this.setupAudioListeners();
@@ -154,12 +298,32 @@ class GlobalAudioManager {
         this.audioCtx.resume().catch(() => {});
       }
       if (this.graphConnected) {
+        this.applyEqParameters();
         this.applyDolbyAtmosParameters(this.state.dolbyAtmosEnabled, this.state.dolbyAtmosPreset);
         return;
       }
 
       const ctx = this.audioCtx;
       this.sourceNode = ctx.createMediaElementSource(this.audio);
+
+      // 10-Band Parametric Equalizer Preamp + BiquadFilter Chain
+      this.eqPreampNode = ctx.createGain();
+      this.eqPreampNode.gain.value = 1.0;
+
+      this.eqFilterNodes = EQ_BAND_FREQUENCIES.map((freq, idx) => {
+        const filter = ctx.createBiquadFilter();
+        if (idx === 0) {
+          filter.type = 'lowshelf';
+        } else if (idx === EQ_BAND_FREQUENCIES.length - 1) {
+          filter.type = 'highshelf';
+        } else {
+          filter.type = 'peaking';
+          filter.Q.value = 1.4;
+        }
+        filter.frequency.value = freq;
+        filter.gain.value = this.state.eqEnabled ? (this.state.eqBands[idx] || 0) : 0;
+        return filter;
+      });
 
       this.dryGainNode = ctx.createGain();
       this.dryGainNode.gain.value = this.state.dolbyAtmosEnabled ? 0.0 : 1.0;
@@ -211,6 +375,8 @@ class GlobalAudioManager {
       // Retain references so V8 never garbage-collects intermediate nodes
       this.retainedNodes = [
         this.sourceNode,
+        this.eqPreampNode,
+        ...this.eqFilterNodes,
         this.dryGainNode,
         this.subBassFilter,
         this.presenceFilter,
@@ -229,10 +395,19 @@ class GlobalAudioManager {
         this.analyserNode,
       ];
 
-      this.sourceNode.connect(this.dryGainNode);
+      // Connect Source -> EQ Preamp -> 10-Band EQ Chain
+      this.sourceNode.connect(this.eqPreampNode);
+      let prevEqNode: AudioNode = this.eqPreampNode;
+      for (const filterNode of this.eqFilterNodes) {
+        prevEqNode.connect(filterNode);
+        prevEqNode = filterNode;
+      }
+
+      // Connect end of 10-band EQ chain to both dry stereo path and Dolby Atmos 3D path
+      prevEqNode.connect(this.dryGainNode);
       this.dryGainNode.connect(this.analyserNode);
 
-      this.sourceNode.connect(this.subBassFilter);
+      prevEqNode.connect(this.subBassFilter);
       this.subBassFilter.connect(this.presenceFilter);
       this.presenceFilter.connect(this.airShelfFilter);
 
@@ -257,11 +432,75 @@ class GlobalAudioManager {
       this.analyserNode.connect(ctx.destination);
 
       this.graphConnected = true;
+      this.applyEqParameters();
       this.applyDolbyAtmosParameters(this.state.dolbyAtmosEnabled, this.state.dolbyAtmosPreset);
     } catch (e) {
-      console.warn('Dolby Atmos WebAudio init fallback to native output:', e);
+      console.warn('Dolby Atmos / EQ WebAudio init fallback to native output:', e);
     }
   }
+
+  private applyEqParameters() {
+    if (!this.graphConnected || !this.audioCtx) return;
+    if (this.audioCtx.state === 'suspended') {
+      this.audioCtx.resume().catch(() => {});
+    }
+    const now = this.audioCtx.currentTime;
+    const enabled = this.state.eqEnabled;
+
+    if (this.eqPreampNode) {
+      const targetLinear = enabled ? Math.pow(10, (this.state.eqPreampDb || 0) / 20) : 1.0;
+      this.eqPreampNode.gain.setTargetAtTime(targetLinear, now, 0.03);
+    }
+
+    this.eqFilterNodes.forEach((node, idx) => {
+      const targetDb = enabled ? Math.max(-12, Math.min(12, this.state.eqBands[idx] || 0)) : 0;
+      node.gain.setTargetAtTime(targetDb, now, 0.03);
+    });
+  }
+
+  public setEqualizer(config: {
+    enabled?: boolean;
+    bands?: number[];
+    preampDb?: number;
+    presetName?: string;
+    speakerModel?: string;
+    aiAnalysis?: string;
+  }) {
+    this.ensureDolbyAtmosGraph();
+    const nextEnabled = config.enabled !== undefined ? config.enabled : this.state.eqEnabled;
+    const nextBands =
+      config.bands && config.bands.length === 10
+        ? config.bands.map((v) => Math.max(-12, Math.min(12, Math.round(Number(v) * 10) / 10)))
+        : this.state.eqBands;
+    const nextPreamp =
+      config.preampDb !== undefined
+        ? Math.max(-12, Math.min(12, Math.round(Number(config.preampDb) * 10) / 10))
+        : this.state.eqPreampDb;
+    const nextPresetName = config.presetName !== undefined ? config.presetName : this.state.eqPresetName;
+    const nextSpeaker = config.speakerModel !== undefined ? config.speakerModel : this.state.eqSpeakerModel;
+    const nextAnalysis = config.aiAnalysis !== undefined ? config.aiAnalysis : this.state.eqAiAnalysis;
+
+    this.updateState({
+      eqEnabled: nextEnabled,
+      eqBands: nextBands,
+      eqPreampDb: nextPreamp,
+      eqPresetName: nextPresetName,
+      eqSpeakerModel: nextSpeaker,
+      eqAiAnalysis: nextAnalysis,
+    });
+
+    saveStoredEqConfig({
+      eqEnabled: nextEnabled,
+      eqBands: nextBands,
+      eqPreampDb: nextPreamp,
+      eqPresetName: nextPresetName,
+      eqSpeakerModel: nextSpeaker,
+      eqAiAnalysis: nextAnalysis,
+    });
+
+    this.applyEqParameters();
+  }
+
 
   private applyDolbyAtmosParameters(
     enabled: boolean,
@@ -528,7 +767,7 @@ class GlobalAudioManager {
         new CustomEvent('glassium-media-focus', { detail: { source: 'music' } })
       );
     }
-    if (this.state.dolbyAtmosEnabled || this.graphConnected) {
+    if (this.state.dolbyAtmosEnabled || this.state.eqEnabled || this.graphConnected) {
       this.ensureDolbyAtmosGraph();
     }
 

@@ -38,6 +38,7 @@ export function AIAssistant() {
 
   const [expanded, setExpanded] = useState(false);
   const [chatInput, setChatInput] = useState('');
+  const [searchFilter, setSearchFilter] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
@@ -51,10 +52,16 @@ export function AIAssistant() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (expanded) {
+    if (expanded && !searchFilter.trim()) {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [chatMessages, isThinking, expanded]);
+  }, [chatMessages, isThinking, expanded, searchFilter]);
+
+  const visibleMessages = chatMessages.filter((msg) => {
+    const q = searchFilter.trim().toLowerCase();
+    if (!q) return true;
+    return msg.text.toLowerCase().includes(q);
+  });
 
   const sendMessage = async (textToSend: string) => {
     const trimmed = textToSend.trim();
@@ -134,6 +141,7 @@ export function AIAssistant() {
   };
 
   const clearChat = () => {
+    setSearchFilter('');
     setChatMessages([
       {
         id: `welcome-${Date.now()}`,
@@ -170,7 +178,7 @@ export function AIAssistant() {
                   className="liquid-glass-card fixed top-3 right-3 bottom-14 z-[5200] w-84 sm:w-96 max-w-[calc(100vw-24px)] flex flex-col justify-between p-4 shadow-2xl"
                 >
               {/* Header */}
-              <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
+              <div className="flex items-center justify-between pb-2.5 border-b border-white/10 shrink-0">
                 <div className="flex items-center gap-2.5">
                   <div className="h-8 w-8 rounded-xl glass-jelly flex items-center justify-center text-sky-300">
                     <Icon name="Bot" size={16} />
@@ -205,8 +213,31 @@ export function AIAssistant() {
                 </div>
               </div>
 
+              {/* Search Bar for Chat Messages */}
+              <div className="pt-2 pb-1.5 border-b border-white/5 shrink-0">
+                <div className="flex items-center gap-2 glass-panel rounded-xl px-2.5 py-1.5 border border-white/10 focus-within:border-sky-400/40">
+                  <Icon name="Search" size={13} className="text-sky-300 shrink-0" />
+                  <input
+                    type="text"
+                    value={searchFilter}
+                    onChange={(e) => setSearchFilter(e.target.value)}
+                    placeholder="会話メッセージを検索..."
+                    className="flex-1 bg-transparent text-[11px] text-white placeholder:text-white/40 outline-none"
+                  />
+                  {searchFilter && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchFilter('')}
+                      className="text-white/50 hover:text-white p-0.5"
+                    >
+                      <Icon name="X" size={12} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* Quick Prompt Chips */}
-              <div className="py-2.5 border-b border-white/5 shrink-0 overflow-x-auto no-scrollbar flex items-center gap-1.5">
+              <div className="py-2 border-b border-white/5 shrink-0 overflow-x-auto no-scrollbar flex items-center gap-1.5">
                 {QUICK_PROMPTS.map((qp, idx) => (
                   <button
                     key={idx}
@@ -220,7 +251,12 @@ export function AIAssistant() {
 
               {/* Chat Messages Body */}
               <div className="flex-1 min-h-0 overflow-y-auto py-3 space-y-3">
-                {chatMessages.map((msg) => (
+                {visibleMessages.length === 0 ? (
+                  <div className="text-center py-8 text-xs text-white/50">
+                    「{searchFilter}」に一致するメッセージはありません
+                  </div>
+                ) : (
+                  visibleMessages.map((msg) => (
                   <div
                     key={msg.id}
                     className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
@@ -246,7 +282,8 @@ export function AIAssistant() {
                       )}
                     </div>
                   </div>
-                ))}
+                ))
+                )}
 
                 {isThinking && (
                   <div className="flex items-center gap-2 px-3 py-2 rounded-xl glass-panel w-fit text-xs text-white/80">

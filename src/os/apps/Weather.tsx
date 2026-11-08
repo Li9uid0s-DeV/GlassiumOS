@@ -221,6 +221,7 @@ export function WeatherApp() {
   };
 
   useEffect(() => {
+    setConsensusData(null);
     loadConsensus(city.name);
   }, [city.name]);
 
@@ -232,47 +233,61 @@ export function WeatherApp() {
   const handleRefresh = () => {
     playSound('click');
     setRefreshing(true);
+    setPreviewCondition(null);
     loadConsensus(city.name);
     setTimeout(() => setRefreshing(false), 800);
   };
 
-  const activeCondition: WeatherConditionKey =
-    previewCondition ??
-    (consensusData ? consensusData.consensusCondition : (city.condition as WeatherConditionKey));
+  // Automatically select background based on consensus weather (or city's weather while loading)
+  const autoDetectedCondition: WeatherConditionKey = consensusData
+    ? consensusData.consensusCondition
+    : (city.condition as WeatherConditionKey);
+
+  const activeCondition: WeatherConditionKey = previewCondition ?? autoDetectedCondition;
 
   return (
     <div className="h-full w-full flex flex-col bg-slate-950 text-white select-none overflow-y-auto relative">
-      {/* VINTAGE ANDROID WEATHER LIVE ANIMATED SKY BACKGROUND */}
+      {/* THREE.JS + RUST/WASM 3D VOLUMETRIC WEATHER SKY & TERRAIN ENGINE */}
       <VintageAndroidWeatherSky condition={activeCondition} />
 
       {/* Top Header & City Switcher Bar */}
-      <div className="p-4 border-b border-white/[0.08] bg-slate-900/60 backdrop-blur-2xl flex flex-wrap items-center justify-between gap-3 shrink-0 sticky top-0 z-20 shadow-md">
+      <div className="p-4 border-b border-white/[0.1] bg-slate-950/80 flex flex-wrap items-center justify-between gap-3 shrink-0 sticky top-0 z-20 shadow-md">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-400/20 flex items-center justify-center text-cyan-400 shadow">
+          <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center text-cyan-400 shadow">
             <Icon name="CloudSun" size={18} />
           </div>
           <div>
             <div className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
-              <span>Weather</span>
+              <span>Weather 3D</span>
               <span className="text-white/40 font-normal">·</span>
-              <span className="text-xs text-white/75 font-normal">{city.name}, {city.country}</span>
+              <span className="text-xs text-white/75 font-normal">
+                {city.name}, {city.country}
+              </span>
             </div>
-            <p className="text-[11px] text-white/40 font-mono">
-              {consensusData ? `多機関照合済み: ${consensusData.updatedAt}` : 'マルチモデル集計中...'}
+            <p className="text-[11px] text-white/55 font-mono">
+              {consensusData
+                ? `多機関照合済み (${consensusData.updatedAt}) · 3D背景: ${
+                    previewCondition ? `プレビュー (${previewCondition})` : `天気に自動連動 (${autoDetectedCondition})`
+                  }`
+                : 'マルチモデル集計中...'}
             </p>
           </div>
         </div>
 
         {/* City Select Segmented Control */}
-        <div className="flex items-center gap-1 bg-white/[0.06] p-1 rounded-xl border border-white/10 backdrop-blur-md">
+        <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-white/15">
           {CITIES.map((c) => (
             <button
               key={c.id}
-              onClick={() => { playSound('click'); setSelectedCityId(c.id); setPreviewCondition(null); }}
+              onClick={() => {
+                playSound('click');
+                setSelectedCityId(c.id);
+                setPreviewCondition(null);
+              }}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
                 c.id === selectedCityId
-                  ? 'bg-white/20 text-white font-bold shadow-sm'
-                  : 'text-white/60 hover:text-white hover:bg-white/[0.06]'
+                  ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
+                  : 'text-white/65 hover:text-white hover:bg-white/[0.08]'
               }`}
             >
               {c.name}
@@ -282,16 +297,20 @@ export function WeatherApp() {
 
         {/* Unit Toggle and Refresh */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="flex rounded-lg bg-white/[0.06] p-0.5 border border-white/[0.08]">
+          <div className="flex rounded-lg bg-slate-900/90 p-0.5 border border-white/15">
             <button
               onClick={() => setUnit('C')}
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${unit === 'C' ? 'bg-cyan-500 text-black font-bold' : 'text-white/60 hover:text-white'}`}
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
+                unit === 'C' ? 'bg-cyan-500 text-black font-bold' : 'text-white/60 hover:text-white'
+              }`}
             >
               °C
             </button>
             <button
               onClick={() => setUnit('F')}
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${unit === 'F' ? 'bg-cyan-500 text-black font-bold' : 'text-white/60 hover:text-white'}`}
+              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
+                unit === 'F' ? 'bg-cyan-500 text-black font-bold' : 'text-white/60 hover:text-white'
+              }`}
             >
               °F
             </button>
@@ -299,7 +318,9 @@ export function WeatherApp() {
 
           <button
             onClick={handleRefresh}
-            className={`p-1.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] transition cursor-pointer ${refreshing ? 'animate-spin text-cyan-400' : 'text-white/70'}`}
+            className={`p-1.5 rounded-lg bg-slate-900/90 border border-white/15 hover:bg-slate-800 transition cursor-pointer ${
+              refreshing ? 'animate-spin text-cyan-400' : 'text-white/75'
+            }`}
             title="最新データを再集計"
           >
             <Icon name="RotateCw" size={14} />
@@ -307,19 +328,35 @@ export function WeatherApp() {
         </div>
       </div>
 
-      {/* VINTAGE ANDROID WEATHER ANIMATION PREVIEW SELECTOR */}
+      {/* THREE.JS 3D WEATHER BACKGROUND AUTO-SYNC & SCENE SELECTOR */}
       <div className="relative z-10 px-6 pt-4 max-w-5xl mx-auto w-full flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2 text-xs font-semibold text-white/90">
-          <span className="material-symbols-rounded text-sm text-cyan-400">animation</span>
-          <span>昔のAndroid風 背景アニメーション切替:</span>
+        <div className="flex items-center gap-2 text-xs font-semibold text-white/95 bg-slate-950/75 px-3 py-1.5 rounded-xl border border-white/15">
+          <span className="material-symbols-rounded text-sm text-cyan-400">view_in_ar</span>
+          <span>Three.js + Rust 立体3D気象背景:</span>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              playSound('click');
+              setPreviewCondition(null);
+            }}
+            className={`px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border cursor-pointer ${
+              previewCondition === null
+                ? 'bg-emerald-400 text-slate-950 border-emerald-300 shadow-md'
+                : 'bg-slate-950/75 hover:bg-slate-900 text-white/80 border-white/15'
+            }`}
+          >
+            <Icon name="Compass" size={13} />
+            <span>自動連動 ({autoDetectedCondition})</span>
+          </button>
           {[
-            { id: 'Sunny' as const, label: '快晴・光彩', icon: 'Sun', color: 'text-amber-400' },
-            { id: 'Rainy' as const, label: '豪雨・ワイパー', icon: 'CloudRain', color: 'text-cyan-400' },
-            { id: 'Thunderstorm' as const, label: '雷雨・稲妻', icon: 'Zap', color: 'text-purple-300' },
-            { id: 'Cloudy' as const, label: '曇天・流雲', icon: 'Cloud', color: 'text-slate-300' },
-            { id: 'Snow' as const, label: '吹雪・氷晶', icon: 'Sparkles', color: 'text-sky-200' },
+            { id: 'Sunny' as const, label: '快晴・3D太陽', icon: 'Sun', color: 'text-amber-400' },
+            { id: 'Rainy' as const, label: '豪雨・3D雨滴', icon: 'CloudRain', color: 'text-cyan-400' },
+            { id: 'Thunderstorm' as const, label: '雷雨・3D稲妻', icon: 'Zap', color: 'text-purple-300' },
+            { id: 'Cloudy' as const, label: '曇天・3D立体雲', icon: 'Cloud', color: 'text-slate-300' },
+            { id: 'Snow' as const, label: '吹雪・3D氷晶', icon: 'Sparkles', color: 'text-sky-200' },
+            { id: 'Aurora' as const, label: 'オーロラ・3D磁気嵐', icon: 'Sparkles', color: 'text-emerald-300' },
           ].map((sc) => (
             <button
               key={sc.id}
@@ -329,12 +366,16 @@ export function WeatherApp() {
                 setPreviewCondition(sc.id === previewCondition ? null : sc.id);
               }}
               className={`px-2.5 py-1 rounded-xl text-xs font-medium transition flex items-center gap-1.5 border cursor-pointer ${
-                activeCondition === sc.id
+                previewCondition === sc.id
                   ? 'bg-cyan-400 text-slate-950 font-black border-cyan-300 shadow-md scale-105'
-                  : 'bg-black/40 hover:bg-black/60 text-white/80 border-white/10 backdrop-blur-md'
+                  : 'bg-slate-950/75 hover:bg-slate-900 text-white/80 border-white/15'
               }`}
             >
-              <Icon name={sc.icon} size={13} className={activeCondition === sc.id ? 'text-slate-950' : sc.color} />
+              <Icon
+                name={sc.icon}
+                size={13}
+                className={previewCondition === sc.id ? 'text-slate-950' : sc.color}
+              />
               <span>{sc.label}</span>
             </button>
           ))}
@@ -344,7 +385,7 @@ export function WeatherApp() {
       {/* Main Weather Display Hero */}
       <div className="relative z-10 p-6 max-w-5xl mx-auto w-full space-y-5">
         {/* MULTI-SOURCE WEATHER CONSENSUS ENSEMBLE DASHBOARD */}
-        <div className="rounded-2xl p-5 bg-slate-900/60 border border-white/15 shadow-2xl backdrop-blur-2xl space-y-3.5">
+        <div className="rounded-2xl p-5 bg-slate-950/75 border border-white/15 shadow-2xl space-y-3.5">
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-400 to-emerald-400 text-slate-950 flex items-center justify-center font-black shadow">
@@ -358,7 +399,7 @@ export function WeatherApp() {
                   </span>
                 </div>
                 <div className="text-[11px] text-white/60">
-                  気象庁(JMA)・欧州中期予報(ECMWF)・米国NOAA・ドイツ気象局・仏Météo・wttr.in を同時照合し、一番予想された数が多い天気を採用
+                  気象庁(JMA)・欧州中期予報(ECMWF)・米国NOAA・ドイツ気象局・仏Météo・wttr.in を同時照合し、一番予想された数が多い天気を自動選択
                 </div>
               </div>
             </div>
@@ -382,8 +423,8 @@ export function WeatherApp() {
                   key={pred.sourceId}
                   className={`p-3 rounded-xl border transition-all ${
                     isWinnerMatch
-                      ? 'bg-cyan-500/15 border-cyan-400/50 shadow-md ring-1 ring-cyan-400/30'
-                      : 'bg-white/[0.04] border-white/10 opacity-75'
+                      ? 'bg-cyan-500/20 border-cyan-400/60 shadow-md ring-1 ring-cyan-400/30'
+                      : 'bg-slate-900/75 border-white/10 opacity-80'
                   }`}
                 >
                   <div className="text-[10px] font-mono text-white/50 truncate">{pred.country}</div>
@@ -404,18 +445,15 @@ export function WeatherApp() {
         </div>
 
         {/* Hero Card */}
-        <div className="relative rounded-2xl p-6 sm:p-8 overflow-hidden bg-gradient-to-br from-cyan-950/40 via-slate-900/70 to-blue-950/50 border border-white/15 shadow-2xl backdrop-blur-2xl">
-          {/* Ambient weather aura */}
-          <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-
+        <div className="relative rounded-2xl p-6 sm:p-8 overflow-hidden bg-slate-950/70 border border-white/15 shadow-2xl">
           <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div>
               <div className="text-cyan-400 text-xs font-medium tracking-wide mb-1 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                <span>最頻出コンセンサス観測</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                <span>最頻出コンセンサス観測 · Three.js 3D連動中</span>
               </div>
               <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{city.name}</h2>
-              <div className="text-white/70 text-xs mt-1">
+              <div className="text-white/75 text-xs mt-1">
                 {consensusData ? consensusData.consensusLabelJa : city.condition} · 湿度 {city.humidity}% · 気圧 {city.pressure} hPa
               </div>
 
@@ -431,14 +469,36 @@ export function WeatherApp() {
             </div>
 
             {/* Condition Icon Visual Card */}
-            <div className="flex flex-col items-center justify-center p-5 rounded-2xl bg-white/[0.06] border border-white/15 backdrop-blur-xl shadow-lg">
+            <div className="flex flex-col items-center justify-center p-5 rounded-2xl bg-slate-900/85 border border-white/15 shadow-lg">
               <Icon
-                name={activeCondition === 'Sunny' ? 'Sun' : activeCondition === 'Rainy' ? 'CloudRain' : activeCondition === 'Thunderstorm' ? 'Zap' : activeCondition === 'Snow' ? 'Sparkles' : 'CloudSun'}
+                name={
+                  activeCondition === 'Sunny'
+                    ? 'Sun'
+                    : activeCondition === 'Rainy'
+                    ? 'CloudRain'
+                    : activeCondition === 'Thunderstorm'
+                    ? 'Zap'
+                    : activeCondition === 'Snow' || activeCondition === 'Aurora'
+                    ? 'Sparkles'
+                    : 'CloudSun'
+                }
                 size={48}
-                className={activeCondition === 'Sunny' ? 'text-amber-400' : activeCondition === 'Rainy' ? 'text-cyan-400' : activeCondition === 'Thunderstorm' ? 'text-purple-300' : 'text-sky-200'}
+                className={
+                  activeCondition === 'Sunny'
+                    ? 'text-amber-400'
+                    : activeCondition === 'Rainy'
+                    ? 'text-cyan-400'
+                    : activeCondition === 'Thunderstorm'
+                    ? 'text-purple-300'
+                    : 'text-sky-200'
+                }
               />
               <span className="text-xs font-bold text-white mt-2.5">
-                {consensusData ? consensusData.consensusLabelJa : activeCondition}
+                {previewCondition
+                  ? `3D Preview: ${previewCondition}`
+                  : consensusData
+                  ? consensusData.consensusLabelJa
+                  : activeCondition}
               </span>
               <span className="text-[11px] text-white/50 mt-0.5">Air Quality: {city.airQuality.status}</span>
             </div>

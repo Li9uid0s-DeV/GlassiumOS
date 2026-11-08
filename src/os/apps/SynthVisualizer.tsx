@@ -26,6 +26,7 @@ import { useOS } from '../OSContext';
 import { globalAudio } from '../globalAudioManager';
 import { backendFetch } from '../backendConfig';
 import { DrumPadTunerView } from './ExtraAppsSuite';
+import { MusicEqualizerPanel } from './MusicEqualizerPanel';
 import {
   generatePronunciationGuide,
   calculateLeadInState,
@@ -43,6 +44,7 @@ type AppleMusicNavId =
   | 'songs'
   | 'recent'
   | 'lyrics'
+  | 'eq'
   | 'settings'
   | 'monochrome-web'
   | 'synth'
@@ -565,6 +567,7 @@ function resolveMvForTrack(track: MonochromeTrack): MusicVideoItem {
 
 function resolveInitialNav(tab?: string): AppleMusicNavId {
   if (tab === 'drumpad' || tab === 'tuner') return 'drumpad';
+  if (tab === 'eq' || tab === 'equalizer' || tab === 'aieq') return 'eq';
   if (tab === 'mv') return 'mv';
   if (tab === 'artist') return 'artist';
   if (tab === 'lyrics') return 'lyrics';
@@ -2912,6 +2915,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               </div>
               {(
                 [
+                  { id: 'eq', label: 'EQ & AIスピーカー補正', icon: 'graphic_eq' },
                   { id: 'settings', label: '設定 (音質・DL・MV・Atmos)', icon: 'tune' },
                   { id: 'monochrome-web', label: 'api.monochrome.tf Web', icon: 'language' },
                   { id: 'synth', label: 'シンセサイザー', icon: 'piano' },
@@ -4173,6 +4177,30 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             </div>
           )}
 
+          {/* VIEW 12.5: 10-BAND PARAMETRIC EQUALIZER & AI SPEAKER AUTO-EQ STUDIO */}
+          {activeNav === 'eq' && (
+            <div className="flex-1 p-6 sm:p-8 pb-36 overflow-y-auto space-y-6">
+              <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-4">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-cyan-300">
+                    10-Band Web Audio BiquadFilter &amp; Gemini Speaker Calibration
+                  </div>
+                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                    イコライザー &amp; AI スピーカー自動補正 (AIEQ)
+                  </h1>
+                  <p className="text-xs text-white/55 mt-1">
+                    お使いのスピーカーやヘッドホンの機種名を入力してAIで自動補正するか、10バンドの周波数スライダーを手動で調整できます。
+                  </p>
+                </div>
+              </div>
+
+              <MusicEqualizerPanel
+                currentTrackGenre={currentTrack.genre}
+                onStatusMessage={(msg) => setStatusBanner(msg)}
+              />
+            </div>
+          )}
+
           {/* VIEW 13: COMPREHENSIVE MUSIC & DOLBY ATMOS SETTINGS (音質・取得サイト・DL品質・MV画質・Dolby Atmos) */}
           {activeNav === 'settings' && (
             <div className="flex-1 p-6 sm:p-8 pb-36 overflow-y-auto space-y-6">
@@ -4200,6 +4228,12 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   </span>
                 </button>
               </div>
+
+              {/* 0. 10-Band Equalizer & AI Speaker Auto-EQ Studio */}
+              <MusicEqualizerPanel
+                currentTrackGenre={currentTrack.genre}
+                onStatusMessage={(msg) => setStatusBanner(msg)}
+              />
 
               {/* 1. Dolby Atmos 3D Spatial Audio Engine Card */}
               <div className="p-5 rounded-2xl apple-liquid-glass border border-white/15 space-y-4">
@@ -4921,6 +4955,20 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 >
                   <span className="material-symbols-rounded text-[15px]">lyrics</span>
                   <span>歌詞</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveNav(activeNav === 'eq' ? 'browse' : 'eq')}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 whitespace-nowrap border ${
+                    activeNav === 'eq'
+                      ? 'bg-cyan-500 border-cyan-300 text-slate-950 font-black shadow-md'
+                      : 'bg-cyan-500/15 border-cyan-400/35 text-cyan-200 hover:bg-cyan-500/30'
+                  }`}
+                  title="10バンド イコライザー & AIスピーカー自動補正 (AIEQ)"
+                >
+                  <span className="material-symbols-rounded text-[15px]">graphic_eq</span>
+                  <span>EQ / AIEQ</span>
                 </button>
 
                 <button
