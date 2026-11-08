@@ -5,6 +5,7 @@ import { Icon } from './Icon';
 
 interface Props {
   win: WindowState;
+  isHidden?: boolean;
   children: ReactNode;
 }
 
@@ -46,7 +47,7 @@ type SnapZone =
   | 'three-right'
   | null;
 
-export const WindowFrame: React.FC<Props> = ({ win, children }) => {
+export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
   const {
     focusWindow,
     closeWindow,
@@ -282,7 +283,7 @@ export const WindowFrame: React.FC<Props> = ({ win, children }) => {
     };
   }, [dragging, resizing, snapPreview, win.id, updateWindowRect, shellMode]);
 
-  if (win.minimized) return null;
+  const hiddenWindow = Boolean(isHidden || win.minimized || win.closed);
 
   const startDrag = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest('button')) return;
@@ -335,6 +336,7 @@ export const WindowFrame: React.FC<Props> = ({ win, children }) => {
         ...getMaximizedBounds(),
         zIndex: win.zIndex,
         borderRadius: 0,
+        display: hiddenWindow ? 'none' : 'flex',
       }
     : {
         left: win.x,
@@ -342,6 +344,7 @@ export const WindowFrame: React.FC<Props> = ({ win, children }) => {
         width: win.width,
         height: win.height,
         zIndex: win.zIndex,
+        display: hiddenWindow ? 'none' : 'flex',
       };
 
   const isMacMode = shellMode === 'mac';

@@ -48,6 +48,85 @@ interface WikiSearchResult {
   pageid: number;
 }
 
+export type BrowserSkinMode = 'opera-gx' | 'chrome' | 'firefox';
+
+export interface YouTubeProxyVideoItem {
+  videoId: string;
+  title: string;
+  author: string;
+  thumbnail: string;
+  lengthSeconds: number;
+}
+
+const DEFAULT_YOUTUBE_VIDEOS: YouTubeProxyVideoItem[] = [
+  {
+    videoId: 'jfKfPfyJRdk',
+    title: 'lofi hip hop radio 📚 beats to relax/study to',
+    author: 'Lofi Girl',
+    thumbnail: 'https://i.ytimg.com/vi/jfKfPfyJRdk/hqdefault.jpg',
+    lengthSeconds: 0,
+  },
+  {
+    videoId: 'aqz-KE-bpKQ',
+    title: 'Big Buck Bunny 60fps 4K - Blender Open Movie',
+    author: 'Blender Foundation',
+    thumbnail: 'https://i.ytimg.com/vi/aqz-KE-bpKQ/hqdefault.jpg',
+    lengthSeconds: 634,
+  },
+  {
+    videoId: 'LXb3EKWsInQ',
+    title: 'COSTA RICA IN 4K 60fps HDR (Ultra HD)',
+    author: 'Jacob + Katie Schwarz',
+    thumbnail: 'https://i.ytimg.com/vi/LXb3EKWsInQ/hqdefault.jpg',
+    lengthSeconds: 314,
+  },
+  {
+    videoId: 'eRsGyueVLvQ',
+    title: 'Sintel - Third Open Movie by Blender Foundation',
+    author: 'Blender Foundation',
+    thumbnail: 'https://i.ytimg.com/vi/eRsGyueVLvQ/hqdefault.jpg',
+    lengthSeconds: 888,
+  },
+  {
+    videoId: 'mN0zPOpADL4',
+    title: 'Spring - Blender Open Movie',
+    author: 'Blender Studio',
+    thumbnail: 'https://i.ytimg.com/vi/mN0zPOpADL4/hqdefault.jpg',
+    lengthSeconds: 464,
+  },
+  {
+    videoId: 'SkVqJ1SGeL0',
+    title: 'CHARGE - Blender Open Movie',
+    author: 'Blender Studio',
+    thumbnail: 'https://i.ytimg.com/vi/SkVqJ1SGeL0/hqdefault.jpg',
+    lengthSeconds: 225,
+  },
+];
+
+function extractYouTubeVideoId(urlOrId: string): string | null {
+  const s = urlOrId.trim();
+  if (/^[a-zA-Z0-9_-]{11}$/.test(s)) return s;
+  try {
+    const u = new URL(s.startsWith('http') ? s : `https://${s}`);
+    if (u.hostname.includes('youtu.be')) {
+      const id = u.pathname.replace(/^\/+/, '').split('/')[0];
+      if (id && id.length === 11) return id;
+    }
+    if (u.hostname.includes('youtube.com')) {
+      const v = u.searchParams.get('v');
+      if (v && v.length === 11) return v;
+      const parts = u.pathname.split('/').filter(Boolean);
+      const embedIdx = parts.findIndex((p) => p === 'embed' || p === 'shorts' || p === 'v');
+      if (embedIdx !== -1 && parts[embedIdx + 1]?.length === 11) {
+        return parts[embedIdx + 1];
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 function normalizeUrl(input: string): string {
   const v = input.trim();
   if (!v || v === 'about:start' || v === 'about:blank' || v.startsWith('about:')) return v;
@@ -115,6 +194,35 @@ export function BrowserApp({ payload }: Props) {
   const [wikiResults, setWikiResults] = useState<WikiSearchResult[]>([]);
   const [wikiArticle, setWikiArticle] = useState<{ title: string; extract: string; url: string } | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
+
+  // Browser UI Skin ('opera-gx' | 'chrome' | 'firefox') & GX Control state
+  const [browserSkin, setBrowserSkin] = useState<BrowserSkinMode>(() => {
+    try {
+      const saved = localStorage.getItem('glasis_browser_skin') as BrowserSkinMode | null;
+      if (saved === 'opera-gx' || saved === 'chrome' || saved === 'firefox') return saved;
+    } catch {
+      // ignore
+    }
+    return 'opera-gx';
+  });
+  const [gxRamLimiter, setGxRamLimiter] = useState<number>(4);
+  const [gxCpuLimiter, setGxCpuLimiter] = useState<number>(25);
+  const [showGxControlPanel, setShowGxControlPanel] = useState<boolean>(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('glasis_browser_skin', browserSkin);
+    } catch {
+      // ignore
+    }
+  }, [browserSkin]);
+
+  // YouTube Proxy state
+  const [ytQuery, setYtQuery] = useState<string>('lofi hip hop');
+  const [ytVideos, setYtVideos] = useState<YouTubeProxyVideoItem[]>(DEFAULT_YOUTUBE_VIDEOS);
+  const [activeYtVideo, setActiveYtVideo] = useState<YouTubeProxyVideoItem>(DEFAULT_YOUTUBE_VIDEOS[0]);
+  const [ytLoading, setYtLoading] = useState<boolean>(false);
+  const [ytEmbedServer, setYtEmbedServer] = useState<'nocookie' | 'invidious' | 'piped'>('nocookie');
 
   const [logs, setLogs] = useState<{ time: string; text: string; type: 'info' | 'proxy' | 'sec' }[]>([
     { time: '00:00', text: '[Wisp v1] Connected to Wisp Multiplexer (wss://wisp.mercurywork.shop/)', type: 'info' },
@@ -320,6 +428,46 @@ export function BrowserApp({ payload }: Props) {
     [addLog, engine, relayNode, wispServer]
   );
 
+  // Search YouTube videos via backend /api/youtube/search (Invidious + Piped proxy)
+  const searchYouTubeProxy = useCallback(
+    async (query: string) => {
+      const clean = query.trim();
+      if (!clean) return;
+      setYtLoading(true);
+      try {
+        const directId = extractYouTubeVideoId(clean);
+        if (directId) {
+          const customVid: YouTubeProxyVideoItem = {
+            videoId: directId,
+            title: `YouTube Video (${directId})`,
+            author: 'YouTube Direct Proxy',
+            thumbnail: `https://i.ytimg.com/vi/${directId}/hqdefault.jpg`,
+            lengthSeconds: 240,
+          };
+          setActiveYtVideo(customVid);
+          setYtVideos((prev) => [customVid, ...prev.filter((v) => v.videoId !== directId)]);
+          setYtLoading(false);
+          return;
+        }
+
+        const res = await fetch(`/api/youtube/search?q=${encodeURIComponent(clean)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.items) && data.items.length > 0) {
+            setYtVideos(data.items);
+            setActiveYtVideo(data.items[0]);
+            return;
+          }
+        }
+      } catch {
+        // fallback to default filtered list
+      } finally {
+        setYtLoading(false);
+      }
+    },
+    []
+  );
+
   const navigateTo = useCallback(
     (url: string, overrideForceRaw = true) => {
       const norm = normalizeUrl(url);
@@ -332,10 +480,40 @@ export function BrowserApp({ payload }: Props) {
 
       addLog(`[${engine.toUpperCase()} + Wisp] Routing -> ${norm}`, 'proxy');
 
+      const isYtUrl =
+        /(?:youtube\.com|youtu\.be)/i.test(norm) || norm === 'about:youtube';
+
       const willUseGitHubHub = !overrideForceRaw && (norm.includes('github.com') || norm.includes('github.io'));
       const willUseSmartSearch = norm.startsWith('about:search?q=');
 
-      if (willUseGitHubHub) {
+      if (isYtUrl) {
+        const vidId = extractYouTubeVideoId(norm);
+        if (vidId) {
+          const customVid: YouTubeProxyVideoItem = {
+            videoId: vidId,
+            title: `YouTube Video (${vidId})`,
+            author: 'YouTube Proxy Stream',
+            thumbnail: `https://i.ytimg.com/vi/${vidId}/hqdefault.jpg`,
+            lengthSeconds: 240,
+          };
+          setActiveYtVideo(customVid);
+          setYtVideos((prev) => [customVid, ...prev.filter((x) => x.videoId !== vidId)]);
+        } else {
+          try {
+            const u = new URL(norm.startsWith('http') ? norm : `https://www.youtube.com`);
+            const sq = u.searchParams.get('search_query') || u.searchParams.get('q');
+            if (sq) {
+              setYtQuery(sq);
+              searchYouTubeProxy(sq);
+            } else {
+              searchYouTubeProxy(ytQuery);
+            }
+          } catch {
+            searchYouTubeProxy(ytQuery);
+          }
+        }
+        setIsLoading(false);
+      } else if (willUseGitHubHub) {
         const matchRepo = norm.match(/github\.com\/([^/]+\/[^/?#]+)/i);
         if (matchRepo && matchRepo[1]) {
           openGitHubRepoDetail(matchRepo[1]);
@@ -368,6 +546,8 @@ export function BrowserApp({ payload }: Props) {
       relayNode,
       runSmartSearch,
       searchGitHubRepos,
+      searchYouTubeProxy,
+      ytQuery,
       addLog,
     ]
   );
@@ -405,7 +585,7 @@ export function BrowserApp({ payload }: Props) {
       setInputVal(url === 'about:start' || url === 'about:gcs' ? '' : url.replace(/^about:search\?q=/, ''));
       setLoadedUrl(url);
       setFrameError(false);
-      if (url !== 'about:start' && url !== 'about:gcs' && !url.startsWith('about:')) {
+      if (url !== 'about:start' && url !== 'about:gcs' && !url.startsWith('about:') && !/(?:youtube\.com|youtu\.be)/i.test(url)) {
         loadProxiedWebpage(url, relayNode);
       }
     }
@@ -420,14 +600,16 @@ export function BrowserApp({ payload }: Props) {
       setInputVal(url === 'about:start' || url === 'about:gcs' ? '' : url.replace(/^about:search\?q=/, ''));
       setLoadedUrl(url);
       setFrameError(false);
-      if (url !== 'about:start' && url !== 'about:gcs' && !url.startsWith('about:')) {
+      if (url !== 'about:start' && url !== 'about:gcs' && !url.startsWith('about:') && !/(?:youtube\.com|youtu\.be)/i.test(url)) {
         loadProxiedWebpage(url, relayNode);
       }
     }
   };
 
   const refreshPage = () => {
-    if (loadedUrl !== 'about:start' && loadedUrl !== 'about:gcs' && !loadedUrl.startsWith('about:')) {
+    if (/(?:youtube\.com|youtu\.be)/i.test(loadedUrl) || loadedUrl === 'about:youtube') {
+      searchYouTubeProxy(ytQuery);
+    } else if (loadedUrl !== 'about:start' && loadedUrl !== 'about:gcs' && !loadedUrl.startsWith('about:')) {
       loadProxiedWebpage(loadedUrl, relayNode);
     } else if (loadedUrl.startsWith('about:search?q=')) {
       runSmartSearch(decodeURIComponent(loadedUrl.replace('about:search?q=', '')));
@@ -466,18 +648,100 @@ export function BrowserApp({ payload }: Props) {
 
   const isStartPage = loadedUrl === 'about:start';
   const isGcsGatewayPage = loadedUrl === 'about:gcs';
+  const isYouTubeView =
+    /(?:youtube\.com|youtu\.be)/i.test(loadedUrl) || loadedUrl === 'about:youtube';
   const isGitHubView = !forceRawIframe && (loadedUrl.includes('github.com') || loadedUrl.includes('github.io'));
   const isSmartSearchView = !forceRawIframe && loadedUrl.startsWith('about:search?q=');
 
+  // Skin-specific theme styling
+  const skinStyles = {
+    'opera-gx': {
+      shellBg: 'bg-[#0b0512] text-white',
+      tabBarBg: 'bg-[#09030f] border-b border-[#ff1b2d]/40',
+      activeTab: 'bg-[#1a0b26] border-t-2 border-t-[#ff1b2d] text-[#ff4d5e] font-bold',
+      toolbarBg: 'bg-[#12071c] border-b border-[#ff1b2d]/30',
+      omniboxBg: 'bg-[#08020d] border border-[#ff1b2d]/50 rounded-none focus-within:border-[#ff1b2d] focus-within:shadow-[0_0_12px_rgba(255,27,45,0.35)]',
+      accentBtn: 'bg-[#ff1b2d] hover:bg-[#ff3848] text-white font-black',
+      badge: '🎮 OPERA GX CYBER',
+    },
+    chrome: {
+      shellBg: 'bg-[#202124] text-white',
+      tabBarBg: 'bg-[#171717] border-b border-white/10',
+      activeTab: 'bg-[#292a2d] rounded-t-xl text-sky-300 font-semibold',
+      toolbarBg: 'bg-[#292a2d] border-b border-white/10',
+      omniboxBg: 'bg-[#1f2023] border border-transparent rounded-full focus-within:border-sky-400 focus-within:bg-[#171717]',
+      accentBtn: 'bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-full',
+      badge: '🌐 GOOGLE CHROME',
+    },
+    firefox: {
+      shellBg: 'bg-[#1c1b22] text-white',
+      tabBarBg: 'bg-[#15141a] border-b border-purple-500/25',
+      activeTab: 'bg-[#2b2a33] rounded-xl my-1 shadow-md border border-purple-400/40 text-amber-300 font-semibold',
+      toolbarBg: 'bg-[#2b2a33] border-b border-purple-500/20',
+      omniboxBg: 'bg-[#1c1b22] border border-purple-400/35 rounded-xl focus-within:border-amber-400 focus-within:ring-2 focus-within:ring-amber-400/25',
+      accentBtn: 'bg-gradient-to-r from-orange-500 to-purple-600 hover:brightness-110 text-white font-bold rounded-lg',
+      badge: '🦊 MOZILLA FIREFOX',
+    },
+  }[browserSkin];
+
   return (
-    <div className="flex h-full w-full min-w-0 min-h-0 flex-col bg-zinc-950 text-white select-none">
+    <div className={`flex h-full w-full min-w-0 min-h-0 flex-col select-none ${skinStyles.shellBg}`}>
+      {/* Browser Skin Tab Strip & Skin Switcher (Opera GX / Chrome / Firefox) */}
+      <div className={`flex items-center justify-between px-3 pt-1.5 gap-2 ${skinStyles.tabBarBg}`}>
+        <div className="flex items-center gap-1.5 min-w-0 overflow-x-auto">
+          <div className={`px-3.5 py-1.5 text-xs flex items-center gap-2 max-w-[240px] truncate ${skinStyles.activeTab}`}>
+            <Icon name={isYouTubeView ? 'Tv' : isStartPage ? 'Compass' : 'Globe'} size={13} />
+            <span className="truncate">
+              {isYouTubeView
+                ? `YouTube Proxy — ${activeYtVideo.title}`
+                : isStartPage
+                ? `${skinStyles.badge} Start`
+                : loadedUrl}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigateTo('https://www.youtube.com')}
+            className="px-2.5 py-1 text-[11px] rounded-lg bg-rose-500/20 hover:bg-rose-500/35 border border-rose-400/40 text-rose-200 font-bold flex items-center gap-1 shrink-0 cursor-pointer"
+          >
+            <Icon name="Tv" size={12} />
+            <span>YouTube Proxy</span>
+          </button>
+        </div>
+
+        {/* Browser UI Skin Switcher Buttons */}
+        <div className="flex items-center gap-1 pb-1 shrink-0">
+          <span className="text-[10px] font-mono text-white/50 hidden sm:inline mr-1">ブラウザUI切替:</span>
+          {(
+            [
+              { id: 'opera-gx', label: '🎮 Opera GX', activeClass: 'bg-[#ff1b2d] text-white border-[#ff4d5e]' },
+              { id: 'chrome', label: '🌐 Chrome', activeClass: 'bg-sky-400 text-slate-950 border-sky-300' },
+              { id: 'firefox', label: '🦊 Firefox', activeClass: 'bg-gradient-to-r from-orange-500 to-purple-600 text-white border-amber-300' },
+            ] as const
+          ).map((sk) => (
+            <button
+              key={sk.id}
+              type="button"
+              onClick={() => setBrowserSkin(sk.id)}
+              className={`px-2.5 py-1 text-[11px] font-bold border rounded-lg transition cursor-pointer ${
+                browserSkin === sk.id
+                  ? sk.activeClass
+                  : 'bg-white/5 hover:bg-white/15 border-white/10 text-white/70'
+              }`}
+            >
+              {sk.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Top Browser Toolbar */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-white/[0.08] bg-black/60 backdrop-blur-md">
+      <div className={`flex items-center gap-2 px-3 py-2 backdrop-blur-md ${skinStyles.toolbarBg}`}>
         <div className="flex items-center gap-1">
           <button
             onClick={goBack}
             disabled={historyIdx === 0}
-            className="p-1.5 text-white/70 hover:bg-white/10 disabled:opacity-30 transition"
+            className="p-1.5 text-white/70 hover:bg-white/10 disabled:opacity-30 transition rounded-lg"
             title="Back"
           >
             <Icon name="ArrowLeft" size={15} />
@@ -485,21 +749,21 @@ export function BrowserApp({ payload }: Props) {
           <button
             onClick={goForward}
             disabled={historyIdx >= history.length - 1}
-            className="p-1.5 text-white/70 hover:bg-white/10 disabled:opacity-30 transition"
+            className="p-1.5 text-white/70 hover:bg-white/10 disabled:opacity-30 transition rounded-lg"
             title="Forward"
           >
             <Icon name="ArrowRight" size={15} />
           </button>
           <button
             onClick={refreshPage}
-            className={`p-1.5 text-white/70 hover:bg-white/10 transition ${isLoading ? 'animate-spin text-cyan-400' : ''}`}
+            className={`p-1.5 text-white/70 hover:bg-white/10 transition rounded-lg ${isLoading ? 'animate-spin text-cyan-400' : ''}`}
             title="Reload Page"
           >
             <Icon name="RefreshCw" size={14} />
           </button>
           <button
             onClick={() => navigateTo('about:start')}
-            className={`p-1.5 transition ${isStartPage ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10'}`}
+            className={`p-1.5 transition rounded-lg ${isStartPage ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10'}`}
             title="Home"
           >
             <Icon name="Home" size={14} />
@@ -512,11 +776,13 @@ export function BrowserApp({ payload }: Props) {
             e.preventDefault();
             navigateTo(inputVal, true);
           }}
-          className="flex-1 flex items-center gap-2 bg-white/[0.04] border-b border-white/15 px-3 py-1.5 focus-within:border-cyan-400 focus-within:bg-black/70 transition"
+          className={`flex-1 flex items-center gap-2 px-3.5 py-1.5 transition ${skinStyles.omniboxBg}`}
         >
-          <div className="flex items-center gap-1.5 text-white/40">
-            {isStartPage ? (
-              <Icon name="Sparkles" size={14} className="text-cyan-400" />
+          <div className="flex items-center gap-1.5 text-white/60">
+            {browserSkin === 'firefox' ? (
+              <Icon name="Shield" size={13} className="text-purple-400" />
+            ) : browserSkin === 'opera-gx' ? (
+              <Icon name="Zap" size={13} className="text-[#ff1b2d]" />
             ) : (
               <Icon name="Lock" size={13} className="text-emerald-400" />
             )}
@@ -525,7 +791,7 @@ export function BrowserApp({ payload }: Props) {
             type="text"
             value={inputVal}
             onChange={(e) => setInputVal(e.target.value)}
-            placeholder="検索またはURL入力 (例: monochrome.tf, duckduckgo.com, ja.wikipedia.org)..."
+            placeholder="URLまたは検索 (youtube.com, monochrome.tf, 動画キーワード)..."
             className="flex-1 bg-transparent text-xs text-white placeholder-white/40 outline-none font-sans"
           />
           {inputVal && (
@@ -539,7 +805,7 @@ export function BrowserApp({ payload }: Props) {
           )}
           <button
             type="submit"
-            className="px-2.5 py-0.5 bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-300 text-[11px] font-semibold transition"
+            className={`px-3 py-0.5 text-[11px] transition cursor-pointer ${skinStyles.accentBtn}`}
           >
             移動
           </button>
@@ -755,10 +1021,249 @@ export function BrowserApp({ payload }: Props) {
       </div>
 
       {/* Main Content View */}
-      <div className="flex-1 relative bg-zinc-950 min-h-0 overflow-hidden">
+      <div className="flex-1 flex relative bg-zinc-950 min-h-0 overflow-hidden">
+        {/* Opera GX Left Gaming Sidebar */}
+        {browserSkin === 'opera-gx' && (
+          <div className="w-11 shrink-0 bg-[#08020d] border-r border-[#ff1b2d]/35 flex flex-col items-center py-2.5 gap-2.5 z-20">
+            <button
+              type="button"
+              onClick={() => setShowGxControlPanel((v) => !v)}
+              className={`w-8 h-8 flex items-center justify-center border transition cursor-pointer ${
+                showGxControlPanel
+                  ? 'bg-[#ff1b2d] border-[#ff4d5e] text-white shadow-[0_0_10px_rgba(255,27,45,0.6)]'
+                  : 'bg-[#160722] border-[#ff1b2d]/40 text-[#ff4d5e] hover:bg-[#ff1b2d]/20'
+              }`}
+              title="GX Control (RAM / CPU Limiter)"
+            >
+              <Icon name="Cpu" size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigateTo('https://www.youtube.com')}
+              className={`w-8 h-8 flex items-center justify-center border transition cursor-pointer ${
+                isYouTubeView
+                  ? 'bg-[#ff1b2d] border-[#ff4d5e] text-white'
+                  : 'bg-[#160722] border-[#ff1b2d]/30 text-rose-400 hover:bg-[#ff1b2d]/20'
+              }`}
+              title="YouTube Proxy Player"
+            >
+              <Icon name="Tv" size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigateTo('https://monochrome.tf')}
+              className="w-8 h-8 flex items-center justify-center bg-[#160722] border border-[#ff1b2d]/30 text-cyan-300 hover:bg-[#ff1b2d]/20 transition cursor-pointer"
+              title="Monochrome Music"
+            >
+              <Icon name="Music" size={14} />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigateTo('https://github.com', false)}
+              className="w-8 h-8 flex items-center justify-center bg-[#160722] border border-[#ff1b2d]/30 text-purple-300 hover:bg-[#ff1b2d]/20 transition cursor-pointer"
+              title="GitHub Hub"
+            >
+              <Icon name="GitBranch" size={14} />
+            </button>
+          </div>
+        )}
+
+        {/* Opera GX Control Panel Popover */}
+        {browserSkin === 'opera-gx' && showGxControlPanel && (
+          <div className="absolute left-12 top-2 z-30 w-64 bg-[#0d0417]/95 border border-[#ff1b2d] p-4 shadow-[0_0_30px_rgba(255,27,45,0.35)] text-xs space-y-3">
+            <div className="flex items-center justify-between border-b border-[#ff1b2d]/30 pb-2">
+              <span className="font-mono font-bold text-[#ff4d5e] uppercase tracking-wider">
+                GX CONTROL LIMITER
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowGxControlPanel(false)}
+                className="text-white/50 hover:text-white cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="space-y-1">
+              <div className="flex justify-between font-mono text-[11px]">
+                <span className="text-white/70">RAM LIMITER</span>
+                <span className="text-[#ff4d5e] font-bold">{gxRamLimiter} GB / 16 GB</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={16}
+                value={gxRamLimiter}
+                onChange={(e) => setGxRamLimiter(Number(e.target.value))}
+                className="w-full accent-[#ff1b2d] cursor-pointer"
+              />
+            </div>
+            <div className="space-y-1">
+              <div className="flex justify-between font-mono text-[11px]">
+                <span className="text-white/70">CPU LIMITER</span>
+                <span className="text-[#ff4d5e] font-bold">{gxCpuLimiter}%</span>
+              </div>
+              <input
+                type="range"
+                min={10}
+                max={100}
+                step={5}
+                value={gxCpuLimiter}
+                onChange={(e) => setGxCpuLimiter(Number(e.target.value))}
+                className="w-full accent-[#ff1b2d] cursor-pointer"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 relative min-w-0 min-h-0 overflow-hidden">
         {isImage ? (
           <div className="h-full w-full flex items-center justify-center bg-zinc-900 overflow-auto p-4">
             <img src={loadedUrl} alt={address} className="max-w-full max-h-full object-contain shadow-2xl" />
+          </div>
+        ) : isYouTubeView ? (
+          /* Built-in YouTube Proxy Hub (No-Cookie / Invidious / Piped Multi-Server) */
+          <div className="h-full w-full overflow-y-auto p-4 md:p-6 bg-zinc-950 text-white space-y-5">
+            <div className="max-w-5xl mx-auto space-y-5">
+              {/* Top YouTube Proxy Header & Search Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-rose-600 flex items-center justify-center text-white shadow-lg shadow-rose-600/30">
+                    <Icon name="Tv" size={18} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-black tracking-tight">YouTube Proxy Hub</span>
+                      <span className="px-2 py-0.5 text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 rounded-full">
+                        Iframe Block Bypass Active
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-white/55">
+                      YouTube検索・動画ID・URLを直接入力してプロキシ経由で再生できます
+                    </p>
+                  </div>
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    searchYouTubeProxy(ytQuery);
+                  }}
+                  className="flex items-center gap-2 flex-1 max-w-md"
+                >
+                  <input
+                    type="text"
+                    value={ytQuery}
+                    onChange={(e) => setYtQuery(e.target.value)}
+                    placeholder="YouTube動画を検索 または URL / 動画IDを入力..."
+                    className="flex-1 bg-black/60 border border-white/15 rounded-xl px-3.5 py-2 text-xs text-white outline-none focus:border-rose-500"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition cursor-pointer shrink-0"
+                  >
+                    {ytLoading ? '検索中...' : '検索 / 再生'}
+                  </button>
+                </form>
+              </div>
+
+              {/* Active Video Player + Server Switcher */}
+              <div className="rounded-2xl overflow-hidden border border-white/15 bg-black shadow-2xl">
+                <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-zinc-900/90 border-b border-white/10">
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-white truncate">{activeYtVideo.title}</div>
+                    <div className="text-[10px] text-white/50">{activeYtVideo.author} • ID: {activeYtVideo.videoId}</div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-mono text-white/50">再生プロキシ:</span>
+                    {(
+                      [
+                        { id: 'nocookie', label: 'YouTube NoCookie' },
+                        { id: 'invidious', label: 'Invidious Proxy' },
+                        { id: 'piped', label: 'Piped Proxy' },
+                      ] as const
+                    ).map((srv) => (
+                      <button
+                        key={srv.id}
+                        type="button"
+                        onClick={() => setYtEmbedServer(srv.id)}
+                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                          ytEmbedServer === srv.id
+                            ? 'bg-rose-600 text-white'
+                            : 'bg-white/10 text-white/70 hover:bg-white/20'
+                        }`}
+                      >
+                        {srv.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="aspect-video w-full bg-black relative">
+                  <iframe
+                    key={`${activeYtVideo.videoId}-${ytEmbedServer}`}
+                    src={
+                      ytEmbedServer === 'nocookie'
+                        ? `https://www.youtube-nocookie.com/embed/${activeYtVideo.videoId}?autoplay=1&rel=0`
+                        : ytEmbedServer === 'invidious'
+                        ? `https://inv.nadeko.net/embed/${activeYtVideo.videoId}?autoplay=1`
+                        : `https://piped.video/embed/${activeYtVideo.videoId}?autoplay=1`
+                    }
+                    title={activeYtVideo.title}
+                    className="w-full h-full border-0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                    allowFullScreen
+                  />
+                </div>
+              </div>
+
+              {/* Video Results Grid */}
+              <div>
+                <div className="text-xs font-bold text-white/75 mb-3 flex items-center justify-between">
+                  <span>動画一覧（クリックで即座にプロキシ再生）</span>
+                  <span className="text-[11px] font-mono text-white/45">{ytVideos.length} videos</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                  {ytVideos.map((vid) => {
+                    const isCurrent = vid.videoId === activeYtVideo.videoId;
+                    return (
+                      <button
+                        key={vid.videoId}
+                        type="button"
+                        onClick={() => setActiveYtVideo(vid)}
+                        className={`text-left rounded-xl overflow-hidden border transition group cursor-pointer flex flex-col ${
+                          isCurrent
+                            ? 'border-rose-500 bg-rose-500/15 shadow-lg shadow-rose-500/10'
+                            : 'border-white/10 bg-white/[0.03] hover:bg-white/[0.07] hover:border-white/25'
+                        }`}
+                      >
+                        <div className="aspect-video w-full bg-zinc-900 relative overflow-hidden">
+                          <img
+                            src={vid.thumbnail}
+                            alt={vid.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-2.5 justify-between">
+                            <span className="px-2 py-0.5 rounded bg-rose-600 text-white text-[10px] font-bold">
+                              {isCurrent ? '▶ 再生中' : '▶ プロキシ再生'}
+                            </span>
+                            {vid.lengthSeconds > 0 && (
+                              <span className="px-1.5 py-0.5 rounded bg-black/80 text-white text-[10px] font-mono">
+                                {Math.floor(vid.lengthSeconds / 60)}:
+                                {String(vid.lengthSeconds % 60).padStart(2, '0')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="p-3">
+                          <div className="text-xs font-bold text-white line-clamp-2">{vid.title}</div>
+                          <div className="text-[11px] text-white/50 mt-1">{vid.author}</div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
         ) : isGcsGatewayPage ? (
           /* Google Cloud Storage (storage.googleapis.com) Gateway & Launcher */
@@ -1167,6 +1672,7 @@ export function BrowserApp({ payload }: Props) {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

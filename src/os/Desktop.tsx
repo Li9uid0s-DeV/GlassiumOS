@@ -162,6 +162,7 @@ function CustomAppView({ payload }: { payload?: { url?: string; isCustomApp?: bo
 export function Desktop() {
   const {
     windows,
+    mountedWindows,
     wallpaper,
     customWallpapers,
     selectedCustomId,
@@ -1657,8 +1658,12 @@ export function Desktop() {
           ACTIVE FLOATING WINDOWS (Filtered by Current Virtual Desktop)
          ======================================================== */}
       <AnimatePresence>
-        {activeDesktopWindows.map((win) => (
-          <WindowFrame key={win.id} win={win}>
+        {mountedWindows.map((win) => (
+          <WindowFrame
+            key={win.id}
+            win={win}
+            isHidden={Boolean(win.closed || win.minimized || ((win.desktopId || 'desk-1') !== activeDesktopId))}
+          >
             <WindowErrorBoundary key={`${win.id}-${win.appId}`} appTitle={win.title}>
               {renderApp(win.appId, win.payload)}
             </WindowErrorBoundary>

@@ -15,15 +15,26 @@ interface ChatMessage {
 }
 
 const QUICK_PROMPTS = [
-  { label: 'ブラックホールとは？', query: 'ブラックホールとは何か、わかりやすく教えて' },
-  { label: '量子コンピュータの仕組み', query: '量子コンピュータの仕組みを初心者向けに解説して' },
-  { label: 'Reactの書き方', query: 'ReactとTypeScriptの基本的なコンポーネント例を教えて' },
-  { label: '集中力を高めるコツ', query: '勉強や開発の集中力を高める科学的な方法を教えて' },
-  { label: '相対性理論について', query: 'アインシュタインの相対性理論を3行で要約して' },
+  { label: '🎬 映画・アニメを開く', query: '映画を開いて' },
+  { label: '🎵 音楽プレイヤー起動', query: '音楽を開いて' },
+  { label: '🌙 ダーク/ライト切替', query: 'ライトモードにして' },
+  { label: '🍎 macOSモードにする', query: 'macOSモードにして' },
+  { label: '📐 ウィンドウ左右整列', query: 'ウィンドウを左右に整列して' },
 ];
 
 export function AIAssistant() {
-  const { openApp, playSound } = useOS();
+  const {
+    openApp,
+    playSound,
+    setShellMode,
+    setTheme,
+    setWallpaper,
+    setAuroraColor,
+    setVolume,
+    lockSystem,
+    snapAllWindows5050,
+    closeAllWindows,
+  } = useOS();
 
   const [expanded, setExpanded] = useState(false);
   const [chatInput, setChatInput] = useState('');
@@ -32,7 +43,7 @@ export function AIAssistant() {
     {
       id: 'welcome-1',
       sender: 'ai',
-      text: 'こんにちは。純粋なチャット専用AIアシスタントです（OS操作機能は無効化されています）。質問や調べもの、プログラミング、アイデア出しなど何でもお気軽に話しかけてください。',
+      text: 'こんにちは！Glassium AI アシスタントです。「映画を開いて」「macOSモードにして」「壁紙を桜にして」「音量を50にして」などのOS操作や質問に何でも対応します。',
       timestamp: Date.now(),
     },
   ]);
@@ -64,6 +75,32 @@ export function AIAssistant() {
     try {
       const data = await requestAIChat({ message: trimmed });
       const aiReply = data.reply || '応答を受信しました。';
+      const act = data.action || data.osAction;
+
+      if (act && act.type) {
+        const target = String(act.target ?? act.value ?? '');
+        if (act.type === 'open_app' || act.type === 'open') {
+          openApp(target as Parameters<typeof openApp>[0]);
+        } else if (act.type === 'set_shell' || act.type === 'shell') {
+          setShellMode(target as Parameters<typeof setShellMode>[0]);
+        } else if (act.type === 'set_theme' || act.type === 'theme') {
+          if (target === 'light' || target === 'dark') setTheme(target);
+        } else if (act.type === 'set_wallpaper' || act.type === 'wallpaper') {
+          setWallpaper(target as Parameters<typeof setWallpaper>[0]);
+        } else if (act.type === 'set_aurora') {
+          setWallpaper('live2d');
+          setAuroraColor(target as Parameters<typeof setAuroraColor>[0]);
+        } else if (act.type === 'set_volume' || act.type === 'volume') {
+          const v = Number(target);
+          if (Number.isFinite(v)) setVolume(Math.max(0, Math.min(100, v)));
+        } else if (act.type === 'lock_screen' || act.type === 'lock') {
+          lockSystem();
+        } else if (act.type === 'snap_windows') {
+          snapAllWindows5050();
+        } else if (act.type === 'close_all') {
+          closeAllWindows();
+        }
+      }
 
       setChatMessages((prev) => [
         ...prev,
@@ -71,6 +108,7 @@ export function AIAssistant() {
           id: `ai-${Date.now()}`,
           sender: 'ai',
           text: aiReply,
+          actionLabel: act?.label,
           timestamp: Date.now(),
         },
       ]);
@@ -100,7 +138,7 @@ export function AIAssistant() {
       {
         id: `welcome-${Date.now()}`,
         sender: 'ai',
-        text: 'チャット履歴をクリアしました。何でもお気軽にお尋ねください。',
+        text: 'チャット履歴をクリアしました。OSの操作や質問などお気軽にお尋ねください。',
         timestamp: Date.now(),
       },
     ]);

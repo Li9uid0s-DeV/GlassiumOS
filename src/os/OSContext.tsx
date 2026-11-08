@@ -102,6 +102,7 @@ export interface OpenOptions {
 
 export interface OSContextValue {
   windows: WindowState[];
+  mountedWindows: WindowState[];
   openApp: (appId: AppId, opts?: OpenOptions) => void;
   closeWindow: (id: string) => void;
   focusWindow: (id: string) => void;
@@ -243,6 +244,8 @@ export interface OSContextValue {
   locked: boolean;
   lockSystem: () => void;
   unlockSystem: () => void;
+  autoLockMinutes: number;
+  setAutoLockMinutes: (mins: number) => void;
 
   // User Profile
   user: UserProfile | null;
@@ -374,6 +377,7 @@ const LS_FS_KEY = 'glassium-os-v5.0-u1-filesystem';
 const LS_ICON_POS_KEY = 'glassium-os-v5.0-u2-icon-positions';
 const LS_DESK_NOTES_KEY = 'glassium-os-v5.0-u1-desk-notes';
 const LS_DESKTOPS_KEY = 'glassium-os-v5.0-u1-desktops';
+const LS_WINDOWS_KEY = 'glassium-os-v5.0-u3-windows';
 
 export const DEFAULT_DESKTOP_ICON_ORDER = [
   'browser',
@@ -434,9 +438,22 @@ export function OSProvider({ children }: { children: ReactNode }) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const persistedSettings = loadPersisted<Record<string, any>>(LS_KEY, {});
 
-  const [windows, setWindows] = useState<WindowState[]>([]);
-  const zCounter = useRef(60);
-  const idCounter = useRef(0);
+  const [allWindows, setWindows] = useState<WindowState[]>(() => {
+    const saved = loadPersisted<WindowState[]>(LS_WINDOWS_KEY, []);
+    if (!Array.isArray(saved)) return [];
+    return saved.filter((w) => w && typeof w.id === 'string' && typeof w.appId === 'string');
+  });
+  const windows = React.useMemo(() => allWindows.filter((w) => !w.closed), [allWindows]);
+  const mountedWindows = allWindows;
+  const zCounter = useRef(
+    allWindows.reduce((max, w) => Math.max(max, w.zIndex || 60), 60) + 1
+  );
+  const idCounter = useRef(
+    allWindows.reduce((max, w) => {
+      const m = /^win-(\d+)$/.exec(w.id);
+      return m ? Math.max(max, Number(m[1])) : max;
+    }, 0) + 1
+  );
 
   // Virtual Desktops ("デスク機能")
   const [desktops, setDesktops] = useState<VirtualDesktop[]>(() => {
@@ -706,6 +723,9 @@ export function OSProvider({ children }: { children: ReactNode }) {
   }, [triggerDynamicIsland]);
 
   const [locked, setLocked] = useState(false);
+  const [autoLockMinutes, setAutoLockMinutes] = useState<number>(
+    typeof persistedSettings.autoLockMinutes === 'number' ? persistedSettings.autoLockMinutes : 5
+  );
   const [lockScreenStyle, setLockScreenStyle] = useState<LockScreenStyle>(
     (persistedSettings.lockScreenStyle as LockScreenStyle) ?? 'hyperos3'
   );
@@ -876,6 +896,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
           volume,
           brightness,
           soundEnabled,
+          autoLockMinutes,
         })
       );
     } catch {
@@ -918,7 +939,17 @@ export function OSProvider({ children }: { children: ReactNode }) {
     volume,
     brightness,
     soundEnabled,
+    autoLockMinutes,
   ]);
+
+  // Persist Windows State (including closed/minimized windows so progress is retained)
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_WINDOWS_KEY, JSON.stringify(allWindows));
+    } catch {
+      // Ignore quota error
+    }
+  }, [allWindows]);
 
   // Persist Apps
   useEffect(() => {
@@ -1235,14 +1266,22 @@ export function OSProvider({ children }: { children: ReactNode }) {
       playSound('open');
       setTaskViewOpen(false);
       setWindows((ws) => {
-        // If window exists on current or any other virtual desktop, bring it to current desktop and unminimize
+        // Reuse existing window (even if closed or minimized) so progress and current screen are preserved!
         const existing = ws.find((w) => w.appId === appId);
-        if (existing && appId !== 'notepad' && !opts?.payload) {
+        if (existing && (appId !== 'notepad' || !opts?.payload)) {
           zCounter.current += 1;
           const z = zCounter.current;
           return ws.map((w) =>
             w.id === existing.id
-              ? { ...w, zIndex: z, minimized: false, desktopId: activeDesktopId }
+              ? {
+                  ...w,
+                  zIndex: z,
+                  minimized: false,
+                  closed: false,
+                  desktopId: activeDesktopId,
+                  ...(opts?.payload !== undefined ? { payload: opts.payload } : {}),
+                  ...(opts?.title ? { title: opts.title } : {}),
+                }
               : w
           );
         }
@@ -1255,7 +1294,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
         idCounter.current += 1;
         const id = `win-${idCounter.current}`;
         zCounter.current += 1;
-        const count = ws.filter((w) => !w.desktopId || w.desktopId === activeDesktopId).length;
+        const count = ws.filter((w) => !w.closed && (!w.desktopId || w.desktopId === activeDesktopId)).length;
         const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
         const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
         const width = Math.min(vw - 20, opts?.width ?? def.width);
@@ -1275,6 +1314,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
           height,
           zIndex: zCounter.current,
           minimized: false,
+          closed: false,
           maximized: false,
           desktopId: activeDesktopId,
           payload: opts?.payload,
@@ -1301,20 +1341,20 @@ export function OSProvider({ children }: { children: ReactNode }) {
         return;
       }
       setWindows((ws) => {
-        const existing = ws.find(
-          (w) => w.appId === app.appId && (!w.desktopId || w.desktopId === activeDesktopId)
-        );
+        const existing = ws.find((w) => w.appId === app.appId);
         if (existing) {
           zCounter.current += 1;
           const z = zCounter.current;
           return ws.map((w) =>
-            w.id === existing.id ? { ...w, zIndex: z, minimized: false } : w
+            w.id === existing.id
+              ? { ...w, zIndex: z, minimized: false, closed: false, desktopId: activeDesktopId }
+              : w
           );
         }
         idCounter.current += 1;
         const id = `win-${idCounter.current}`;
         zCounter.current += 1;
-        const count = ws.filter((w) => !w.desktopId || w.desktopId === activeDesktopId).length;
+        const count = ws.filter((w) => !w.closed && (!w.desktopId || w.desktopId === activeDesktopId)).length;
         const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
         const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
         const width = Math.min(vw - 20, 840);
@@ -1334,6 +1374,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
           height,
           zIndex: zCounter.current,
           minimized: false,
+          closed: false,
           maximized: false,
           desktopId: activeDesktopId,
           payload: { appInfo: app, url: app.url, isCustomApp: Boolean(app.url) },
@@ -1346,7 +1387,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
 
   const closeWindow = useCallback((id: string) => {
     playSound('click');
-    setWindows((ws) => ws.filter((w) => w.id !== id));
+    // Keep window in allWindows with closed: true so React component state & user progress are preserved
+    setWindows((ws) => ws.map((w) => (w.id === id ? { ...w, closed: true, minimized: false } : w)));
   }, [playSound]);
 
   const minimizeWindow = useCallback((id: string) => {
@@ -1359,7 +1401,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
       zCounter.current += 1;
       const z = zCounter.current;
       setWindows((ws) =>
-        ws.map((w) => (w.id === id ? { ...w, minimized: false, zIndex: z } : w))
+        ws.map((w) => (w.id === id ? { ...w, minimized: false, closed: false, zIndex: z } : w))
       );
     },
     []
@@ -1688,28 +1730,36 @@ export function OSProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // System auto-sleep after 5 minutes of idle
+  // System auto-lock after autoLockMinutes of idle (0 = Off)
   useEffect(() => {
+    if (!autoLockMinutes || autoLockMinutes <= 0 || locked) return;
     let timer: number;
+    const timeoutMs = autoLockMinutes * 60 * 1000;
     const resetIdle = () => {
-      clearTimeout(timer);
+      window.clearTimeout(timer);
       timer = window.setTimeout(() => {
-        if (!locked && user) {
+        if (!locked) {
           lockSystem();
         }
-      }, 5 * 60 * 1000); // 5 minutes
+      }, timeoutMs);
     };
 
     window.addEventListener('mousemove', resetIdle, { passive: true });
+    window.addEventListener('pointerdown', resetIdle, { passive: true });
     window.addEventListener('keydown', resetIdle, { passive: true });
+    window.addEventListener('wheel', resetIdle, { passive: true });
+    window.addEventListener('touchstart', resetIdle, { passive: true });
     resetIdle();
 
     return () => {
-      clearTimeout(timer);
+      window.clearTimeout(timer);
       window.removeEventListener('mousemove', resetIdle);
+      window.removeEventListener('pointerdown', resetIdle);
       window.removeEventListener('keydown', resetIdle);
+      window.removeEventListener('wheel', resetIdle);
+      window.removeEventListener('touchstart', resetIdle);
     };
-  }, [locked, user, lockSystem]);
+  }, [locked, autoLockMinutes, lockSystem]);
 
   // Global Keyboard Shortcuts (e.g. Win+L to lock system)
   useEffect(() => {
@@ -1728,7 +1778,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
     const vh = typeof window !== 'undefined' ? window.innerHeight - 48 : 750;
     setWindows((ws) => {
-      const visible = ws.filter((w) => !w.minimized);
+      const visible = ws.filter((w) => !w.minimized && !w.closed);
       if (visible.length === 0) return ws;
       if (visible.length === 1) {
         return ws.map((w) =>
@@ -1751,6 +1801,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
 
   const value: OSContextValue = {
     windows,
+    mountedWindows,
     openApp,
     closeWindow,
     focusWindow,
@@ -1862,6 +1913,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
     locked,
     lockSystem,
     unlockSystem,
+    autoLockMinutes,
+    setAutoLockMinutes,
     user,
     setUser,
     showWelcome,

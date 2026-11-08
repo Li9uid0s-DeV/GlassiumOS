@@ -1505,16 +1505,46 @@ export function CloudAndAIGameHub({
   onUnlockEverything,
 }: CloudAndAIGameHubProps) {
   // ---------------- 1. Native Game Hub State ----------------
-  const [selectedProvider, setSelectedProvider] = useState<GameSourceProvider>('all');
+  const [selectedProvider, setSelectedProvider] = useState<GameSourceProvider>(() => {
+    const saved = localStorage.getItem('glassium_gamehub_provider') as GameSourceProvider | null;
+    return saved || 'all';
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [externalGames, setExternalGames] = useState<ExternalGameItem[]>(INITIAL_EXTERNAL_GAMES);
-  const [activeGame, setActiveGame] = useState<ExternalGameItem | null>(null);
+  const [activeGame, setActiveGame] = useState<ExternalGameItem | null>(() => {
+    try {
+      const saved = localStorage.getItem('glassium_gamehub_active_game');
+      return saved ? (JSON.parse(saved) as ExternalGameItem) : null;
+    } catch {
+      return null;
+    }
+  });
   const [localBlobHtmlUrl, setLocalBlobHtmlUrl] = useState<string | null>(null);
   const [localFileTitle, setLocalFileTitle] = useState<string>('');
-  const [proxyEngine, setProxyEngine] = useState<'direct' | 'scramjet' | 'ultraviolet'>('direct');
+  const [proxyEngine, setProxyEngine] = useState<'api-proxy' | 'scramjet' | 'ultraviolet' | 'direct'>('api-proxy');
   const [isSyncingCatalog, setIsSyncingCatalog] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('glassium_gamehub_provider', selectedProvider);
+    } catch {
+      // ignore
+    }
+  }, [selectedProvider]);
+
+  useEffect(() => {
+    try {
+      if (activeGame && !activeGame.playUrl.startsWith('blob:')) {
+        localStorage.setItem('glassium_gamehub_active_game', JSON.stringify(activeGame));
+      } else if (!activeGame) {
+        localStorage.removeItem('glassium_gamehub_active_game');
+      }
+    } catch {
+      // ignore
+    }
+  }, [activeGame]);
 
   // ---------------- 2. Google Drive Folder Explorer State ----------------
   const [showDriveExplorer, setShowDriveExplorer] = useState(false);
@@ -1763,16 +1793,26 @@ export function CloudAndAIGameHub({
     });
   }, [externalGames, selectedProvider, cloudMoonCategory, searchQuery]);
 
-  // Launch and execute an HTML game file inside the iframe (fetches .html from GitHub/jsDelivr, injects <base href>, gives up cleanly if 404)
+  // Launch and execute an HTML game file or proxied CloudMoon/external game inside the iframe
   const handleSelectAndPlayGame = useCallback(
     async (game: ExternalGameItem) => {
       setActiveHtmlSrcDoc(null);
       setJsdelivrStatus('');
-      if (game.requiresProxy && proxyEngine === 'direct') {
-        setProxyEngine('scramjet');
+      const needsProxy =
+        Boolean(game.requiresProxy) ||
+        Boolean(game.cloudStream) ||
+        game.provider === 'cloudmoon' ||
+        game.provider === 'slope2' ||
+        game.provider === 'tglsc' ||
+        game.provider === 'lumin' ||
+        game.playUrl.includes('cloudmoonapp.com');
+
+      if (needsProxy && proxyEngine === 'direct') {
+        setProxyEngine('api-proxy');
       }
 
       const isJsdelivrOrRawHtml =
+        Boolean(game.isHtmlFile) ||
         game.playUrl.includes('cdn.jsdelivr.net/gh/') ||
         game.playUrl.includes('raw.githubusercontent.com/') ||
         /\.html?(\?|$)/i.test(game.playUrl);
@@ -1790,12 +1830,8 @@ export function CloudAndAIGameHub({
           }
           const res = await fetch(targetUrl);
           if (!res.ok) {
-            // Cleanly give up if the game HTML file is not found
-            setActiveGame(null);
-            setJsdelivrStatus(
-              `⚠️ ゲームファイルが見つかりませんでした (HTTP ${res.status}): ${targetUrl} — 見つからないため取得をあきらめました。`
-            );
-            setShowJsdelivrGuide(true);
+            // Fallback to server /api/html-runner proxy instead of giving up
+            setActiveHtmlSrcDoc(null);
             return;
           }
           let html = await res.text();
@@ -1843,14 +1879,6 @@ export function CloudAndAIGameHub({
           normalized = `https://cdn.jsdelivr.net/gh/${owner}/${repo}@${branch}/${subPath}`;
         }
 
-        const checkRes = await fetch(normalized);
-        if (!checkRes.ok) {
-          setJsdelivrStatus(
-            `❌ 指定されたURLにHTMLファイルが見つかりませんでした (HTTP ${checkRes.status})。見つからないため取得をあきらめました。`
-          );
-          return;
-        }
-
         const repoExtract = normalized.match(/cdn\.jsdelivr\.net\/gh\/([^/]+)\/([^/@]+)/i);
         const ownerRepo = repoExtract ? `${repoExtract[1]}/${repoExtract[2]}` : 'custom/html-game';
         const newGame: ExternalGameItem = {
@@ -1871,7 +1899,7 @@ export function CloudAndAIGameHub({
           controls: 'キーボード / マウス操作',
         };
         setExternalGames((prev) => [newGame, ...prev]);
-        setJsdelivrStatus(`✅ HTMLゲームを発見しました！ iframe内で起動します: ${normalized}`);
+        setJsdelivrStatus(`✅ HTMLゲームを起動します: ${normalized}`);
         await handleSelectAndPlayGame(newGame);
         return;
       }
@@ -1907,7 +1935,7 @@ export function CloudAndAIGameHub({
 
       if (!foundBranch || filesList.length === 0) {
         setJsdelivrStatus(
-          `❌ リポジトリ「${owner}/${repo}」がGitHub / jsDelivr上で見つかりませんでした。見つからないため取得をあきらめました。`
+          `❌ リポジトリ「${owner}/${repo}」がGitHub / jsDelivr上で見つかりませんでした。`
         );
         return;
       }
@@ -1918,18 +1946,16 @@ export function CloudAndAIGameHub({
 
       if (htmlFiles.length === 0) {
         setJsdelivrStatus(
-          `❌ リポジトリ「${owner}/${repo}@${foundBranch}」内に実行可能な .html ファイルが見つかりませんでした。見つからないため取得をあきらめました。`
+          `❌ リポジトリ「${owner}/${repo}@${foundBranch}」内に実行可能な .html ファイルが見つかりませんでした。`
         );
         return;
       }
 
-      // Prefer root /index.html or htdocs/index.html
       const preferredHtml =
         htmlFiles.find((f) => f.toLowerCase() === '/index.html') ||
         htmlFiles.find((f) => f.toLowerCase().endsWith('/index.html')) ||
         htmlFiles[0];
 
-      // Find authentic game icon/screenshot from the repo itself
       const imageFiles = filesList
         .map((f) => String(f.name || ''))
         .filter((n) => /\.(png|jpg|jpeg|webp|gif)$/i.test(n));
@@ -1965,40 +1991,48 @@ export function CloudAndAIGameHub({
       await handleSelectAndPlayGame(newGame);
     } catch {
       setJsdelivrStatus(
-        '❌ GitHub / jsDelivr からの通信に失敗したため、取得をあきらめました。'
+        '❌ GitHub / jsDelivr からの通信に失敗しました。'
       );
     } finally {
       setIsScanningJsdelivr(false);
     }
   };
 
-  // Resolve iframe URL (Server /api/gdrive/html, /api/html-runner, Blob URL, Direct, or Server Scramjet/Ultraviolet)
+  // Resolve iframe URL (Server /api/gdrive/html, /api/html-runner, /api/proxy, Blob URL, Direct, or Server Scramjet/Ultraviolet)
   const resolveGameIframeSrc = useCallback(
-    (rawUrl: string, forceProxy?: boolean): string => {
+    (rawUrl: string, forceProxy?: boolean, isHtmlFile?: boolean): string => {
       if (!rawUrl) return 'about:blank';
       if (rawUrl.startsWith('blob:') || rawUrl.startsWith('data:')) {
         return rawUrl;
       }
-      if (rawUrl.startsWith('/api/gdrive/html') || rawUrl.startsWith('/api/html-runner')) {
+      if (rawUrl.startsWith('/api/gdrive/html') || rawUrl.startsWith('/api/html-runner') || rawUrl.startsWith('/api/proxy')) {
         return resolveBackendUrl(rawUrl);
       }
       if (
+        isHtmlFile ||
         rawUrl.includes('cdn.jsdelivr.net/gh/') ||
         rawUrl.includes('raw.githubusercontent.com/') ||
         /\.html?(\?|$)/i.test(rawUrl)
       ) {
         return resolveBackendUrl(`/api/html-runner?url=${encodeURIComponent(rawUrl)}`);
       }
-      const engineToUse: ProxyEngine =
-        proxyEngine === 'direct'
-          ? forceProxy
-            ? 'scramjet'
-            : 'direct'
-          : proxyEngine;
-      if (engineToUse === 'direct') {
+      const isCloudMoonOrProxied =
+        forceProxy ||
+        rawUrl.includes('cloudmoonapp.com') ||
+        rawUrl.includes('slope') ||
+        rawUrl.includes('1v1.lol') ||
+        rawUrl.includes('krunker.io');
+
+      const effectiveEngine =
+        proxyEngine === 'direct' && isCloudMoonOrProxied ? 'api-proxy' : proxyEngine;
+
+      if (effectiveEngine === 'direct') {
         return rawUrl;
       }
-      return getServiceWorkerProxyUrl(rawUrl, engineToUse);
+      if (effectiveEngine === 'api-proxy') {
+        return resolveBackendUrl(`/api/proxy?url=${encodeURIComponent(rawUrl)}`);
+      }
+      return getServiceWorkerProxyUrl(rawUrl, effectiveEngine as ProxyEngine);
     },
     [proxyEngine]
   );
@@ -3097,6 +3131,34 @@ export function CloudAndAIGameHub({
 
                 {/* CloudMoon Server Node & Quality Selectors */}
                 <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProxyEngine('api-proxy');
+                      handleSelectAndPlayGame({
+                        id: 'cloudmoon-portal-proxy',
+                        title: 'CloudMoon Web ポータル (プロキシ直結)',
+                        provider: 'cloudmoon',
+                        providerLabel: 'CloudMoon Proxy',
+                        category: 'クラウドゲーミングポータル',
+                        rating: '5.0 ★',
+                        players: 'Cloud GPU',
+                        badge: '☁️ プロキシ直結',
+                        accentColor: '#38bdf8',
+                        thumbnail: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=600&q=80',
+                        description: 'CloudMoon (web.cloudmoonapp.com) をサーバープロキシ経由で直接iframe内に接続します。',
+                        playUrl: 'https://web.cloudmoonapp.com/',
+                        controls: 'マウス / キーボード / ゲームパッド',
+                        requiresProxy: true,
+                        cloudStream: true,
+                        gpuPod: 'RTX-4090 Cloud Pod',
+                      });
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl bg-sky-400 hover:bg-sky-300 text-slate-950 font-black text-xs shadow-lg flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Icon name="Zap" size={14} />
+                    <span>☁️ CloudMoon 本体をプロキシで起動</span>
+                  </button>
                   <select
                     value={cloudMoonRegion}
                     onChange={(e) => setCloudMoonRegion(e.target.value)}

@@ -63,6 +63,7 @@ export interface WindowState {
   zIndex: number;
   minimized: boolean;
   maximized: boolean;
+  closed?: boolean;
   desktopId?: string;
   prevRect?: { x: number; y: number; width: number; height: number };
   payload?: unknown;

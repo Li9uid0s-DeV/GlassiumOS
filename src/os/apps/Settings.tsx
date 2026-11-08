@@ -815,6 +815,8 @@ export function SettingsApp() {
     gridSnapEnabled,
     setGridSnapEnabled,
     resetDesktopIconPositions,
+    autoLockMinutes,
+    setAutoLockMinutes,
   } = useOS();
 
   const isLight = theme === 'light';
@@ -1892,18 +1894,18 @@ export function SettingsApp() {
               ) : systemSubView === 'power' ? (
                 /* ---------------- POWER & SLEEP ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('電源とスリープ', 'Power & Sleep', () => setSystemSubView('main'))}
+                  {renderBreadcrumbHeader('電源とスリープ・自動ロック', 'Power, Sleep & Auto-Lock', () => setSystemSubView('main'))}
 
                   <div className="space-y-5">
                     <div className="flex items-center justify-between">
                       <div>
                         <h3 className="text-[13px] font-bold tracking-tight">
-                          {isJa ? '画面スリープ' : 'Sleep Screen'}
+                          {isJa ? '画面スリープ・ロック起動' : 'Sleep & Lock Screen'}
                         </h3>
                         <p className="text-[11px] opacity-50 mt-0.5">
                           {isJa
-                            ? 'ロック画面・スリープモードを即座に起動します'
-                            : 'Enter lock screen and ambient sleep mode immediately'}
+                            ? 'Bing日替わり自然壁紙ロック画面（上にスライドでロック解除）を即座に起動します'
+                            : 'Enter Bing daily nature lock screen immediately'}
                         </p>
                       </div>
                       <button
@@ -1911,8 +1913,65 @@ export function SettingsApp() {
                         onClick={() => lockSystem()}
                         className="px-3.5 py-1.5 rounded-xl bg-[var(--os-accent)] text-black text-xs font-bold shadow hover:brightness-110"
                       >
-                        {isJa ? 'スリープ起動' : 'Sleep Now'}
+                        {isJa ? '今すぐロック' : 'Lock Now'}
                       </button>
+                    </div>
+
+                    {/* Auto-Lock Timeout Selector */}
+                    <div className={`pt-4 border-t space-y-3 ${isLight ? 'border-slate-300' : 'border-white/10'}`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-[13px] font-bold tracking-tight">
+                            {isJa ? '画面の自動ロックまでの時間' : 'Screen Auto-Lock Timeout'}
+                          </h3>
+                          <p className="text-[11px] opacity-50 mt-0.5">
+                            {isJa
+                              ? '無操作状態が続いたときに自動でロック画面に切り替わるまでの時間を設定します（「オフ」で自動ロック無効）'
+                              : 'Automatically lock screen after inactivity (choose Off to disable)'}
+                          </p>
+                        </div>
+                        <span className="px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-400 font-mono text-xs font-bold">
+                          {autoLockMinutes === 0 ? 'オフ (無効)' : `${autoLockMinutes}分`}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 text-xs">
+                        {[
+                          { m: 0, label: 'オフ' },
+                          { m: 1, label: '1分' },
+                          { m: 3, label: '3分' },
+                          { m: 5, label: '5分' },
+                          { m: 10, label: '10分' },
+                          { m: 15, label: '15分' },
+                          { m: 30, label: '30分' },
+                          { m: 60, label: '60分' },
+                        ].map((item) => (
+                          <button
+                            key={item.m}
+                            type="button"
+                            onClick={() => {
+                              playSound('click');
+                              setAutoLockMinutes(item.m);
+                              addNotification({
+                                title: '自動ロック設定',
+                                message:
+                                  item.m === 0
+                                    ? '画面の自動ロックを「オフ」にしました。'
+                                    : `自動ロックまでの時間を「${item.m}分」に設定しました。`,
+                              });
+                            }}
+                            className={`py-2.5 px-2 rounded-xl font-bold text-center transition cursor-pointer ${
+                              autoLockMinutes === item.m
+                                ? 'bg-[var(--os-accent)] text-black shadow-md'
+                                : isLight
+                                ? 'bg-slate-200/70 hover:bg-slate-300/70 text-slate-800'
+                                : 'bg-white/5 hover:bg-white/10 text-white/80'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 pt-2">

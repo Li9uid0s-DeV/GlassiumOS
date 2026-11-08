@@ -722,6 +722,70 @@ class GlobalAudioManager {
       }
     }
 
+    // Stage 4: Piped Audio Stream Fallback (/api/music/piped)
+    if (this.pendingTrack === track) {
+      try {
+        const query = `${track.title} ${cleanArtist}`.trim();
+        const pipedRes = await fetch(
+          resolveBackendUrl(`/api/music/piped?q=${encodeURIComponent(query)}`),
+          { signal: AbortSignal.timeout(5500) }
+        );
+        if (pipedRes.ok) {
+          const pipedData = (await pipedRes.json()) as { url?: string };
+          if (pipedData?.url && this.pendingTrack === track) {
+            this.audio.src = pipedData.url;
+            this.playPromise = this.audio.play();
+            await this.playPromise;
+            this.playPromise = null;
+            this.updateState({
+              isPlaying: true,
+              isBuffering: false,
+              error: null,
+              statusMessage: `フル尺再生中 (Piped Fallback): ${track.title} — ${cleanArtist}`,
+            });
+            return;
+          }
+        }
+      } catch (err4: unknown) {
+        this.playPromise = null;
+        if ((err4 as Error)?.name === 'AbortError' || this.pendingTrack !== track) {
+          return;
+        }
+      }
+    }
+
+    // Stage 5: Invidious Audio Stream Fallback (/api/music/invidious)
+    if (this.pendingTrack === track) {
+      try {
+        const query = `${track.title} ${cleanArtist}`.trim();
+        const invRes = await fetch(
+          resolveBackendUrl(`/api/music/invidious?q=${encodeURIComponent(query)}`),
+          { signal: AbortSignal.timeout(5500) }
+        );
+        if (invRes.ok) {
+          const invData = (await invRes.json()) as { url?: string };
+          if (invData?.url && this.pendingTrack === track) {
+            this.audio.src = invData.url;
+            this.playPromise = this.audio.play();
+            await this.playPromise;
+            this.playPromise = null;
+            this.updateState({
+              isPlaying: true,
+              isBuffering: false,
+              error: null,
+              statusMessage: `フル尺再生中 (Invidious Fallback): ${track.title} — ${cleanArtist}`,
+            });
+            return;
+          }
+        }
+      } catch (err5: unknown) {
+        this.playPromise = null;
+        if ((err5 as Error)?.name === 'AbortError' || this.pendingTrack !== track) {
+          return;
+        }
+      }
+    }
+
     if (this.pendingTrack === track) {
       this.updateState({
         isPlaying: false,

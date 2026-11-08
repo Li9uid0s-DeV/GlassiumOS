@@ -7,6 +7,8 @@ import { StartMenu } from './StartMenu';
 import { AIAssistant } from './AIAssistant';
 import { AppLogo } from './AppLogo';
 import { requestAIChat } from './aiClient';
+import { getMusicState, subscribeMusicState, MusicPlayerState } from './musicBridge';
+import { globalAudio } from './globalAudioManager';
 
 interface TaskbarProps {
   onLock?: () => void;
@@ -78,8 +80,14 @@ export function Taskbar(_props?: TaskbarProps) {
     installedApps,
     launchInstalledApp,
     shellMode,
+    setShellMode,
+    setTheme,
+    setWallpaper,
+    setAuroraColor,
     volume,
     setVolume,
+    brightness,
+    setBrightness,
     soundEnabled,
     setSoundEnabled,
     activeDesktopId,
@@ -87,6 +95,11 @@ export function Taskbar(_props?: TaskbarProps) {
     setTaskViewOpen,
     toggleTaskView,
     theme,
+    lockSystem,
+    snapAllWindows5050,
+    closeAllWindows,
+    autoLockMinutes,
+    setAutoLockMinutes,
   } = useOS();
   const isLight = theme === 'light';
 
@@ -106,6 +119,15 @@ export function Taskbar(_props?: TaskbarProps) {
   const searchDropdownRef = useRef<HTMLDivElement>(null);
   const [startPos, setStartPos] = useState<{ x: number; width: number } | null>(null);
 
+  // Live Music State for Quick Controls
+  const [musicState, setMusicState] = useState<MusicPlayerState | null>(() => getMusicState());
+
+  useEffect(() => {
+    return subscribeMusicState((st) => {
+      setMusicState(st);
+    });
+  }, []);
+
   // OS-Level Integrated AI Omnibar state (GlassiumOS 5)
   const [aiOmniInput, setAiOmniInput] = useState('');
   const [aiOmniReply, setAiOmniReply] = useState<string | null>(null);
@@ -119,6 +141,31 @@ export function Taskbar(_props?: TaskbarProps) {
     setAiOmniOpen(true);
     try {
       const res = await requestAIChat({ message: q });
+      const act = res.action || res.osAction;
+      if (act && act.type) {
+        const target = String(act.target ?? act.value ?? '');
+        if (act.type === 'open_app' || act.type === 'open') {
+          openApp(target as AppId);
+        } else if (act.type === 'set_shell' || act.type === 'shell') {
+          setShellMode(target as Parameters<typeof setShellMode>[0]);
+        } else if (act.type === 'set_theme' || act.type === 'theme') {
+          if (target === 'light' || target === 'dark') setTheme(target);
+        } else if (act.type === 'set_wallpaper' || act.type === 'wallpaper') {
+          setWallpaper(target as Parameters<typeof setWallpaper>[0]);
+        } else if (act.type === 'set_aurora') {
+          setWallpaper('live2d');
+          setAuroraColor(target as Parameters<typeof setAuroraColor>[0]);
+        } else if (act.type === 'set_volume' || act.type === 'volume') {
+          const v = Number(target);
+          if (Number.isFinite(v)) setVolume(Math.max(0, Math.min(100, v)));
+        } else if (act.type === 'lock_screen' || act.type === 'lock') {
+          lockSystem();
+        } else if (act.type === 'snap_windows') {
+          snapAllWindows5050();
+        } else if (act.type === 'close_all') {
+          closeAllWindows();
+        }
+      }
       setAiOmniReply(res.reply);
       setAiOmniInput('');
     } catch {
@@ -1286,92 +1333,376 @@ export function Taskbar(_props?: TaskbarProps) {
         )}
       </AnimatePresence>
 
-      {/* Flat Quick Settings Flyout (Brightness removed as requested) */}
+      {/* Redesigned Liquid Glass Quick Controls Center + Live Now Playing Music Player */}
       <AnimatePresence>
         {trayOpen && (
           <>
             <div className="fixed inset-0 z-[5100]" onClick={() => setTrayOpen(false)} />
             <motion.div
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              initial={{ opacity: 0, y: 14, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 12, scale: 0.98 }}
-              transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-              className={`fixed bottom-14 right-3 z-[5200] w-72 max-w-[calc(100vw-24px)] rounded-xl p-4 backdrop-blur-2xl border shadow-2xl ${
+              exit={{ opacity: 0, y: 14, scale: 0.96 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+              className={`fixed bottom-14 right-3 z-[5200] w-[360px] sm:w-[390px] max-w-[calc(100vw-24px)] rounded-3xl p-4 backdrop-blur-3xl border shadow-[0_24px_80px_rgba(0,0,0,0.65)] space-y-3.5 select-none ${
                 isLight
-                  ? 'bg-white/95 border-slate-900/12 text-slate-900'
-                  : 'bg-slate-900/90 border-white/15 text-white'
+                  ? 'bg-white/95 border-slate-900/15 text-slate-900'
+                  : 'bg-slate-950/92 border-white/15 text-white'
               }`}
             >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold tracking-wide">Quick Controls</span>
-                <button
-                  onClick={() => {
-                    setTrayOpen(false);
-                    openApp('settings');
-                  }}
-                  className="text-[11px] os-accent-text hover:underline flex items-center gap-1 transition"
-                >
-                  <Icon name="Settings" size={12} />
-                  <span>Settings</span>
-                </button>
+              {/* Top Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
+                  <span className="text-xs font-black tracking-wide uppercase">
+                    Quick Controls Center
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTrayOpen(false);
+                      lockSystem();
+                    }}
+                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${
+                      isLight
+                        ? 'bg-slate-900/5 hover:bg-slate-900/10 text-slate-700'
+                        : 'bg-white/10 hover:bg-white/20 text-white/85'
+                    }`}
+                    title="今すぐ画面をロック"
+                  >
+                    <Icon name="Lock" size={12} />
+                    <span>ロック</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTrayOpen(false);
+                      openApp('settings');
+                    }}
+                    className="px-2.5 py-1 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/30 text-[11px] text-cyan-300 font-bold flex items-center gap-1 transition cursor-pointer"
+                  >
+                    <Icon name="Settings" size={12} />
+                    <span>設定</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 mb-4">
+              {/* LIVE NOW PLAYING MUSIC CARD (Shown prominently when music is playing or loaded) */}
+              {musicState?.currentTrack ? (
+                <div
+                  className={`p-3.5 rounded-2xl border relative overflow-hidden transition-all ${
+                    musicState.isPlaying
+                      ? 'bg-gradient-to-br from-cyan-950/80 via-slate-900/90 to-fuchsia-950/60 border-cyan-400/40 shadow-lg text-white'
+                      : isLight
+                      ? 'bg-slate-900/5 border-slate-900/10'
+                      : 'bg-white/[0.05] border-white/10'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      onClick={() => {
+                        setTrayOpen(false);
+                        openApp('synth');
+                      }}
+                      className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-white/20 shadow-md cursor-pointer group"
+                      style={{
+                        background:
+                          musicState.currentTrack.coverGradient ||
+                          'linear-gradient(135deg, #06b6d4, #6366f1)',
+                      }}
+                    >
+                      {musicState.currentTrack.artworkUrl ? (
+                        <img
+                          src={musicState.currentTrack.artworkUrl}
+                          alt={musicState.currentTrack.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-white">
+                          <Icon name="Music" size={20} />
+                        </div>
+                      )}
+                      {musicState.isPlaying && (
+                        <div className="absolute bottom-1 right-1 px-1 py-0.5 rounded bg-black/70 text-[8px] font-mono text-cyan-300 font-bold">
+                          LIVE
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[10px] font-mono uppercase tracking-wider text-cyan-300 font-bold flex items-center gap-1">
+                          <Icon name="Music" size={10} />
+                          <span>{musicState.isPlaying ? 'NOW PLAYING' : 'PAUSED'}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTrayOpen(false);
+                            openApp('synth');
+                          }}
+                          className="text-[10px] text-cyan-300 hover:underline font-bold cursor-pointer"
+                        >
+                          Musicを開く ↗
+                        </button>
+                      </div>
+                      <div className="text-xs font-black truncate mt-0.5">
+                        {musicState.currentTrack.title}
+                      </div>
+                      <div className="text-[11px] opacity-70 truncate">
+                        {musicState.currentTrack.artist}
+                      </div>
+                    </div>
+
+                    {/* Playback Controls */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => globalAudio.prev()}
+                        className="w-7 h-7 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition cursor-pointer"
+                        title="前の曲"
+                      >
+                        <Icon name="SkipBack" size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => globalAudio.togglePlay()}
+                        className="w-8 h-8 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 flex items-center justify-center shadow-md transition cursor-pointer"
+                        title={musicState.isPlaying ? '一時停止' : '再生'}
+                      >
+                        <Icon name={musicState.isPlaying ? 'Pause' : 'Play'} size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => globalAudio.next()}
+                        className="w-7 h-7 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition cursor-pointer"
+                        title="次の曲"
+                      >
+                        <Icon name="SkipForward" size={13} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Interactive Seek Bar */}
+                  <div className="mt-2.5 flex items-center gap-2 text-[10px] font-mono opacity-85">
+                    <span>
+                      {Math.floor((musicState.currentTime || 0) / 60)}:
+                      {Math.floor((musicState.currentTime || 0) % 60)
+                        .toString()
+                        .padStart(2, '0')}
+                    </span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={Math.max(1, musicState.duration || musicState.currentTrack.duration || 180)}
+                      value={Math.min(
+                        musicState.currentTime || 0,
+                        musicState.duration || musicState.currentTrack.duration || 180
+                      )}
+                      onChange={(e) => globalAudio.seek(Number(e.target.value))}
+                      className="flex-1 h-1 accent-cyan-400 cursor-pointer"
+                    />
+                    <span>
+                      {Math.floor(
+                        (musicState.duration || musicState.currentTrack.duration || 180) / 60
+                      )}
+                      :
+                      {Math.floor(
+                        (musicState.duration || musicState.currentTrack.duration || 180) % 60
+                      )
+                        .toString()
+                        .padStart(2, '0')}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  onClick={() => {
+                    setTrayOpen(false);
+                    openApp('synth');
+                  }}
+                  className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition ${
+                    isLight
+                      ? 'bg-slate-900/5 hover:bg-slate-900/10 border-slate-900/10'
+                      : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/10'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                      <Icon name="Music" size={16} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold">Glassium Music Player</div>
+                      <div className="text-[10px] opacity-60">
+                        クリックして音楽を再生 (Monochrome / Piped / Invidious)
+                      </div>
+                    </div>
+                  </div>
+                  <Icon name="Play" size={14} className="text-cyan-400" />
+                </div>
+              )}
+
+              {/* Quick Toggle Tiles Grid (2x3) */}
+              <div className="grid grid-cols-3 gap-2">
                 {[
-                  { key: 'wifi' as const, label: 'Wi-Fi', icon: 'Wifi' },
-                  { key: 'bluetooth' as const, label: 'Bluetooth', icon: 'Bluetooth' },
-                  { key: 'darkMode' as const, label: 'Dark Mode', icon: 'Moon' },
+                  {
+                    key: 'wifi' as const,
+                    label: 'Wi-Fi',
+                    sub: quickSettings.wifi ? 'Connected' : 'Off',
+                    icon: 'Wifi',
+                  },
+                  {
+                    key: 'bluetooth' as const,
+                    label: 'Bluetooth',
+                    sub: quickSettings.bluetooth ? 'On' : 'Off',
+                    icon: 'Bluetooth',
+                  },
+                  {
+                    key: 'darkMode' as const,
+                    label: 'ダークモード',
+                    sub: quickSettings.darkMode ? 'Dark' : 'Light',
+                    icon: 'Moon',
+                  },
+                  {
+                    key: 'dnd' as const,
+                    label: '集中モード',
+                    sub: quickSettings.dnd ? 'DND On' : 'Off',
+                    icon: 'BellOff',
+                  },
+                  {
+                    key: 'liteMode' as const,
+                    label: '軽量モード',
+                    sub: quickSettings.liteMode ? '60FPS Eco' : 'Full GPU',
+                    icon: 'Zap',
+                  },
+                  {
+                    key: 'batterySaver' as const,
+                    label: '省電力',
+                    sub: quickSettings.batterySaver ? 'Active' : 'Standard',
+                    icon: 'BatteryCharging',
+                  },
                 ].map((q) => (
                   <button
                     key={q.key}
+                    type="button"
                     onClick={() => toggleQuick(q.key)}
-                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-lg border transition ${
+                    className={`flex flex-col items-start gap-1 p-2.5 rounded-2xl border text-left transition cursor-pointer ${
                       quickSettings[q.key]
-                        ? 'os-accent-bg border-transparent'
+                        ? 'os-accent-bg border-transparent shadow-md'
                         : isLight
                         ? 'bg-slate-900/5 border-slate-900/10 text-slate-700 hover:bg-slate-900/10'
-                        : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
+                        : 'bg-white/[0.05] border-white/10 text-white/75 hover:bg-white/10'
                     }`}
                   >
                     <Icon name={q.icon} size={15} />
-                    <span className="text-[10px] font-medium">{q.label}</span>
+                    <div className="min-w-0 w-full">
+                      <div className="text-[11px] font-bold truncate">{q.label}</div>
+                      <div className="text-[9px] opacity-75 truncate">{q.sub}</div>
+                    </div>
                   </button>
                 ))}
               </div>
 
+              {/* Volume & Brightness Sliders */}
               <div
-                className={`rounded-lg p-3 border ${
+                className={`rounded-2xl p-3 border space-y-3 ${
                   isLight ? 'bg-slate-900/[0.03] border-slate-900/10' : 'bg-white/[0.04] border-white/10'
                 }`}
               >
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <button
-                    onClick={() => setSoundEnabled(!soundEnabled)}
-                    className="flex items-center gap-1.5 hover:opacity-80 transition"
-                  >
-                    <Icon
-                      name={soundEnabled && volume > 0 ? 'Volume2' : 'VolumeX'}
-                      size={13}
-                      className="os-accent-text"
-                    />
-                    <span>Master Volume</span>
-                  </button>
-                  <span className="font-mono text-[11px] opacity-65">
-                    {soundEnabled ? `${volume}%` : 'Muted'}
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <button
+                      type="button"
+                      onClick={() => setSoundEnabled(!soundEnabled)}
+                      className="flex items-center gap-1.5 font-bold hover:opacity-80 transition cursor-pointer"
+                    >
+                      <Icon
+                        name={soundEnabled && volume > 0 ? 'Volume2' : 'VolumeX'}
+                        size={13}
+                        className="os-accent-text"
+                      />
+                      <span>システム音量</span>
+                    </button>
+                    <span className="font-mono text-[11px] font-bold opacity-75">
+                      {soundEnabled ? `${volume}%` : 'ミュート'}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={soundEnabled ? volume : 0}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setVolume(val);
+                      globalAudio.setVolume(val / 100);
+                      if (val > 0 && !soundEnabled) setSoundEnabled(true);
+                    }}
+                    className="glass-slider w-full"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="flex items-center gap-1.5 font-bold">
+                      <Icon name="Sun" size={13} className="text-amber-400" />
+                      <span>画面の明るさ</span>
+                    </span>
+                    <span className="font-mono text-[11px] font-bold opacity-75">
+                      {brightness}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={30}
+                    max={100}
+                    value={brightness}
+                    onChange={(e) => setBrightness(Number(e.target.value))}
+                    className="glass-slider w-full"
+                  />
+                </div>
+              </div>
+
+              {/* Auto-Lock Timeout Quick Selector */}
+              <div
+                className={`rounded-2xl p-3 border space-y-2 ${
+                  isLight ? 'bg-slate-900/[0.03] border-slate-900/10' : 'bg-white/[0.04] border-white/10'
+                }`}
+              >
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-bold flex items-center gap-1.5">
+                    <Icon name="Clock" size={12} className="text-cyan-400" />
+                    <span>自動画面ロック時間</span>
+                  </span>
+                  <span className="font-mono text-[10px] text-cyan-400 font-bold">
+                    {autoLockMinutes === 0 ? 'オフ (常時ON)' : `${autoLockMinutes}分後`}
                   </span>
                 </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={soundEnabled ? volume : 0}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    setVolume(val);
-                    if (val > 0 && !soundEnabled) setSoundEnabled(true);
-                  }}
-                  className="glass-slider w-full"
-                />
+                <div className="grid grid-cols-5 gap-1">
+                  {[
+                    { m: 0, label: 'オフ' },
+                    { m: 1, label: '1分' },
+                    { m: 5, label: '5分' },
+                    { m: 15, label: '15分' },
+                    { m: 30, label: '30分' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.m}
+                      type="button"
+                      onClick={() => setAutoLockMinutes(opt.m)}
+                      className={`py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
+                        autoLockMinutes === opt.m
+                          ? 'bg-cyan-400 text-slate-950 shadow'
+                          : isLight
+                          ? 'bg-slate-900/5 hover:bg-slate-900/10 text-slate-700'
+                          : 'bg-white/5 hover:bg-white/15 text-white/75'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </motion.div>
           </>

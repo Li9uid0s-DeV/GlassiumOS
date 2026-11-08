@@ -412,8 +412,36 @@ async function generateSmartLocalFallback(userPrompt: string): Promise<AIChatRes
     };
   }
 
-  // 6. App Launchers
+  // 6. System Lock / Volume / Window Snap Commands
+  if (lower.includes('ロック') || lower.includes('スリープ') || lower.includes('lock screen') || lower.includes('sleep')) {
+    return withNormalizedAction({
+      reply: 'システムを **ロック画面** に切り替えました。上にスライドするとロック解除できます。',
+      action: makeAction('lock_screen', 'lock', '画面をロック'),
+      model: 'glassium-5-local-engine',
+    });
+  }
+
+  const volMatch = lower.match(/(?:音量|ボリューム|volume).*?(\d{1,3})/);
+  if (volMatch) {
+    const v = Math.max(0, Math.min(100, Number(volMatch[1])));
+    return withNormalizedAction({
+      reply: `システム音量を **${v}%** に変更しました。`,
+      action: makeAction('set_volume', String(v), `音量を ${v}% に設定`),
+      model: 'glassium-5-local-engine',
+    });
+  }
+
+  if (lower.includes('整列') || lower.includes('スナップ') || lower.includes('並べて') || lower.includes('snap')) {
+    return withNormalizedAction({
+      reply: '開いているすべてのウィンドウを **左右50:50に自動スナップ整列** しました。',
+      action: makeAction('snap_windows', '5050', 'ウィンドウを左右整列'),
+      model: 'glassium-5-local-engine',
+    });
+  }
+
+  // 7. App Launchers
   const appKeywords: Array<{ keys: string[]; id: string; name: string }> = [
+    { keys: ['映画', 'アニメ', '動画', 'フリーレン', 'エンタメ', 'entertainment', 'movie', 'anime', 'youtube'], id: 'entertainment', name: 'Entertainment (映画・アニメ・動画)' },
     { keys: ['設定', 'settings', 'カスタマイズ'], id: 'settings', name: '設定 (Settings)' },
     { keys: ['ブラウザ', 'browser', '検索', 'ネット'], id: 'browser', name: 'ブラウザ (Browser)' },
     { keys: ['ターミナル', 'terminal', 'コマンド', 'shell'], id: 'terminal', name: 'ターミナル (Terminal)' },
@@ -421,11 +449,11 @@ async function generateSmartLocalFallback(userPrompt: string): Promise<AIChatRes
     { keys: ['電卓', 'calculator', '計算機'], id: 'calculator', name: '電卓 (Calculator)' },
     { keys: ['タスクマネージャー', 'task manager', 'タスク管理', 'メモリ', 'cpu'], id: 'taskmanager', name: 'タスクマネージャー' },
     { keys: ['ファイル', 'explorer', 'エクスプローラー', 'フォルダ'], id: 'explorer', name: 'ファイル (Explorer)' },
-    { keys: ['音楽', 'ミュージック', 'music', 'synth'], id: 'synth', name: 'Music Player' },
+    { keys: ['音楽', 'ミュージック', 'music', 'synth', 'カラオケ'], id: 'synth', name: 'Music Player' },
     { keys: ['天気', 'weather', '気温'], id: 'weather', name: '天気 (Weather)' },
     { keys: ['時計', 'clock', 'アラーム', 'ストップウォッチ', 'タイマー'], id: 'clock', name: '時計 (Clock)' },
     { keys: ['カレンダー', 'calendar', '予定'], id: 'calendar', name: 'カレンダー (Calendar)' },
-    { keys: ['ゲーム', 'game', 'アーケード', 'レトロ'], id: 'game', name: 'Arcade Games' },
+    { keys: ['ゲーム', 'game', 'アーケード', 'レトロ', 'マイクラ', 'cloudmoon'], id: 'game', name: 'Cloud & AI Game Hub' },
     { keys: ['studio', 'スタジオ', 'ide', 'コード実行'], id: 'studio', name: 'Glassium Studio' },
     { keys: ['ストア', 'app store', 'アプリストア'], id: 'appstore', name: 'App Store' },
     { keys: ['ペイント', 'paint', 'お絵かき'], id: 'paint', name: 'Paint Studio' },
@@ -436,7 +464,7 @@ async function generateSmartLocalFallback(userPrompt: string): Promise<AIChatRes
   for (const app of appKeywords) {
     if (
       app.keys.some((k) => lower.includes(k)) &&
-      (lower.includes('開') || lower.includes('起動') || lower.includes('open') || lower.includes('launch') || lower.includes('見せて') || lower.includes('出して') || msg.length <= 12)
+      (lower.includes('開') || lower.includes('起動') || lower.includes('open') || lower.includes('launch') || lower.includes('見せて') || lower.includes('出して') || lower.includes('見たい') || lower.includes('聴きたい') || msg.length <= 16)
     ) {
       return withNormalizedAction({
         reply: `**${app.name}** を起動しました。`,

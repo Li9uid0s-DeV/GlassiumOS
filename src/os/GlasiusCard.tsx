@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Icon } from './Icon';
-import { requestAIChat } from './aiClient';
+import { requestAIChat, AIAction } from './aiClient';
+import { useOS } from './OSContext';
+import { AppId, ShellMode, WallpaperId, AuroraPaletteId } from './types';
 import {
   CLOCK_FONT_OPTIONS,
   ClockFontId,
@@ -26,6 +28,17 @@ const DEFAULT_CUSTOM_INFO: LockScreenCustomInfo = {
 };
 
 export function GlasiusCard({ onClose }: { onClose?: () => void }) {
+  const {
+    openApp,
+    setShellMode,
+    setTheme,
+    setWallpaper,
+    setAuroraColor,
+    setVolume: setOSVolume,
+    lockSystem,
+    snapAllWindows5050,
+    closeAllWindows,
+  } = useOS();
   const [time, setTime] = useState(new Date());
 
   // Synced Clock Font
@@ -56,7 +69,7 @@ export function GlasiusCard({ onClose }: { onClose?: () => void }) {
   });
   const [muted, setMuted] = useState(false);
 
-  // Right-Side Notifications + Pure Chat-Only AI
+  // Right-Side Notifications + Desktop OS Control AI
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [notifications, setNotifications] = useState([
     {
@@ -67,22 +80,87 @@ export function GlasiusCard({ onClose }: { onClose?: () => void }) {
     },
     {
       id: 'dn-2',
-      title: '純粋チャットAI (OS操作なし)',
-      body: '右側のAIはシステム設定を変更せず会話のみを行います',
-      time: '1分前',
+      title: 'デスクトップ AI OS コントロール有効',
+      body: '「映画を開いて」「ダークモードにして」「macOSにして」などOSを直接操作できます',
+      time: '今',
     },
   ]);
   const [chatHistory, setChatHistory] = useState<
-    Array<{ id: string; role: 'user' | 'assistant'; text: string }>
+    Array<{ id: string; role: 'user' | 'assistant'; text: string; actionLabel?: string }>
   >([
     {
       id: 'init',
       role: 'assistant',
-      text: 'こんにちは！OS操作を行わない会話専用のAIチャットです。何でも気軽に話しかけてください。',
+      text: 'こんにちは！デスクトップAIコパイロットです。「映画を開いて」「音楽を開いて」「ダークモードにして」「macOSモードに切替」「音量を60にして」などOS操作を直接実行できます！',
     },
   ]);
   const [chatInput, setChatInput] = useState('');
   const [isSending, setIsSending] = useState(false);
+
+  const executeOSAction = useCallback(
+    (action?: AIAction) => {
+      if (!action || !action.type) return;
+      const target = String(action.target ?? action.value ?? '');
+      switch (action.type) {
+        case 'open_app':
+        case 'open':
+          if (target) openApp(target as AppId);
+          break;
+        case 'set_shell':
+        case 'shell':
+          if (target) setShellMode(target as ShellMode);
+          break;
+        case 'set_theme':
+        case 'theme':
+          if (target === 'light' || target === 'dark') setTheme(target);
+          break;
+        case 'set_wallpaper':
+        case 'wallpaper':
+          if (target) setWallpaper(target as WallpaperId);
+          break;
+        case 'set_aurora':
+          if (target) {
+            setWallpaper('live2d');
+            setAuroraColor(target as AuroraPaletteId);
+          }
+          break;
+        case 'set_volume':
+        case 'volume': {
+          const num = Number(target);
+          if (Number.isFinite(num)) {
+            const clamped = Math.max(0, Math.min(100, num));
+            setVolume(clamped);
+            setOSVolume(clamped);
+            setMusicVolume(clamped / 100);
+          }
+          break;
+        }
+        case 'lock_screen':
+        case 'lock':
+          lockSystem();
+          break;
+        case 'snap_windows':
+          snapAllWindows5050();
+          break;
+        case 'close_all':
+          closeAllWindows();
+          break;
+        default:
+          break;
+      }
+    },
+    [
+      openApp,
+      setShellMode,
+      setTheme,
+      setWallpaper,
+      setAuroraColor,
+      setOSVolume,
+      lockSystem,
+      snapAllWindows5050,
+      closeAllWindows,
+    ]
+  );
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -124,6 +202,7 @@ export function GlasiusCard({ onClose }: { onClose?: () => void }) {
     const clamped = Math.max(0, Math.min(100, val));
     setVolume(clamped);
     setMuted(clamped === 0);
+    setOSVolume(clamped);
     localStorage.setItem('glassium_system_volume', String(clamped));
     setMusicVolume(clamped / 100);
     window.dispatchEvent(
@@ -142,12 +221,21 @@ export function GlasiusCard({ onClose }: { onClose?: () => void }) {
     setChatInput('');
     setIsSending(true);
     try {
-      const reply = await requestAIChat(
+      const res = await requestAIChat(
         [...chatHistory, userMsg].map((m) => ({ role: m.role, content: m.text }))
       );
+      const act = res.action || res.osAction;
+      if (act) {
+        executeOSAction(act);
+      }
       setChatHistory((prev) => [
         ...prev,
-        { id: `a-${Date.now()}`, role: 'assistant', text: reply },
+        {
+          id: `a-${Date.now()}`,
+          role: 'assistant',
+          text: res.reply || '操作を実行しました。',
+          actionLabel: act?.label,
+        },
       ]);
     } catch {
       setChatHistory((prev) => [
@@ -379,13 +467,13 @@ export function GlasiusCard({ onClose }: { onClose?: () => void }) {
 
       {/* =================================================================
           3. RIGHT SIDE (右側):
-             NOTIFICATIONS + PURE CHAT-ONLY AI (WITH ZERO OS OPERATIONS)
+             NOTIFICATIONS + DESKTOP AI COPILOT (WITH FULL OS CONTROL)
       ================================================================= */}
       <div className="fixed top-4 right-5 z-20 pointer-events-auto hidden xl:flex flex-col gap-2.5 w-80">
         <div className="flex items-center justify-between px-3.5 py-2 rounded-2xl bg-black/45 backdrop-blur-2xl border border-white/20 text-white text-xs">
           <div className="flex items-center gap-2 font-bold">
             <span className="ios27-liquid-circle-dot scale-75" />
-            <span>通知 & 純粋AIチャット</span>
+            <span>通知 & AI OS コパイロット</span>
           </div>
           <button
             type="button"
@@ -423,20 +511,42 @@ export function GlasiusCard({ onClose }: { onClose?: () => void }) {
               )}
             </div>
 
-            {/* Pure Chat-Only AI Box */}
-            <div className="rounded-3xl bg-white/[0.08] backdrop-blur-3xl border border-white/20 shadow-2xl overflow-hidden flex flex-col h-72 text-white">
+            {/* Desktop OS Control AI Box */}
+            <div className="rounded-3xl bg-white/[0.08] backdrop-blur-3xl border border-white/20 shadow-2xl overflow-hidden flex flex-col h-80 text-white">
               <div className="px-3.5 py-2 bg-black/35 border-b border-white/15 flex items-center justify-between text-[11px]">
-                <span className="font-black text-cyan-200">💬 Pure Chat AI (OS操作なし)</span>
-                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/10">
-                  CHAT ONLY
+                <span className="font-black text-cyan-200">🤖 Desktop AI (OS操作対応)</span>
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-200 border border-cyan-400/30">
+                  OS CONTROL
                 </span>
+              </div>
+
+              {/* Quick OS Action Chips */}
+              <div className="px-2.5 py-1.5 bg-black/25 border-b border-white/10 flex items-center gap-1 overflow-x-auto no-scrollbar text-[10px]">
+                {[
+                  { label: '🎬 映画を開く', cmd: '映画を開いて' },
+                  { label: '🎵 音楽を開く', cmd: '音楽を開いて' },
+                  { label: '🎮 ゲーム起動', cmd: 'ゲームを開いて' },
+                  { label: '🌙 ダーク/ライト', cmd: 'ライトモードにして' },
+                  { label: '🍎 macOS化', cmd: 'macOSモードにして' },
+                ].map((chip) => (
+                  <button
+                    key={chip.label}
+                    type="button"
+                    onClick={() => {
+                      setChatInput(chip.cmd);
+                    }}
+                    className="px-2 py-0.5 rounded-lg bg-white/10 hover:bg-cyan-400 hover:text-slate-950 text-white/85 whitespace-nowrap transition shrink-0"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
               </div>
 
               <div className="flex-1 overflow-y-auto p-3 space-y-2 text-xs">
                 {chatHistory.map((m) => (
                   <div
                     key={m.id}
-                    className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}
                   >
                     <div
                       className={`max-w-[85%] px-2.5 py-1.5 rounded-2xl ${
@@ -447,11 +557,16 @@ export function GlasiusCard({ onClose }: { onClose?: () => void }) {
                     >
                       {m.text}
                     </div>
+                    {m.actionLabel && (
+                      <span className="mt-1 px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[10px] font-mono">
+                        ⚡ 実行済: {m.actionLabel}
+                      </span>
+                    )}
                   </div>
                 ))}
                 {isSending && (
                   <div className="text-[10px] text-cyan-200 font-mono animate-pulse">
-                    返信を生成中...
+                    OS操作・返信を生成中...
                   </div>
                 )}
               </div>
@@ -464,7 +579,7 @@ export function GlasiusCard({ onClose }: { onClose?: () => void }) {
                   type="text"
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="AIと会話する..."
+                  placeholder="例: 映画を開いて / macOSにして..."
                   className="flex-1 px-2.5 py-1.5 rounded-xl bg-white/10 border border-white/15 text-xs text-white outline-none"
                 />
                 <button
@@ -472,7 +587,7 @@ export function GlasiusCard({ onClose }: { onClose?: () => void }) {
                   disabled={isSending}
                   className="px-3 py-1.5 rounded-xl bg-cyan-400 text-slate-950 font-black text-xs"
                 >
-                  送信
+                  実行
                 </button>
               </form>
             </div>

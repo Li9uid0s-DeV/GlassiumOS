@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { backendFetch } from '../backendConfig';
 
 export type EntertainmentTab = 'movies' | 'anime' | 'youtube' | 'shorts';
-export type StreamingProvider = 'mapple-fun' | 'streamex' | 'flixhd' | 'mapletv' | 'youtube';
+export type StreamingProvider = 'vidlink' | 'mapple-fun' | 'streamex' | 'flixhd' | 'mapletv' | 'youtube';
 
 interface MediaItem {
   id: string;
@@ -10,7 +10,7 @@ interface MediaItem {
   originalTitle?: string;
   type: 'movie' | 'series' | 'anime';
   year: number;
-  rating: number; // e.g. 8.8
+  rating: number;
   genre: string[];
   posterUrl: string;
   backdropUrl?: string;
@@ -19,6 +19,7 @@ interface MediaItem {
   tmdbId?: number;
   imdbId?: string;
   youtubeId?: string;
+  embedUrl?: string;
   featured?: boolean;
 }
 
@@ -29,6 +30,7 @@ interface YouTubeVideoItem {
   thumbnailUrl: string;
   views: string;
   category: 'music' | 'anime' | 'gaming' | 'lofi' | 'tech';
+  directVideoUrl?: string;
 }
 
 interface YouTubeShortItem {
@@ -44,35 +46,41 @@ const PROVIDER_METADATA: Record<
   StreamingProvider,
   { name: string; badge: string; color: string; desc: string }
 > = {
-  'mapple-fun': {
-    name: 'Mapple Fun (mapple.fun)',
-    badge: '推奨 (Primary)',
+  vidlink: {
+    name: 'VidLink Pro (1080p HD)',
+    badge: '最推奨 (Primary)',
     color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    desc: 'https://mapple.fun/ 高画質映画・海外ドラマ・アニメダイレクトストリーム',
+    desc: 'マルチオーディオ・字幕対応 1080p シネマストリーム',
+  },
+  'mapple-fun': {
+    name: 'VidSrc CC / Mapple',
+    badge: '高速サーバー 1',
+    color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
+    desc: '映画・アニメ・海外ドラマ高速ストリームサーバー',
   },
   streamex: {
-    name: 'StreameX',
-    badge: 'ミラー 1 (Fast)',
-    color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-    desc: '低遅延・高帯域ストリーミングプロバイダー',
+    name: 'AutoEmbed HD',
+    badge: 'ミラー 2 (Fast)',
+    color: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
+    desc: '低遅延・自動マルチソース切り替えプレイヤー',
   },
   flixhd: {
-    name: 'FlixHD',
-    badge: 'ミラー 2 (1080p HD)',
+    name: '2Embed Cinema',
+    badge: 'ミラー 3 (IMDb/TMDB)',
     color: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-    desc: 'Full HD 1080p 対応バックアップサーバー',
+    desc: 'IMDb / TMDB ID 連動バックアップサーバー',
   },
   mapletv: {
-    name: 'Maple TV',
-    badge: 'ミラー 3 (Mirror)',
+    name: 'Embed.su Pro',
+    badge: 'ミラー 4 (Edge)',
     color: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
     desc: '分散エッジ中継サーバー',
   },
   youtube: {
-    name: 'YouTube',
-    badge: '公式トレイラー・クリップ',
+    name: 'YouTube / 公式PV',
+    badge: '公式トレイラー・本予告',
     color: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
-    desc: 'YouTube公式埋め込みプレイヤー',
+    desc: 'YouTube NoCookie 埋め込みプレイヤー',
   },
 };
 
@@ -128,11 +136,12 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2023,
     rating: 9.3,
     genre: ['ファンタジー', '冒険', 'ドラマ'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/dqzenvhVVyv204vE0bK0Y9F7z3s.jpg',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/dqZENchTd7lp5zht7BdlqM7RBhD.jpg',
+    backdropUrl: 'https://image.tmdb.org/t/p/w1280/9faGSFi5jam6pDWGNd0p8JcJgXQ.jpg',
     description: '魔王を倒した勇者一行のその後を描く後日譚ファンタジー。千年以上生きるエルフの魔法使いフリーレンが、人の心を知るための旅に出る。',
     episodesCount: 28,
     tmdbId: 209867,
-    imdbId: 'tt22687790',
+    imdbId: 'tt22248376',
     youtubeId: 'qgQunxD0qMo',
     featured: true,
   },
@@ -144,9 +153,10 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     year: 2024,
     rating: 8.9,
     genre: ['ダークファンタジー', 'アクション', '時代劇'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/xUfVStAEX3GjFvKJm1aZkZ9C7n.jpg',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/xUfRZu2mi8jH6SzQEJGP6tjBuYj.jpg',
+    backdropUrl: 'https://image.tmdb.org/t/p/w1280/nTvM4mhqNlHIvUkI1gVnW6XP7GG.jpg',
     description: '鬼殺隊最高位の剣士「柱」たちによる合同強化訓練が始まる。宿敵・鬼舞辻無惨との最終決戦に向け、炭治郎たちの過酷な修業の幕が上がる。',
-    episodesCount: 8,
+    episodesCount: 55,
     tmdbId: 85937,
     imdbId: 'tt9335498',
     youtubeId: 'W3_n7wE4vY4',
@@ -155,15 +165,33 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
   {
     id: 'jujutsu-kaisen-s2',
     title: '呪術廻戦 懐玉・玉折／渋谷事変',
-    originalTitle: 'Jujutsu Kaisen Season 2',
+    originalTitle: 'Jujutsu Kaisen',
     type: 'anime',
     year: 2023,
     rating: 8.8,
-    genre: ['オカルト', 'バトルアクション', 'ダークファンタジー'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/eP1WwP9n0C06iS0lFwXf.jpg',
+    genre: ['オカルト', 'アクション', 'ダークファンタジー'],
+    posterUrl: 'https://image.tmdb.org/t/p/w500/fHpKWq9ayzSk8nSwqRuaAUemRKh.jpg',
+    backdropUrl: 'https://image.tmdb.org/t/p/w1280/gmECX1DvFgdUPjtio2zaL8BPYPu.jpg',
     description: '五条悟と夏油傑の高専時代、そしてハロウィンの渋谷を舞台に繰り広げられる未曾有の呪霊テロ。特級呪術師たちの激突を描く。',
-    episodesCount: 23,
+    episodesCount: 47,
+    tmdbId: 95479,
+    imdbId: 'tt12343534',
     youtubeId: 'O6qVieflwqs',
+  },
+  {
+    id: 'kusuriya-no-hitorigoto',
+    title: '薬屋のひとりごと',
+    originalTitle: 'The Apothecary Diaries',
+    type: 'anime',
+    year: 2023,
+    rating: 9.0,
+    genre: ['ミステリー', '時代劇', 'ドラマ'],
+    posterUrl: 'https://image.tmdb.org/t/p/w500/e3ojpANrFnmJCyeBNTinBt9BCIN.jpg',
+    description: '大陸の中央に位置する大国・後宮に勤める元薬師の少女・猫猫（マオマオ）が、王宮内で巻き起こる難事件を薬学の知識で解決する。',
+    episodesCount: 24,
+    tmdbId: 220542,
+    imdbId: 'tt26743760',
+    youtubeId: 'XYNGkSvFT8c',
   },
   {
     id: 'solo-leveling',
@@ -171,24 +199,28 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     originalTitle: 'Solo Leveling',
     type: 'anime',
     year: 2024,
-    rating: 8.5,
-    genre: ['異世界', 'アクション', 'ゲーム・ファンタジー'],
+    rating: 8.6,
+    genre: ['ファンタジー', 'アクション', '冒険'],
     posterUrl: 'https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr1viJuBDV4j6eb.jpg',
     description: '人類最弱兵器と呼ばれたE級ハンター水篠旬が、死の淵で手に入れた「自分だけが見えるクエスト画面」を通じて最強のS級へと成長していく。',
     episodesCount: 12,
+    tmdbId: 127532,
+    imdbId: 'tt21209876',
     youtubeId: 'cR5gZk8G7nE',
   },
   {
     id: 'oshi-no-ko',
-    title: '【推しの子】第2期',
+    title: '【推しの子】',
     originalTitle: 'Oshi no Ko',
     type: 'anime',
     year: 2024,
     rating: 8.7,
-    genre: ['サスペンス', '芸能界', 'ドラマ'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/dqzenvhVVyv204vE0bK0Y9F7z3s.jpg',
-    description: '伝説のアイドル・アイの死の真相を追うアクアとルビー。2.5次元舞台「東京ブレイド」編を舞台に役者たちの熱き演技バトルが幕を開ける。',
-    episodesCount: 13,
+    genre: ['サスペンス', 'ドラマ', 'ファンタジー'],
+    posterUrl: 'https://image.tmdb.org/t/p/w500/op3B52xK7i1G1B1Z2kG9pD0T3xS.jpg',
+    description: '伝説のアイドル・アイの死の真相を追うアクアとルビー。芸能界の光と闇、そして2.5次元舞台編での役者たちの熱き演技バトル。',
+    episodesCount: 24,
+    tmdbId: 203737,
+    imdbId: 'tt21030032',
     youtubeId: '1n_k_0t_WpM',
   },
   {
@@ -198,11 +230,59 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     type: 'anime',
     year: 2024,
     rating: 8.6,
-    genre: ['グルメ', 'ファンタジー', 'コメディ'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/geCRueV3ElhRTr1viJuBDV4j6eb.jpg',
+    genre: ['ファンタジー', 'コメディ', '冒険'],
+    posterUrl: 'https://image.tmdb.org/t/p/w500/tN3p7k2uB2eN8Q9L0mG3sF5wR1.jpg',
     description: 'レッドドラゴンに食べられた妹を救うため、魔物を狩って自給自足で料理しながら深層を目指す異色グルメファンタジー。',
     episodesCount: 24,
+    tmdbId: 209868,
+    imdbId: 'tt21621494',
     youtubeId: 'c1uY1b-7Vjg',
+  },
+  {
+    id: 'attack-on-titan',
+    title: '進撃の巨人 The Final Season',
+    originalTitle: 'Attack on Titan',
+    type: 'anime',
+    year: 2023,
+    rating: 9.2,
+    genre: ['アクション', 'ダークファンタジー', 'ドラマ'],
+    posterUrl: 'https://image.tmdb.org/t/p/w500/hTP1DtLGFamjfu8WqjnuQdP1n4i.jpg',
+    backdropUrl: 'https://image.tmdb.org/t/p/w1280/rqbCbjB19amtOtFQbb3K2lgm2zv.jpg',
+    description: '巨人がすべてを支配する世界。壁の外の真実を知ったエレン・イェーガーと調査兵団が迎える人類の最終局面。',
+    episodesCount: 89,
+    tmdbId: 1429,
+    imdbId: 'tt2560140',
+    youtubeId: 'E7WytLM2KvY',
+  },
+  {
+    id: 'spy-x-family',
+    title: 'SPY×FAMILY (スパイファミリー)',
+    originalTitle: 'SPY x FAMILY',
+    type: 'anime',
+    year: 2023,
+    rating: 8.6,
+    genre: ['アクション', 'コメディ', 'ファミリー'],
+    posterUrl: 'https://image.tmdb.org/t/p/w500/3r4LYFuXrg3G8fepysr4xSLWnQL.jpg',
+    description: '敏腕スパイ〈黄昏〉、殺し屋ヨル、超能力者アーニャが互いの正体を隠して仮初の家族を築き、世界の平和に挑む。',
+    episodesCount: 37,
+    tmdbId: 120089,
+    imdbId: 'tt13706018',
+    youtubeId: 'ofXigq9aIpo',
+  },
+  {
+    id: 'cyberpunk-edgerunners',
+    title: 'サイバーパンク エッジランナーズ',
+    originalTitle: 'Cyberpunk: Edgerunners',
+    type: 'anime',
+    year: 2022,
+    rating: 8.7,
+    genre: ['SF', 'アクション', 'ダークファンタジー'],
+    posterUrl: 'https://image.tmdb.org/t/p/w500/7jSWOc6jWSw5hZ78HB8Hw3pJxuk.jpg',
+    description: 'テクノロジーと身体改造に狂乱したメガシティ・ナイトシティ。すべてを失ったストリートキッドのデイビッドが傭兵「エッジランナー」として頂点を目指す。',
+    episodesCount: 10,
+    tmdbId: 105248,
+    imdbId: 'tt12590266',
+    youtubeId: 'JtqIas3bYhg',
   },
 
   // Movies
@@ -212,10 +292,13 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     originalTitle: 'Dune: Part Two',
     type: 'movie',
     year: 2024,
-    rating: 8.6,
+    rating: 8.8,
     genre: ['SF', 'アドベンチャー', 'アクション'],
     posterUrl: 'https://image.tmdb.org/t/p/w500/8b8R8W88QjeTdn9OE8PY05Nxl1X.jpg',
+    backdropUrl: 'https://image.tmdb.org/t/p/w1280/xOMo8BRK7PfcJv9JCnx7s5hj0PX.jpg',
     description: '宇宙の命運を握る砂の惑星アラキス。ポール・アトレイデスがチャニやフレメンたちと手を組み、一族を滅ぼした宿敵ハルコンネン家への復讐に立ち向かう。',
+    tmdbId: 693134,
+    imdbId: 'tt15239678',
     youtubeId: 'Way9Dexny3w',
     featured: true,
   },
@@ -226,9 +309,12 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     type: 'movie',
     year: 2023,
     rating: 8.9,
-    genre: ['伝記', '歴史', 'サスペンス'],
+    genre: ['ドラマ', '歴史', 'サスペンス'],
     posterUrl: 'https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGvF8Z1nOHb.jpg',
+    backdropUrl: 'https://image.tmdb.org/t/p/w1280/fm6KqXpk3M2HVveHwCrBSSBaO0V.jpg',
     description: 'クリストファー・ノーラン監督作品。マンハッタン計画を指揮し原子爆弾を生み出した天才物理学者J・ロバート・オッペンハイマーの光と影。',
+    tmdbId: 872585,
+    imdbId: 'tt15398776',
     youtubeId: 'uYPbbksJxIg',
   },
   {
@@ -237,11 +323,74 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     originalTitle: 'Interstellar',
     type: 'movie',
     year: 2014,
-    rating: 8.7,
+    rating: 9.2,
     genre: ['SF', 'ドラマ', 'アドベンチャー'],
     posterUrl: 'https://image.tmdb.org/t/p/w500/gEU2QniE6E77NI6lCU6MxlNBvIx.jpg',
+    backdropUrl: 'https://image.tmdb.org/t/p/w1280/xJHokMbljvjADYdit5fK5VQsXEG.jpg',
     description: '地球の寿命が尽きかけ、人類滅亡の危機に瀕した近未来。愛する家族を残し、人類の居住可能な新たな惑星を探すためワームホールを越える探査チームの旅。',
+    tmdbId: 157336,
+    imdbId: 'tt0816692',
     youtubeId: 'zSWdZVtXT7E',
+  },
+  {
+    id: 'your-name-kimi-no-na-wa',
+    title: '君の名は。',
+    originalTitle: 'Your Name.',
+    type: 'movie',
+    year: 2016,
+    rating: 8.9,
+    genre: ['ファンタジー', 'ドラマ', 'アニメーション'],
+    posterUrl: 'https://image.tmdb.org/t/p/w500/q719jXXEzOoYaps6babgKnONONX.jpg',
+    backdropUrl: 'https://image.tmdb.org/t/p/w1280/dIWwZW7dJJtqC6CgWzYkNVKIUm8.jpg',
+    description: '1000年ぶりとなる彗星の接近を1カ月後に控えた日本。東京に暮らす少年・瀧と飛騨の山奥に暮らす少女・三葉の心が入れ替わる奇跡の物語。',
+    tmdbId: 372058,
+    imdbId: 'tt5311514',
+    youtubeId: 'k4xGqY5IDBE',
+  },
+  {
+    id: 'suzume-no-tojimari',
+    title: 'すずめの戸締まり',
+    originalTitle: 'Suzume',
+    type: 'movie',
+    year: 2022,
+    rating: 8.5,
+    genre: ['ファンタジー', '冒険', 'アニメーション'],
+    posterUrl: 'https://image.tmdb.org/t/p/w500/vIeu8WysZrTSFb2uhPViKjX9EcC.jpg',
+    backdropUrl: 'https://image.tmdb.org/t/p/w1280/6YwkGolwdOMNpbTOmLjoehlVWs5.jpg',
+    description: '九州の静かな町で暮らす17歳の少女・鈴芽（すずめ）は、「扉を探してるんだ」という旅の青年・草太に出会う。日本各地の災いの扉を閉める旅。',
+    tmdbId: 916224,
+    imdbId: 'tt16428256',
+    youtubeId: 'SwNo_M7gB7c',
+  },
+  {
+    id: 'spirited-away',
+    title: '千と千尋の神隠し',
+    originalTitle: 'Spirited Away',
+    type: 'movie',
+    year: 2001,
+    rating: 9.0,
+    genre: ['ファンタジー', '冒険', 'アニメーション'],
+    posterUrl: 'https://image.tmdb.org/t/p/w500/39wmItIWsg5sZMyRUHLkWBcuVCM.jpg',
+    backdropUrl: 'https://image.tmdb.org/t/p/w1280/Ab8mkHmkYADjU7wQiOkia9BzGvS.jpg',
+    description: '神々の世界に迷い込んだ10歳の少女・千尋が、湯屋「油屋」で働きながら豚に変えられた両親を救うために奮闘するスタジオジブリ不朽の名作。',
+    tmdbId: 129,
+    imdbId: 'tt0245429',
+    youtubeId: 'ByXuk9QqQkk',
+  },
+  {
+    id: 'godzilla-minus-one',
+    title: 'ゴジラ-1.0 (Godzilla Minus One)',
+    originalTitle: 'ゴジラ-1.0',
+    type: 'movie',
+    year: 2023,
+    rating: 8.7,
+    genre: ['SF', 'アクション', 'ドラマ'],
+    posterUrl: 'https://image.tmdb.org/t/p/w500/hkxxMIGaiCTmrEArK7J56JTKUlB.jpg',
+    backdropUrl: 'https://image.tmdb.org/t/p/w1280/bWIIWhnaoWx3FTVXv6GkYDv3djL.jpg',
+    description: '戦後、焦土と化し無（ゼロ）になった日本へ、追い打ちをかけるように突如現れたゴジラ。その圧倒的な脅威に立ち向かう人々の物語。',
+    tmdbId: 940721,
+    imdbId: 'tt23289160',
+    youtubeId: 'VvSrHIX5a-0',
   },
   {
     id: 'spider-man-across-spider-verse',
@@ -249,11 +398,29 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     originalTitle: 'Spider-Man: Across the Spider-Verse',
     type: 'movie',
     year: 2023,
-    rating: 8.7,
+    rating: 8.8,
     genre: ['アニメーション', 'アクション', 'SF'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/8Vt6mWEReuy4Of61Lnj5Xj7sfs8.jpg',
+    posterUrl: 'https://image.tmdb.org/t/p/w500/8Vt6mWEReuy4Of61Lnj5Xj704m8.jpg',
+    backdropUrl: 'https://image.tmdb.org/t/p/w1280/4HodYYKEIsGOdinkGi2Ucz6X9i0.jpg',
     description: 'マルチバースを自在に渡り歩くスパイダー・ソサエティに出会ったマイルス・モラレス。自らの愛する人を救うか、マルチバースの秩序を守るかの選択を迫られる。',
+    tmdbId: 569094,
+    imdbId: 'tt9362722',
     youtubeId: 'cqGjhVJWtEg',
+  },
+  {
+    id: 'inception',
+    title: 'インセプション',
+    originalTitle: 'Inception',
+    type: 'movie',
+    year: 2010,
+    rating: 8.8,
+    genre: ['SF', 'アクション', 'サスペンス'],
+    posterUrl: 'https://image.tmdb.org/t/p/w500/oYuLEt3zVCKq57qu2F8dT7NIa6f.jpg',
+    backdropUrl: 'https://image.tmdb.org/t/p/w1280/8ZTVqvKDQ8emSGUEMjsS4yHAwrp.jpg',
+    description: '他人の夢の潜在意識に入り込みアイデアを盗み出すプロフェッショナル・コブが、逆に相手の心にアイデアを植え付ける究極の作戦「インセプション」に挑む。',
+    tmdbId: 27205,
+    imdbId: 'tt1375666',
+    youtubeId: 'YoHD9XEInc0',
   },
 
   // TV Series
@@ -263,11 +430,13 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     originalTitle: 'Shōgun',
     type: 'series',
     year: 2024,
-    rating: 8.7,
-    genre: ['時代劇', '歴史ドラマ', 'アドベンチャー'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/7O4iVfJ9YwYHQ1vbgVzM32D3P1s.jpg',
+    rating: 8.8,
+    genre: ['時代劇', 'ドラマ', 'アクション'],
+    posterUrl: 'https://image.tmdb.org/t/p/w500/7O4iVfOMQmdCSxhOg1WnzG1AgYT.jpg',
     description: '天下分け目の関ヶ原前夜。戦国最強の武将・吉井虎長と、難破して日本に漂着した英国人航海士ジョン・ブラックソーンの運命が交錯する超大作戦国ドラマ。',
     episodesCount: 10,
+    tmdbId: 126308,
+    imdbId: 'tt2788316',
     youtubeId: 'yBLHX-pE_V4',
     featured: true,
   },
@@ -277,11 +446,13 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     originalTitle: 'Fallout',
     type: 'series',
     year: 2024,
-    rating: 8.4,
-    genre: ['SF', 'ブラックコメディ', 'ポストアポカリプス'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/AnsZu445bO2tB2h9.jpg',
+    rating: 8.5,
+    genre: ['SF', 'アクション', 'ドラマ'],
+    posterUrl: 'https://image.tmdb.org/t/p/w500/AnsSKR9LuK0T9bAOcPVA3PUvyWj.jpg',
     description: '核戦争から200年後の荒廃したロサンゼルス。地下シェルター「Vault 33」から初めて過酷なウェイストランドへ飛び出したルーシーの波乱に満ちたサバイバル。',
     episodesCount: 8,
+    tmdbId: 106379,
+    imdbId: 'tt12637874',
     youtubeId: 'V-mugKDQDlg',
   },
   {
@@ -291,24 +462,13 @@ const CURATED_MEDIA_CATALOG: MediaItem[] = [
     type: 'series',
     year: 2022,
     rating: 8.7,
-    genre: ['SFホラー', 'ミステリー', '80sレトロ'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/xUfVStAEX3GjFvKJm1aZkZ9C7n.jpg',
+    genre: ['SF', 'ミステリー', 'ドラマ'],
+    posterUrl: 'https://image.tmdb.org/t/p/w500/49WJfeN0moxb9IPfGn8AIqMGskD.jpg',
     description: '1980年代のインディアナ州ホーキンス。少年の失踪事件をきっかけに、町に潜む秘密研究所、超能力を持つ謎の少女、そして「裏側の世界」の脅威が姿を現す。',
     episodesCount: 34,
+    tmdbId: 66732,
+    imdbId: 'tt4574334',
     youtubeId: 'b9EkMc79ZSU',
-  },
-  {
-    id: 'cyberpunk-edgerunners',
-    title: 'サイバーパンク エッジランナーズ',
-    originalTitle: 'Cyberpunk: Edgerunners',
-    type: 'anime',
-    year: 2022,
-    rating: 8.6,
-    genre: ['サイバーパンク', 'クライム', 'SFアクション'],
-    posterUrl: 'https://image.tmdb.org/t/p/w500/dqzenvhVVyv204vE0bK0Y9F7z3s.jpg',
-    description: 'テクノロジーと身体改造に狂乱したメガシティ・ナイトシティ。すべてを失ったストリートキッドのデイビッドが傭兵「エッジランナー」として頂点を目指す。',
-    episodesCount: 10,
-    youtubeId: 'JtqIas3bYhg',
   },
 ];
 
@@ -437,28 +597,60 @@ const cachedTvEpisodeCounts = new Map<number, number>();
 
 function optimizePosterUrl(url?: string): string {
   if (!url) return '';
-  // Downscale TMDB w500/w1280 to w342 for 60% faster decode & lower GPU memory
   return url.replace('/t/p/w500/', '/t/p/w342/').replace('/t/p/w1280/', '/t/p/w780/');
 }
 
+const ENT_STATE_KEY = 'glassium_entertainment_saved_state_v2';
+
 export function EntertainmentApp({ initialTab, payload }: { initialTab?: string; payload?: { videoId?: string; mode?: string } }) {
+  const savedState = useMemo(() => {
+    try {
+      const raw = localStorage.getItem(ENT_STATE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const [activeTab, setActiveTab] = useState<EntertainmentTab>(() => {
     if (initialTab === 'shorts' || payload?.mode === 'shorts') return 'shorts';
     if (initialTab === 'youtube' || payload?.mode === 'youtube') return 'youtube';
     if (initialTab === 'anime' || payload?.mode === 'anime') return 'anime';
-    return 'movies';
+    return (savedState?.activeTab as EntertainmentTab) || 'movies';
   });
 
-  const [provider, setProvider] = useState<StreamingProvider>('mapple-fun');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedGenre, setSelectedGenre] = useState<string>('All');
-  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(
-    cachedPopularMappleMovies[0] || CURATED_MEDIA_CATALOG[0]
+  const [provider, setProvider] = useState<StreamingProvider>(
+    (savedState?.provider as StreamingProvider) || 'vidlink'
   );
-  const [currentEpisode, setCurrentEpisode] = useState<number>(1);
-  const [isPlayingCinema, setIsPlayingCinema] = useState(false);
+  const [searchQuery, setSearchQuery] = useState<string>(savedState?.searchQuery || '');
+  const [selectedGenre, setSelectedGenre] = useState<string>(savedState?.selectedGenre || 'All');
+  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(
+    savedState?.selectedMedia || cachedPopularMappleMovies[0] || CURATED_MEDIA_CATALOG[0]
+  );
+  const [currentEpisode, setCurrentEpisode] = useState<number>(savedState?.currentEpisode || 1);
+  const [isPlayingCinema, setIsPlayingCinema] = useState<boolean>(Boolean(savedState?.isPlayingCinema));
   const [theaterMode, setTheaterMode] = useState(false);
-  const [visibleCardCount, setVisibleCardCount] = useState<number>(18);
+  const [visibleCardCount, setVisibleCardCount] = useState<number>(24);
+
+  // Persist current Entertainment progress so closing/reopening or reloading keeps exact place
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        ENT_STATE_KEY,
+        JSON.stringify({
+          activeTab,
+          provider,
+          searchQuery,
+          selectedGenre,
+          selectedMedia,
+          currentEpisode,
+          isPlayingCinema,
+        })
+      );
+    } catch {
+      // ignore
+    }
+  }, [activeTab, provider, searchQuery, selectedGenre, selectedMedia, currentEpisode, isPlayingCinema]);
 
   // YouTube Custom Search & Playback State
   const [customYoutubeUrl, setCustomYoutubeUrl] = useState('');
@@ -518,7 +710,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
             cachedPopularMappleMovies = data.results;
           }
           setMappleMovies(data.results);
-          if (!isPlayingCinema && activeTab === 'movies') {
+          if (!isPlayingCinema && activeTab === 'movies' && !selectedMedia) {
             setSelectedMedia(data.results[0]);
           }
         }
@@ -528,7 +720,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     } finally {
       setIsSearchingOnline(false);
     }
-  }, [activeTab, isPlayingCinema]);
+  }, [activeTab, isPlayingCinema, selectedMedia]);
 
   // Initial fetch for Mapple movies on mount or when tab becomes 'movies'
   useEffect(() => {
@@ -557,7 +749,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     }
   }, [isPlayingCinema, activeTab]);
 
-  // Debounced live TMDB / Mapple search fetch with query cache
+  // Debounced live Multi-Source search fetch with query cache
   useEffect(() => {
     const q = searchQuery.trim();
     if (!q) {
@@ -569,6 +761,9 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     const cached = cachedSearchQueries.get(q.toLowerCase());
     if (cached) {
       setOnlineSearchResults(cached);
+      if (!isPlayingCinema && cached[0]) {
+        setSelectedMedia(cached[0]);
+      }
       return;
     }
 
@@ -592,7 +787,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
       } finally {
         setIsSearchingOnline(false);
       }
-    }, 320);
+    }, 260);
 
     return () => clearTimeout(timer);
   }, [searchQuery, isPlayingCinema]);
@@ -620,37 +815,40 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     }
   }, [selectedMedia]);
 
-  // Filter media based on tab, genre, and search (combining mapple movies + live TMDB search + local catalog)
+  // Filter media based on tab, genre, and search (properly filtering when searchQuery is active!)
   const filteredCatalog = useMemo(() => {
-    let list = [...onlineSearchResults, ...mappleMovies, ...CURATED_MEDIA_CATALOG];
+    const q = searchQuery.trim().toLowerCase();
+    const localMatching = [...CURATED_MEDIA_CATALOG, ...mappleMovies].filter((m) => {
+      if (!q) return true;
+      return (
+        (m.title || '').toLowerCase().includes(q) ||
+        (m.originalTitle || '').toLowerCase().includes(q) ||
+        (m.description || '').toLowerCase().includes(q) ||
+        (m.genre || []).some((g) => g.toLowerCase().includes(q))
+      );
+    });
+
+    let list = q ? [...onlineSearchResults, ...localMatching] : [...CURATED_MEDIA_CATALOG, ...mappleMovies];
     const seen = new Set<string>();
     list = list.filter((m) => {
-      const key = m.tmdbId ? `tmdb-${m.tmdbId}` : m.id;
+      const key = m.tmdbId ? `tmdb-${m.type}-${m.tmdbId}` : m.id;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
     });
 
-    if (activeTab === 'movies') {
-      list = list.filter((m) => m.type === 'movie' || m.type === 'series');
-    } else if (activeTab === 'anime') {
-      list = list.filter((m) => m.type === 'anime');
+    if (!q) {
+      if (activeTab === 'movies') {
+        list = list.filter((m) => m.type === 'movie' || m.type === 'series');
+      } else if (activeTab === 'anime') {
+        list = list.filter((m) => m.type === 'anime');
+      }
     }
 
     if (selectedGenre !== 'All') {
-      list = list.filter((m) => (m.genre || []).includes(selectedGenre));
+      list = list.filter((m) => (m.genre || []).some((g) => g.includes(selectedGenre)));
     }
 
-    const q = searchQuery.trim().toLowerCase();
-    if (q && onlineSearchResults.length === 0) {
-      list = list.filter(
-        (m) =>
-          (m.title || '').toLowerCase().includes(q) ||
-          m.originalTitle?.toLowerCase().includes(q) ||
-          (m.description || '').toLowerCase().includes(q) ||
-          (m.genre || []).some((g) => g.toLowerCase().includes(q))
-      );
-    }
     return list;
   }, [onlineSearchResults, mappleMovies, activeTab, selectedGenre, searchQuery]);
 
@@ -659,44 +857,82 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     [filteredCatalog, visibleCardCount]
   );
 
-  // Compute embed URL for current player & provider (mapple.fun, StreameX, FlixHD, Maple TV, YouTube)
+  // Compute embed URL for current player & provider — NEVER fall back to Frieren (209867) for other movies!
   const currentEmbedUrl = useMemo(() => {
     if (!selectedMedia) return '';
 
-    const tmdbId = selectedMedia.tmdbId || 209867;
-    const imdbId = selectedMedia.imdbId || 'tt22687790';
+    const tmdbId = selectedMedia.tmdbId;
+    const imdbId = selectedMedia.imdbId;
     const ep = currentEpisode || 1;
     const isMovie = selectedMedia.type === 'movie';
 
+    if (provider === 'youtube') {
+      if (selectedMedia.youtubeId) {
+        return `https://www.youtube-nocookie.com/embed/${selectedMedia.youtubeId}?autoplay=1&rel=0`;
+      }
+      if (selectedMedia.embedUrl && selectedMedia.embedUrl.includes('youtube')) {
+        return selectedMedia.embedUrl;
+      }
+    }
+
+    // If item has a direct embedUrl (e.g. Jikan trailer or iTunes preview) and no tmdbId/imdbId
+    if (!tmdbId && !imdbId) {
+      if (selectedMedia.embedUrl) return selectedMedia.embedUrl;
+      if (selectedMedia.youtubeId) {
+        return `https://www.youtube-nocookie.com/embed/${selectedMedia.youtubeId}?autoplay=1&rel=0`;
+      }
+    }
+
+    const targetId = tmdbId || imdbId || 693134;
+
     switch (provider) {
-      case 'mapple-fun':
-        // https://mapple.fun/ stream embed server
-        if (isMovie) {
-          return `https://mapple.fun/embed/movie/${tmdbId}`;
+      case 'vidlink':
+        if (tmdbId) {
+          return isMovie
+            ? `https://vidlink.pro/movie/${tmdbId}?autoplay=true`
+            : `https://vidlink.pro/tv/${tmdbId}/1/${ep}?autoplay=true`;
         }
-        return `https://mapple.fun/embed/tv/${tmdbId}/1/${ep}`;
+        return isMovie
+          ? `https://www.2embed.cc/embed/${targetId}`
+          : `https://www.2embed.cc/embedtv/${targetId}&s=1&e=${ep}`;
+
+      case 'mapple-fun':
+        if (tmdbId) {
+          return isMovie
+            ? `https://vidsrc.cc/v2/embed/movie/${tmdbId}`
+            : `https://vidsrc.cc/v2/embed/tv/${tmdbId}/1/${ep}`;
+        }
+        return `https://www.2embed.cc/embed/${targetId}`;
 
       case 'streamex':
-        if (isMovie) {
-          return `https://vidsrc.to/embed/movie/${tmdbId}`;
+        if (tmdbId) {
+          return isMovie
+            ? `https://player.autoembed.cc/embed/movie/${tmdbId}`
+            : `https://player.autoembed.cc/embed/tv/${tmdbId}/1/${ep}`;
         }
-        return `https://vidsrc.to/embed/tv/${tmdbId}/1/${ep}`;
+        return `https://vidsrc.me/embed/movie?imdb=${imdbId || 'tt15239678'}`;
 
       case 'flixhd':
-        if (isMovie) {
-          return `https://vidsrc.me/embed/movie?imdb=${imdbId}`;
+        if (imdbId) {
+          return isMovie
+            ? `https://www.2embed.cc/embed/${imdbId}`
+            : `https://www.2embed.cc/embedtv/${imdbId}&s=1&e=${ep}`;
         }
-        return `https://vidsrc.me/embed/tv?imdb=${imdbId}&season=1&episode=${ep}`;
+        return isMovie
+          ? `https://www.2embed.cc/embed/${targetId}`
+          : `https://www.2embed.cc/embedtv/${targetId}&s=1&e=${ep}`;
 
       case 'mapletv':
-        if (isMovie) {
-          return `https://embed.su/embed/movie/${tmdbId}`;
+        if (tmdbId) {
+          return isMovie
+            ? `https://embed.su/embed/movie/${tmdbId}`
+            : `https://embed.su/embed/tv/${tmdbId}/1/${ep}`;
         }
-        return `https://embed.su/embed/tv/${tmdbId}/1/${ep}`;
+        return `https://www.2embed.cc/embed/${targetId}`;
 
       case 'youtube':
       default: {
-        const ytId = selectedMedia.youtubeId || 'qgQunxD0qMo';
+        const ytId = selectedMedia.youtubeId || 'Way9Dexny3w';
         return `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0`;
       }
     }
@@ -821,17 +1057,18 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
 
         {/* Right: Provider Switcher Pill */}
         <div className="flex items-center gap-2">
-          <label className="text-[11px] text-white/50 hidden sm:inline">ソース:</label>
+          <label className="text-[11px] text-white/50 hidden sm:inline">サーバー:</label>
           <select
             value={provider}
             onChange={(e) => setProvider(e.target.value as StreamingProvider)}
             className="bg-black/60 border border-white/15 text-white text-xs font-semibold rounded-lg px-2.5 py-1.5 outline-none hover:border-white/30 transition cursor-pointer"
           >
-            <option value="mapple-fun">Mapple Fun (mapple.fun) (推奨)</option>
-            <option value="streamex">StreameX (ミラー 1)</option>
-            <option value="flixhd">FlixHD (1080p)</option>
-            <option value="mapletv">Maple TV (ミラー 3)</option>
-            <option value="youtube">YouTube (公式)</option>
+            <option value="vidlink">VidLink Pro (1080p 最推奨)</option>
+            <option value="mapple-fun">VidSrc CC / Mapple (高速1)</option>
+            <option value="streamex">AutoEmbed HD (ミラー2)</option>
+            <option value="flixhd">2Embed Cinema (ミラー3)</option>
+            <option value="mapletv">Embed.su Pro (ミラー4)</option>
+            <option value="youtube">YouTube / 公式PV</option>
           </select>
         </div>
       </header>
@@ -855,51 +1092,74 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
                 } overflow-hidden shrink-0 border-b border-white/10`}
               >
                 {isPlayingCinema ? (
-                  <div className="relative w-full h-full">
-                    <iframe
-                      src={currentEmbedUrl}
-                      title={selectedMedia.title}
-                      className="w-full h-full border-0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                    {/* Floating Controls Bar over video */}
-                    <div className="absolute top-3 right-3 flex items-center gap-2 z-10 pointer-events-auto">
-                      <div className="flex items-center gap-1.5 bg-black/80 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/20 text-[11px]">
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="text-white/80 font-medium">
-                          {PROVIDER_METADATA[provider].name}
-                        </span>
+                  <div className="relative w-full h-full bg-black">
+                    {/\.(m4v|mp4|webm)(\?|$)/i.test(currentEmbedUrl) ? (
+                      <video
+                        key={currentEmbedUrl}
+                        src={currentEmbedUrl}
+                        controls
+                        autoPlay
+                        className="w-full h-full object-contain bg-black"
+                      />
+                    ) : (
+                      <iframe
+                        key={`${selectedMedia.id}-${provider}-${currentEpisode}`}
+                        src={currentEmbedUrl}
+                        title={selectedMedia.title}
+                        className="w-full h-full border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                        allowFullScreen
+                      />
+                    )}
+                    {/* Floating Controls & 1-Click Server Switcher over video */}
+                    <div className="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 z-10 pointer-events-none">
+                      <div className="flex items-center gap-1 bg-black/80 backdrop-blur-md p-1 rounded-full border border-white/20 pointer-events-auto overflow-x-auto max-w-full">
+                        {(
+                          [
+                            ['vidlink', 'VidLink 1080p'],
+                            ['mapple-fun', 'VidSrc CC'],
+                            ['streamex', 'AutoEmbed'],
+                            ['flixhd', '2Embed'],
+                            ['mapletv', 'Embed.su'],
+                            ['youtube', '公式PV/YouTube'],
+                          ] as Array<[StreamingProvider, string]>
+                        ).map(([provKey, label]) => (
+                          <button
+                            key={provKey}
+                            type="button"
+                            onClick={() => setProvider(provKey)}
+                            className={`px-2.5 py-1 rounded-full text-[10px] font-bold transition whitespace-nowrap ${
+                              provider === provKey
+                                ? 'bg-rose-600 text-white shadow'
+                                : 'text-white/70 hover:text-white hover:bg-white/15'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
                       </div>
-                      <a
-                        href={currentEmbedUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="h-8 px-2.5 rounded-full bg-black/80 backdrop-blur-md hover:bg-white/20 flex items-center gap-1 text-white text-xs border border-white/20 transition"
-                        title="別タブで動画ページを直接開く"
-                      >
-                        <span className="material-symbols-rounded text-sm">open_in_new</span>
-                        <span className="hidden sm:inline">直リンク</span>
-                      </a>
-                      <button
-                        onClick={() => setTheaterMode(!theaterMode)}
-                        className="w-8 h-8 rounded-full bg-black/80 backdrop-blur-md hover:bg-white/20 flex items-center justify-center text-white border border-white/20 transition"
-                        title={theaterMode ? '通常サイズ' : 'シアターモード'}
-                      >
-                        <span className="material-symbols-rounded text-base">
-                          {theaterMode ? 'close_fullscreen' : 'fit_screen'}
-                        </span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setIsPlayingCinema(false);
-                          setTheaterMode(false);
-                        }}
-                        className="w-8 h-8 rounded-full bg-black/80 backdrop-blur-md hover:bg-rose-500/80 flex items-center justify-center text-white border border-white/20 transition"
-                        title="閉じる"
-                      >
-                        <span className="material-symbols-rounded text-base">close</span>
-                      </button>
+
+                      <div className="flex items-center gap-1.5 pointer-events-auto ml-auto">
+                        <button
+                          onClick={() => setTheaterMode(!theaterMode)}
+                          className="w-8 h-8 rounded-full bg-black/80 backdrop-blur-md hover:bg-white/20 flex items-center justify-center text-white border border-white/20 transition"
+                          title={theaterMode ? '通常サイズ' : 'シアターモード'}
+                        >
+                          <span className="material-symbols-rounded text-base">
+                            {theaterMode ? 'close_fullscreen' : 'fit_screen'}
+                          </span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsPlayingCinema(false);
+                            setTheaterMode(false);
+                          }}
+                          className="w-8 h-8 rounded-full bg-black/80 backdrop-blur-md hover:bg-rose-500/80 flex items-center justify-center text-white border border-white/20 transition"
+                          title="閉じる"
+                        >
+                          <span className="material-symbols-rounded text-base">close</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : (

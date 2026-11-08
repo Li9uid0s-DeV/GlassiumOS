@@ -75,6 +75,47 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   const [pinInput, setPinInput] = useState('');
   const [passError, setPassError] = useState(false);
 
+  // Slide-up gesture & Bing Daily Nature Wallpaper state
+  const [slideOffsetY, setSlideOffsetY] = useState(0);
+  const [dragStartY, setDragStartY] = useState<number | null>(null);
+  const [bingImages, setBingImages] = useState<
+    Array<{ url: string; title: string; copyright: string; startdate?: string }>
+  >([
+    {
+      url: 'https://www.bing.com/th?id=OHR.BanffSnow_ROW6870286334_1920x1080.jpg',
+      title: 'Banff National Park, Alberta, Canada',
+      copyright: '© Bing Daily Nature Archive',
+    },
+  ]);
+  const [bingIndex, setBingIndex] = useState(0);
+  const [useBingWallpaper, setUseBingWallpaper] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/bing-wallpaper')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data) return;
+        if (Array.isArray(data.images) && data.images.length > 0) {
+          setBingImages(data.images);
+        } else if (data.url) {
+          setBingImages([
+            {
+              url: data.url,
+              title: data.title || 'Bing Daily Nature Wallpaper',
+              copyright: data.copyright || '© Microsoft Bing',
+            },
+          ]);
+        }
+      })
+      .catch(() => {
+        // Keep default Bing nature image
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Top-Left Customizable Weather & Personal Info
   const [customInfo, setCustomInfo] = useState<LockScreenCustomInfo>(() => {
     try {
@@ -101,26 +142,20 @@ export const LockScreen: React.FC<LockScreenProps> = ({
     {
       id: 'n-1',
       app: 'Glassium System',
-      title: 'Glassium OS 準備完了',
-      body: 'ロック解除ボタンをクリックしてデスクトップへアクセスできます',
+      title: '上にスライドしてロック解除',
+      body: expectedPassword
+        ? '画面を上にスライドすると背景がボケてパスワード入力欄が表示されます'
+        : 'パスワード未設定のため、上にスライドするとそのままデスクトップへ移動します',
       time: '今',
       accent: 'from-cyan-400 to-sky-500',
     },
     {
       id: 'n-2',
-      app: 'Glassium Cloud Server',
-      title: 'Render バックエンド自動接続完了',
-      body: 'HTML5 ゲーム実行エンジン (jsDelivr / GitHub) と高音質音楽ストリームが有効です',
-      time: '2分前',
+      app: 'Bing Daily Nature',
+      title: 'Bing 日替わり自然壁紙が有効',
+      body: '世界中の美しい自然風景が毎日自動でロック画面の背景に切り替わります',
+      time: '今',
       accent: 'from-emerald-400 to-teal-500',
-    },
-    {
-      id: 'n-3',
-      app: 'HyperOS Weather Alert',
-      title: '今夜は星空指数 95%',
-      body: '降水確率10%・夜間の気温変化にご注意ください',
-      time: '12分前',
-      accent: 'from-amber-400 to-orange-500',
     },
   ]);
 
@@ -130,7 +165,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
     {
       id: 'welcome',
       role: 'assistant',
-      text: 'こんにちは！ロック画面の純粋チャットAIです（OS操作は行わず、質問や雑談・アイデア出しに専念します）。何でも話しかけてください。',
+      text: 'こんにちは！ロック画面のAIチャットです。質問や雑談・アイデア出しなど何でも話しかけてください。',
     },
   ]);
   const [aiInput, setAiInput] = useState('');
@@ -187,10 +222,10 @@ export const LockScreen: React.FC<LockScreenProps> = ({
         role: m.role,
         content: m.text,
       }));
-      const reply = await requestAIChat(historyPayload);
+      const res = await requestAIChat(historyPayload);
       setAiMessages((prev) => [
         ...prev,
-        { id: `a-${Date.now()}`, role: 'assistant', text: reply },
+        { id: `a-${Date.now()}`, role: 'assistant', text: res.reply || '応答を受信しました。' },
       ]);
     } catch {
       setAiMessages((prev) => [
@@ -206,17 +241,55 @@ export const LockScreen: React.FC<LockScreenProps> = ({
     }
   };
 
-  const handleUnlockTrigger = () => {
-    if (expectedPassword && passwordMode) {
-      if (pinInput !== expectedPassword) {
-        setPassError(true);
-        soundService.playNotify();
-        return;
-      }
+  // Triggered when the user slides up or clicks unlock
+  const triggerSlideUpAction = () => {
+    if (!expectedPassword) {
+      // No password configured -> go straight to desktop!
+      setPassError(false);
+      soundService.playOpen();
+      onUnlock();
+    } else {
+      // Password configured -> blur background and reveal password input field!
+      setPasswordMode(true);
+      soundService.playClick();
+    }
+  };
+
+  const handlePasswordSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (expectedPassword && pinInput !== expectedPassword) {
+      setPassError(true);
+      soundService.playNotify();
+      return;
     }
     setPassError(false);
     soundService.playOpen();
     onUnlock();
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button, input, select, form, a, textarea')) return;
+    setDragStartY(e.clientY);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (dragStartY === null) return;
+    const deltaY = dragStartY - e.clientY; // positive when dragging UP
+    if (deltaY > 0) {
+      setSlideOffsetY(Math.min(deltaY, 220));
+    } else {
+      setSlideOffsetY(0);
+    }
+  };
+
+  const handlePointerUp = () => {
+    if (dragStartY === null) return;
+    if (slideOffsetY > 55) {
+      triggerSlideUpAction();
+    }
+    setDragStartY(null);
+    setSlideOffsetY(0);
   };
 
   // Scene background gradients & foreground depth SVG paths
@@ -252,6 +325,8 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   }[customInfo.depthScene];
 
   const isMediaPlaying = Boolean(musicState?.isPlaying && musicState?.currentTrack);
+  const activeBing = bingImages[bingIndex % bingImages.length] || bingImages[0];
+  const blurAmountPx = passwordMode ? 24 : Math.min(20, Math.round(slideOffsetY / 8));
 
   // If OS is not locked, do not render lock screen
   if (!locked) {
@@ -266,26 +341,43 @@ export const LockScreen: React.FC<LockScreenProps> = ({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0, scale: 1.02, filter: 'blur(16px)' }}
         transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         className="fixed inset-0 z-[100] select-none overflow-hidden text-white"
         style={{ background: sceneTheme.bg }}
       >
         {/* =====================================================================
-            LAYER 0: HYPEROS 3/4 + iOS 27 LIQUID GLASS BACKGROUND LIGHT ORBS
-            (Positioned behind bottom-left clock so digits refract the light)
+            LAYER 0: BING DAILY NATURE WALLPAPER + DYNAMIC SLIDE-UP BLUR
         ===================================================================== */}
-        <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
+        <div
+          className="absolute inset-0 pointer-events-none z-0 overflow-hidden transition-all duration-300"
+          style={{
+            filter: blurAmountPx > 0 ? `blur(${blurAmountPx}px) brightness(0.68)` : 'none',
+            transform: passwordMode || slideOffsetY > 10 ? 'scale(1.06)' : 'scale(1)',
+          }}
+        >
+          {useBingWallpaper && activeBing?.url && (
+            <img
+              src={activeBing.url}
+              alt={activeBing.title}
+              className="absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700"
+            />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/20 to-slate-950/45" />
+
           <div
-            className="absolute -bottom-16 -left-12 w-[520px] h-[420px] rounded-full blur-[70px] opacity-80"
+            className="absolute -bottom-16 -left-12 w-[520px] h-[420px] rounded-full blur-[70px] opacity-60"
             style={{ background: sceneTheme.glow }}
           />
-          <div className="absolute bottom-24 left-44 w-72 h-72 rounded-full bg-gradient-to-tr from-cyan-400/40 via-fuchsia-400/35 to-amber-300/40 blur-[55px]" />
-          <div className="absolute top-12 left-1/3 w-96 h-96 rounded-full bg-sky-500/15 blur-[110px]" />
+          <div className="absolute bottom-24 left-44 w-72 h-72 rounded-full bg-gradient-to-tr from-cyan-400/30 via-fuchsia-400/25 to-amber-300/30 blur-[55px]" />
 
           {/* Distant Background Mountain Layer */}
           <svg
             viewBox="0 0 1440 500"
             preserveAspectRatio="none"
-            className="absolute bottom-0 left-0 w-full h-[360px] opacity-65"
+            className="absolute bottom-0 left-0 w-full h-[360px] opacity-40"
           >
             <path
               d="M0,500 L0,250 L180,120 L370,235 L590,95 L820,260 L1080,140 L1290,240 L1440,170 L1440,500 Z"
@@ -295,10 +387,123 @@ export const LockScreen: React.FC<LockScreenProps> = ({
         </div>
 
         {/* =====================================================================
-            TOP-LEFT (左上): GENUINE SYSTEM STATUS & WEATHER FORECAST + CUSTOM INFO
-            (No fake biometric face scanning - Real Unlock Button)
+            CENTERED PASSWORD OVERLAY WHEN SLID UP (IF PASSWORD IS SET)
         ===================================================================== */}
-        <div className="absolute top-6 left-6 z-30 flex flex-col gap-3 max-w-md w-[calc(100vw-3rem)] sm:w-[390px]">
+        <AnimatePresence>
+          {passwordMode && (
+            <motion.div
+              initial={{ opacity: 0, y: 40, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 30, scale: 0.96 }}
+              className="fixed inset-0 z-50 flex flex-col items-center justify-center p-6 bg-black/35 backdrop-blur-md"
+            >
+              <form
+                onSubmit={handlePasswordSubmit}
+                className="w-full max-w-sm p-6 rounded-3xl bg-white/[0.12] backdrop-blur-3xl border border-white/25 shadow-[0_24px_80px_rgba(0,0,0,0.65)] flex flex-col items-center gap-4 text-center"
+              >
+                <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-cyan-300/60 shadow-xl">
+                  <AvatarRenderer avatar={userAvatar} size={64} />
+                </div>
+                <div>
+                  <div className="text-base font-black text-white">{userName}</div>
+                  <div className="text-[11px] text-cyan-200 mt-0.5">
+                    パスワードを入力してロック解除
+                  </div>
+                </div>
+
+                <div
+                  className={`w-full flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-black/55 border ${
+                    passError ? 'border-rose-400 ring-2 ring-rose-500/40' : 'border-white/25 focus-within:border-cyan-300'
+                  }`}
+                >
+                  <Icon name="Lock" size={14} className="text-cyan-300 shrink-0" />
+                  <input
+                    type="password"
+                    value={pinInput}
+                    onChange={(e) => {
+                      setPinInput(e.target.value);
+                      setPassError(false);
+                    }}
+                    placeholder="パスワードを入力..."
+                    className="flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/45"
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    className="px-3.5 py-1.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black text-xs transition cursor-pointer"
+                  >
+                    解除
+                  </button>
+                </div>
+
+                {passError && (
+                  <div className="text-xs text-rose-300 font-bold">
+                    パスワードが正しくありません。もう一度お試しください。
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPasswordMode(false);
+                    setPassError(false);
+                  }}
+                  className="text-xs text-white/65 hover:text-white mt-1 cursor-pointer"
+                >
+                  キャンセルしてロック画面に戻る
+                </button>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* =====================================================================
+            BOTTOM-CENTER SLIDE-UP HANDLE & BING WALLPAPER CAPTION
+        ===================================================================== */}
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 flex flex-col items-center gap-2 pointer-events-auto">
+          <button
+            type="button"
+            onClick={triggerSlideUpAction}
+            className="group px-5 py-2 rounded-full bg-black/45 hover:bg-black/65 backdrop-blur-2xl border border-white/20 shadow-xl flex flex-col items-center gap-1 transition cursor-pointer"
+          >
+            <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-200 group-hover:-translate-y-0.5 transition-transform">
+              <Icon name="ChevronUp" size={14} />
+              <span>
+                {expectedPassword
+                  ? '上にスライドしてパスワード入力'
+                  : '上にスライドしてデスクトップへ進む'}
+              </span>
+            </div>
+            <div className="w-12 h-1 rounded-full bg-white/40 group-hover:bg-cyan-300 transition-colors" />
+          </button>
+
+          {useBingWallpaper && activeBing && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 backdrop-blur-xl border border-white/10 text-[10px] text-white/75 max-w-[90vw]">
+              <Icon name="Globe" size={11} className="text-cyan-300 shrink-0" />
+              <span className="truncate max-w-[260px] sm:max-w-[380px]">
+                Bing 日替わり自然壁紙: {activeBing.title}
+              </span>
+              {bingImages.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setBingIndex((prev) => (prev + 1) % bingImages.length)}
+                  className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-cyan-200 font-bold shrink-0 cursor-pointer"
+                  title="別の日のBing自然壁紙に切替"
+                >
+                  切替
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* =====================================================================
+            TOP-LEFT (左上): GENUINE SYSTEM STATUS & WEATHER FORECAST + CUSTOM INFO
+        ===================================================================== */}
+        <div
+          className="absolute top-6 left-6 z-30 flex flex-col gap-3 max-w-md w-[calc(100vw-3rem)] sm:w-[390px] transition-transform duration-200"
+          style={{ transform: slideOffsetY > 0 ? `translateY(-${Math.round(slideOffsetY * 0.45)}px)` : undefined }}
+        >
           {/* Authentic Glassium Unlock Bar */}
           <div className="flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-2xl bg-black/45 backdrop-blur-2xl border border-white/15 shadow-xl">
             <div className="flex items-center gap-2.5">
@@ -308,7 +513,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
               <div>
                 <div className="text-[10px] font-mono uppercase tracking-wider text-white/60 flex items-center gap-1.5">
                   <span className="ios27-liquid-circle-dot scale-75" />
-                  <span>GLASSIUM OS · LOCKED</span>
+                  <span>GLASSIUM OS · BING NATURE LOCK</span>
                 </div>
                 <div className="text-xs font-bold text-white truncate max-w-[150px]">
                   {userName}
@@ -319,60 +524,22 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={handleUnlockTrigger}
+                onClick={() => setUseBingWallpaper(!useBingWallpaper)}
+                className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white/90 text-[11px] font-bold cursor-pointer"
+                title="Bing自然壁紙 / テーマ背景切替"
+              >
+                {useBingWallpaper ? '🏞️ Bing自然' : '🌌 オーロラ'}
+              </button>
+              <button
+                type="button"
+                onClick={triggerSlideUpAction}
                 className="px-3.5 py-1.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 font-black text-xs shadow-md hover:scale-105 active:scale-95 transition flex items-center gap-1.5 cursor-pointer"
               >
                 <Icon name="Unlock" size={13} />
                 <span>ロック解除</span>
               </button>
-              {expectedPassword && (
-                <button
-                  type="button"
-                  onClick={() => setPasswordMode(!passwordMode)}
-                  className="p-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 text-xs"
-                  title="パスワード入力"
-                >
-                  <Icon name="Key" size={13} />
-                </button>
-              )}
             </div>
           </div>
-
-          {/* Password / PIN Box if required */}
-          <AnimatePresence>
-            {passwordMode && (
-              <motion.form
-                initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleUnlockTrigger();
-                }}
-                className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-black/60 backdrop-blur-2xl border ${
-                  passError ? 'border-rose-400' : 'border-white/20'
-                }`}
-              >
-                <input
-                  type="password"
-                  value={pinInput}
-                  onChange={(e) => {
-                    setPinInput(e.target.value);
-                    setPassError(false);
-                  }}
-                  placeholder="パスワードを入力して Enter..."
-                  className="flex-1 bg-transparent text-xs text-white outline-none placeholder:text-white/45"
-                  autoFocus
-                />
-                <button
-                  type="submit"
-                  className="px-3 py-1 rounded-lg bg-cyan-400 text-slate-950 font-bold text-xs hover:brightness-110"
-                >
-                  OK
-                </button>
-              </motion.form>
-            )}
-          </AnimatePresence>
 
           {/* Customizable Weather Forecast & Personal Info Card */}
           <div className="p-4 rounded-3xl bg-white/[0.08] backdrop-blur-3xl border border-white/20 shadow-[0_20px_50px_rgba(0,0,0,0.45)] space-y-3">
