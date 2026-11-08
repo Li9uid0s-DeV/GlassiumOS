@@ -2,9 +2,6 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
-import { installBackendFetchInterceptor } from './os/backendConfig';
-
-installBackendFetchInterceptor();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -12,18 +9,16 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>
 );
 
-// Register Wisp + Ultraviolet (/uv/service/) & Scramjet (/scramjet/) Service Worker Proxy safely
+// Register GlassiumOS Service Worker Proxy for browser CORS bypass
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
-      .register('./sw-proxy.js')
+      .register('/sw-proxy.js', { scope: '/' })
       .then((reg) => {
-        if (reg.waiting) {
-          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-        }
+        console.log('[GlassiumOS] Service Worker Proxy registered successfully:', reg.scope);
       })
-      .catch(() => {
-        // Fallback handled by server-side /uv/service/* & /scramjet/* Wisp routes
+      .catch((err) => {
+        console.warn('[GlassiumOS] Service Worker registration failed:', err);
       });
   });
 }

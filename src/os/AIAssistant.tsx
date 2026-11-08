@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useOS } from './OSContext';
+import { useOS, AuroraColor, Wallpaper } from './OSContext';
 import { Icon } from './Icon';
-import { requestAIChat } from './aiClient';
+import { AppId, ShellMode } from './types';
 
 interface ChatMessage {
   id: string;
@@ -15,36 +15,41 @@ interface ChatMessage {
 }
 
 const QUICK_PROMPTS = [
-  { label: '🎬 映画・アニメを開く', query: '映画を開いて' },
-  { label: '🎵 音楽プレイヤー起動', query: '音楽を開いて' },
-  { label: '🌙 ダーク/ライト切替', query: 'ライトモードにして' },
-  { label: '🍎 macOSモードにする', query: 'macOSモードにして' },
-  { label: '📐 ウィンドウ左右整列', query: 'ウィンドウを左右に整列して' },
+  { label: 'ブラックホールとは？', query: 'ブラックホールとは何か、わかりやすく教えて' },
+  { label: '美味しいカレーの作り方', query: 'コクが出る美味しいカレーの作り方を教えて' },
+  { label: 'Reactの書き方', query: 'ReactとTypeScriptの基本的なコンポーネント例を教えて' },
+  { label: 'オーロラをエメラルドに', query: 'オーロラのカラーをエメラルド＆スカイに変更して' },
+  { label: 'ウィンドウ整列', query: 'ウィンドウを並べて整列して' },
 ];
 
 export function AIAssistant() {
   const {
+    windows,
     openApp,
-    playSound,
-    setShellMode,
+    updateWindowRect,
     setTheme,
+    setShellMode,
+    shellMode,
+    theme,
+    wallpaper,
     setWallpaper,
     setAuroraColor,
-    setVolume,
+    setGlassCurvature,
+    setGlassWobble,
     lockSystem,
-    snapAllWindows5050,
-    closeAllWindows,
+    currentThemeId,
+    applyThemeConfig,
+    playSound,
   } = useOS();
 
   const [expanded, setExpanded] = useState(false);
   const [chatInput, setChatInput] = useState('');
-  const [searchFilter, setSearchFilter] = useState('');
   const [isThinking, setIsThinking] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome-1',
       sender: 'ai',
-      text: 'こんにちは！Glassium AI アシスタントです。「映画を開いて」「macOSモードにして」「壁紙を桜にして」「音量を50にして」などのOS操作や質問に何でも対応します。',
+      text: 'こんにちは。質問や計算、コード作成、オーロラ・3Dガラス設定の変更、アプリの起動など何でもお任せください。',
       timestamp: Date.now(),
     },
   ]);
@@ -52,16 +57,72 @@ export function AIAssistant() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (expanded && !searchFilter.trim()) {
+    if (expanded) {
       chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [chatMessages, isThinking, expanded, searchFilter]);
+  }, [chatMessages, isThinking, expanded]);
 
-  const visibleMessages = chatMessages.filter((msg) => {
-    const q = searchFilter.trim().toLowerCase();
-    if (!q) return true;
-    return msg.text.toLowerCase().includes(q);
-  });
+  const executeAction = useCallback(
+    (action: { type: string; target?: string; label?: string }) => {
+      if (!action || !action.type || action.type === 'none') return;
+
+      if (action.type === 'open_app' && action.target) {
+        openApp(action.target as AppId);
+      } else if (action.type === 'set_shell' && action.target) {
+        setShellMode(action.target as ShellMode);
+      } else if (action.type === 'set_theme' && action.target) {
+        setTheme(action.target === 'light' ? 'light' : 'dark');
+      } else if (action.type === 'apply_theme' && action.target) {
+        applyThemeConfig(action.target);
+      } else if (action.type === 'set_wallpaper' && action.target) {
+        setWallpaper(action.target as Wallpaper);
+      } else if (action.type === 'set_aurora' && action.target) {
+        setWallpaper('live2d');
+        setAuroraColor(action.target as AuroraColor);
+      } else if (action.type === 'set_glass' && action.target) {
+        const val = Number(action.target) || 75;
+        setGlassCurvature(val);
+        setGlassWobble(Math.min(100, val + 10));
+      } else if (action.type === 'lock_system') {
+        lockSystem();
+      } else if (action.type === 'snap_windows') {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const TASKBAR_H = 56;
+        const GAP = 8;
+        const nonMin = windows.filter((w) => !w.minimized);
+        if (nonMin.length >= 2) {
+          updateWindowRect(nonMin[0].id, {
+            x: GAP,
+            y: GAP,
+            width: vw / 2 - GAP * 1.5,
+            height: vh - TASKBAR_H - GAP * 1.5,
+          });
+          updateWindowRect(nonMin[1].id, {
+            x: vw / 2 + GAP * 0.5,
+            y: GAP,
+            width: vw / 2 - GAP * 1.5,
+            height: vh - TASKBAR_H - GAP * 1.5,
+          });
+        }
+      } else if (action.type === 'play_music') {
+        openApp('synth');
+      }
+    },
+    [
+      openApp,
+      setShellMode,
+      setTheme,
+      applyThemeConfig,
+      setWallpaper,
+      setAuroraColor,
+      setGlassCurvature,
+      setGlassWobble,
+      lockSystem,
+      windows,
+      updateWindowRect,
+    ]
+  );
 
   const sendMessage = async (textToSend: string) => {
     const trimmed = textToSend.trim();
@@ -80,33 +141,42 @@ export function AIAssistant() {
     playSound?.('click');
 
     try {
-      const data = await requestAIChat({ message: trimmed });
-      const aiReply = data.reply || '応答を受信しました。';
-      const act = data.action || data.osAction;
+      const historyPayload = chatMessages.slice(-8).map((m) => ({
+        role: m.sender === 'ai' ? 'assistant' : 'user',
+        content: m.text,
+      }));
 
-      if (act && act.type) {
-        const target = String(act.target ?? act.value ?? '');
-        if (act.type === 'open_app' || act.type === 'open') {
-          openApp(target as Parameters<typeof openApp>[0]);
-        } else if (act.type === 'set_shell' || act.type === 'shell') {
-          setShellMode(target as Parameters<typeof setShellMode>[0]);
-        } else if (act.type === 'set_theme' || act.type === 'theme') {
-          if (target === 'light' || target === 'dark') setTheme(target);
-        } else if (act.type === 'set_wallpaper' || act.type === 'wallpaper') {
-          setWallpaper(target as Parameters<typeof setWallpaper>[0]);
-        } else if (act.type === 'set_aurora') {
-          setWallpaper('live2d');
-          setAuroraColor(target as Parameters<typeof setAuroraColor>[0]);
-        } else if (act.type === 'set_volume' || act.type === 'volume') {
-          const v = Number(target);
-          if (Number.isFinite(v)) setVolume(Math.max(0, Math.min(100, v)));
-        } else if (act.type === 'lock_screen' || act.type === 'lock') {
-          lockSystem();
-        } else if (act.type === 'snap_windows') {
-          snapAllWindows5050();
-        } else if (act.type === 'close_all') {
-          closeAllWindows();
-        }
+      const contextPayload = {
+        activeWindows: windows.filter((w) => !w.minimized).map((w) => w.title),
+        shellMode,
+        theme,
+        wallpaper,
+        currentThemeId,
+      };
+
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: trimmed,
+          history: historyPayload,
+          context: contextPayload,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const aiReply = data.reply || '応答を受信しました。';
+      let actionCallback: (() => void) | undefined;
+      let actionBtnLabel: string | undefined;
+
+      if (data.action && data.action.type && data.action.type !== 'none') {
+        actionCallback = () => executeAction(data.action);
+        actionBtnLabel = data.action.label || '実行する';
+        setTimeout(() => executeAction(data.action), 250);
       }
 
       setChatMessages((prev) => [
@@ -115,7 +185,8 @@ export function AIAssistant() {
           id: `ai-${Date.now()}`,
           sender: 'ai',
           text: aiReply,
-          actionLabel: act?.label,
+          action: actionCallback,
+          actionLabel: actionBtnLabel,
           timestamp: Date.now(),
         },
       ]);
@@ -126,7 +197,7 @@ export function AIAssistant() {
         {
           id: `ai-${Date.now()}`,
           sender: 'ai',
-          text: '回答を生成しました。続けてご質問があれば入力してください。',
+          text: '通信エラーが発生しました。もう一度お試しください。',
           timestamp: Date.now(),
         },
       ]);
@@ -141,12 +212,11 @@ export function AIAssistant() {
   };
 
   const clearChat = () => {
-    setSearchFilter('');
     setChatMessages([
       {
         id: `welcome-${Date.now()}`,
         sender: 'ai',
-        text: 'チャット履歴をクリアしました。OSの操作や質問などお気軽にお尋ねください。',
+        text: 'チャット履歴をクリアしました。何でもお気軽にお尋ねください。',
         timestamp: Date.now(),
       },
     ]);
@@ -178,7 +248,7 @@ export function AIAssistant() {
                   className="liquid-glass-card fixed top-3 right-3 bottom-14 z-[5200] w-84 sm:w-96 max-w-[calc(100vw-24px)] flex flex-col justify-between p-4 shadow-2xl"
                 >
               {/* Header */}
-              <div className="flex items-center justify-between pb-2.5 border-b border-white/10 shrink-0">
+              <div className="flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
                 <div className="flex items-center gap-2.5">
                   <div className="h-8 w-8 rounded-xl glass-jelly flex items-center justify-center text-sky-300">
                     <Icon name="Bot" size={16} />
@@ -213,31 +283,8 @@ export function AIAssistant() {
                 </div>
               </div>
 
-              {/* Search Bar for Chat Messages */}
-              <div className="pt-2 pb-1.5 border-b border-white/5 shrink-0">
-                <div className="flex items-center gap-2 glass-panel rounded-xl px-2.5 py-1.5 border border-white/10 focus-within:border-sky-400/40">
-                  <Icon name="Search" size={13} className="text-sky-300 shrink-0" />
-                  <input
-                    type="text"
-                    value={searchFilter}
-                    onChange={(e) => setSearchFilter(e.target.value)}
-                    placeholder="会話メッセージを検索..."
-                    className="flex-1 bg-transparent text-[11px] text-white placeholder:text-white/40 outline-none"
-                  />
-                  {searchFilter && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchFilter('')}
-                      className="text-white/50 hover:text-white p-0.5"
-                    >
-                      <Icon name="X" size={12} />
-                    </button>
-                  )}
-                </div>
-              </div>
-
               {/* Quick Prompt Chips */}
-              <div className="py-2 border-b border-white/5 shrink-0 overflow-x-auto no-scrollbar flex items-center gap-1.5">
+              <div className="py-2.5 border-b border-white/5 shrink-0 overflow-x-auto no-scrollbar flex items-center gap-1.5">
                 {QUICK_PROMPTS.map((qp, idx) => (
                   <button
                     key={idx}
@@ -251,12 +298,7 @@ export function AIAssistant() {
 
               {/* Chat Messages Body */}
               <div className="flex-1 min-h-0 overflow-y-auto py-3 space-y-3">
-                {visibleMessages.length === 0 ? (
-                  <div className="text-center py-8 text-xs text-white/50">
-                    「{searchFilter}」に一致するメッセージはありません
-                  </div>
-                ) : (
-                  visibleMessages.map((msg) => (
+                {chatMessages.map((msg) => (
                   <div
                     key={msg.id}
                     className={`flex flex-col ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}
@@ -282,8 +324,7 @@ export function AIAssistant() {
                       )}
                     </div>
                   </div>
-                ))
-                )}
+                ))}
 
                 {isThinking && (
                   <div className="flex items-center gap-2 px-3 py-2 rounded-xl glass-panel w-fit text-xs text-white/80">

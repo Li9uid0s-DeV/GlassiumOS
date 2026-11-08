@@ -6,9 +6,6 @@ import { Icon } from './Icon';
 import { StartMenu } from './StartMenu';
 import { AIAssistant } from './AIAssistant';
 import { AppLogo } from './AppLogo';
-import { requestAIChat } from './aiClient';
-import { getMusicState, subscribeMusicState, MusicPlayerState } from './musicBridge';
-import { globalAudio } from './globalAudioManager';
 
 interface TaskbarProps {
   onLock?: () => void;
@@ -22,44 +19,13 @@ const SEARCHABLE_APPS: { appId: AppId; label: string; keywords: string; icon: st
   { appId: 'calculator', label: 'Calculator', keywords: 'math calc 電卓 計算', icon: 'Calculator' },
   { appId: 'settings', label: 'Settings', keywords: 'config preferences theme 設定', icon: 'Settings' },
   { appId: 'game', label: 'Games', keywords: 'play arcade 2048 snake tetris ゲーム', icon: 'Gamepad2' },
-  { appId: 'synth', label: 'Music', keywords: 'audio synth player 音楽 曲 歌', icon: 'Music' },
-  { appId: 'entertainment', label: 'Entertainment (動画・アニメ・映画)', keywords: 'video movie anime tv youtube shorts prime shows streamex flixhd maple 動画 映画 アニメ ショーツ', icon: 'Tv' },
+  { appId: 'synth', label: 'Music', keywords: 'audio synth player 音楽', icon: 'Music' },
   { appId: 'calendar', label: 'Calendar', keywords: 'date schedule tasks カレンダー', icon: 'Calendar' },
   { appId: 'weather', label: 'Weather', keywords: 'forecast temperature 天気', icon: 'CloudSun' },
   { appId: 'clock', label: 'Clock', keywords: 'time alarm timer 時計', icon: 'Clock' },
   { appId: 'ai', label: 'AI Assistant', keywords: 'gemini chat copilot アシスタント', icon: 'Sparkles' },
   { appId: 'taskmanager', label: 'Task Manager', keywords: 'processes windows cpu memory タスク', icon: 'Cpu' },
   { appId: 'appstore', label: 'App Store', keywords: 'install store ストア', icon: 'Store' },
-  { appId: 'paint', label: 'Paint Studio', keywords: 'draw canvas art ペイント お絵かき', icon: 'Palette' },
-  { appId: 'pomodoro', label: 'Pomodoro Timer', keywords: 'focus study timer ポモドーロ 集中', icon: 'Clock' },
-  { appId: 'unitconverter', label: 'Unit Converter', keywords: 'length weight temp 単位変換', icon: 'SlidersHorizontal' },
-  { appId: 'colorpicker', label: 'Color Studio', keywords: 'rgb hex palette カラー 色', icon: 'Palette' },
-  { appId: 'passgen', label: 'Password Generator', keywords: 'security key パスワード', icon: 'Key' },
-  { appId: 'qrcode', label: 'QR Matrix Studio', keywords: 'qr barcode QRコード', icon: 'Grid3x3' },
-  { appId: 'jsonformat', label: 'JSON Formatter', keywords: 'json format validate 整形', icon: 'Code2' },
-  { appId: 'regex', label: 'Regex Tester', keywords: 'regexp pattern 正規表現', icon: 'Search' },
-  { appId: 'markdown', label: 'Markdown Reader', keywords: 'md preview マークダウン', icon: 'FileText' },
-  { appId: 'kanban', label: 'Kanban Board', keywords: 'todo project task カンバン', icon: 'LayoutGrid' },
-  { appId: 'habit', label: 'Habit Tracker', keywords: 'routine streak 習慣', icon: 'CheckCircle2' },
-  { appId: 'expense', label: 'Expense Ledger', keywords: 'budget money 家計簿 収支', icon: 'Calculator' },
-  { appId: 'bmi', label: 'Health & BMI', keywords: 'weight health 健康 BMI', icon: 'Activity' },
-  { appId: 'worldclock', label: 'World Clock Hub', keywords: 'timezone global 世界時計', icon: 'Globe' },
-  { appId: 'morse', label: 'Morse & Cipher', keywords: 'morse code モールス 暗号', icon: 'Zap' },
-  { appId: 'base64', label: 'Base64 & URL Tool', keywords: 'encode decode エンコード', icon: 'Code2' },
-  { appId: 'diff', label: 'Text Diff Viewer', keywords: 'compare difference 差分', icon: 'Layers' },
-  { appId: 'wordcount', label: 'Word Analyzer', keywords: 'character count 文字数', icon: 'FileText' },
-  { appId: 'flashcards', label: 'Flashcards Deck', keywords: 'study quiz 暗記 カード', icon: 'BookOpen' },
-  { appId: 'whiteboard', label: 'Idea Board', keywords: 'sticky brainstorm アイデア 付箋', icon: 'PenTool' },
-  { appId: 'drumpad', label: '808 Drum Pad', keywords: 'beat drum music ドラム', icon: 'Music' },
-  { appId: 'tuner', label: 'Frequency Synth', keywords: 'hz pitch audio 周波数', icon: 'Volume2' },
-  { appId: 'minesweeper', label: 'Minesweeper', keywords: 'mine puzzle マインスイーパー', icon: 'Gamepad2' },
-  { appId: 'tictactoe', label: 'Tic-Tac-Toe AI', keywords: 'ox game マルバツ 〇×', icon: 'Grid3x3' },
-  { appId: 'memory', label: 'Memory Match', keywords: 'cards match 神経衰弱', icon: 'Sparkles' },
-  { appId: 'typing', label: 'Typing Trainer', keywords: 'wpm keyboard タイピング', icon: 'SquareTerminal' },
-  { appId: 'sudoku', label: 'Mini Sudoku', keywords: 'number puzzle ナンプレ 数独', icon: 'Grid3x3' },
-  { appId: 'periodic', label: 'Periodic Table', keywords: 'chemistry elements 元素周期表', icon: 'Sparkles' },
-  { appId: 'dictionary', label: 'Tech Lexicon', keywords: 'words lexicon 辞典 辞書', icon: 'BookOpen' },
-  { appId: 'sysinfo', label: 'System Diagnostics', keywords: 'hardware specs システム診断', icon: 'Cpu' },
 ];
 
 export function Taskbar(_props?: TaskbarProps) {
@@ -74,20 +40,13 @@ export function Taskbar(_props?: TaskbarProps) {
     quickSettings,
     toggleQuick,
     taskbarAlign,
-    autoHideTaskbar,
     startOpen,
     setStartOpen,
     installedApps,
     launchInstalledApp,
     shellMode,
-    setShellMode,
-    setTheme,
-    setWallpaper,
-    setAuroraColor,
     volume,
     setVolume,
-    brightness,
-    setBrightness,
     soundEnabled,
     setSoundEnabled,
     activeDesktopId,
@@ -95,11 +54,6 @@ export function Taskbar(_props?: TaskbarProps) {
     setTaskViewOpen,
     toggleTaskView,
     theme,
-    lockSystem,
-    snapAllWindows5050,
-    closeAllWindows,
-    autoLockMinutes,
-    setAutoLockMinutes,
   } = useOS();
   const isLight = theme === 'light';
 
@@ -119,62 +73,6 @@ export function Taskbar(_props?: TaskbarProps) {
   const searchDropdownRef = useRef<HTMLDivElement>(null);
   const [startPos, setStartPos] = useState<{ x: number; width: number } | null>(null);
 
-  // Live Music State for Quick Controls
-  const [musicState, setMusicState] = useState<MusicPlayerState | null>(() => getMusicState());
-
-  useEffect(() => {
-    return subscribeMusicState((st) => {
-      setMusicState(st);
-    });
-  }, []);
-
-  // OS-Level Integrated AI Omnibar state (GlassiumOS 5)
-  const [aiOmniInput, setAiOmniInput] = useState('');
-  const [aiOmniReply, setAiOmniReply] = useState<string | null>(null);
-  const [aiOmniLoading, setAiOmniLoading] = useState(false);
-  const [aiOmniOpen, setAiOmniOpen] = useState(false);
-
-  const handleRunOmniAI = async () => {
-    const q = aiOmniInput.trim();
-    if (!q || aiOmniLoading) return;
-    setAiOmniLoading(true);
-    setAiOmniOpen(true);
-    try {
-      const res = await requestAIChat({ message: q });
-      const act = res.action || res.osAction;
-      if (act && act.type) {
-        const target = String(act.target ?? act.value ?? '');
-        if (act.type === 'open_app' || act.type === 'open') {
-          openApp(target as AppId);
-        } else if (act.type === 'set_shell' || act.type === 'shell') {
-          setShellMode(target as Parameters<typeof setShellMode>[0]);
-        } else if (act.type === 'set_theme' || act.type === 'theme') {
-          if (target === 'light' || target === 'dark') setTheme(target);
-        } else if (act.type === 'set_wallpaper' || act.type === 'wallpaper') {
-          setWallpaper(target as Parameters<typeof setWallpaper>[0]);
-        } else if (act.type === 'set_aurora') {
-          setWallpaper('live2d');
-          setAuroraColor(target as Parameters<typeof setAuroraColor>[0]);
-        } else if (act.type === 'set_volume' || act.type === 'volume') {
-          const v = Number(target);
-          if (Number.isFinite(v)) setVolume(Math.max(0, Math.min(100, v)));
-        } else if (act.type === 'lock_screen' || act.type === 'lock') {
-          lockSystem();
-        } else if (act.type === 'snap_windows') {
-          snapAllWindows5050();
-        } else if (act.type === 'close_all') {
-          closeAllWindows();
-        }
-      }
-      setAiOmniReply(res.reply);
-      setAiOmniInput('');
-    } catch {
-      setAiOmniReply('応答を取得できませんでした。');
-    } finally {
-      setAiOmniLoading(false);
-    }
-  };
-
   const handleMouseEnterIcon = (e: React.MouseEvent<HTMLDivElement>, appId: string) => {
     const rect = e.currentTarget.getBoundingClientRect();
     setHoverPos({ x: rect.left + rect.width / 2 });
@@ -187,24 +85,6 @@ export function Taskbar(_props?: TaskbarProps) {
       setStartPos({ x: rect.left, width: rect.width });
     }
   }, []);
-
-  const [isTaskbarHovered, setIsTaskbarHovered] = useState(false);
-
-  useEffect(() => {
-    if (!autoHideTaskbar) {
-      setIsTaskbarHovered(true);
-      return;
-    }
-    const handleMouseMove = (e: MouseEvent) => {
-      if (e.clientY >= window.innerHeight - 14 || startOpen || trayOpen || calendarFlyoutOpen || aiOmniOpen) {
-        setIsTaskbarHovered(true);
-      } else if (e.clientY < window.innerHeight - 60) {
-        setIsTaskbarHovered(false);
-      }
-    };
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [autoHideTaskbar, startOpen, trayOpen, calendarFlyoutOpen, aiOmniOpen]);
 
   useEffect(() => {
     const t = setInterval(() => setNow(new Date()), 1000);
@@ -244,7 +124,6 @@ export function Taskbar(_props?: TaskbarProps) {
     setSearchFocused(false);
     setTrayOpen(false);
     setTaskViewOpen(false);
-    setAiOmniOpen(false);
     setStartOpen(!startOpen);
   };
 
@@ -292,7 +171,7 @@ export function Taskbar(_props?: TaskbarProps) {
   const isWin10 = shellMode === 'windows10';
   const isDeX = shellMode === 'dex';
   const isChromeOS = shellMode === 'chromeos';
-  const isGlassium5 = shellMode === 'windows';
+  const isZorin = shellMode === 'zorin';
 
   return (
     <>
@@ -481,9 +360,9 @@ export function Taskbar(_props?: TaskbarProps) {
       )}
 
       {/* ==============================================================
-          4. SAMSUNG DEX / CHROMEOS SHELLS
+          4. SAMSUNG DEX / CHROMEOS / ZORIN SHELLS
          ============================================================== */}
-      {(isDeX || isChromeOS) && (
+      {(isDeX || isChromeOS || isZorin) && (
         <div
           className="fixed bottom-0 inset-x-0 h-11 w-screen z-[5000] flex items-center justify-between px-3 select-none font-sans bg-slate-900/60 backdrop-blur-2xl shadow-[0_-8px_32px_rgba(0,0,0,0.45)] text-white"
         >
@@ -533,278 +412,17 @@ export function Taskbar(_props?: TaskbarProps) {
       )}
 
       {/* ==============================================================
-          5. GLASSIUMOS 5 MINIMAL HAIRLINE TASKBAR (shellMode === 'windows')
+          5. GLASSIUMOS-V4.0 FLAT TASKBAR (DEFAULT)
          ============================================================== */}
-      {isGlassium5 && (
-        <>
-          {autoHideTaskbar && (
-            <div
-              className="fixed bottom-0 left-0 right-0 h-1.5 z-[5001] cursor-pointer"
-              onMouseEnter={() => setIsTaskbarHovered(true)}
-            />
-          )}
-
-          {/* OS-Level Integrated AI Omnibar Reply Popover */}
-          <AnimatePresence>
-            {aiOmniOpen && (aiOmniReply || aiOmniLoading) && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 8 }}
-                transition={{ duration: 0.14 }}
-                className={`fixed bottom-12 left-4 z-[5400] w-96 max-w-[calc(100vw-32px)] backdrop-blur-2xl border-t-2 border-[var(--os-accent)] shadow-2xl p-4 font-sans ${
-                  isLight ? 'bg-white/95 text-slate-900' : 'bg-slate-950/95 text-white'
-                }`}
-              >
-                <div className={`flex items-center justify-between pb-2 mb-2 border-b ${isLight ? 'border-slate-200' : 'border-white/10'}`}>
-                  <div className="flex items-center gap-2 text-xs font-bold">
-                    <Icon name="Sparkles" size={14} className="text-[var(--os-accent)]" />
-                    <span>GlassiumOS 5 AI コア応答</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setAiOmniOpen(false);
-                        openApp('ai');
-                      }}
-                      className="text-[11px] text-[var(--os-accent)] hover:underline"
-                    >
-                      AI アプリを開く
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setAiOmniOpen(false)}
-                      className="opacity-50 hover:opacity-100"
-                    >
-                      <Icon name="X" size={13} />
-                    </button>
-                  </div>
-                </div>
-                <div className="text-xs leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
-                  {aiOmniLoading ? '処理中...' : aiOmniReply}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <div
-            className={`fixed bottom-0 inset-x-0 h-11 w-screen z-[5000] backdrop-blur-2xl flex items-center justify-between px-4 select-none transition-all duration-200 border-t ${
-              autoHideTaskbar && !isTaskbarHovered ? 'translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
-            } ${
-              isLight
-                ? 'bg-white/85 border-slate-300/80 text-slate-900'
-                : 'bg-slate-950/88 border-white/10 text-white'
-            }`}
-            onMouseEnter={() => setIsTaskbarHovered(true)}
-          >
-            {/* Left: Start Logo + OS-Level AI & App Omnibar + Desk View */}
-            <div className="flex items-center gap-4 min-w-0" ref={searchContainerRef}>
-              <button
-                ref={startBtnRef}
-                type="button"
-                onClick={handleStartClick}
-                className="h-11 px-2 flex items-center gap-2 transition-opacity hover:opacity-100 relative"
-                title="GlassiumOS 5 スタート"
-              >
-                {startOpen && <span className="absolute top-0 left-0 right-0 h-0.5 bg-[var(--os-accent)]" />}
-                <AppLogo size={20} />
-                <span className="text-xs font-bold tracking-tight hidden md:inline">GlassiumOS 5</span>
-              </button>
-
-              <div className={`h-4 w-px ${isLight ? 'bg-slate-300' : 'bg-white/10'}`} />
-
-              {/* Hairline Integrated Search & OS AI Omnibar */}
-              <div className="flex items-center gap-3">
-                <div className={`flex items-center gap-2 h-7 border-b transition-all ${
-                  searchFocused
-                    ? 'w-36 sm:w-44 border-[var(--os-accent)]'
-                    : isLight
-                    ? 'w-28 sm:w-36 border-slate-300'
-                    : 'w-28 sm:w-36 border-white/15'
-                }`}>
-                  <Icon name="Search" size={13} className={searchFocused ? 'text-[var(--os-accent)]' : 'opacity-45'} />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onFocus={() => {
-                      setStartOpen(false);
-                      setTrayOpen(false);
-                      setTaskViewOpen(false);
-                      setSearchFocused(true);
-                    }}
-                    onChange={(e) => {
-                      setSearchQuery(e.target.value);
-                      setSearchFocused(true);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && filteredSearchApps.length > 0) {
-                        openApp(filteredSearchApps[0].appId);
-                        setSearchQuery('');
-                        setSearchFocused(false);
-                      } else if (e.key === 'Escape') {
-                        setSearchFocused(false);
-                      }
-                    }}
-                    placeholder="アプリ検索"
-                    className="w-full bg-transparent outline-none text-xs"
-                  />
-                </div>
-
-                {/* Direct OS AI Command / Question Omnibar */}
-                <div className={`hidden lg:flex items-center gap-2 h-7 border-b transition-all w-48 xl:w-60 ${
-                  aiOmniInput ? 'border-[var(--os-accent)]' : isLight ? 'border-slate-300' : 'border-white/15'
-                }`}>
-                  <Icon name="Sparkles" size={13} className="text-[var(--os-accent)] shrink-0" />
-                  <input
-                    type="text"
-                    value={aiOmniInput}
-                    onChange={(e) => setAiOmniInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleRunOmniAI();
-                    }}
-                    placeholder="AI操作・質問 (例: ライトモード / 計算)"
-                    className="w-full bg-transparent outline-none text-xs"
-                  />
-                  {aiOmniInput && (
-                    <button
-                      type="button"
-                      onClick={handleRunOmniAI}
-                      className="text-[10px] font-bold text-[var(--os-accent)] shrink-0"
-                    >
-                      実行
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={toggleTaskView}
-                className={`h-11 px-2 flex items-center justify-center relative transition-opacity ${
-                  taskViewOpen ? 'text-[var(--os-accent)]' : 'opacity-65 hover:opacity-100'
-                }`}
-                title="仮想デスクトップ"
-              >
-                {taskViewOpen && <span className="absolute top-0 left-0 right-0 h-0.5 bg-[var(--os-accent)]" />}
-                <Icon name="Layers" size={16} />
-              </button>
-            </div>
-
-            {/* Center: Borderless Hairline Indicator App Icons */}
-            <div
-              className={`flex items-center gap-1 h-full ${
-                taskbarAlign === 'left' ? 'justify-start pl-4' : 'justify-center'
-              } flex-1 max-w-xl px-2`}
-            >
-              {TASKBAR_APPS.map((app) => {
-                const wins = currentDesktopWindows.filter((w) => w.appId === app.appId);
-                const active = wins.length > 0;
-                const anyVisible = wins.some((w) => !w.minimized);
-                return (
-                  <div
-                    key={app.appId}
-                    className="relative h-full flex items-center shrink-0"
-                    onMouseEnter={(e) => handleMouseEnterIcon(e, app.appId)}
-                    onMouseLeave={() => { setHoveredApp(null); setHoverPos(null); }}
-                  >
-                    <button
-                      onClick={() => handleAppClick(app.appId)}
-                      className={`relative h-full px-2.5 flex items-center justify-center transition-opacity ${
-                        anyVisible ? 'opacity-100' : active ? 'opacity-85' : 'opacity-70 hover:opacity-100'
-                      }`}
-                      title={app.label}
-                    >
-                      {active && (
-                        <span
-                          className={`absolute top-0 left-1 right-1 h-0.5 bg-[var(--os-accent)] transition-all ${
-                            anyVisible ? 'opacity-100' : 'opacity-45'
-                          }`}
-                        />
-                      )}
-                      <Icon name={app.appId} size={20} />
-                    </button>
-                  </div>
-                );
-              })}
-
-              {/* Non-pinned open windows */}
-              {currentDesktopWindows
-                .filter(
-                  (w, idx, arr) =>
-                    !TASKBAR_APPS.some((t) => t.appId === w.appId) &&
-                    !installedApps.some((i) => i.appId === w.appId) &&
-                    arr.findIndex((x) => x.appId === w.appId) === idx
-                )
-                .map((win) => {
-                  const anyVisible = !win.minimized;
-                  return (
-                    <button
-                      key={win.id}
-                      onClick={() => handleAppClick(win.appId as AppId)}
-                      className="relative h-full px-2.5 flex items-center justify-center shrink-0"
-                      title={win.title}
-                    >
-                      <span
-                        className={`absolute top-0 left-1 right-1 h-0.5 bg-[var(--os-accent)] ${
-                          anyVisible ? 'opacity-100' : 'opacity-45'
-                        }`}
-                      />
-                      <Icon name={win.appId} size={20} />
-                    </button>
-                  );
-                })}
-            </div>
-
-            {/* Right: Minimal Hairline System Tray */}
-            <div className="flex items-center gap-3 h-full min-w-0 justify-end">
-              <AIAssistant />
-              <div className={`h-4 w-px shrink-0 ${isLight ? 'bg-slate-300' : 'bg-white/10'}`} />
-              <button
-                onClick={() => setTrayOpen((v) => !v)}
-                className="flex items-center gap-2.5 h-full px-2 transition-opacity opacity-85 hover:opacity-100"
-                title="システムコントロール"
-              >
-                <div className="flex items-center gap-1.5">
-                  <Icon name="Wifi" size={13} className={quickSettings.wifi ? 'text-[var(--os-accent)]' : 'opacity-40'} />
-                  <Icon
-                    name={soundEnabled && volume > 0 ? 'Volume2' : 'VolumeX'}
-                    size={13}
-                    className={soundEnabled && volume > 0 ? 'text-[var(--os-accent)]' : 'opacity-40'}
-                  />
-                </div>
-                <div className="text-right leading-tight hidden sm:block">
-                  <div className="text-[11px] font-medium tabular-nums font-mono">{timeStr}</div>
-                  <div className="text-[9px] opacity-55">{dateStr}</div>
-                </div>
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ==============================================================
-          6. WINDOWS 11 TASKBAR (shellMode === 'windows11')
-         ============================================================== */}
-      {!isXP && !isVista && !isWin10 && !isDeX && !isChromeOS && !isGlassium5 && (
-        <>
-          {autoHideTaskbar && (
-            <div
-              className="fixed bottom-0 left-0 right-0 h-1.5 z-[5001] cursor-pointer"
-              onMouseEnter={() => setIsTaskbarHovered(true)}
-            />
-          )}
-          <div
-            className={`fixed bottom-0 inset-x-0 h-12 w-screen z-[5000] backdrop-blur-2xl flex items-center justify-between px-3 select-none transition-all duration-200 shadow-[0_-8px_32px_rgba(0,0,0,0.3)] ${
-              autoHideTaskbar && !isTaskbarHovered ? 'translate-y-full opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
-            } ${
-              isLight
-                ? 'bg-slate-100/45 text-slate-900 shadow-[0_-8px_32px_rgba(0,0,0,0.08)]'
-                : 'bg-slate-900/38 text-white'
-            }`}
-            style={{ position: 'fixed', bottom: 0, left: 0, right: 0, width: '100vw', borderRadius: 0 }}
-            onMouseEnter={() => setIsTaskbarHovered(true)}
-          >
+      {!isXP && !isVista && !isWin10 && !isDeX && !isChromeOS && !isZorin && (
+        <div
+          className={`fixed bottom-0 inset-x-0 h-12 w-screen z-[5000] backdrop-blur-2xl flex items-center justify-between px-3 select-none transition-colors duration-200 shadow-[0_-8px_32px_rgba(0,0,0,0.3)] ${
+            isLight
+              ? 'bg-slate-100/45 text-slate-900 shadow-[0_-8px_32px_rgba(0,0,0,0.08)]'
+              : 'bg-slate-900/38 text-white'
+          }`}
+          style={{ position: 'fixed', bottom: 0, left: 0, right: 0, width: '100vw', borderRadius: 0 }}
+        >
           {/* Left: Start Button + Flat App Search Bar + Task View */}
           <div className="flex items-center gap-2 min-w-0" ref={searchContainerRef}>
             <button
@@ -818,9 +436,9 @@ export function Taskbar(_props?: TaskbarProps) {
                   ? 'bg-slate-900/5 hover:bg-slate-900/10 active:scale-95'
                   : 'bg-white/[0.06] hover:bg-white/[0.12] active:scale-95'
               }`}
-              title="Windows 11 Start"
+              title="GlassiumOS-V4.0 Start"
             >
-              <AppLogo size={20} />
+              <AppLogo size={20} glow={startOpen} />
             </button>
 
             {/* Flat Search Bar */}
@@ -1279,8 +897,7 @@ export function Taskbar(_props?: TaskbarProps) {
             </button>
           </div>
         </div>
-      </>
-    )}
+      )}
 
       {/* Instant App Search Dropdown */}
       <AnimatePresence>
@@ -1333,376 +950,92 @@ export function Taskbar(_props?: TaskbarProps) {
         )}
       </AnimatePresence>
 
-      {/* Redesigned Liquid Glass Quick Controls Center + Live Now Playing Music Player */}
+      {/* Flat Quick Settings Flyout (Brightness removed as requested) */}
       <AnimatePresence>
         {trayOpen && (
           <>
             <div className="fixed inset-0 z-[5100]" onClick={() => setTrayOpen(false)} />
             <motion.div
-              initial={{ opacity: 0, y: 14, scale: 0.96 }}
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 14, scale: 0.96 }}
-              transition={{ type: 'spring', stiffness: 420, damping: 30 }}
-              className={`fixed bottom-14 right-3 z-[5200] w-[360px] sm:w-[390px] max-w-[calc(100vw-24px)] rounded-3xl p-4 backdrop-blur-3xl border shadow-[0_24px_80px_rgba(0,0,0,0.65)] space-y-3.5 select-none ${
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ type: 'spring', stiffness: 420, damping: 32 }}
+              className={`fixed bottom-14 right-3 z-[5200] w-72 max-w-[calc(100vw-24px)] rounded-xl p-4 backdrop-blur-2xl border shadow-2xl ${
                 isLight
-                  ? 'bg-white/95 border-slate-900/15 text-slate-900'
-                  : 'bg-slate-950/92 border-white/15 text-white'
+                  ? 'bg-white/95 border-slate-900/12 text-slate-900'
+                  : 'bg-slate-900/90 border-white/15 text-white'
               }`}
             >
-              {/* Top Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                  <span className="text-xs font-black tracking-wide uppercase">
-                    Quick Controls Center
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTrayOpen(false);
-                      lockSystem();
-                    }}
-                    className={`px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center gap-1 transition cursor-pointer ${
-                      isLight
-                        ? 'bg-slate-900/5 hover:bg-slate-900/10 text-slate-700'
-                        : 'bg-white/10 hover:bg-white/20 text-white/85'
-                    }`}
-                    title="今すぐ画面をロック"
-                  >
-                    <Icon name="Lock" size={12} />
-                    <span>ロック</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setTrayOpen(false);
-                      openApp('settings');
-                    }}
-                    className="px-2.5 py-1 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/30 text-[11px] text-cyan-300 font-bold flex items-center gap-1 transition cursor-pointer"
-                  >
-                    <Icon name="Settings" size={12} />
-                    <span>設定</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* LIVE NOW PLAYING MUSIC CARD (Shown prominently when music is playing or loaded) */}
-              {musicState?.currentTrack ? (
-                <div
-                  className={`p-3.5 rounded-2xl border relative overflow-hidden transition-all ${
-                    musicState.isPlaying
-                      ? 'bg-gradient-to-br from-cyan-950/80 via-slate-900/90 to-fuchsia-950/60 border-cyan-400/40 shadow-lg text-white'
-                      : isLight
-                      ? 'bg-slate-900/5 border-slate-900/10'
-                      : 'bg-white/[0.05] border-white/10'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div
-                      onClick={() => {
-                        setTrayOpen(false);
-                        openApp('synth');
-                      }}
-                      className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-white/20 shadow-md cursor-pointer group"
-                      style={{
-                        background:
-                          musicState.currentTrack.coverGradient ||
-                          'linear-gradient(135deg, #06b6d4, #6366f1)',
-                      }}
-                    >
-                      {musicState.currentTrack.artworkUrl ? (
-                        <img
-                          src={musicState.currentTrack.artworkUrl}
-                          alt={musicState.currentTrack.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-white">
-                          <Icon name="Music" size={20} />
-                        </div>
-                      )}
-                      {musicState.isPlaying && (
-                        <div className="absolute bottom-1 right-1 px-1 py-0.5 rounded bg-black/70 text-[8px] font-mono text-cyan-300 font-bold">
-                          LIVE
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-1">
-                        <span className="text-[10px] font-mono uppercase tracking-wider text-cyan-300 font-bold flex items-center gap-1">
-                          <Icon name="Music" size={10} />
-                          <span>{musicState.isPlaying ? 'NOW PLAYING' : 'PAUSED'}</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTrayOpen(false);
-                            openApp('synth');
-                          }}
-                          className="text-[10px] text-cyan-300 hover:underline font-bold cursor-pointer"
-                        >
-                          Musicを開く ↗
-                        </button>
-                      </div>
-                      <div className="text-xs font-black truncate mt-0.5">
-                        {musicState.currentTrack.title}
-                      </div>
-                      <div className="text-[11px] opacity-70 truncate">
-                        {musicState.currentTrack.artist}
-                      </div>
-                    </div>
-
-                    {/* Playback Controls */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => globalAudio.prev()}
-                        className="w-7 h-7 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition cursor-pointer"
-                        title="前の曲"
-                      >
-                        <Icon name="SkipBack" size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => globalAudio.togglePlay()}
-                        className="w-8 h-8 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-slate-950 flex items-center justify-center shadow-md transition cursor-pointer"
-                        title={musicState.isPlaying ? '一時停止' : '再生'}
-                      >
-                        <Icon name={musicState.isPlaying ? 'Pause' : 'Play'} size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => globalAudio.next()}
-                        className="w-7 h-7 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition cursor-pointer"
-                        title="次の曲"
-                      >
-                        <Icon name="SkipForward" size={13} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Interactive Seek Bar */}
-                  <div className="mt-2.5 flex items-center gap-2 text-[10px] font-mono opacity-85">
-                    <span>
-                      {Math.floor((musicState.currentTime || 0) / 60)}:
-                      {Math.floor((musicState.currentTime || 0) % 60)
-                        .toString()
-                        .padStart(2, '0')}
-                    </span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={Math.max(1, musicState.duration || musicState.currentTrack.duration || 180)}
-                      value={Math.min(
-                        musicState.currentTime || 0,
-                        musicState.duration || musicState.currentTrack.duration || 180
-                      )}
-                      onChange={(e) => globalAudio.seek(Number(e.target.value))}
-                      className="flex-1 h-1 accent-cyan-400 cursor-pointer"
-                    />
-                    <span>
-                      {Math.floor(
-                        (musicState.duration || musicState.currentTrack.duration || 180) / 60
-                      )}
-                      :
-                      {Math.floor(
-                        (musicState.duration || musicState.currentTrack.duration || 180) % 60
-                      )
-                        .toString()
-                        .padStart(2, '0')}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                <div
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold tracking-wide">Quick Controls</span>
+                <button
                   onClick={() => {
                     setTrayOpen(false);
-                    openApp('synth');
+                    openApp('settings');
                   }}
-                  className={`p-3 rounded-2xl border flex items-center justify-between cursor-pointer transition ${
-                    isLight
-                      ? 'bg-slate-900/5 hover:bg-slate-900/10 border-slate-900/10'
-                      : 'bg-white/[0.04] hover:bg-white/[0.08] border-white/10'
-                  }`}
+                  className="text-[11px] os-accent-text hover:underline flex items-center gap-1 transition"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
-                      <Icon name="Music" size={16} />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold">Glassium Music Player</div>
-                      <div className="text-[10px] opacity-60">
-                        クリックして音楽を再生 (Monochrome / Piped / Invidious)
-                      </div>
-                    </div>
-                  </div>
-                  <Icon name="Play" size={14} className="text-cyan-400" />
-                </div>
-              )}
+                  <Icon name="Settings" size={12} />
+                  <span>Settings</span>
+                </button>
+              </div>
 
-              {/* Quick Toggle Tiles Grid (2x3) */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2 mb-4">
                 {[
-                  {
-                    key: 'wifi' as const,
-                    label: 'Wi-Fi',
-                    sub: quickSettings.wifi ? 'Connected' : 'Off',
-                    icon: 'Wifi',
-                  },
-                  {
-                    key: 'bluetooth' as const,
-                    label: 'Bluetooth',
-                    sub: quickSettings.bluetooth ? 'On' : 'Off',
-                    icon: 'Bluetooth',
-                  },
-                  {
-                    key: 'darkMode' as const,
-                    label: 'ダークモード',
-                    sub: quickSettings.darkMode ? 'Dark' : 'Light',
-                    icon: 'Moon',
-                  },
-                  {
-                    key: 'dnd' as const,
-                    label: '集中モード',
-                    sub: quickSettings.dnd ? 'DND On' : 'Off',
-                    icon: 'BellOff',
-                  },
-                  {
-                    key: 'liteMode' as const,
-                    label: '軽量モード',
-                    sub: quickSettings.liteMode ? '60FPS Eco' : 'Full GPU',
-                    icon: 'Zap',
-                  },
-                  {
-                    key: 'batterySaver' as const,
-                    label: '省電力',
-                    sub: quickSettings.batterySaver ? 'Active' : 'Standard',
-                    icon: 'BatteryCharging',
-                  },
+                  { key: 'wifi' as const, label: 'Wi-Fi', icon: 'Wifi' },
+                  { key: 'bluetooth' as const, label: 'Bluetooth', icon: 'Bluetooth' },
+                  { key: 'darkMode' as const, label: 'Dark Mode', icon: 'Moon' },
                 ].map((q) => (
                   <button
                     key={q.key}
-                    type="button"
                     onClick={() => toggleQuick(q.key)}
-                    className={`flex flex-col items-start gap-1 p-2.5 rounded-2xl border text-left transition cursor-pointer ${
+                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-lg border transition ${
                       quickSettings[q.key]
-                        ? 'os-accent-bg border-transparent shadow-md'
+                        ? 'os-accent-bg border-transparent'
                         : isLight
                         ? 'bg-slate-900/5 border-slate-900/10 text-slate-700 hover:bg-slate-900/10'
-                        : 'bg-white/[0.05] border-white/10 text-white/75 hover:bg-white/10'
+                        : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
                     }`}
                   >
                     <Icon name={q.icon} size={15} />
-                    <div className="min-w-0 w-full">
-                      <div className="text-[11px] font-bold truncate">{q.label}</div>
-                      <div className="text-[9px] opacity-75 truncate">{q.sub}</div>
-                    </div>
+                    <span className="text-[10px] font-medium">{q.label}</span>
                   </button>
                 ))}
               </div>
 
-              {/* Volume & Brightness Sliders */}
               <div
-                className={`rounded-2xl p-3 border space-y-3 ${
+                className={`rounded-lg p-3 border ${
                   isLight ? 'bg-slate-900/[0.03] border-slate-900/10' : 'bg-white/[0.04] border-white/10'
                 }`}
               >
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <button
-                      type="button"
-                      onClick={() => setSoundEnabled(!soundEnabled)}
-                      className="flex items-center gap-1.5 font-bold hover:opacity-80 transition cursor-pointer"
-                    >
-                      <Icon
-                        name={soundEnabled && volume > 0 ? 'Volume2' : 'VolumeX'}
-                        size={13}
-                        className="os-accent-text"
-                      />
-                      <span>システム音量</span>
-                    </button>
-                    <span className="font-mono text-[11px] font-bold opacity-75">
-                      {soundEnabled ? `${volume}%` : 'ミュート'}
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={soundEnabled ? volume : 0}
-                    onChange={(e) => {
-                      const val = Number(e.target.value);
-                      setVolume(val);
-                      globalAudio.setVolume(val / 100);
-                      if (val > 0 && !soundEnabled) setSoundEnabled(true);
-                    }}
-                    className="glass-slider w-full"
-                  />
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="flex items-center gap-1.5 font-bold">
-                      <Icon name="Sun" size={13} className="text-amber-400" />
-                      <span>画面の明るさ</span>
-                    </span>
-                    <span className="font-mono text-[11px] font-bold opacity-75">
-                      {brightness}%
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={30}
-                    max={100}
-                    value={brightness}
-                    onChange={(e) => setBrightness(Number(e.target.value))}
-                    className="glass-slider w-full"
-                  />
-                </div>
-              </div>
-
-              {/* Auto-Lock Timeout Quick Selector */}
-              <div
-                className={`rounded-2xl p-3 border space-y-2 ${
-                  isLight ? 'bg-slate-900/[0.03] border-slate-900/10' : 'bg-white/[0.04] border-white/10'
-                }`}
-              >
-                <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-bold flex items-center gap-1.5">
-                    <Icon name="Clock" size={12} className="text-cyan-400" />
-                    <span>自動画面ロック時間</span>
-                  </span>
-                  <span className="font-mono text-[10px] text-cyan-400 font-bold">
-                    {autoLockMinutes === 0 ? 'オフ (常時ON)' : `${autoLockMinutes}分後`}
+                <div className="flex items-center justify-between text-xs mb-1.5">
+                  <button
+                    onClick={() => setSoundEnabled(!soundEnabled)}
+                    className="flex items-center gap-1.5 hover:opacity-80 transition"
+                  >
+                    <Icon
+                      name={soundEnabled && volume > 0 ? 'Volume2' : 'VolumeX'}
+                      size={13}
+                      className="os-accent-text"
+                    />
+                    <span>Master Volume</span>
+                  </button>
+                  <span className="font-mono text-[11px] opacity-65">
+                    {soundEnabled ? `${volume}%` : 'Muted'}
                   </span>
                 </div>
-                <div className="grid grid-cols-5 gap-1">
-                  {[
-                    { m: 0, label: 'オフ' },
-                    { m: 1, label: '1分' },
-                    { m: 5, label: '5分' },
-                    { m: 15, label: '15分' },
-                    { m: 30, label: '30分' },
-                  ].map((opt) => (
-                    <button
-                      key={opt.m}
-                      type="button"
-                      onClick={() => setAutoLockMinutes(opt.m)}
-                      className={`py-1 rounded-lg text-[10px] font-bold transition cursor-pointer ${
-                        autoLockMinutes === opt.m
-                          ? 'bg-cyan-400 text-slate-950 shadow'
-                          : isLight
-                          ? 'bg-slate-900/5 hover:bg-slate-900/10 text-slate-700'
-                          : 'bg-white/5 hover:bg-white/15 text-white/75'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={soundEnabled ? volume : 0}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setVolume(val);
+                    if (val > 0 && !soundEnabled) setSoundEnabled(true);
+                  }}
+                  className="glass-slider w-full"
+                />
               </div>
             </motion.div>
           </>

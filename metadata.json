@@ -1,6 +1,6 @@
 {
-  "name": "GlassiumOS 5",
-  "description": "GlassiumOS is an educational web-based operating system interface for learning computer science, system architecture, and web development.",
+  "name": "GlassiumOS V4.6 Pro",
+  "description": "An advanced web operating system featuring liquid glass UI, Glassium Studio AI workspace, RetroCade emulator, Service Worker proxy browser, Quick Look, and GitHub project loader.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

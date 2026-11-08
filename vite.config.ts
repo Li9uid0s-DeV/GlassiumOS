@@ -8,7 +8,12 @@ import { fileURLToPath, URL } from 'node:url';
 export default defineConfig({
   plugins: [react()],
 
-  base: './',
+  base:
+    process.env.VITE_GH_PAGES === 'true'
+      ? '/GlassiumOS-V4.0/'
+      : process.env.NODE_ENV === 'production'
+      ? './'
+      : '/',
 
   resolve: {
     alias: {
@@ -18,9 +23,8 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3000,
-    hmr: false,
   },
   optimizeDeps: {
-    include: ['lucide-react', 'three', 'framer-motion'],
+    exclude: ['lucide-react'],
   },
 });

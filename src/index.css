@@ -2,132 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ============================================================================
-   GlassiumOS Bespoke Composite Font System ("Glassium Sans")
-   - English / Latin: Elegant, refined geometric-humanist curves (Quicksand / Comfortaa / Outfit)
-   - Japanese: Soft, gentle rounded curves with maximum legibility (M PLUS Rounded 1c / Zen Maru Gothic)
-   ============================================================================ */
-:root {
-  --font-os-sans: 'Quicksand', 'Outfit', 'Comfortaa', 'M PLUS Rounded 1c', 'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'Noto Sans JP', system-ui, -apple-system, sans-serif;
-  --font-os-mono: 'JetBrains Mono', 'Comfortaa', 'M PLUS Rounded 1c', ui-monospace, SFMono-Regular, monospace;
-}
-
-body,
-.font-sans {
-  font-family: var(--font-os-sans) !important;
-  font-feature-settings: 'palt' 1, 'kern' 1, 'cv02' 1;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-  letter-spacing: 0.015em;
-}
-
-/* Switchable Clock Font Presets (All enforce strict tabular-nums & small uniform circles) */
-.clock-font-glassium-round {
-  font-family: 'Comfortaa', 'Quicksand', 'M PLUS Rounded 1c', monospace !important;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1, 'zero' 0;
-}
-
-.clock-font-hyperos-tall {
-  font-family: 'Outfit', 'Plus Jakarta Sans', 'Zen Maru Gothic', sans-serif !important;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1;
-}
-
-.clock-font-ios27-liquid {
-  font-family: 'Quicksand', 'Comfortaa', 'M PLUS Rounded 1c', sans-serif !important;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1;
-}
-
-.clock-font-win-hello {
-  font-family: 'Plus Jakarta Sans', 'Outfit', 'M PLUS Rounded 1c', sans-serif !important;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1;
-}
-
-.clock-font-cyber-mono {
-  font-family: 'Chakra Petch', 'Orbitron', 'JetBrains Mono', monospace !important;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1;
-}
-
-.clock-font-zen-maru {
-  font-family: 'Zen Maru Gothic', 'M PLUS Rounded 1c', 'Quicksand', sans-serif !important;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum' 1;
-}
-
-/* iOS 27 Liquid Glass Text - The characters/numerals themselves are pure liquid glass:
-   No rectangular card/box background; the glyph itself is transparent, refractive, fluid glass with specular sheen and crystal bevel */
-.ios27-liquid-digit {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  width: auto;
-  min-width: 0.65em;
-  padding: 0 0.04em;
-  line-height: 1;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  background: none !important;
-  background-color: transparent !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  border: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  /* Liquid Glass Core Fill: multi-stop iridescent liquid reflection */
-  background-image: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 1) 0%,
-    rgba(224, 242, 254, 0.9) 18%,
-    rgba(186, 230, 253, 0.35) 42%,
-    rgba(255, 255, 255, 0.98) 60%,
-    rgba(56, 189, 248, 0.45) 82%,
-    rgba(255, 255, 255, 0.95) 100%
-  ) !important;
-  -webkit-background-clip: text !important;
-  background-clip: text !important;
-  color: transparent !important;
-  -webkit-text-fill-color: transparent !important;
-  /* Crystal glass rim outline */
-  -webkit-text-stroke: 1.8px rgba(255, 255, 255, 0.88);
-  /* Liquid caustics, specular shine and ambient drop-shadow */
-  filter: drop-shadow(0 2px 3px rgba(255, 255, 255, 0.9))
-          drop-shadow(0 6px 14px rgba(56, 189, 248, 0.45))
-          drop-shadow(0 12px 24px rgba(0, 0, 0, 0.65));
-  user-select: none;
-}
-
-/* Small, perfectly uniform circular dots for clock colon & indicators (all circles identical size) */
-.ios27-liquid-circle-dot {
-  width: 10px;
-  height: 10px;
-  min-width: 10px;
-  min-height: 10px;
-  max-width: 10px;
-  max-height: 10px;
-  border-radius: 9999px;
-  display: inline-block;
-  background: radial-gradient(
-    circle at 35% 35%,
-    rgba(255, 255, 255, 1) 0%,
-    rgba(224, 242, 254, 0.85) 35%,
-    rgba(56, 189, 248, 0.35) 75%,
-    rgba(255, 255, 255, 0.9) 100%
-  );
-  border: 1.5px solid rgba(255, 255, 255, 0.88);
-  box-shadow:
-    0 2px 4px rgba(255, 255, 255, 0.9),
-    0 4px 12px rgba(56, 189, 248, 0.45),
-    0 8px 18px rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-}
-
 :root,
 [data-theme='dark'] {
   --os-accent: #06b6d4;
@@ -175,16 +49,9 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
-  font-family: 'Plus Jakarta Sans', 'Noto Sans JP', -apple-system, BlinkMacSystemFont, 'Segoe UI Variable', sans-serif;
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-  letter-spacing: -0.011em;
+  font-family: 'Inter', 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, sans-serif;
   user-select: none;
   color: var(--os-text);
-}
-
-.font-mono {
-  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
-  font-variant-numeric: tabular-nums;
 }
 
 /* ============================================================
@@ -389,58 +256,6 @@ input[type='range'].glass-slider::-moz-range-thumb {
   border: 2px solid #ffffff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
   cursor: pointer;
-}
-
-/* ============================================================
-   SURFACE MATERIAL ENGINE OVERRIDES
-   ============================================================ */
-[data-design-engine='windows-mica'] .liquid-glass-window,
-[data-design-engine='windows-mica'] .liquid-glass-card {
-  background: rgba(15, 23, 42, 0.92) !important;
-  backdrop-filter: blur(16px) saturate(130%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-}
-
-[data-theme='light'][data-design-engine='windows-mica'] .liquid-glass-window,
-[data-theme='light'][data-design-engine='windows-mica'] .liquid-glass-card {
-  background: rgba(241, 245, 249, 0.94) !important;
-  backdrop-filter: blur(16px) saturate(130%) !important;
-  border: 1px solid rgba(15, 23, 42, 0.08) !important;
-}
-
-[data-design-engine='frosted-blur'] .liquid-glass-window,
-[data-design-engine='frosted-blur'] .liquid-glass-card {
-  background: rgba(15, 23, 42, 0.62) !important;
-  backdrop-filter: blur(40px) saturate(220%) !important;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
-}
-
-[data-design-engine='dark-slate'] .liquid-glass-window,
-[data-design-engine='dark-slate'] .liquid-glass-card {
-  background: #090d16 !important;
-  backdrop-filter: blur(8px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.06) !important;
-}
-
-[data-theme='light'][data-design-engine='dark-slate'] .liquid-glass-window,
-[data-theme='light'][data-design-engine='dark-slate'] .liquid-glass-card {
-  background: #f8fafc !important;
-  backdrop-filter: blur(8px) !important;
-  border: 1px solid rgba(15, 23, 42, 0.12) !important;
-}
-
-[data-design-engine='cyberpunk-neon'] .liquid-glass-window,
-[data-design-engine='cyberpunk-neon'] .liquid-glass-card {
-  background: rgba(6, 11, 25, 0.95) !important;
-  border: 1px solid rgba(var(--os-accent-rgb), 0.5) !important;
-  box-shadow: 0 0 32px rgba(var(--os-accent-rgb), 0.22), 0 20px 54px rgba(0, 0, 0, 0.8) !important;
-}
-
-[data-design-engine='miuix-glass'] .liquid-glass-window,
-[data-design-engine='miuix-glass'] .liquid-glass-card {
-  background: rgba(255, 255, 255, 0.07) !important;
-  backdrop-filter: blur(32px) saturate(180%) !important;
-  border-radius: 24px !important;
 }
 
 /* Flat Accent Toggle Switch */
@@ -652,38 +467,14 @@ input[type='range'].glass-slider::-moz-range-thumb {
 }
 
 /* ============================================================
-   ACCENT COLOR DIRECT OVERRIDES
-   ============================================================ */
-[data-accent='cyan'] {
-  --os-accent: #06b6d4 !important;
-  --os-accent-rgb: 6, 182, 212 !important;
-}
-[data-accent='blue'] {
-  --os-accent: #3b82f6 !important;
-  --os-accent-rgb: 59, 130, 246 !important;
-}
-[data-accent='violet'] {
-  --os-accent: #8b5cf6 !important;
-  --os-accent-rgb: 139, 92, 246 !important;
-}
-[data-accent='emerald'] {
-  --os-accent: #10b981 !important;
-  --os-accent-rgb: 16, 185, 129 !important;
-}
-[data-accent='rose'] {
-  --os-accent: #f43f5e !important;
-  --os-accent-rgb: 244, 63, 94 !important;
-}
-[data-accent='amber'] {
-  --os-accent: #f59e0b !important;
-  --os-accent-rgb: 245, 158, 11 !important;
-}
-
-/* ============================================================
    UI STYLE ENGINES (AUTHENTIC & FUN PRESETS)
    ============================================================ */
 
 /* 1. Glassium (Zero Border Line Standard) */
+[data-ui-style='glassium'] {
+  --os-accent: #06b6d4;
+  --os-accent-rgb: 6, 182, 212;
+}
 [data-ui-style='glassium'] .liquid-glass-window {
   border-radius: 18px;
   box-shadow:
@@ -694,6 +485,8 @@ input[type='range'].glass-slider::-moz-range-thumb {
 
 /* 2. macOS (Apple Human Interface Guidelines) */
 [data-ui-style='macos'] {
+  --os-accent: #3b82f6;
+  --os-accent-rgb: 59, 130, 246;
   --theme-radius: 14px;
 }
 [data-ui-style='macos'] .liquid-glass-window {
@@ -712,6 +505,8 @@ input[type='range'].glass-slider::-moz-range-thumb {
 
 /* 3. One UI (Samsung Reachability & Comfort Curve) */
 [data-ui-style='one-ui'] {
+  --os-accent: #2563eb;
+  --os-accent-rgb: 37, 99, 235;
   --theme-radius: 26px;
 }
 [data-ui-style='one-ui'] .liquid-glass-window {
@@ -728,6 +523,8 @@ input[type='range'].glass-slider::-moz-range-thumb {
 
 /* 4. MIUI (Alive Aesthetics & Kenya Hara Superellipse) */
 [data-ui-style='miui'] {
+  --os-accent: #f97316;
+  --os-accent-rgb: 249, 115, 22;
   --theme-radius: 22px;
 }
 [data-ui-style='miui'] .liquid-glass-window {
@@ -736,12 +533,14 @@ input[type='range'].glass-slider::-moz-range-thumb {
   -webkit-backdrop-filter: blur(28px) saturate(175%);
   box-shadow:
     0 24px 64px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(var(--os-accent-rgb), 0.22),
+    0 0 0 1px rgba(249, 115, 22, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 /* 5. Material 3 (Google Material You Dynamic Tonal) */
 [data-ui-style='material3'] {
+  --os-accent: #8b5cf6;
+  --os-accent-rgb: 139, 92, 246;
   --theme-radius: 28px;
 }
 [data-ui-style='material3'] .liquid-glass-window {
@@ -757,6 +556,8 @@ input[type='range'].glass-slider::-moz-range-thumb {
 
 /* 6. The AI (Neural Matrix Cyber Sci-Fi) */
 [data-ui-style='the-ai'] {
+  --os-accent: #10b981;
+  --os-accent-rgb: 16, 185, 129;
   --theme-radius: 10px;
 }
 [data-ui-style='the-ai'] .liquid-glass-window {
@@ -775,6 +576,8 @@ input[type='range'].glass-slider::-moz-range-thumb {
 
 /* 7. Nyan Cat (Rainbow Arcade Pop) */
 [data-ui-style='nyan-cat'] {
+  --os-accent: #ec4899;
+  --os-accent-rgb: 236, 72, 153;
   --theme-radius: 20px;
 }
 [data-ui-style='nyan-cat'] .liquid-glass-window {
@@ -790,6 +593,8 @@ input[type='range'].glass-slider::-moz-range-thumb {
 
 /* 8. Meme (Much OS, Such Window, Very Doge) */
 [data-ui-style='meme'] {
+  --os-accent: #eab308;
+  --os-accent-rgb: 234, 179, 8;
   --theme-radius: 18px;
 }
 [data-ui-style='meme'] .liquid-glass-window {
@@ -798,648 +603,6 @@ input[type='range'].glass-slider::-moz-range-thumb {
     0 24px 60px rgba(234, 179, 8, 0.18),
     0 4px 18px rgba(0, 0, 0, 0.45),
     inset 0 1px 0 rgba(253, 224, 71, 0.4);
-}
-
-/* ============================================================
-   PER-SHELL-MODE APP & WINDOW LAYOUT ADAPTATION
-   ============================================================ */
-
-/* GlassiumOS 5 (Fluid Liquid Glass Window Architecture) */
-[data-shell-mode='windows'] .liquid-glass-window {
-  border-radius: var(--theme-radius, 18px);
-}
-
-/* Windows 11 (Fluent Rounded Mica Architecture) */
-[data-shell-mode='windows11'] .liquid-glass-window {
-  border-radius: 12px !important;
-}
-[data-shell-mode='windows11'] .window-body-shell-windows11 button:not(.rounded-full),
-[data-shell-mode='windows11'] .window-body-shell-windows11 input:not([type='range']) {
-  border-radius: 6px !important;
-}
-
-/* Windows 10 (Crisp Rectangular Fluent Metro) */
-[data-shell-mode='windows10'] .liquid-glass-window {
-  border-radius: 0px !important;
-}
-[data-shell-mode='windows10'] .window-body-shell-windows10 button:not(.rounded-full),
-[data-shell-mode='windows10'] .window-body-shell-windows10 input:not([type='range']) {
-  border-radius: 0px !important;
-}
-
-/* macOS (Aqua Rounded Controls & Translucent Sidebar) */
-[data-shell-mode='mac'] .liquid-glass-window {
-  border-radius: 12px !important;
-}
-[data-shell-mode='mac'] .window-body-shell-mac button:not(.rounded-full),
-[data-shell-mode='mac'] .window-body-shell-mac input:not([type='range']) {
-  border-radius: 8px !important;
-}
-
-/* Ubuntu Desktop (Yaru Warm Header & Rounded Pill Controls) */
-[data-shell-mode='ubuntu'] .liquid-glass-window {
-  border-radius: 10px 10px 6px 6px !important;
-}
-[data-shell-mode='ubuntu'] .window-body-shell-ubuntu button:not(.rounded-full),
-[data-shell-mode='ubuntu'] .window-body-shell-ubuntu input:not([type='range']) {
-  border-radius: 6px !important;
-}
-
-/* DeX / ChromeOS (Soft Pill Geometry) */
-[data-shell-mode='dex'] .liquid-glass-window,
-[data-shell-mode='chromeos'] .liquid-glass-window {
-  border-radius: 16px !important;
-}
-[data-shell-mode='chromeos'] .window-body-shell-chromeos button {
-  border-radius: 9999px !important;
-}
-
-/* ============================================================
-   APPLE MUSIC TIME-SYNCED LYRICS (60FPS) & LIQUID GLASS UI
-   ============================================================ */
-
-.apple-liquid-glass {
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.12) 0%,
-    rgba(255, 255, 255, 0.04) 50%,
-    rgba(255, 255, 255, 0.08) 100%
-  );
-  backdrop-filter: blur(36px) saturate(190%);
-  -webkit-backdrop-filter: blur(36px) saturate(190%);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow:
-    0 20px 50px rgba(0, 0, 0, 0.45),
-    inset 0 1px 1px rgba(255, 255, 255, 0.26),
-    inset 0 -1px 1px rgba(255, 255, 255, 0.05);
-}
-
-.apple-liquid-glass-bar {
-  background: linear-gradient(
-    180deg,
-    rgba(34, 34, 38, 0.78) 0%,
-    rgba(20, 20, 24, 0.84) 100%
-  );
-  backdrop-filter: blur(40px) saturate(200%);
-  -webkit-backdrop-filter: blur(40px) saturate(200%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow:
-    0 10px 30px rgba(0, 0, 0, 0.38),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-
-.apple-liquid-glass-pill {
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.16) 0%,
-    rgba(255, 255, 255, 0.06) 100%
-  );
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.32),
-    inset 0 1px 0 rgba(255, 255, 255, 0.28);
-}
-
-/* Lyric Line Optical Depth & Spring Cubic-Bezier Transition */
-.apple-lyric-line {
-  transform-origin: left center;
-  transition:
-    transform 0.56s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.5s cubic-bezier(0.22, 1, 0.36, 1),
-    background-color 0.25s ease;
-  will-change: transform, opacity, filter;
-}
-
-.apple-lyric-line.is-active {
-  transform: scale(1.05);
-  opacity: 1;
-  filter: blur(0px);
-}
-
-.apple-lyric-line.is-neighbor {
-  transform: scale(0.99);
-  opacity: 0.4;
-  filter: blur(1.2px);
-}
-
-.apple-lyric-line.is-inactive {
-  transform: scale(0.965);
-  opacity: 0.32;
-  filter: blur(1.5px);
-}
-
-.apple-lyric-line:hover {
-  opacity: 0.92 !important;
-  filter: blur(0px) !important;
-}
-
-/* Word-by-Word Karaoke Gradient Wipe (0% -> 100%) + Vertical Float */
-.apple-karaoke-word {
-  display: inline-block;
-  white-space: pre-wrap;
-  background-image: linear-gradient(
-    90deg,
-    #ffffff 0%,
-    #ffffff var(--word-progress, 0%),
-    rgba(255, 255, 255, 0.32) var(--word-progress, 0%),
-    rgba(255, 255, 255, 0.32) 100%
-  );
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: transparent;
-  transform: translateY(var(--word-lift, 0px)) scale(var(--word-scale, 1));
-  filter: drop-shadow(0 0 var(--word-glow, 0px) rgba(255, 255, 255, 0.72));
-  transition:
-    transform 0.14s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.14s ease;
-  will-change: transform, background-image, filter;
-}
-
-/* Vibrant Karaoke Color Themes (DAM / JOYSOUND style dynamic highlight) */
-.apple-karaoke-word.karaoke-theme-neon-gold {
-  background-image: linear-gradient(
-    90deg,
-    #f59e0b 0%,
-    #fbbf24 calc(var(--word-progress, 0%) * 0.5),
-    #f43f5e var(--word-progress, 0%),
-    rgba(255, 255, 255, 0.35) var(--word-progress, 0%),
-    rgba(255, 255, 255, 0.35) 100%
-  );
-  filter: drop-shadow(0 0 var(--word-glow, 0px) rgba(251, 191, 36, 0.95));
-}
-
-.apple-karaoke-word.karaoke-theme-cyber-cyan {
-  background-image: linear-gradient(
-    90deg,
-    #06b6d4 0%,
-    #38bdf8 calc(var(--word-progress, 0%) * 0.5),
-    #818cf8 var(--word-progress, 0%),
-    rgba(255, 255, 255, 0.35) var(--word-progress, 0%),
-    rgba(255, 255, 255, 0.35) 100%
-  );
-  filter: drop-shadow(0 0 var(--word-glow, 0px) rgba(56, 189, 248, 0.95));
-}
-
-.apple-karaoke-word.karaoke-theme-ruby-rose {
-  background-image: linear-gradient(
-    90deg,
-    #e11d48 0%,
-    #f43f5e calc(var(--word-progress, 0%) * 0.5),
-    #fda4af var(--word-progress, 0%),
-    rgba(255, 255, 255, 0.35) var(--word-progress, 0%),
-    rgba(255, 255, 255, 0.35) 100%
-  );
-  filter: drop-shadow(0 0 var(--word-glow, 0px) rgba(244, 63, 94, 0.95));
-}
-
-.apple-karaoke-word.karaoke-theme-rainbow-glow {
-  background-image: linear-gradient(
-    90deg,
-    #f43f5e 0%,
-    #fbbf24 calc(var(--word-progress, 0%) * 0.35),
-    #10b981 calc(var(--word-progress, 0%) * 0.7),
-    #38bdf8 var(--word-progress, 0%),
-    rgba(255, 255, 255, 0.35) var(--word-progress, 0%),
-    rgba(255, 255, 255, 0.35) 100%
-  );
-  filter: drop-shadow(0 0 var(--word-glow, 0px) rgba(244, 63, 94, 0.9));
-}
-
-/* Karaoke Lead-in countdown beat animations */
-@keyframes karaokeBeatPulse {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 0.9;
-  }
-  50% {
-    transform: scale(1.22);
-    opacity: 1;
-    box-shadow: 0 0 16px rgba(251, 191, 36, 0.95);
-  }
-}
-
-.karaoke-lead-in-pulse {
-  animation: karaokeBeatPulse 0.65s cubic-bezier(0.22, 1, 0.36, 1) infinite;
-}
-
-.karaoke-pitch-progress-track {
-  height: 3px;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.12);
-  overflow: hidden;
-  position: relative;
-}
-
-.karaoke-pitch-progress-fill {
-  height: 100%;
-  border-radius: 9999px;
-  transition: width 0.08s linear;
-  box-shadow: 0 0 10px rgba(251, 191, 36, 0.85);
-}
-
-/* Google Material Symbols Rounded font definition */
-.material-symbols-rounded {
-  font-family: 'Material Symbols Rounded', sans-serif;
-  font-weight: normal;
-  font-style: normal;
-  line-height: 1;
-  letter-spacing: normal;
-  text-transform: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-  word-wrap: normal;
-  direction: ltr;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-  -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: 'liga';
-  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-  user-select: none;
-  flex-shrink: 0;
-}
-
-/* ============================================================
-   GLASSIUM LIQUID GLASS DOCK & ARTWORK-ADAPTIVE FLUID GRADIENT
-   ============================================================ */
-
-@keyframes artworkMeshOrbit1 {
-  0% {
-    transform: translate3d(-12%, -10%, 0) scale(1.25) rotate(0deg);
-  }
-  33% {
-    transform: translate3d(14%, -6%, 0) scale(1.4) rotate(120deg);
-  }
-  66% {
-    transform: translate3d(-6%, 14%, 0) scale(1.3) rotate(240deg);
-  }
-  100% {
-    transform: translate3d(-12%, -10%, 0) scale(1.25) rotate(360deg);
-  }
-}
-
-@keyframes artworkMeshOrbit2 {
-  0% {
-    transform: translate3d(14%, 12%, 0) scale(1.35) rotate(360deg);
-  }
-  50% {
-    transform: translate3d(-16%, -12%, 0) scale(1.55) rotate(180deg);
-  }
-  100% {
-    transform: translate3d(14%, 12%, 0) scale(1.35) rotate(0deg);
-  }
-}
-
-@keyframes artworkMeshOrbit3 {
-  0% {
-    transform: translate3d(-8%, 16%, 0) scale(1.2) rotate(0deg);
-  }
-  50% {
-    transform: translate3d(16%, -14%, 0) scale(1.45) rotate(-180deg);
-  }
-  100% {
-    transform: translate3d(-8%, 16%, 0) scale(1.2) rotate(-360deg);
-  }
-}
-
-@keyframes dockGradientFlow {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
-}
-
-.artwork-fluid-orb-1 {
-  animation: artworkMeshOrbit1 22s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
-  will-change: transform;
-}
-
-.artwork-fluid-orb-2 {
-  animation: artworkMeshOrbit2 28s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
-  will-change: transform;
-}
-
-.artwork-fluid-orb-3 {
-  animation: artworkMeshOrbit3 19s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
-  will-change: transform;
-}
-
-.artwork-dock-underglow {
-  background-size: 240% 240%;
-  animation: dockGradientFlow 9s ease infinite;
-}
-
-.liquid-glass-music-dock {
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.16) 0%,
-    rgba(255, 255, 255, 0.05) 48%,
-    rgba(15, 23, 42, 0.52) 100%
-  );
-  backdrop-filter: blur(36px) saturate(210%);
-  -webkit-backdrop-filter: blur(36px) saturate(210%);
-  border: 1px solid rgba(255, 255, 255, 0.24);
-  box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.68),
-    0 6px 20px rgba(0, 0, 0, 0.4),
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.36),
-    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
-}
-
-/* ============================================================
-   ALEXANDRE VACASSIN LIQUID GLASS DISPLACEMENT SYSTEM
-   Genuine SVG Displacement Map & Chromatic Refraction Engine
-   ============================================================ */
-
-.liquid-glass-svg-canvas {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 520px;
-  height: 520px;
-  transform: translate(-50%, -50%);
-  background-color: rgba(255, 255, 255, 0.18);
-  pointer-events: none;
-  filter: drop-shadow(0 2px 4px rgba(255, 255, 255, 0.85))
-          drop-shadow(0 8px 20px rgba(56, 189, 248, 0.45))
-          drop-shadow(0 14px 28px rgba(0, 0, 0, 0.65));
-}
-
-.liquid-glass-svg-canvas.glass-points {
-  backdrop-filter: url(#filter-points);
-  -webkit-backdrop-filter: url(#filter-points);
-  mask: url(#shape-mask-points);
-  -webkit-mask: url(#shape-mask-points);
-}
-
-.liquid-glass-svg-canvas.glass-0 {
-  backdrop-filter: url(#filter-0);
-  -webkit-backdrop-filter: url(#filter-0);
-  mask: url(#shape-mask-0);
-  -webkit-mask: url(#shape-mask-0);
-}
-.liquid-glass-svg-canvas.glass-1 {
-  backdrop-filter: url(#filter-1);
-  -webkit-backdrop-filter: url(#filter-1);
-  mask: url(#shape-mask-1);
-  -webkit-mask: url(#shape-mask-1);
-}
-.liquid-glass-svg-canvas.glass-2 {
-  backdrop-filter: url(#filter-2);
-  -webkit-backdrop-filter: url(#filter-2);
-  mask: url(#shape-mask-2);
-  -webkit-mask: url(#shape-mask-2);
-}
-.liquid-glass-svg-canvas.glass-3 {
-  backdrop-filter: url(#filter-3);
-  -webkit-backdrop-filter: url(#filter-3);
-  mask: url(#shape-mask-3);
-  -webkit-mask: url(#shape-mask-3);
-}
-.liquid-glass-svg-canvas.glass-4 {
-  backdrop-filter: url(#filter-4);
-  -webkit-backdrop-filter: url(#filter-4);
-  mask: url(#shape-mask-4);
-  -webkit-mask: url(#shape-mask-4);
-}
-.liquid-glass-svg-canvas.glass-5 {
-  backdrop-filter: url(#filter-5);
-  -webkit-backdrop-filter: url(#filter-5);
-  mask: url(#shape-mask-5);
-  -webkit-mask: url(#shape-mask-5);
-}
-.liquid-glass-svg-canvas.glass-6 {
-  backdrop-filter: url(#filter-6);
-  -webkit-backdrop-filter: url(#filter-6);
-  mask: url(#shape-mask-6);
-  -webkit-mask: url(#shape-mask-6);
-}
-.liquid-glass-svg-canvas.glass-7 {
-  backdrop-filter: url(#filter-7);
-  -webkit-backdrop-filter: url(#filter-7);
-  mask: url(#shape-mask-7);
-  -webkit-mask: url(#shape-mask-7);
-}
-.liquid-glass-svg-canvas.glass-8 {
-  backdrop-filter: url(#filter-8);
-  -webkit-backdrop-filter: url(#filter-8);
-  mask: url(#shape-mask-8);
-  -webkit-mask: url(#shape-mask-8);
-}
-.liquid-glass-svg-canvas.glass-9 {
-  backdrop-filter: url(#filter-9);
-  -webkit-backdrop-filter: url(#filter-9);
-  mask: url(#shape-mask-9);
-  -webkit-mask: url(#shape-mask-9);
-}
-
-/* Clock slot structure */
-.liquid-clock-stage {
-  display: flex;
-  gap: 0px;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: visible;
-  height: 220px;
-}
-
-.liquid-number-slot {
-  width: 90px;
-  height: 220px;
-  position: relative;
-  overflow: visible;
-}
-
-.liquid-separator-slot {
-  width: 44px;
-  height: 220px;
-  position: relative;
-  overflow: visible;
-}
-
-/* ============================================================
-   LIQUID GLASS MUSIC UI DISPLACEMENT & SHAPE MASKS
-   Adapted for Music Player capsules, vinyl discs, and controls
-   ============================================================ */
-
-.liquid-music-pill-body {
-  backdrop-filter: url(#filter-points) blur(20px) saturate(220%);
-  -webkit-backdrop-filter: url(#filter-points) blur(20px) saturate(220%);
-  mask: url(#shape-mask-music-pill);
-  -webkit-mask: url(#shape-mask-music-pill);
-  background: radial-gradient(
-    circle at 35% 25%,
-    rgba(255, 255, 255, 0.28) 0%,
-    rgba(255, 255, 255, 0.08) 55%,
-    rgba(6, 182, 212, 0.12) 100%
-  );
-  box-shadow:
-    inset 0 2px 4px rgba(255, 255, 255, 0.5),
-    inset 0 -2px 4px rgba(0, 0, 0, 0.4),
-    0 24px 60px rgba(0, 0, 0, 0.6);
-  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-/* Focused glow effect on the liquid music pill */
-:focus-within > .liquid-music-pill-body,
-:focus > .liquid-music-pill-body,
-.liquid-music-pill-container:focus-within .liquid-music-pill-body {
-  box-shadow:
-    inset 0 2px 6px rgba(255, 255, 255, 0.75),
-    inset 0 -2px 6px rgba(6, 182, 212, 0.4),
-    0 0 20px rgba(6, 182, 212, 0.45),
-    0 24px 60px rgba(0, 0, 0, 0.7);
-}
-
-/* ============================================================
-   WEATHER ICON ANIMATIONS INSIDE THE LIQUID PILL (WHEN FOCUSED)
-   - Subtle bobbing motion for Sun
-   - Gentle rain effect for CloudRain
-   ============================================================ */
-
-@keyframes weatherSunBobbing {
-  0%, 100% {
-    transform: translateY(0px) rotate(0deg) scale(1);
-    filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.6));
-  }
-  50% {
-    transform: translateY(-4px) rotate(14deg) scale(1.1);
-    filter: drop-shadow(0 0 14px rgba(251, 191, 36, 0.95));
-  }
-}
-
-@keyframes weatherRainCloudBob {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-2.5px);
-  }
-}
-
-@keyframes weatherRainDropsFall {
-  0% {
-    transform: translateY(-3px) scaleY(0.6);
-    opacity: 0;
-  }
-  35% {
-    opacity: 0.95;
-  }
-  100% {
-    transform: translateY(7px) scaleY(1.3);
-    opacity: 0;
-  }
-}
-
-@keyframes vintageSunRayRotate {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes vintageRainStreak {
-  0% {
-    transform: translateY(-80px) skewX(-12deg);
-  }
-  100% {
-    transform: translateY(700px) skewX(-12deg);
-  }
-}
-
-@keyframes vintageCloudDrift {
-  0% {
-    transform: translateX(-15%);
-  }
-  50% {
-    transform: translateX(15%);
-  }
-  100% {
-    transform: translateX(-15%);
-  }
-}
-
-/* Animation trigger when pill component is focused */
-:focus .liquid-weather-icon-sun,
-:focus-within .liquid-weather-icon-sun,
-.group:focus-within .liquid-weather-icon-sun,
-.group:hover .liquid-weather-icon-sun,
-.liquid-weather-pill-btn:focus .liquid-weather-icon-sun {
-  animation: weatherSunBobbing 2.4s ease-in-out infinite;
-}
-
-:focus .liquid-weather-icon-rain,
-:focus-within .liquid-weather-icon-rain,
-.group:focus-within .liquid-weather-icon-rain,
-.group:hover .liquid-weather-icon-rain,
-.liquid-weather-pill-btn:focus .liquid-weather-icon-rain {
-  animation: weatherRainCloudBob 1.6s ease-in-out infinite;
-  filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.85));
-}
-
-:focus .liquid-weather-raindrop,
-:focus-within .liquid-weather-raindrop,
-.group:focus-within .liquid-weather-raindrop,
-.group:hover .liquid-weather-raindrop,
-.liquid-weather-pill-btn:focus .liquid-weather-raindrop {
-  animation: weatherRainDropsFall 0.95s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-
-.liquid-music-disc-body {
-  backdrop-filter: url(#filter-points) blur(18px) saturate(200%);
-  -webkit-backdrop-filter: url(#filter-points) blur(18px) saturate(200%);
-  mask: url(#shape-mask-music-disc);
-  -webkit-mask: url(#shape-mask-music-disc);
-  background: radial-gradient(
-    circle at 50% 50%,
-    rgba(255, 255, 255, 0.35) 0%,
-    rgba(15, 23, 42, 0.75) 45%,
-    rgba(6, 182, 212, 0.3) 100%
-  );
-  box-shadow:
-    inset 0 0 18px rgba(255, 255, 255, 0.4),
-    0 16px 45px rgba(0, 0, 0, 0.65);
-}
-
-.liquid-music-btn-play {
-  mask: url(#shape-mask-music-play);
-  -webkit-mask: url(#shape-mask-music-play);
-  backdrop-filter: url(#filter-points);
-  -webkit-backdrop-filter: url(#filter-points);
-}
-
-.liquid-music-btn-pause {
-  mask: url(#shape-mask-music-pause);
-  -webkit-mask: url(#shape-mask-music-pause);
-  backdrop-filter: url(#filter-points);
-  -webkit-backdrop-filter: url(#filter-points);
-}
-
-.liquid-music-btn-skip-next {
-  mask: url(#shape-mask-music-skip-next);
-  -webkit-mask: url(#shape-mask-music-skip-next);
-  backdrop-filter: url(#filter-points);
-  -webkit-backdrop-filter: url(#filter-points);
-}
-
-.liquid-music-btn-skip-prev {
-  mask: url(#shape-mask-music-skip-prev);
-  -webkit-mask: url(#shape-mask-music-skip-prev);
-  backdrop-filter: url(#filter-points);
-  -webkit-backdrop-filter: url(#filter-points);
 }
 
 

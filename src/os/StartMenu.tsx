@@ -39,31 +39,12 @@ const PINNED: PinnedEntry[] = [
   { uid: 'pin-settings', appId: 'settings', label: 'Settings', icon: 'settings' },
   { uid: 'pin-game', appId: 'game', label: 'Games', icon: 'game' },
   { uid: 'pin-synth', appId: 'synth', label: 'Music', icon: 'synth' },
-  { uid: 'pin-entertainment', appId: 'entertainment', label: 'Entertainment', icon: 'entertainment' },
   { uid: 'pin-calendar', appId: 'calendar', label: 'Calendar', icon: 'calendar' },
   { uid: 'pin-weather', appId: 'weather', label: 'Weather', icon: 'weather' },
   { uid: 'pin-clock', appId: 'clock', label: 'Clock', icon: 'clock' },
   { uid: 'pin-ai', appId: 'ai', label: 'AI Assistant', icon: 'ai' },
-  { uid: 'pin-studio', appId: 'studio', label: 'Glassium Studio', icon: 'studio' },
-  { uid: 'pin-paint', appId: 'paint', label: 'Spect Studio', icon: 'paint' },
   { uid: 'pin-taskmanager', appId: 'taskmanager', label: 'Task Manager', icon: 'taskmanager' },
   { uid: 'pin-appstore', appId: 'appstore', label: 'App Store', icon: 'appstore' },
-  { uid: 'pin-retrocade', appId: 'retrocade', label: 'RetroCade', icon: 'Gamepad2' },
-];
-
-const CONSOLIDATED_TOOL_SHORTCUTS: { appId: AppId; label: string; parentLabel: string; icon: string }[] = [
-  { appId: 'unitconverter', label: '単位・通貨変換', parentLabel: 'Calculator', icon: 'SlidersHorizontal' },
-  { appId: 'bmi', label: 'BMI・健康計算', parentLabel: 'Calculator', icon: 'Activity' },
-  { appId: 'expense', label: '収支管理 (家計簿)', parentLabel: 'Calculator', icon: 'Calculator' },
-  { appId: 'pomodoro', label: 'ポモドーロタイマー', parentLabel: 'Clock', icon: 'Clock' },
-  { appId: 'kanban', label: 'カンバンボード', parentLabel: 'Calendar', icon: 'LayoutGrid' },
-  { appId: 'habit', label: '習慣トラッカー', parentLabel: 'Calendar', icon: 'CheckCircle2' },
-  { appId: 'whiteboard', label: 'アイデアメモ', parentLabel: 'Calendar', icon: 'PenTool' },
-  { appId: 'jsonformat', label: 'JSON整形・正規表現', parentLabel: 'Glassium Studio', icon: 'Code2' },
-  { appId: 'passgen', label: 'パスワード生成', parentLabel: 'Glassium Studio', icon: 'Key' },
-  { appId: 'wordcount', label: '文字数・テキスト差分', parentLabel: 'Editor', icon: 'FileText' },
-  { appId: 'drumpad', label: 'ドラムパッド・周波数', parentLabel: 'Music', icon: 'Volume2' },
-  { appId: 'sysinfo', label: 'システム診断', parentLabel: 'Task Manager', icon: 'Cpu' },
 ];
 
 const RECOMMENDED_ITEMS: {
@@ -89,13 +70,13 @@ const RECOMMENDED_ITEMS: {
     appId: 'notepad',
     payload: {
       fileName: 'GlassiumOS_Notes.md',
-      content: '# GlassiumOS 5 u1 (GlasispectUI)\n\nMinimal Refractive Glass & Integrated AI Desktop Environment.\n',
+      content: '# GlassiumOS-V4.0\n\n2.5D Glassmorphism & Lustrous Gradient Desktop Environment.\n',
     },
   },
   {
     id: 'rec-game',
-    title: '3DMaze (50F Roguelike) & Slope',
-    subtitle: '3D ダンジョン RTA ＆ 物理ランナー',
+    title: 'Arcade & 3D Games',
+    subtitle: 'よく使うアプリケーション',
     icon: 'game',
     appId: 'game',
   },
@@ -222,12 +203,6 @@ export function StartMenu({ open, onClose }: Props) {
 
     const combinedApps: PinnedEntry[] = [
       ...allPinned,
-      ...CONSOLIDATED_TOOL_SHORTCUTS.map((t) => ({
-        uid: `tool-${t.appId}`,
-        appId: t.appId,
-        label: `${t.label} (${t.parentLabel})`,
-        icon: t.icon,
-      })),
       ...TASKBAR_APPS.filter((t) => !allPinned.some((p) => p.appId === t.appId)).map((t) => ({
         uid: `tb-${t.appId}`,
         appId: t.appId,
@@ -305,6 +280,7 @@ export function StartMenu({ open, onClose }: Props) {
   const isWin10 = shellMode === 'windows10';
   const isDeX = shellMode === 'dex';
   const isChromeOS = shellMode === 'chromeos';
+  const isZorin = shellMode === 'zorin';
 
   const userName = user?.name || 'Administrator';
   const userInitial = (userName.trim()[0] || 'A').toUpperCase();
@@ -518,12 +494,7 @@ export function StartMenu({ open, onClose }: Props) {
               className="fixed bottom-10 left-0 z-[5200] w-[min(620px,calc(100vw-16px))] h-[min(500px,calc(100vh-56px))] rounded-none shadow-2xl border border-zinc-700 bg-zinc-950/95 backdrop-blur-2xl flex font-sans select-none text-white"
             >
               <div className="w-12 bg-black/60 border-r border-zinc-800 flex flex-col justify-between items-center py-3 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setAllProgramsView((v) => !v)}
-                  className="p-2 text-white/60 hover:text-white"
-                  title="All Apps"
-                >
+                <button className="p-2 text-white/60 hover:text-white" title="Expand">
                   <Icon name="LayoutGrid" size={16} fluent={false} />
                 </button>
                 <div className="flex flex-col items-center gap-3">
@@ -572,9 +543,9 @@ export function StartMenu({ open, onClose }: Props) {
           )}
 
           {/* ==============================================================
-              4. SAMSUNG DEX / CHROMEOS DRAWERS
+              4. SAMSUNG DEX / CHROMEOS / ZORIN DRAWERS
              ============================================================== */}
-          {(isDeX || isChromeOS) && (
+          {(isDeX || isChromeOS || isZorin) && (
             <motion.div
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
@@ -613,198 +584,9 @@ export function StartMenu({ open, onClose }: Props) {
           )}
 
           {/* ==============================================================
-              5A. GLASSIUMOS 5 START MENU (Borderless Hairline 2-Column UI)
+              5. AUTHENTIC WINDOWS 11 START MENU (Flat GlassiumOS-V4.0)
              ============================================================== */}
-          {shellMode === 'windows' && (
-            <div
-              className={`fixed bottom-[48px] z-[5200] pointer-events-none ${
-                taskbarAlign === 'left'
-                  ? 'left-0 flex justify-start'
-                  : 'inset-x-0 flex justify-center'
-              }`}
-            >
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 12 }}
-                transition={{ duration: 0.16 }}
-                onClick={(e) => e.stopPropagation()}
-                className={`pointer-events-auto w-full max-w-[660px] max-h-[calc(100vh-64px)] flex flex-col backdrop-blur-2xl border-t border-x select-none ${
-                  isLight
-                    ? 'bg-white/95 border-slate-300 text-slate-900 shadow-2xl'
-                    : 'bg-slate-950/95 border-white/15 text-white shadow-[0_24px_60px_rgba(0,0,0,0.8)]'
-                }`}
-              >
-                {/* Top Hairline Search & AI Bar */}
-                <div className={`flex items-center justify-between px-6 py-3.5 border-b ${isLight ? 'border-slate-200' : 'border-white/10'}`}>
-                  <div className="flex items-center gap-3 flex-1">
-                    <Icon name="Search" size={15} className="os-accent-text shrink-0" fluent={false} />
-                    <input
-                      autoFocus
-                      type="text"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Escape') {
-                          if (query) setQuery('');
-                          else onClose();
-                        } else if (e.key === 'Enter' && searchResults.length > 0) {
-                          launchSearchResult(searchResults[0]);
-                        }
-                      }}
-                      placeholder="アプリケーション、統合ツール、ファイルを検索..."
-                      className="flex-1 bg-transparent text-xs outline-none"
-                    />
-                    {query && (
-                      <button type="button" onClick={() => setQuery('')} className="opacity-50 hover:opacity-100">
-                        <Icon name="X" size={14} fluent={false} />
-                      </button>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => { openApp('ai'); onClose(); }}
-                    className="ml-4 pl-4 border-l border-current/15 text-xs font-medium os-accent-text hover:underline flex items-center gap-1.5 shrink-0"
-                  >
-                    <Icon name="Sparkles" size={13} fluent={false} />
-                    <span>AI Assistant</span>
-                  </button>
-                </div>
-
-                {/* Body: Search Results or 2-Column Hairline Layout */}
-                {query.trim() ? (
-                  <div className="p-6 overflow-y-auto max-h-[380px] divide-y divide-current/10">
-                    {searchResults.length > 0 ? (
-                      searchResults.map((result) => (
-                        <button
-                          key={result.uid}
-                          type="button"
-                          onClick={() => launchSearchResult(result)}
-                          className="w-full flex items-center justify-between py-2.5 px-2 hover:bg-current/5 transition text-left"
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <Icon name={result.icon} size={22} />
-                            <div className="min-w-0">
-                              <div className="text-xs font-medium truncate">{result.label}</div>
-                              <div className="text-[10px] opacity-50">
-                                {result.type === 'app' ? 'アプリケーション / 統合機能' : `ファイル · ${result.filePath?.join('/') || '/'}`}
-                              </div>
-                            </div>
-                          </div>
-                          <Icon name="ChevronRight" size={14} className="opacity-40" fluent={false} />
-                        </button>
-                      ))
-                    ) : (
-                      <div className="py-12 text-center text-xs opacity-45">一致する項目がありません</div>
-                    )}
-                  </div>
-                ) : (
-                  <div className={`grid grid-cols-1 sm:grid-cols-12 divide-y sm:divide-y-0 sm:divide-x ${isLight ? 'divide-slate-200' : 'divide-white/10'} min-h-[340px] max-h-[400px] overflow-hidden`}>
-                    {/* Left 7 Columns: Core Unified Applications */}
-                    <div className="sm:col-span-7 p-5 overflow-y-auto flex flex-col justify-between">
-                      <div>
-                        <div className="text-[11px] font-medium opacity-50 mb-3 px-1">アプリケーション</div>
-                        <div className="grid grid-cols-3 gap-x-2 gap-y-3">
-                          {allPinned.slice(0, 15).map((app) => (
-                            <button
-                              key={app.uid}
-                              type="button"
-                              onClick={() => launch(app)}
-                              className="flex items-center gap-2.5 py-1.5 px-2 hover:bg-current/5 transition text-left group"
-                            >
-                              <div className="w-7 h-7 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                                <Icon name={app.icon} size={22} />
-                              </div>
-                              <span className="text-xs font-medium truncate">{app.label}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Right 5 Columns: Consolidated Multi-Tool Shortcuts */}
-                    <div className="sm:col-span-5 p-5 overflow-y-auto">
-                      <div className="text-[11px] font-medium opacity-50 mb-2 px-1">統合ツール直接起動</div>
-                      <div className={`divide-y ${isLight ? 'divide-slate-200/70' : 'divide-white/[0.07]'}`}>
-                        {CONSOLIDATED_TOOL_SHORTCUTS.map((tool) => (
-                          <button
-                            key={tool.appId}
-                            type="button"
-                            onClick={() => { openApp(tool.appId); onClose(); }}
-                            className="w-full flex items-center justify-between py-2 px-1 hover:bg-current/5 transition text-left group"
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <Icon name={tool.icon} size={14} className="os-accent-text shrink-0" fluent={false} />
-                              <span className="text-xs truncate">{tool.label}</span>
-                            </div>
-                            <span className="text-[10px] font-mono opacity-45 shrink-0">{tool.parentLabel}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Bottom Footer Hairline Bar */}
-                <div className={`px-6 py-3 border-t flex items-center justify-between text-xs ${isLight ? 'border-slate-200 bg-slate-50' : 'border-white/10 bg-black/40'}`}>
-                  <button
-                    type="button"
-                    onClick={() => { openApp('settings'); onClose(); }}
-                    className="flex items-center gap-2.5 hover:opacity-80 transition"
-                  >
-                    <div className="h-6 w-6 rounded-full os-accent-bg flex items-center justify-center text-white text-[11px] font-bold">
-                      {userInitial}
-                    </div>
-                    <span className="font-medium">{userName}</span>
-                    <span className="text-[10px] font-mono opacity-45">GlassiumOS 5 u1 · GlasispectUI</span>
-                  </button>
-
-                  <div className="flex items-center gap-4">
-                    <button
-                      type="button"
-                      onClick={() => { openApp('game', { payload: { gameId: 'maze' } }); onClose(); }}
-                      className="text-[10px] font-mono text-cyan-300 hover:text-cyan-200 transition flex items-center gap-1"
-                      title="3DMaze デイリーチャレンジ最高記録"
-                    >
-                      <Icon name="Compass" size={12} fluent={false} />
-                      <span>
-                        {(() => {
-                          try {
-                            const rec = JSON.parse(localStorage.getItem('glassium_3dmaze_daily_best') || 'null');
-                            if (rec && rec.floor) return `3DMaze Best: ${rec.floor}F (${rec.timeStr || '--:--'})`;
-                          } catch {
-                            // ignore
-                          }
-                          return '3DMaze Daily RTA';
-                        })()}
-                      </span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { openApp('settings'); onClose(); }}
-                      className="opacity-70 hover:opacity-100 transition flex items-center gap-1"
-                    >
-                      <Icon name="Settings" size={13} fluent={false} />
-                      <span>設定</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { onClose(); lockSystem(); }}
-                      className="text-rose-400 hover:text-rose-300 transition flex items-center gap-1"
-                    >
-                      <Icon name="Power" size={13} fluent={false} />
-                      <span>ロック</span>
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            </div>
-          )}
-
-          {/* ==============================================================
-              5B. AUTHENTIC WINDOWS 11 START MENU (Preserved when shellMode === 'windows11')
-             ============================================================== */}
-          {shellMode === 'windows11' && (
+          {!isXP && !isVista && !isWin10 && !isDeX && !isChromeOS && !isZorin && (
             <div
               className={`fixed bottom-[56px] z-[5200] pointer-events-none ${
                 taskbarAlign === 'left'

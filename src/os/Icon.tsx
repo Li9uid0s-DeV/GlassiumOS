@@ -121,23 +121,10 @@ import {
   CheckCircle2,
   RotateCcw,
   MousePointer,
-  Tv,
-  Film,
-  Video,
-  Clapperboard,
-  Key,
-  Code2,
 } from 'lucide-react';
 import { FluentAppIcon, resolveFluentIconType } from './FluentAppIcon';
 
 const map = {
-  entertainment: Tv,
-  Tv,
-  Film,
-  Video,
-  Clapperboard,
-  Key,
-  Code2,
   CloudSun,
   CloudRain,
   Cloud,
@@ -270,18 +257,16 @@ export function Icon({
   size = 16,
   onClick,
   fluent = true,
-  strokeWidth = 1.65,
 }: {
   name: string;
   className?: string;
   size?: number;
   onClick?: () => void;
   fluent?: boolean;
-  strokeWidth?: number;
 }) {
   if (fluent && resolveFluentIconType(name)) {
     return <FluentAppIcon name={name} size={size} className={className} onClick={onClick} />;
   }
   const C = (map as Record<string, typeof FolderOpen>)[name] ?? File;
-  return <C className={className} size={size} strokeWidth={strokeWidth} onClick={onClick} />;
+  return <C className={className} size={size} onClick={onClick} />;
 }

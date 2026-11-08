@@ -1,54 +1,93 @@
 import React from 'react';
 
 interface AppLogoProps {
-  className?: string;
   size?: number;
+  className?: string;
+  variant?: 'squircle' | 'raw' | 'glass';
   glow?: boolean;
 }
 
 /**
- * GlassiumOS 5 Official Emblem
- * Faceted crystal prism motif representing layered refractive glass planes.
+ * GlassiumOS-V4.0 Official Brand Emblem: Abstracted Flat 2D Gradient Mark
+ * Deconstructed, asymmetric geometric ribbon flow inspired by Microsoft 365 / Copilot
+ * that subtly hints at a "G" vortex without being a literal letterform. Pure flat 2D.
  */
-export const AppLogo: React.FC<AppLogoProps> = ({ className = '', size = 24, glow = false }) => {
-  return (
+export function AppLogo({ size = 32, className = '', variant = 'raw' }: AppLogoProps) {
+  const uid = React.useId().replace(/:/g, '');
+
+  const svgContent = (
     <svg
+      viewBox="0 0 256 256"
       width={size}
       height={size}
-      viewBox="0 0 28 28"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={`${className} ${glow ? 'drop-shadow-[0_0_8px_rgba(56,189,248,0.65)]' : ''}`}
+      className="shrink-0 transition-transform duration-300"
     >
       <defs>
-        <linearGradient id="glassium5-facet-top" x1="4" y1="2" x2="24" y2="14" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#67e8f9" />
-          <stop offset="100%" stopColor="#38bdf8" />
+        {/* Ribbon 1 (Top-Left Diagonal Sweep): Pink -> Magenta -> Amethyst */}
+        <linearGradient id={`g-abs-1-${uid}`} x1="188" y1="28" x2="32" y2="164" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#f472b6" />
+          <stop offset="45%" stopColor="#d946ef" />
+          <stop offset="100%" stopColor="#7c3aed" />
         </linearGradient>
-        <linearGradient id="glassium5-facet-left" x1="3" y1="10" x2="14" y2="26" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#0ea5e9" />
+
+        {/* Ribbon 2 (Bottom Asymmetric Arc): Amethyst -> Indigo -> Royal Blue */}
+        <linearGradient id={`g-abs-2-${uid}`} x1="48" y1="168" x2="224" y2="184" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#9333ea" />
+          <stop offset="50%" stopColor="#6366f1" />
           <stop offset="100%" stopColor="#2563eb" />
         </linearGradient>
-        <linearGradient id="glassium5-facet-right" x1="14" y1="10" x2="25" y2="26" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#6366f1" />
-          <stop offset="100%" stopColor="#3b82f6" />
-        </linearGradient>
-        <linearGradient id="glassium5-core" x1="9" y1="8" x2="19" y2="20" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.92" />
-          <stop offset="100%" stopColor="#bae6fd" stopOpacity="0.55" />
+
+        {/* Ribbon 3 (Floating Diagonal Inner Wing): Cobalt -> Cyan -> Bright Aqua */}
+        <linearGradient id={`g-abs-3-${uid}`} x1="108" y1="148" x2="228" y2="88" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#3b82f6" />
+          <stop offset="55%" stopColor="#06b6d4" />
+          <stop offset="100%" stopColor="#2dd4bf" />
         </linearGradient>
       </defs>
-      {/* Top crystal crown */}
-      <polygon points="14,2 25,9.5 14,14.5 3,9.5" fill="url(#glassium5-facet-top)" />
-      {/* Left refractive wing */}
-      <polygon points="3,9.5 14,14.5 14,26 4.5,19.5" fill="url(#glassium5-facet-left)" />
-      {/* Right refractive wing */}
-      <polygon points="25,9.5 23.5,19.5 14,26 14,14.5" fill="url(#glassium5-facet-right)" />
-      {/* Inner luminous diamond core */}
-      <polygon points="14,6.5 19.5,11.5 14,21.5 8.5,11.5" fill="url(#glassium5-core)" />
-      {/* Clean geometric facet hairlines */}
-      <line x1="14" y1="2" x2="14" y2="26" stroke="#ffffff" strokeOpacity="0.45" strokeWidth="0.75" />
-      <line x1="3" y1="9.5" x2="25" y2="9.5" stroke="#ffffff" strokeOpacity="0.35" strokeWidth="0.75" />
+
+      {/* Part 1: Deconstructed Upper-Left Sweeping Blade (Tilted & Tapered) */}
+      <path
+        d="M178 36C132 20 76 38 46 82C24 114 24 154 42 184C48 194 62 194 68 184C73 176 72 166 68 156C58 134 62 106 80 86C102 62 138 56 166 68C178 73 192 66 194 54C196 44 188 39 178 36Z"
+        fill={`url(#g-abs-1-${uid})`}
+      />
+
+      {/* Part 2: Detached Lower-Right Flowing Ribbon with Negative-Space Gap */}
+      <path
+        d="M78 206C114 232 168 228 202 194C222 174 232 146 228 118C226 106 214 100 204 106L182 119C187 138 182 158 168 172C146 194 112 196 88 178C78 170 64 174 62 186C60 194 68 200 78 206Z"
+        fill={`url(#g-abs-2-${uid})`}
+      />
+
+      {/* Part 3: Stylized Floating Diagonal Wing (Replaces literal horizontal G bar) */}
+      <path
+        d="M112 142C104 132 108 116 120 110L192 74C206 67 222 74 226 88C230 100 222 114 210 120L138 156C128 161 118 150 112 142Z"
+        fill={`url(#g-abs-3-${uid})`}
+      />
     </svg>
   );
-};
+
+  if (variant === 'squircle') {
+    return (
+      <div
+        className={`rounded-2xl bg-slate-900/70 p-1.5 flex items-center justify-center ${className}`}
+        style={{ width: size * 1.3, height: size * 1.3 }}
+      >
+        {svgContent}
+      </div>
+    );
+  }
+
+  if (variant === 'glass') {
+    return (
+      <div
+        className={`rounded-xl bg-slate-900/50 p-1 flex items-center justify-center ${className}`}
+        style={{ width: size * 1.25, height: size * 1.25 }}
+      >
+        {svgContent}
+      </div>
+    );
+  }
+
+  return <div className={`inline-flex items-center justify-center ${className}`}>{svgContent}</div>;
+}

@@ -15,38 +15,7 @@ export type AppId =
   | 'clock'
   | 'ai'
   | 'studio'
-  | 'retrocade'
-  | 'paint'
-  | 'pomodoro'
-  | 'unitconverter'
-  | 'colorpicker'
-  | 'passgen'
-  | 'qrcode'
-  | 'jsonformat'
-  | 'regex'
-  | 'markdown'
-  | 'kanban'
-  | 'habit'
-  | 'expense'
-  | 'bmi'
-  | 'worldclock'
-  | 'morse'
-  | 'base64'
-  | 'diff'
-  | 'wordcount'
-  | 'flashcards'
-  | 'whiteboard'
-  | 'drumpad'
-  | 'tuner'
-  | 'minesweeper'
-  | 'tictactoe'
-  | 'memory'
-  | 'typing'
-  | 'sudoku'
-  | 'periodic'
-  | 'dictionary'
-  | 'entertainment'
-  | 'sysinfo';
+  | 'retrocade';
 
 // Custom installed apps use a string ID prefixed with 'custom:'
 export type WindowAppId = AppId | string;
@@ -63,7 +32,6 @@ export interface WindowState {
   zIndex: number;
   minimized: boolean;
   maximized: boolean;
-  closed?: boolean;
   desktopId?: string;
   prevRect?: { x: number; y: number; width: number; height: number };
   payload?: unknown;
@@ -82,8 +50,6 @@ export interface TaskbarApp {
 
 export const TASKBAR_APPS: TaskbarApp[] = [
   { appId: 'browser', label: 'Browser', icon: 'Globe' },
-  { appId: 'entertainment', label: 'Entertainment', icon: 'Tv' },
-  { appId: 'synth', label: 'Music', icon: 'Music' },
   { appId: 'notepad', label: 'Editor', icon: 'FileText' },
   { appId: 'terminal', label: 'Terminal', icon: 'SquareTerminal' },
   { appId: 'explorer', label: 'Files', icon: 'FolderOpen' },
@@ -143,46 +109,35 @@ export const DESKTOP_ICON_SIZE_PRESETS: Record<
   },
 };
 
-export type ThemeMode = 'dark' | 'light' | 'system' | 'sunset-sunrise';
-
-export type AccentColor = 'dynamic' | 'cyan' | 'blue' | 'violet' | 'emerald' | 'rose' | 'amber';
+export type AccentColor = 'cyan' | 'blue' | 'violet' | 'emerald' | 'rose' | 'amber';
 
 export const ACCENT_COLOR_PRESETS: {
   id: AccentColor;
   label: string;
   labelJa: string;
-  descJa?: string;
   hex: string;
   rgb: string;
 }[] = [
-  {
-    id: 'dynamic',
-    label: 'Dynamic',
-    labelJa: '動的 (背景・画像・ダーク/ライト連動)',
-    descJa: '背景の色やアップロードした画像にあわせてアクセントカラー、ダーク、ライトかで変動する',
-    hex: '#38bdf8',
-    rgb: '56, 189, 248',
-  },
-  { id: 'cyan', label: 'Cyan', labelJa: 'シアン', descJa: '透明感ある標準ネオンシアン', hex: '#06b6d4', rgb: '6, 182, 212' },
-  { id: 'blue', label: 'Blue', labelJa: 'ブルー', descJa: '鮮やかで知的なコバルトブルー', hex: '#3b82f6', rgb: '59, 130, 246' },
-  { id: 'violet', label: 'Violet', labelJa: 'バイオレット', descJa: '深みのあるアメジストバイオレット', hex: '#8b5cf6', rgb: '139, 92, 246' },
-  { id: 'emerald', label: 'Emerald', labelJa: 'エメラルド', descJa: '自然で鮮やかなエメラルドグリーン', hex: '#10b981', rgb: '16, 185, 129' },
-  { id: 'rose', label: 'Rose', labelJa: 'ローズ', descJa: '華やかなクリムゾンローズ', hex: '#f43f5e', rgb: '244, 63, 94' },
-  { id: 'amber', label: 'Amber', labelJa: 'アンバー', descJa: '温かみのあるゴールデンアンバー', hex: '#f59e0b', rgb: '245, 158, 11' },
+  { id: 'cyan', label: 'Cyan', labelJa: 'シアン', hex: '#06b6d4', rgb: '6, 182, 212' },
+  { id: 'blue', label: 'Blue', labelJa: 'ブルー', hex: '#3b82f6', rgb: '59, 130, 246' },
+  { id: 'violet', label: 'Violet', labelJa: 'バイオレット', hex: '#8b5cf6', rgb: '139, 92, 246' },
+  { id: 'emerald', label: 'Emerald', labelJa: 'エメラルド', hex: '#10b981', rgb: '16, 185, 129' },
+  { id: 'rose', label: 'Rose', labelJa: 'ローズ', hex: '#f43f5e', rgb: '244, 63, 94' },
+  { id: 'amber', label: 'Amber', labelJa: 'アンバー', hex: '#f59e0b', rgb: '245, 158, 11' },
 ];
-
-
-export type OSLanguage = 'en' | 'ja';
 
 export type ShellMode =
   | 'windows'
   | 'windows11'
   | 'windows10'
   | 'windows8'
+  | 'vista'
+  | 'xp'
   | 'dex'
   | 'chromeos'
   | 'mac'
   | 'ubuntu'
+  | 'zorin'
   | 'android'
   | 'ios'
   | 'metro';
@@ -365,51 +320,9 @@ export const STORE_CATALOG: StoreApp[] = [
     author: 'AI Studio Core',
     rating: 5.0,
     size: '4.8 MB',
-    version: '4.7.0',
+    version: '4.1.0',
     builtInAppId: 'ai',
   },
-  {
-    id: 'entertainment',
-    name: 'Entertainment',
-    description: 'Prime Shows, StreameX, FlixHD, Maple TV, YouTube & Shorts multi-source streaming hub.',
-    category: 'utilities',
-    icon: 'Tv',
-    author: 'Glassium Media',
-    rating: 5.0,
-    size: '3.4 MB',
-    version: '5.0.0',
-    builtInAppId: 'entertainment',
-  },
-  { id: 'paint', name: 'Spect Studio', description: 'GlasispectUI digital canvas with brushes, layers, color palette, and PNG export.', category: 'utilities', icon: 'Palette', author: 'Glasispect Creative', rating: 4.9, size: '1.4 MB', version: '5.0 u2', builtInAppId: 'paint' },
-  { id: 'pomodoro', name: 'Pomodoro Timer', description: '25/5 focus and break timer for deep productivity.', category: 'utilities', icon: 'Clock', author: 'Glassium Core', rating: 4.9, size: '920 KB', version: '4.7.0', builtInAppId: 'pomodoro' },
-  { id: 'unitconverter', name: 'Unit Converter', description: 'Convert length, weight, temperature, and digital storage.', category: 'utilities', icon: 'SlidersHorizontal', author: 'Glassium Tools', rating: 4.8, size: '880 KB', version: '4.7.0', builtInAppId: 'unitconverter' },
-  { id: 'colorpicker', name: 'Color Studio', description: 'RGB/HSL mixer, HEX generator, and color palettes.', category: 'utilities', icon: 'Palette', author: 'Glassium Creative', rating: 4.9, size: '1.1 MB', version: '4.7.0', builtInAppId: 'colorpicker' },
-  { id: 'passgen', name: 'Password Generator', description: 'Cryptographic password generator with entropy controls.', category: 'utilities', icon: 'Key', author: 'Glassium Security', rating: 4.9, size: '750 KB', version: '4.7.0', builtInAppId: 'passgen' },
-  { id: 'qrcode', name: 'QR Matrix Studio', description: 'Generate visual matrix codes for URLs and text.', category: 'utilities', icon: 'Grid3x3', author: 'Glassium Tools', rating: 4.8, size: '990 KB', version: '4.7.0', builtInAppId: 'qrcode' },
-  { id: 'jsonformat', name: 'JSON Formatter', description: 'Format, validate, and minify JSON payloads.', category: 'utilities', icon: 'Code2', author: 'Glassium Dev', rating: 4.9, size: '840 KB', version: '4.7.0', builtInAppId: 'jsonformat' },
-  { id: 'regex', name: 'Regex Tester', description: 'Test regular expressions with real-time match highlighting.', category: 'utilities', icon: 'Search', author: 'Glassium Dev', rating: 4.8, size: '910 KB', version: '4.7.0', builtInAppId: 'regex' },
-  { id: 'markdown', name: 'Markdown Reader', description: 'Side-by-side live Markdown editor and reader.', category: 'utilities', icon: 'FileText', author: 'TextCraft', rating: 4.9, size: '1.2 MB', version: '4.7.0', builtInAppId: 'markdown' },
-  { id: 'kanban', name: 'Kanban Board', description: 'Agile task management across Todo, Doing, and Done.', category: 'utilities', icon: 'LayoutGrid', author: 'Glassium Work', rating: 5.0, size: '1.6 MB', version: '4.7.0', builtInAppId: 'kanban' },
-  { id: 'habit', name: 'Habit Tracker', description: 'Track daily routines and weekly completion streaks.', category: 'utilities', icon: 'CheckCircle2', author: 'Glassium Life', rating: 4.8, size: '1.1 MB', version: '4.7.0', builtInAppId: 'habit' },
-  { id: 'expense', name: 'Expense Ledger', description: 'Personal budget and expense tracker.', category: 'utilities', icon: 'Calculator', author: 'Glassium Finance', rating: 4.9, size: '1.3 MB', version: '4.7.0', builtInAppId: 'expense' },
-  { id: 'bmi', name: 'Health & BMI', description: 'Calculate BMI and ideal weight range.', category: 'utilities', icon: 'Activity', author: 'Glassium Health', rating: 4.7, size: '820 KB', version: '4.7.0', builtInAppId: 'bmi' },
-  { id: 'worldclock', name: 'World Clock Hub', description: 'Compare global time zones simultaneously.', category: 'utilities', icon: 'Globe', author: 'Liquid Chronometry', rating: 4.9, size: '1.0 MB', version: '4.7.0', builtInAppId: 'worldclock' },
-  { id: 'morse', name: 'Morse & Cipher', description: 'Encode/decode Morse code instantly.', category: 'utilities', icon: 'Zap', author: 'Glassium Tools', rating: 4.7, size: '780 KB', version: '4.7.0', builtInAppId: 'morse' },
-  { id: 'base64', name: 'Base64 & URL Tool', description: 'UTF-8 Base64 and URL encoder/decoder.', category: 'utilities', icon: 'Code2', author: 'Glassium Dev', rating: 4.8, size: '790 KB', version: '4.7.0', builtInAppId: 'base64' },
-  { id: 'diff', name: 'Text Diff Viewer', description: 'Compare two texts line-by-line to spot changes.', category: 'utilities', icon: 'Layers', author: 'Glassium Dev', rating: 4.8, size: '940 KB', version: '4.7.0', builtInAppId: 'diff' },
-  { id: 'wordcount', name: 'Word Analyzer', description: 'Count characters, words, lines, and reading time.', category: 'utilities', icon: 'FileText', author: 'TextCraft', rating: 4.9, size: '720 KB', version: '4.7.0', builtInAppId: 'wordcount' },
-  { id: 'flashcards', name: 'Flashcards Deck', description: 'Interactive flip cards for studying tech and languages.', category: 'utilities', icon: 'BookOpen', author: 'Glassium Study', rating: 4.9, size: '1.1 MB', version: '4.7.0', builtInAppId: 'flashcards' },
-  { id: 'whiteboard', name: 'Idea Board', description: 'Organize brainstorm cards by priority.', category: 'utilities', icon: 'PenTool', author: 'Glassium Work', rating: 4.8, size: '1.2 MB', version: '4.7.0', builtInAppId: 'whiteboard' },
-  { id: 'drumpad', name: '808 Drum Pad', description: 'Synthesized 9-pad beat maker with WebAudio.', category: 'utilities', icon: 'Music', author: 'Monochrome Audio', rating: 5.0, size: '1.8 MB', version: '4.7.0', builtInAppId: 'drumpad' },
-  { id: 'tuner', name: 'Frequency Synth', description: 'Audio pitch and waveform generator (80Hz - 1200Hz).', category: 'utilities', icon: 'Volume2', author: 'Monochrome Audio', rating: 4.8, size: '960 KB', version: '4.7.0', builtInAppId: 'tuner' },
-  { id: 'minesweeper', name: 'Cyber Minesweeper', description: 'Classic logic grid puzzle.', category: 'games', icon: 'Gamepad2', author: 'PuzzleCraft', rating: 4.9, size: '1.1 MB', version: '4.7.0', builtInAppId: 'minesweeper' },
-  { id: 'tictactoe', name: 'Tic-Tac-Toe AI', description: 'Play Tic-Tac-Toe on a sleek grid.', category: 'games', icon: 'Grid3x3', author: 'PuzzleCraft', rating: 4.8, size: '740 KB', version: '4.7.0', builtInAppId: 'tictactoe' },
-  { id: 'memory', name: 'Memory Match', description: 'Flip and match pairs of icons.', category: 'games', icon: 'Sparkles', author: 'RetroByte', rating: 4.9, size: '950 KB', version: '4.7.0', builtInAppId: 'memory' },
-  { id: 'typing', name: 'Typing Trainer', description: 'Test your WPM speed and accuracy with code & phrases.', category: 'games', icon: 'SquareTerminal', author: 'Velocity Studios', rating: 4.9, size: '1.2 MB', version: '4.7.0', builtInAppId: 'typing' },
-  { id: 'sudoku', name: 'Mini Sudoku', description: 'Logic number puzzle with instant verification.', category: 'games', icon: 'Grid3x3', author: 'PuzzleCraft', rating: 4.8, size: '890 KB', version: '4.7.0', builtInAppId: 'sudoku' },
-  { id: 'periodic', name: 'Periodic Table', description: 'Interactive chemical elements reference.', category: 'utilities', icon: 'Sparkles', author: 'Glassium Science', rating: 5.0, size: '1.5 MB', version: '4.7.0', builtInAppId: 'periodic' },
-  { id: 'dictionary', name: 'Tech Lexicon', description: 'Searchable dictionary of software and AI terms.', category: 'utilities', icon: 'BookOpen', author: 'Glassium Study', rating: 4.8, size: '1.3 MB', version: '4.7.0', builtInAppId: 'dictionary' },
-  { id: 'sysinfo', name: 'System Diagnostics', description: 'Hardware, display, and browser runtime diagnostics.', category: 'utilities', icon: 'Cpu', author: 'Glassium Core', rating: 4.9, size: '900 KB', version: '4.7.0', builtInAppId: 'sysinfo' },
 ];
 
 export interface InstalledApp {
@@ -444,7 +357,7 @@ export interface StoreTheme {
   config: {
     shellMode: ShellMode;
     designEngine: DesignEngine;
-    wallpaper: 'live2d' | 'golden-sparkle' | 'space' | 'aurora' | 'sunset' | 'ocean' | 'forest' | 'cosmic' | 'bloom' | 'shader';
+    wallpaper: 'live2d' | 'space' | 'aurora' | 'sunset' | 'ocean' | 'forest' | 'cosmic' | 'bloom' | 'shader';
     theme: 'dark' | 'light';
     blurAmount?: number;
     cornerRadius?: number;
@@ -454,6 +367,58 @@ export interface StoreTheme {
 }
 
 export const STORE_THEMES: StoreTheme[] = [
+  {
+    id: 'xp-luna',
+    name: 'Windows XP Luna Classic',
+    nameJa: 'Windows XP ルナ・クラシック',
+    description: 'Iconic royal blue taskbar, emerald green Start button, Bliss rolling hills wallpaper, and nostalgic Luna titlebars.',
+    descriptionJa: '象徴的なロイヤルブルータスクバー、エメラルドグリーンのスタートボタン、草原の壁紙、懐かしのルナUI。',
+    author: 'Microsoft Retro Archives',
+    category: 'retro',
+    rating: 4.9,
+    downloads: '1.4M',
+    version: '5.1.2600',
+    size: '4.2 MB',
+    badge: 'Retro Classic',
+    previewGradient: 'from-blue-600 via-sky-500 to-emerald-500',
+    accentColor: '#22c55e',
+    config: {
+      shellMode: 'xp',
+      designEngine: 'liquid-glass',
+      wallpaper: 'forest',
+      theme: 'light',
+      blurAmount: 6,
+      cornerRadius: 6,
+      transparency: 15,
+      accentColor: '#16a34a',
+    },
+  },
+  {
+    id: 'vista-aero',
+    name: 'Windows Vista Aero Glass',
+    nameJa: 'Windows Vista アルティメット・エアロ',
+    description: 'Frosted smoked glass translucency, radiant Start Orb, and live desktop Sidebar with analog clock and real-time CPU gauges.',
+    descriptionJa: 'すりガラスのエアロ透過、光るスタートオーブ、アナログ時計とCPUメーターが動く本物のデスクトップサイドバー。',
+    author: 'Aero Design Labs',
+    category: 'retro',
+    rating: 4.8,
+    downloads: '980K',
+    version: '6.0.6002',
+    size: '5.8 MB',
+    badge: 'Aero Glass',
+    previewGradient: 'from-slate-900 via-cyan-900 to-teal-500',
+    accentColor: '#0ea5e9',
+    config: {
+      shellMode: 'vista',
+      designEngine: 'frosted-blur',
+      wallpaper: 'aurora',
+      theme: 'dark',
+      blurAmount: 18,
+      cornerRadius: 8,
+      transparency: 28,
+      accentColor: '#38bdf8',
+    },
+  },
   {
     id: 'win10-fluent',
     name: 'Windows 10 Fluent Dark',
@@ -715,6 +680,32 @@ export const STORE_THEMES: StoreTheme[] = [
     },
   },
   {
+    id: 'zorin-pro',
+    name: 'Zorin OS 17 Pro Elegance',
+    nameJa: 'Zorin OS 17 プロ・エレガンス',
+    description: 'Clean modern Linux desktop with floating pill dock, categorized quick launcher, high-contrast cyan accents, and fluid transitions.',
+    descriptionJa: '洗練されたモダンLinux。フローティングピルドック、整理されたカテゴリランチャー、鮮やかなシアンアクセント。',
+    author: 'Zorin Group',
+    category: 'modern',
+    rating: 4.9,
+    downloads: '1.7M',
+    version: '17.1 Pro',
+    size: '4.5 MB',
+    badge: 'Linux Pro',
+    previewGradient: 'from-slate-950 via-sky-950 to-blue-800',
+    accentColor: '#0ea5e9',
+    config: {
+      shellMode: 'zorin',
+      designEngine: 'frosted-blur',
+      wallpaper: 'aurora',
+      theme: 'dark',
+      blurAmount: 16,
+      cornerRadius: 12,
+      transparency: 20,
+      accentColor: '#0ea5e9',
+    },
+  },
+  {
     id: 'hyperos-miuix',
     name: 'HyperOS 3 & MIUIx Flagship',
     nameJa: 'HyperOS 3 & MIUIx フラッグシップ',
@@ -769,13 +760,13 @@ export interface UIStyleInfo {
 export const UI_STYLES: UIStyleInfo[] = [
   {
     id: 'glassium',
-    name: 'GlasispectUI',
-    sub: 'Zero Border Line · GlassiumOS 5 u1',
+    name: 'Glassium',
+    sub: 'Zero Border Line',
     category: 'authentic',
     accent: '#06b6d4',
-    badge: 'GlassiumOS 5 u1',
+    badge: 'Standard',
     previewGradient: 'linear-gradient(135deg, rgba(6,182,212,0.8), rgba(99,102,241,0.8))',
-    description: 'GlassiumOS 5 u1 標準の GlasispectUI。枠線を排したZero Border Lineと液体ガラス屈折サーフェス。',
+    description: '枠線を一切排除したZero Border Lineコンセプト。光沢反射と滑らかな液体ガラス透過サーフェス。',
   },
   {
     id: 'macos',

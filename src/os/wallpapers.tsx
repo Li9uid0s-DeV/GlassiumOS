@@ -4,20 +4,8 @@ export const WALLPAPERS: Record<
   Wallpaper,
   { label: string; style: string; preview: string; isBright?: boolean }
 > = {
-  'dynamic-world': {
-    label: 'Dynamic World u3 (時間・風・天候・季節・イベント連動)',
-    style: 'linear-gradient(135deg, #020617 0%, #0f172a 45%, #0369a1 100%)',
-    preview: 'linear-gradient(135deg, #020617 0%, #0ea5e9 48%, #f59e0b 100%)',
-    isBright: false,
-  },
-  'golden-sparkle': {
-    label: 'Golden Sparkle',
-    style: 'linear-gradient(135deg, #04050a 0%, #151008 42%, #3b2609 75%, #784c12 100%)',
-    preview: 'linear-gradient(135deg, #070913 0%, #271a07 40%, #b47818 78%, #fde68a 100%)',
-    isBright: false,
-  },
   live2d: {
-    label: 'Aurora Silk 4.7',
+    label: '2D Aurora Live',
     style: 'linear-gradient(135deg, #050816 0%, #09132c 45%, #071b2f 100%)',
     preview: 'linear-gradient(135deg, #a855f7 0%, #3b82f6 50%, #06b6d4 100%)',
     isBright: false,
@@ -29,13 +17,13 @@ export const WALLPAPERS: Record<
     isBright: false,
   },
   bloom: {
-    label: 'Daylight Bloom',
+    label: 'Daylight Bloom (Light)',
     style: 'linear-gradient(135deg, #f8fafc 0%, #e0f2fe 50%, #fce7f3 100%)',
     preview: 'linear-gradient(135deg, #f8fafc 0%, #e0f2fe 50%, #fce7f3 100%)',
     isBright: true,
   },
   sunset: {
-    label: 'Pastel Sky',
+    label: 'Pastel Sky (Light)',
     style: 'linear-gradient(135deg, #ffe4e6 0%, #e0f2fe 55%, #f0f9ff 100%)',
     preview: 'linear-gradient(135deg, #fda4af 0%, #bae6fd 100%)',
     isBright: true,

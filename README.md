@@ -1,6 +1,6 @@
-# GlassiumOS-5
+# GlassiumOS-V4.0
 
-**GlassiumOS-5** is a modern 2.5D Glassmorphism Web Operating System built with Vite, React, TypeScript, and Tailwind CSS.
+**GlassiumOS-V4.0** is a modern 2.5D Glassmorphism Web Operating System built with Vite, React, TypeScript, and Tailwind CSS.
 
 ## Key Features
 - **Brand Identity — The Fluid "G"**: Custom 2.5D liquid-glass ribbon monogram with Neon Purple (`#d946ef`) ➔ Amethyst (`#8b5cf6`) ➔ Translucent Cyan (`#06b6d4`) gradients and specular highlights.

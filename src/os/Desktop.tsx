@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode, useEffect, useRef, useState } from 'react';
+import { Component, ErrorInfo, ReactNode, useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useOS } from './OSContext';
 import { WindowFrame } from './WindowFrame';
@@ -8,7 +8,6 @@ import { WALLPAPERS, WallpaperOrbs } from './wallpapers';
 import { LiquidShader } from './LiquidShader';
 import { SpaceWallpaper } from './SpaceWallpaper';
 import { Live2DWallpaper } from './Live2DWallpaper';
-import { DynamicWorldWallpaper, loadDynamicEnvironmentConfig, saveDynamicEnvironmentConfig } from './DynamicWorldWallpaper';
 import { LockScreen } from './LockScreen';
 import { TerminalApp } from './apps/Terminal';
 import { NotepadApp } from './apps/Notepad';
@@ -24,25 +23,18 @@ import { AIAssistantApp } from './apps/AIAssistantApp';
 import { Calculator } from './apps/Calculator';
 import { TaskManager } from './apps/TaskManager';
 import { SynthVisualizerApp } from './apps/SynthVisualizer';
-import { EntertainmentApp } from './apps/Entertainment';
 import { GlassiumStudioApp } from './apps/GlassiumStudio';
 import { RetroCadeApp } from './apps/RetroCade';
-import { renderExtraApp } from './apps/ExtraAppsSuite';
 import { Icon } from './Icon';
 import { AppId, TASKBAR_APPS, DESKTOP_ICON_SIZE_PRESETS, DesktopIconSize } from './types';
 import { AppLogo } from './AppLogo';
-import { GlasiusCard } from './GlasiusCard';
-import { InitialSetupWizard, InitialSetupResult } from './InitialSetupWizard';
 
 function renderApp(appId: string, payload?: unknown) {
   switch (appId) {
     case 'terminal':
       return <TerminalApp />;
     case 'notepad':
-    case 'markdown':
-    case 'diff':
-    case 'wordcount':
-      return <NotepadApp initialTab={appId} payload={payload as { fileName?: string; content?: string }} />;
+      return <NotepadApp payload={payload as { fileName?: string; content?: string }} />;
     case 'explorer':
       return <FileExplorerApp payload={payload as { folderPath?: string[] }} />;
     case 'browser':
@@ -50,56 +42,30 @@ function renderApp(appId: string, payload?: unknown) {
     case 'settings':
       return <SettingsApp />;
     case 'game':
-    case 'minesweeper':
-    case 'tictactoe':
-    case 'memory':
-    case 'typing':
-    case 'sudoku':
-      return <GameApp initialTab={appId} payload={payload as { gameId?: string }} />;
+      return <GameApp payload={payload as { gameId?: string }} />;
     case 'appstore':
       return <AppStoreApp />;
     case 'calculator':
-    case 'unitconverter':
-    case 'bmi':
-    case 'expense':
-      return <Calculator initialTab={appId} />;
+      return <Calculator />;
     case 'taskmanager':
     case 'sysmon':
-    case 'sysinfo':
-      return <TaskManager initialTab={appId} />;
+      return <TaskManager />;
     case 'calendar':
-    case 'kanban':
-    case 'habit':
-    case 'whiteboard':
-      return <CalendarApp initialTab={appId} />;
+      return <CalendarApp />;
     case 'synth':
-    case 'drumpad':
-    case 'tuner':
-      return <SynthVisualizerApp initialTab={appId} />;
-    case 'entertainment':
-      return <EntertainmentApp initialTab={appId} payload={payload as { videoId?: string; mode?: string }} />;
+      return <SynthVisualizerApp />;
     case 'weather':
       return <WeatherApp />;
     case 'clock':
-    case 'pomodoro':
-    case 'worldclock':
-      return <ClockApp initialTab={appId} />;
+      return <ClockApp />;
     case 'ai':
       return <AIAssistantApp />;
     case 'studio':
-    case 'jsonformat':
-    case 'regex':
-    case 'base64':
-    case 'morse':
-    case 'passgen':
-      return <GlassiumStudioApp initialTab={appId} />;
+      return <GlassiumStudioApp />;
     case 'retrocade':
       return <RetroCadeApp />;
-    default: {
-      const extra = renderExtraApp(appId);
-      if (extra) return extra;
+    default:
       return <CustomAppView payload={payload as { url?: string; isCustomApp?: boolean }} />;
-    }
   }
 }
 
@@ -163,12 +129,9 @@ function CustomAppView({ payload }: { payload?: { url?: string; isCustomApp?: bo
 export function Desktop() {
   const {
     windows,
-    mountedWindows,
     wallpaper,
-    setWallpaper,
     customWallpapers,
     selectedCustomId,
-    setSelectedCustomId,
     theme,
     accentColor,
     uiStyle,
@@ -178,11 +141,6 @@ export function Desktop() {
     lockSystem,
     unlockSystem,
     user,
-    setUser,
-    setTheme,
-    setAccentColor,
-    setUiStyle,
-    triggerDynamicIsland,
     showWelcome,
     setWelcome,
     shellMode,
@@ -225,105 +183,15 @@ export function Desktop() {
 
   const [time, setTime] = useState(new Date());
   const [notifCenterOpen, setNotifCenterOpen] = useState(false);
-  const [setupWizardOpen, setSetupWizardOpen] = useState<boolean>(() => {
-    const done = localStorage.getItem('glassium_setup_completed');
-    return !done || !user;
-  });
-
-  useEffect(() => {
-    const handleReopenSetup = () => setSetupWizardOpen(true);
-    window.addEventListener('open-glassium-setup', handleReopenSetup);
-    return () => window.removeEventListener('open-glassium-setup', handleReopenSetup);
-  }, []);
   const [draggingIcon, setDraggingIcon] = useState<{ id: string; x: number; y: number } | null>(null);
   const [selectedIconId, setSelectedIconId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [draggingNote, setDraggingNote] = useState<{ id: string; x: number; y: number } | null>(null);
-  const [showGlasiusWidget, setShowGlasiusWidget] = useState<boolean>(() => {
-    return localStorage.getItem('glassium_show_desktop_widget') === 'true';
-  });
   const [showWhatsNewModal, setShowWhatsNewModal] = useState<boolean>(() => {
-    const dismissed = localStorage.getItem('glassium_v5.0_u3_whats_new_dismissed');
+    // Show What's New Modal on startup if not dismissed for this version
+    const dismissed = localStorage.getItem('glassium_v4.6_whats_new_dismissed');
     return !dismissed;
   });
-
-  useEffect(() => {
-    const handleOpenU3Notes = () => setShowWhatsNewModal(true);
-    window.addEventListener('open-glassium-u3-notes', handleOpenU3Notes);
-    return () => window.removeEventListener('open-glassium-u3-notes', handleOpenU3Notes);
-  }, []);
-
-  // Global OS Music State & Floating Bottom Liquid Glass Dock State
-  const [musicState, setMusicState] = useState<{
-    isPlaying: boolean;
-    title?: string;
-    artist?: string;
-    album?: string;
-    artworkUrl?: string;
-    coverGradient?: string;
-    currentTime?: number;
-    duration?: number;
-    lyricLine?: string;
-    palette?: { c1: string; c2: string; c3: string; c4: string };
-  } | null>(null);
-  const [pillDismissed, setPillDismissed] = useState(false);
-  const [desktopPillMinimized, setDesktopPillMinimized] = useState(false);
-  const [desktopPillOffset, setDesktopPillOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [isDraggingDesktopPill, setIsDraggingDesktopPill] = useState(false);
-  const desktopPillDragRef = useRef<{
-    startX: number;
-    startY: number;
-    origX: number;
-    origY: number;
-  } | null>(null);
-
-  const handleDesktopPillPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    if (target.closest('button, [data-no-dock-drag="true"]')) return;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setIsDraggingDesktopPill(true);
-    desktopPillDragRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      origX: desktopPillOffset.x,
-      origY: desktopPillOffset.y,
-    };
-  };
-
-  const handleDesktopPillPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!desktopPillDragRef.current) return;
-    const dx = e.clientX - desktopPillDragRef.current.startX;
-    const dy = e.clientY - desktopPillDragRef.current.startY;
-    setDesktopPillOffset({
-      x: Math.max(-520, Math.min(520, desktopPillDragRef.current.origX + dx)),
-      y: Math.max(-680, Math.min(40, desktopPillDragRef.current.origY + dy)),
-    });
-  };
-
-  const handleDesktopPillPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!desktopPillDragRef.current) return;
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch {
-      // ignore
-    }
-    desktopPillDragRef.current = null;
-    setIsDraggingDesktopPill(false);
-  };
-
-  useEffect(() => {
-    const onMusicState = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail) {
-        setMusicState(detail);
-        if (detail.isPlaying) {
-          setPillDismissed(false);
-        }
-      }
-    };
-    window.addEventListener('glassium-music-state', onMusicState);
-    return () => window.removeEventListener('glassium-music-state', onMusicState);
-  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => setTime(new Date()), 1000);
@@ -334,8 +202,7 @@ export function Desktop() {
   const dateStr = time.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 
   const customWallpaper = customWallpapers.find((c) => c.id === selectedCustomId);
-  const useDynamicWorld = wallpaper === 'dynamic-world' && !liteMode;
-  const useLive2D = (wallpaper === 'live2d' || wallpaper === 'golden-sparkle') && !liteMode;
+  const useLive2D = wallpaper === 'live2d' && !liteMode;
   const useShader = wallpaper === 'shader' && !liteMode;
   const useSpace = wallpaper === 'space' && !liteMode;
   const shaderOpacity = transparency / 100;
@@ -362,7 +229,7 @@ export function Desktop() {
     }
   };
 
-  const iconPreset = DESKTOP_ICON_SIZE_PRESETS[desktopIconSize] ?? DESKTOP_ICON_SIZE_PRESETS.medium;
+  const iconPreset = DESKTOP_ICON_SIZE_PRESETS[desktopIconSize];
   const useDarkDesktopText = isWallpaperBright;
 
   const handleIconPointerDown = (
@@ -457,55 +324,14 @@ export function Desktop() {
     { id: 'settings', label: 'Settings', icon: 'settings' },
     { id: 'game', label: 'Games', icon: 'game' },
     { id: 'synth', label: 'Music', icon: 'synth' },
-    { id: 'entertainment', label: 'Entertainment', icon: 'entertainment' },
     { id: 'calendar', label: 'Calendar', icon: 'calendar' },
     { id: 'weather', label: 'Weather', icon: 'weather' },
     { id: 'clock', label: 'Clock', icon: 'clock' },
     { id: 'ai', label: 'AI Assistant', icon: 'ai' },
-    { id: 'studio', label: 'Glassium Studio', icon: 'studio' },
-    { id: 'paint', label: 'Spect Studio', icon: 'paint' },
     { id: 'taskmanager', label: 'Task Manager', icon: 'taskmanager' },
     { id: 'appstore', label: 'App Store', icon: 'appstore' },
     { id: 'recycle', label: 'Trash', icon: 'recycle' },
   ];
-
-  if (locked) {
-    return (
-      <div
-        data-theme={theme}
-        data-accent={accentColor}
-        data-ui-style={uiStyle}
-        className="relative h-full w-full overflow-hidden select-none"
-      >
-        <LockScreen
-          locked={locked}
-          onUnlock={unlockSystem}
-          expectedPassword={user?.password}
-          userName={user?.name}
-          userAvatar={user?.avatar}
-        />
-        <AnimatePresence>
-          {setupWizardOpen && (
-            <InitialSetupWizard
-              initialUser={user}
-              initialUiStyle={uiStyle}
-              initialTheme={theme}
-              initialAccent={accentColor}
-              onComplete={(result: InitialSetupResult) => {
-                setUser(result.user);
-                setUiStyle(result.uiStyle);
-                setTheme(result.theme);
-                setAccentColor(result.accentColor);
-                localStorage.setItem('glassium_setup_completed', 'true');
-                setSetupWizardOpen(false);
-                triggerDynamicIsland('Setup Complete', `ようこそ、${result.user.name}さん`, 'Sparkles');
-              }}
-            />
-          )}
-        </AnimatePresence>
-      </div>
-    );
-  }
 
   return (
     <div
@@ -539,40 +365,8 @@ export function Desktop() {
         />
       )}
 
-      {/* u3 Dynamic World Live Wallpaper (Time, Wind Speed, Wind Direction, Weather, Season, Halloween & Christmas Events) */}
-      {useDynamicWorld && !customWallpaper && <DynamicWorldWallpaper showControllerHud={true} />}
-
-      {/* Quick Switcher Pill when not on dynamic-world */}
-      {!useDynamicWorld && (
-        <div className="fixed top-9 right-4 z-20 pointer-events-auto flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedCustomId(null);
-              setWallpaper('dynamic-world');
-            }}
-            className="px-3 py-1.5 rounded-xl bg-black/55 hover:bg-black/75 backdrop-blur-xl border border-cyan-400/35 text-[11px] text-cyan-200 font-semibold flex items-center gap-1.5 shadow-xl transition cursor-pointer"
-          >
-            <span className="material-symbols-rounded text-sm text-cyan-300">public</span>
-            <span>u3 動的環境壁紙 (時間・風・天候・季節・イベント) に切替</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowWhatsNewModal(true)}
-            className="px-2.5 py-1.5 rounded-xl bg-black/55 hover:bg-black/75 backdrop-blur-xl border border-white/15 text-[11px] text-white/85 font-semibold transition cursor-pointer"
-          >
-            u3 新機能
-          </button>
-        </div>
-      )}
-
-      {/* 2D Interactive Aurora Silk & PS5 Golden Sparkle Live Wallpaper */}
-      {useLive2D && !customWallpaper && (
-        <Live2DWallpaper
-          lite={false}
-          auroraColor={wallpaper === 'golden-sparkle' ? 'golden-sparkle' : undefined}
-        />
-      )}
+      {/* 2D Interactive Aurora Silk Live Wallpaper (Default on initial startup) */}
+      {useLive2D && !customWallpaper && <Live2DWallpaper lite={false} />}
 
       {/* 3D Black Hole Raymarching Space live wallpaper */}
       {useSpace && !customWallpaper && <SpaceWallpaper lite={false} preset={nebulaPreset} />}
@@ -581,7 +375,7 @@ export function Desktop() {
       {useShader && !customWallpaper && <LiquidShader lite={false} opacity={shaderOpacity} />}
 
       {/* Floating orbs */}
-      {!liteMode && !useDynamicWorld && !useLive2D && !useShader && !useSpace && !customWallpaper && <WallpaperOrbs />}
+      {!liteMode && !useLive2D && !useShader && !useSpace && !customWallpaper && <WallpaperOrbs />}
 
       {/* ========================================================
           1. MAC DESKTOP SHELL: Top Menu Bar + Magnified Bottom Dock
@@ -594,7 +388,7 @@ export function Desktop() {
               <div className="cursor-pointer hover:opacity-80" onClick={() => openApp('settings')}>
                 <AppLogo size={16} />
               </div>
-              <span className="font-bold tracking-tight">GlassiumOS 5 u3</span>
+              <span className="font-bold tracking-tight">GlassiumOS-V4.0</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('explorer')}>Files</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('settings')}>Settings</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => setShellMode('windows')}>View</span>
@@ -674,7 +468,7 @@ export function Desktop() {
           <div className="fixed top-0 inset-x-0 h-7 bg-slate-950/80 backdrop-blur-md border-b border-white/10 z-40 px-3 flex items-center justify-between text-xs text-white">
             <div className="flex items-center gap-3">
               <span className="font-semibold text-cyan-300 cursor-pointer" onClick={() => openApp('terminal')}>Activities</span>
-              <span className="text-white/60">GlassiumOS 5</span>
+              <span className="text-white/60">GlassiumOS-V4.0</span>
             </div>
             <div className="flex items-center gap-3">
               <span className="font-mono text-[11px]">{dateStr} {timeStr}</span>
@@ -766,7 +560,7 @@ export function Desktop() {
           >
             <div className="flex items-center gap-2 text-white/70 text-xs">
               <Icon name="Search" size={15} className="text-sky-400" />
-              <span>Search GlassiumOS 5 or type URL...</span>
+              <span>Search LiquidOS or type URL...</span>
             </div>
             <Icon name="Mic" size={15} className="text-white/60" />
           </div>
@@ -852,43 +646,13 @@ export function Desktop() {
             <span className="font-semibold">{timeStr}</span>
             {/* Dynamic Island Pill */}
             <div
-              onClick={() => {
-                if (musicState?.isPlaying) {
-                  openApp('synth');
-                } else {
-                  setNotifCenterOpen(!notifCenterOpen);
-                }
-              }}
+              onClick={() => setNotifCenterOpen(!notifCenterOpen)}
               className="flex cursor-pointer items-center gap-2 rounded-full bg-black/90 px-4 py-1.5 text-white ring-1 ring-white/25 shadow-2xl hover:scale-105 transition"
             >
-              {musicState?.isPlaying ? (
-                <>
-                  <span className="material-symbols-rounded text-cyan-400 text-sm animate-pulse">music_note</span>
-                  <span className="text-[11px] font-medium font-sans truncate max-w-[140px] sm:max-w-[190px]">
-                    {musicState.title || '再生中'}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      window.dispatchEvent(
-                        new CustomEvent('glassium-music-command', { detail: { action: 'toggle-play' } })
-                      );
-                    }}
-                    title="一時停止"
-                    className="ml-0.5 text-white/80 hover:text-cyan-300"
-                  >
-                    <span className="material-symbols-rounded text-sm">pause</span>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span className={`h-2 w-2 rounded-full ${dynamicIslandEvent ? 'bg-cyan-400 animate-ping' : 'bg-emerald-400 animate-pulse'}`} />
-                  <span className="text-[11px] font-medium font-sans">
-                    {dynamicIslandEvent ? `${dynamicIslandEvent.title}${dynamicIslandEvent.subtitle ? ` · ${dynamicIslandEvent.subtitle}` : ''}` : 'GlassiumOS 5 Active'}
-                  </span>
-                </>
-              )}
+              <span className={`h-2 w-2 rounded-full ${dynamicIslandEvent ? 'bg-cyan-400 animate-ping' : 'bg-emerald-400 animate-pulse'}`} />
+              <span className="text-[11px] font-medium font-sans">
+                {dynamicIslandEvent ? `${dynamicIslandEvent.title}${dynamicIslandEvent.subtitle ? ` · ${dynamicIslandEvent.subtitle}` : ''}` : 'LiquidOS v4.0.0 Active'}
+              </span>
             </div>
             <div className="flex items-center gap-1.5">
               <Icon name="Wifi" size={13} />
@@ -997,8 +761,8 @@ export function Desktop() {
                       <span className="text-[10px] font-mono bg-black/20 px-1.5 py-0.5 uppercase tracking-wider">Gemini 3.8</span>
                     </div>
                     <div>
-                      <div className="text-base font-bold leading-tight">GlassiumOS 5 AI Assistant</div>
-                      <div className="text-[11px] text-white/80">Integrated OS Assistant</div>
+                      <div className="text-base font-bold leading-tight">Liquid Copilot AI Studio</div>
+                      <div className="text-[11px] text-white/80">Autonomous OS Assistant</div>
                     </div>
                   </div>
 
@@ -1199,7 +963,7 @@ export function Desktop() {
           <div className="flex items-center justify-between text-xs text-white/40 font-mono shrink-0 pt-3 max-w-7xl w-full mx-auto border-t border-white/5">
             <div className="flex items-center gap-2">
               <AppLogo size={16} />
-              <span>GlassiumOS 5 Metro Live</span>
+              <span>LiquidOS-4.1.0-Beta Metro Live</span>
             </div>
             <div>Swipe horizontally or tap to launch tiles</div>
           </div>
@@ -1532,26 +1296,6 @@ export function Desktop() {
               <Icon name="Columns" size={14} className="text-sky-500" />
               <span>ウィンドウを左右に並べる</span>
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                const next = !showGlasiusWidget;
-                setShowGlasiusWidget(next);
-                localStorage.setItem('glassium_show_desktop_widget', next ? 'true' : 'false');
-                setContextMenu(null);
-              }}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-left transition ${
-                theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-white/10'
-              }`}
-            >
-              <span className="flex items-center gap-2.5">
-                <Icon name="Clock" size={14} className="text-cyan-400" />
-                <span>デスクトップ時計ウィジェット</span>
-              </span>
-              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${showGlasiusWidget ? 'os-accent-soft' : 'opacity-45'}`}>
-                {showGlasiusWidget ? 'ON' : 'OFF'}
-              </span>
-            </button>
             <div className={`my-1 border-t ${theme === 'light' ? 'border-slate-200' : 'border-white/10'}`} />
             <button
               type="button"
@@ -1681,27 +1425,13 @@ export function Desktop() {
         </div>
       )}
 
-      {/* Signature GlasiusCard Spatial HUD (Top-Left Weather/Info, Bottom-Left Liquid Glass Clock & Volume, Right-Side Notifications & Pure Chat AI) */}
-      {showGlasiusWidget && (
-        <GlasiusCard
-          onClose={() => {
-            setShowGlasiusWidget(false);
-            localStorage.setItem('glassium_show_desktop_widget', 'false');
-          }}
-        />
-      )}
-
       {/* ========================================================
           ACTIVE FLOATING WINDOWS (Filtered by Current Virtual Desktop)
          ======================================================== */}
       <AnimatePresence>
-        {mountedWindows.map((win) => (
-          <WindowFrame
-            key={win.id}
-            win={win}
-            isHidden={Boolean(win.closed || win.minimized || ((win.desktopId || 'desk-1') !== activeDesktopId))}
-          >
-            <WindowErrorBoundary key={`${win.id}-${win.appId}`} appTitle={win.title}>
+        {activeDesktopWindows.map((win) => (
+          <WindowFrame key={win.id} win={win}>
+            <WindowErrorBoundary appTitle={win.title}>
               {renderApp(win.appId, win.payload)}
             </WindowErrorBoundary>
           </WindowFrame>
@@ -1914,7 +1644,7 @@ export function Desktop() {
         )}
       </AnimatePresence>
 
-      {/* What's New Release Notes & Interactive Feature Showcase Modal (GlassiumOS 5 u3) */}
+      {/* What's New Release Notes Modal */}
       <AnimatePresence>
         {showWhatsNewModal && (
           <motion.div
@@ -1923,509 +1653,121 @@ export function Desktop() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-6"
             onClick={() => {
-              localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
+              localStorage.setItem('glassium_v4.6_whats_new_dismissed', 'true');
               setShowWhatsNewModal(false);
             }}
           >
             <motion.div
-              initial={{ scale: 0.96, y: 12 }}
+              initial={{ scale: 0.9, y: 20 }}
               animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.96, y: 12 }}
-              transition={{ duration: 0.18 }}
+              exit={{ scale: 0.9, y: 20 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 30 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-3xl max-h-[88vh] liquid-glass-window rounded-2xl border border-white/20 p-6 sm:p-8 shadow-2xl flex flex-col gap-5 overflow-hidden relative text-white"
+              className="w-full max-w-xl max-h-[85vh] bg-zinc-900/95 border border-white/20 rounded-3xl p-6 sm:p-8 shadow-[0_25px_70px_rgba(0,0,0,0.8)] flex flex-col gap-5 overflow-hidden relative text-white"
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b border-white/10 pb-4">
                 <div className="flex items-center gap-3">
-                  <AppLogo size={30} />
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 to-fuchsia-500 flex items-center justify-center text-black font-bold shadow-lg">
+                    <Icon name="Sparkles" size={20} />
+                  </div>
                   <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-lg sm:text-xl font-bold tracking-tight">
-                        GlassiumOS 5 u3 大型アップデート新機能ガイド
-                      </h2>
-                      <span className="px-2.5 py-0.5 rounded-md bg-gradient-to-r from-cyan-500/30 to-fuchsia-500/30 border border-cyan-400/40 text-cyan-200 text-[10px] font-mono font-bold">
-                        UPDATE 3 (u2 以降の追加機能すべて収録)
-                      </span>
-                    </div>
-                    <p className="text-xs text-white/60 font-mono mt-0.5">
-                      GlassiumOS 5.0 u3 · TypeScript UI × Rust/WebAssembly Hybrid Engine
-                    </p>
+                    <h2 className="text-lg font-bold tracking-tight">GlassiumOS V4.6 Update Notes</h2>
+                    <p className="text-xs text-cyan-300 font-mono">新機能・機能進化のおしらせ</p>
                   </div>
                 </div>
                 <button
                   onClick={() => {
-                    localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
+                    localStorage.setItem('glassium_v4.6_whats_new_dismissed', 'true');
                     setShowWhatsNewModal(false);
                   }}
-                  className="p-1.5 text-white/60 hover:text-white transition cursor-pointer"
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white/70 hover:text-white transition"
                 >
                   <Icon name="X" size={18} />
                 </button>
               </div>
 
-              {/* Release Notes Content List with Interactive 'Try Now' Launchers */}
-              <div className="flex-1 overflow-y-auto pr-1 text-xs divide-y divide-white/10 space-y-1">
-                <div className="py-3.5 first:pt-0 flex flex-col gap-1.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-bold text-cyan-300 text-sm">
-                      1. 音楽 10バンド・イコライザー（Rock / Pop / Jazz / Classical ＋ ドラッグ縦フェーダー）＆ AI Speaker Auto-EQ
-                    </span>
+              {/* Release Notes Content List */}
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1 text-xs divide-y divide-white/10">
+                {/* 1. Live Hover Preview */}
+                <div className="pt-3 first:pt-0 flex flex-col gap-1">
+                  <div className="font-semibold text-white">タスクバー ホバープレビュー</div>
+                  <p className="text-white/65 leading-relaxed">
+                    タスクバーのアイコンにホバーすると、該当アプリのウィンドウ真上に小さなプレビュー画面を表示します。
+                  </p>
+                </div>
+
+                {/* 2. Glassium Studio */}
+                <div className="pt-3 flex flex-col gap-1">
+                  <div className="flex items-center justify-between font-semibold text-white">
+                    <span>Glassium Studio (AI 開発環境)</span>
                     <button
-                      type="button"
                       onClick={() => {
-                        localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
+                        localStorage.setItem('glassium_v4.6_whats_new_dismissed', 'true');
                         setShowWhatsNewModal(false);
-                        openApp('synth');
+                        openApp('studio');
                       }}
-                      className="px-3 py-1 rounded-lg bg-cyan-500/25 hover:bg-cyan-500/40 border border-cyan-400/40 text-cyan-200 text-[11px] font-bold transition cursor-pointer"
+                      className="text-[11px] text-cyan-400 hover:underline"
                     >
-                      Music EQを開く →
+                      起動
                     </button>
                   </div>
-                  <p className="text-white/75 leading-relaxed">
-                    「Rock」「Pop」「Jazz」「Classical」「Flat」のジャンル別プリセットに加え、ドラッグ可能な10帯域縦フェーダー（32Hz〜16kHz）と直接ドラッグ描画できる周波数特性グラフを実装。さらにAIEQには <strong>JBL Charge 5 (Bluetooth &amp; Wi-Fi)</strong>、<strong>Amazon Echo Studio (Gen 1)</strong>、<strong>JBL Quantum 910 Wireless シリーズ</strong>、<strong>ZEALOT ZE-41</strong> などの専用音響補正プロファイルを追加しました。
+                  <p className="text-white/65 leading-relaxed">
+                    Gemini APIキーを使用してHTML/CSS/JSコードを自動生成・実行・編集できる内蔵統合環境です。GitHubリポジトリへの直接プッシュに対応しています。
                   </p>
                 </div>
 
-                <div className="py-3.5 flex flex-col gap-1.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-bold text-amber-300 text-sm">
-                      2. 時間・風速・風向き・天候・季節・イベント（ハロウィン / クリスマス等）動的デスクトップ背景
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedCustomId(null);
-                          setWallpaper('dynamic-world');
-                          const cur = loadDynamicEnvironmentConfig();
-                          saveDynamicEnvironmentConfig({ ...cur, event: 'halloween' });
-                          localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
-                          setShowWhatsNewModal(false);
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-orange-500/25 hover:bg-orange-500/40 border border-orange-400/40 text-orange-200 text-[10px] font-bold transition cursor-pointer"
-                      >
-                        🎃 ハロウィン背景を試す
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedCustomId(null);
-                          setWallpaper('dynamic-world');
-                          const cur = loadDynamicEnvironmentConfig();
-                          saveDynamicEnvironmentConfig({ ...cur, event: 'christmas' });
-                          localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
-                          setShowWhatsNewModal(false);
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-emerald-500/25 hover:bg-emerald-500/40 border border-emerald-400/40 text-emerald-200 text-[10px] font-bold transition cursor-pointer"
-                      >
-                        🎄 クリスマス背景を試す
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-white/75 leading-relaxed">
-                    時間帯（朝焼け・昼・夕暮れ・夜）、風の強さ（m/s）と風向き（8方位）、天候（快晴・雨・雷雨・雪・オーロラ）、季節（春の桜吹雪・夏の新緑と蛍・秋の紅葉・冬の銀世界）、さらにハロウィン（赤い満月・コウモリ・ジャックオーランタン）やクリスマス（サンタとトナカイのソリ・イルミネーションツリー・降雪）に応じてリアルタイムに変化する新背景「Dynamic World u3」を搭載しました。画面右上の環境ピルからいつでもカスタマイズ可能です。
+                {/* 3. Mac Quick Look */}
+                <div className="pt-3 flex flex-col gap-1">
+                  <div className="font-semibold text-white">Quick Look (スペースキープレビュー)</div>
+                  <p className="text-white/65 leading-relaxed">
+                    ファイルマネージャーでファイルを選択しスペースキーを押すことで、アプリを開かずに内容をすばやくプレビュー表示します。
                   </p>
                 </div>
 
-                <div className="py-3.5 flex flex-col gap-1.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-bold text-orange-300 text-sm">
-                      3. TypeScript (フロントエンドUI) × Rust / WebAssembly (重い演算ロジック) ハイブリッドエンジン
-                    </span>
-                    <span className="px-2 py-0.5 rounded bg-orange-500/20 border border-orange-400/40 text-[10px] font-mono text-orange-200">
-                      🦀 rust-core (wasm32) Active
-                    </span>
-                  </div>
-                  <p className="text-white/75 leading-relaxed">
-                    UI層はTypeScript/Reactで構築し、高負荷な数値処理（10バンドIIRパラメトリックEQの周波数伝達曲線計算、3D気象パーティクルの重力・風速・境界ラップ物理ステップ、2Dハッシュノイズによる3D山岳地形ハイトマップ生成、カラオケの歌い出しリードイン計算）を Rust (`#![no_std]` WebAssembly) 側でネイティブ実行するハイブリッド構成に進化しました。
-                  </p>
-                </div>
-
-                <div className="py-3.5 flex flex-col gap-1.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-bold text-sky-300 text-sm">
-                      4. 天気アプリ：マルチサイト多数決コンセンサス予測 ＆ Three.js 3D立体気象ジオラマ背景
-                    </span>
+                {/* 4. RetroCade */}
+                <div className="pt-3 flex flex-col gap-1">
+                  <div className="flex items-center justify-between font-semibold text-white">
+                    <span>RetroCade (ゲームエミュレータ)</span>
                     <button
-                      type="button"
                       onClick={() => {
-                        localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
+                        localStorage.setItem('glassium_v4.6_whats_new_dismissed', 'true');
                         setShowWhatsNewModal(false);
-                        openApp('weather');
+                        openApp('retrocade');
                       }}
-                      className="px-3 py-1 rounded-lg bg-sky-500/25 hover:bg-sky-500/40 border border-sky-400/40 text-sky-200 text-[11px] font-bold transition cursor-pointer"
+                      className="text-[11px] text-cyan-400 hover:underline"
                     >
-                      3D天気アプリを開く →
+                      起動
                     </button>
                   </div>
-                  <p className="text-white/75 leading-relaxed">
-                    複数の気象データソースから最も多く予想された天気を算出する多数決コンセンサスエンジンと、現在の天気に自動連動する Three.js 3D立体ジオラマ空間（3D山岳地形・多層3Dクラウド・3D雨雪パーティクル・3D稲妻発光・気象観測スパイア）を実装しました。
+                  <p className="text-white/65 leading-relaxed">
+                    ローカルのROMファイル（.nes, .gb）を読み込んで再生できるWebAssemblyベースのエミュレータです。
                   </p>
                 </div>
 
-                <div className="py-3.5 flex flex-col gap-1.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-bold text-rose-300 text-sm">
-                      5. リアルタイム・カラオケモード（歌い出しカウントダウン・発音ルビ・カラオケ色変化・歌詞日本語通訳）
-                    </span>
-                  </div>
-                  <p className="text-white/75 leading-relaxed">
-                    歌詞の歌い出しタイミング（3・2・1リードイン）と発音ガイド（かな／ローマ字ルビ）を自動検知し、進行に合わせて色が変化するカラオケハイライト表示と日本語通訳（歌詞通訳）レイヤーをMusicアプリに追加しました。
-                  </p>
-                </div>
-
-                <div className="py-3.5 flex flex-col gap-1.5">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="font-bold text-emerald-300 text-sm">
-                      6. ウィンドウ状態の完全保存・再開 ＆ Entertainment 全映画検索・Browser 3大スキン・AI検索バー
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
-                          setShowWhatsNewModal(false);
-                          openApp('entertainment');
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold transition cursor-pointer"
-                      >
-                        映画・アニメ
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
-                          setShowWhatsNewModal(false);
-                          openApp('ai');
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold transition cursor-pointer"
-                      >
-                        AIアシスタント
-                      </button>
-                    </div>
-                  </div>
-                  <p className="text-white/75 leading-relaxed">
-                    ウィンドウを閉じても進行内容や画面状態を保持して再開できるセッション保存機構、映画・アニメのマルチサーバー検索＆再生、Browserの Opera GX / Chrome / Firefox UI切替＆YouTubeプロキシ再生、ロック画面のBing日替わり自然壁紙＆上スライドぼかし解除、Quick Controlsの音楽プレイヤー統合、時計の25分超長時間タイマー、AIアシスタントの過去チャット検索バーを実装しました。
+                {/* 5. Proxy Browser & SW */}
+                <div className="pt-3 flex flex-col gap-1">
+                  <div className="font-semibold text-white">Service Worker プロキシ機能</div>
+                  <p className="text-white/65 leading-relaxed">
+                    CORSおよびフレーム埋め込み制限を緩和するプロキシを実装し、ブラウザ内での外部サイト閲覧やGitHubアプリの直接ロードを可能にします。
                   </p>
                 </div>
               </div>
 
               {/* Modal Footer */}
               <div className="pt-3 border-t border-white/10 flex items-center justify-between">
-                <span className="text-[11px] text-white/50 font-mono">
-                  GlassiumOS 5.0 u3 · GlasispectUI Hybrid Edition
-                </span>
+                <span className="text-[11px] text-white/40 font-mono">GlassiumOS v4.6</span>
                 <button
                   onClick={() => {
-                    localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
+                    localStorage.setItem('glassium_v4.6_whats_new_dismissed', 'true');
                     setShowWhatsNewModal(false);
                   }}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-400 text-slate-950 font-black text-xs hover:brightness-110 transition cursor-pointer shadow-lg"
+                  className="px-4 py-1.5 bg-white text-black font-semibold text-xs rounded hover:bg-slate-200 transition"
                 >
-                  GlassiumOS 5 u3 をはじめる
+                  閉じる
                 </button>
               </div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* ========================================================
-          OS-LEVEL FLOATING BOTTOM DOCK MUSIC BAR (GlassiumOS Liquid Glass Dock)
-          Fixed at bottom of screen with real-time artwork-pattern moving gradient
-         ======================================================== */}
-      <AnimatePresence>
-        {musicState?.isPlaying && !pillDismissed && (
-          <motion.div
-            initial={{ y: 60, opacity: 0, scale: 0.94 }}
-            animate={{ y: 0, opacity: 1, scale: 1 }}
-            exit={{ y: 50, opacity: 0, scale: 0.92 }}
-            transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-            className="fixed bottom-14 sm:bottom-16 left-1/2 z-[4200] max-w-[94vw] w-auto pointer-events-auto"
-            style={{
-              transform: `translate3d(calc(-50% + ${desktopPillOffset.x}px), ${desktopPillOffset.y}px, 0)`,
-              transition: isDraggingDesktopPill ? 'none' : undefined,
-            }}
-          >
-            {desktopPillMinimized ? (
-              <div
-                onPointerDown={handleDesktopPillPointerDown}
-                onPointerMove={handleDesktopPillPointerMove}
-                onPointerUp={handleDesktopPillPointerUp}
-                onPointerCancel={handleDesktopPillPointerUp}
-                className="relative group px-3 py-1.5 rounded-2xl liquid-glass-music-dock liquid-glass-window overflow-hidden flex items-center gap-2.5 cursor-grab active:cursor-grabbing shadow-2xl"
-                title="ドラッグして移動 / 展開ボタンで元のサイズへ"
-              >
-                <span className="material-symbols-rounded text-xs text-white/50 select-none">
-                  drag_indicator
-                </span>
-                <button
-                  type="button"
-                  data-no-dock-drag="true"
-                  onClick={() => openApp('synth')}
-                  className="w-7 h-7 rounded-lg overflow-hidden bg-slate-800 border border-white/25 shrink-0"
-                >
-                  {musicState.artworkUrl ? (
-                    <img src={musicState.artworkUrl} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="material-symbols-rounded text-cyan-400 text-sm">music_note</span>
-                  )}
-                </button>
-                <span className="text-xs font-bold text-white truncate max-w-[130px]">
-                  {musicState.title || 'Playing'}
-                </span>
-                <button
-                  type="button"
-                  data-no-dock-drag="true"
-                  onClick={() =>
-                    window.dispatchEvent(
-                      new CustomEvent('glassium-music-command', { detail: { action: 'toggle-play' } })
-                    )
-                  }
-                  className="w-7 h-7 rounded-lg bg-white text-slate-950 flex items-center justify-center"
-                >
-                  <span className="material-symbols-rounded text-base">
-                    {musicState.isPlaying ? 'pause' : 'play_arrow'}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  data-no-dock-drag="true"
-                  onClick={() => setDesktopPillMinimized(false)}
-                  className="w-6 h-6 rounded-lg bg-white/15 hover:bg-white/25 text-white flex items-center justify-center"
-                  title="展開"
-                >
-                  <span className="material-symbols-rounded text-xs">open_in_full</span>
-                </button>
-              </div>
-            ) : (
-              <div
-                onPointerDown={handleDesktopPillPointerDown}
-                onPointerMove={handleDesktopPillPointerMove}
-                onPointerUp={handleDesktopPillPointerUp}
-                onPointerCancel={handleDesktopPillPointerUp}
-                className="relative group px-4 py-2.5 rounded-2xl liquid-glass-music-dock liquid-glass-window overflow-hidden flex flex-col gap-1.5 transition cursor-grab active:cursor-grabbing"
-              >
-                {/* Real-Time Moving Artwork-Pattern Gradient Behind the Liquid Glass Dock */}
-                <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-70">
-                  <div
-                    className="absolute -inset-6 blur-2xl opacity-60 artwork-dock-underglow transition-all duration-1000"
-                    style={{
-                      background: `linear-gradient(125deg, ${
-                        musicState.palette?.c1 || '#fa243c'
-                      } 0%, ${musicState.palette?.c2 || '#8b5cf6'} 35%, ${
-                        musicState.palette?.c3 || '#06b6d4'
-                      } 70%, ${musicState.palette?.c4 || '#f59e0b'} 100%)`,
-                    }}
-                  />
-                  {musicState.artworkUrl && (
-                    <>
-                      <img
-                        src={musicState.artworkUrl}
-                        alt=""
-                        className="absolute -top-1/2 -left-1/4 w-[85%] h-[220%] object-cover blur-[32px] saturate-[2.4] opacity-45 artwork-fluid-orb-1"
-                      />
-                      <img
-                        src={musicState.artworkUrl}
-                        alt=""
-                        className="absolute -bottom-1/2 -right-1/4 w-[85%] h-[220%] object-cover blur-[36px] saturate-[2.4] opacity-40 artwork-fluid-orb-2 mix-blend-screen"
-                      />
-                    </>
-                  )}
-                  <div className="absolute inset-0 bg-slate-950/45" />
-                </div>
-
-                <div className="relative z-10 flex items-center gap-3">
-                  <span
-                    className="material-symbols-rounded text-sm text-white/45 select-none"
-                    title="ドラッグしてピルを移動"
-                  >
-                    drag_indicator
-                  </span>
-
-                  {/* Artwork Thumbnail / Clickable to open SynthVisualizer */}
-                  <button
-                    type="button"
-                    data-no-dock-drag="true"
-                    onClick={() => openApp('synth')}
-                    title="Music プレイヤーを開く"
-                    className="relative z-10 w-10 h-10 rounded-xl overflow-hidden bg-slate-800 border border-white/25 shrink-0 shadow-[0_6px_16px_rgba(0,0,0,0.5)] group-hover:scale-105 transition flex items-center justify-center cursor-pointer"
-                  >
-                    {musicState.artworkUrl ? (
-                      <img
-                        src={musicState.artworkUrl}
-                        alt={musicState.title || 'Track Artwork'}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="material-symbols-rounded text-cyan-400 text-lg">music_note</span>
-                    )}
-                  </button>
-
-                  {/* Title, Artist, & Realtime Synchronized Lyric Line */}
-                  <div
-                    data-no-dock-drag="true"
-                    onClick={() => openApp('synth')}
-                    className="relative z-10 min-w-0 max-w-[180px] sm:max-w-[290px] cursor-pointer flex flex-col justify-center"
-                  >
-                    <div className="flex items-center gap-1.5 truncate">
-                      <span className="text-xs font-bold text-white tracking-tight truncate">
-                        {musicState.title || 'Playing Track'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openApp('synth', { payload: { tab: 'artist' } });
-                          setTimeout(() => {
-                            window.dispatchEvent(
-                              new CustomEvent('glassium-music-command', {
-                                detail: {
-                                  action: 'open-artist',
-                                  artist: musicState.artist || 'YOASOBI',
-                                },
-                              })
-                            );
-                          }, 80);
-                        }}
-                        className="text-[11px] text-white/85 hover:text-[#fa243c] hover:underline truncate font-semibold"
-                        title="アーティストページを開く"
-                      >
-                        · {musicState.artist || 'Official Artist'}
-                      </button>
-                    </div>
-                    {musicState.lyricLine ? (
-                      <span className="text-[10.5px] text-white/85 font-medium truncate flex items-center gap-1">
-                        <span className="material-symbols-rounded text-[13px] text-rose-400">lyrics</span>
-                        <span className="truncate">{musicState.lyricLine}</span>
-                      </span>
-                    ) : (
-                      <span className="text-[10.5px] text-white/50 truncate block">
-                        {musicState.album || 'Lossless Hi-Fi Stream'}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Quick MV / Artist / Transport Buttons inside Liquid Glass Dock */}
-                  <div
-                    data-no-dock-drag="true"
-                    className="relative z-10 flex items-center gap-1 shrink-0 border-l border-white/15 pl-2.5"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => openApp('synth', { payload: { tab: 'mv' } })}
-                      title="MVを開く"
-                      className="hidden sm:flex w-7 h-7 rounded-lg items-center justify-center text-white/70 hover:text-white hover:bg-white/15 transition cursor-pointer"
-                    >
-                      <span className="material-symbols-rounded text-[16px]">smart_display</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        openApp('synth', { payload: { tab: 'artist' } });
-                        setTimeout(() => {
-                          window.dispatchEvent(
-                            new CustomEvent('glassium-music-command', {
-                              detail: {
-                                action: 'open-artist',
-                                artist: musicState.artist || 'YOASOBI',
-                              },
-                            })
-                          );
-                        }, 80);
-                      }}
-                      title="アーティストページ"
-                      className="hidden sm:flex w-7 h-7 rounded-lg items-center justify-center text-white/70 hover:text-white hover:bg-white/15 transition cursor-pointer"
-                    >
-                      <span className="material-symbols-rounded text-[16px]">person</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        window.dispatchEvent(
-                          new CustomEvent('glassium-music-command', { detail: { action: 'prev' } })
-                        )
-                      }
-                      title="前の曲"
-                      className="w-8 h-8 rounded-xl flex items-center justify-center text-white/85 hover:text-white hover:bg-white/15 active:scale-90 transition cursor-pointer"
-                    >
-                      <span className="material-symbols-rounded text-[19px]">skip_previous</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        window.dispatchEvent(
-                          new CustomEvent('glassium-music-command', { detail: { action: 'toggle-play' } })
-                        )
-                      }
-                      title={musicState.isPlaying ? '一時停止' : '再生'}
-                      className="w-8 h-8 rounded-xl bg-white text-slate-950 flex items-center justify-center font-bold shadow-[0_6px_18px_rgba(255,255,255,0.3)] hover:scale-105 active:scale-95 transition cursor-pointer"
-                    >
-                      <span
-                        className="material-symbols-rounded text-[20px] leading-none"
-                        style={{ fontVariationSettings: "'FILL' 1, 'wght' 600" }}
-                      >
-                        {musicState.isPlaying ? 'pause' : 'play_arrow'}
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        window.dispatchEvent(
-                          new CustomEvent('glassium-music-command', { detail: { action: 'next' } })
-                        )
-                      }
-                      title="次の曲"
-                      className="w-8 h-8 rounded-xl flex items-center justify-center text-white/85 hover:text-white hover:bg-white/15 active:scale-90 transition cursor-pointer"
-                    >
-                      <span className="material-symbols-rounded text-[19px]">skip_next</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setDesktopPillMinimized(true)}
-                      title="ミニピルに最小化"
-                      className="ml-0.5 w-6 h-6 rounded-lg flex items-center justify-center text-white/65 hover:text-white hover:bg-white/15 transition cursor-pointer"
-                    >
-                      <span className="material-symbols-rounded text-[15px]">close_fullscreen</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setPillDismissed(true)}
-                      title="ドックを隠す (バックグラウンド再生は継続)"
-                      className="w-6 h-6 rounded-lg flex items-center justify-center text-white/50 hover:text-white hover:bg-white/15 transition cursor-pointer"
-                    >
-                      <span className="material-symbols-rounded text-[15px]">close</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Liquid Glass Dock Progress Bar */}
-                <div className="relative z-10 w-full h-1 rounded-full bg-white/15 overflow-hidden">
-                  <div
-                    className="h-full transition-all duration-150"
-                    style={{
-                      width: `${Math.min(
-                        100,
-                        ((musicState.currentTime || 0) / Math.max(1, musicState.duration || 210)) * 100
-                      )}%`,
-                      background: `linear-gradient(90deg, ${
-                        musicState.palette?.c1 || '#fa243c'
-                      }, ${musicState.palette?.c2 || '#a855f7'}, ${
-                        musicState.palette?.c3 || '#06b6d4'
-                      })`,
-                    }}
-                  />
-                </div>
-              </div>
-            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -2444,29 +1786,7 @@ export function Desktop() {
         onUnlock={unlockSystem}
         expectedPassword={user?.password}
         userName={user?.name}
-        userAvatar={user?.avatar}
       />
-
-      {/* Initial Setup Wizard (First Launch Account, Theme, UI Style, Accent, & Password) */}
-      <AnimatePresence>
-        {setupWizardOpen && (
-          <InitialSetupWizard
-            initialUser={user}
-            initialUiStyle={uiStyle}
-            initialTheme={theme}
-            initialAccent={accentColor}
-            onComplete={(result: InitialSetupResult) => {
-              setUser(result.user);
-              setUiStyle(result.uiStyle);
-              setTheme(result.theme);
-              setAccentColor(result.accentColor);
-              localStorage.setItem('glassium_setup_completed', 'true');
-              setSetupWizardOpen(false);
-              triggerDynamicIsland('Setup Complete', `ようこそ、${result.user.name}さん`, 'Sparkles');
-            }}
-          />
-        )}
-      </AnimatePresence>
     </div>
   );
 }
