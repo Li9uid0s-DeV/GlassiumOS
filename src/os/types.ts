@@ -51,7 +51,8 @@ export type AppId =
   | 'glassexcel'
   | 'glassppt'
   | 'glassnote'
-  | 'tsxrunner';
+  | 'tsxrunner'
+  | 'garageband';
 
 // Custom installed apps use a string ID prefixed with 'custom:' or 'tsx:'
 export type WindowAppId = AppId | string;
@@ -255,6 +256,18 @@ export interface StoreApp {
 }
 
 export const STORE_CATALOG: StoreApp[] = [
+  {
+    id: 'garageband',
+    name: 'GarageBand Studio',
+    description: 'マルチトラック録音・打ち込みシーケンサー、本格ピアノ鍵盤、16パッドMPCドラム、ライブループ、EQ/リバーブ/ディレイ/空間音響、WAV書き出しを備えた音楽制作ワークステーション。',
+    category: 'audio',
+    icon: 'garageband',
+    author: 'Glassium Audio & Creative',
+    rating: 5.0,
+    size: '8.8 MB',
+    version: '5.0 u4',
+    builtInAppId: 'garageband',
+  },
   {
     id: 'sonicstudio',
     name: 'Glassium Sonic 3D',

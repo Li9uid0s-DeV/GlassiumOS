@@ -58,7 +58,10 @@ export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
     shellMode,
     theme,
     language,
+    isMobileClient: isMobileFromOS,
   } = useOS();
+
+  const isMobileClient = Boolean(isMobileFromOS || shellMode === 'android' || shellMode === 'ios');
 
   const isLight = theme === 'light';
   const isFocused = getTopWindowId() === win.id;
@@ -319,6 +322,9 @@ export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
   };
 
   const getMaximizedBounds = () => {
+    if (isMobileClient) {
+      return { left: 0, top: 0, width: '100vw', height: 'calc(100vh - 44px)' };
+    }
     if (shellMode === 'mac') {
       return { left: 0, top: 32, width: '100vw', height: 'calc(100vh - 108px)' };
     }
@@ -331,11 +337,11 @@ export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
     return { left: 0, top: 0, width: '100vw', height: 'calc(100vh - 56px)' };
   };
 
-  const style: React.CSSProperties = win.maximized
+  const style: React.CSSProperties = (win.maximized || isMobileClient)
     ? {
         ...getMaximizedBounds(),
         zIndex: win.zIndex,
-        borderRadius: 0,
+        borderRadius: isMobileClient ? '0 0 16px 16px' : 0,
         display: hiddenWindow ? 'none' : 'flex',
       }
     : {
@@ -675,7 +681,7 @@ export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
                   minimizeWindow(win.id);
                 }}
                 aria-label="Minimize"
-                title="Minimize"
+                title="最小化 (進行状況を保存)"
                 className="win-caption-btn"
               >
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -802,7 +808,7 @@ export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
                   closeWindow(win.id);
                 }}
                 aria-label="Close"
-                title="Close"
+                title="閉じる (進行状況をリセットして終了)"
                 className="win-caption-close"
               >
                 <svg width="10" height="10" viewBox="0 0 10 10" fill="none">

@@ -314,6 +314,9 @@ export interface OSContextValue {
   addDeskNote: () => void;
   updateDeskNote: (id: string, patch: Partial<DeskStickyNote>) => void;
   deleteDeskNote: (id: string) => void;
+
+  closeAllWindows: () => void;
+  isMobileClient: boolean;
 }
 
 const OSContext = createContext<OSContextValue | null>(null);
@@ -372,6 +375,7 @@ const APP_DEFAULTS: Record<AppId, { title: string; icon: string; width: number; 
   glassppt: { title: 'Glassium Stage (PowerPoint スライド)', icon: 'glassppt', width: 980, height: 640 },
   glassnote: { title: 'Glassium Note (OneNote デジタルノート)', icon: 'glassnote', width: 940, height: 620 },
   tsxrunner: { title: 'Glassium TSX Studio', icon: 'tsxrunner', width: 900, height: 600 },
+  garageband: { title: 'GarageBand Studio', icon: 'garageband', width: 1040, height: 680 },
 };
 
 const INITIAL_TASKS: CalendarTask[] = [
@@ -639,9 +643,28 @@ export function OSProvider({ children }: { children: ReactNode }) {
 
   const [temperature] = useState<number>(21);
 
-  // Shell & Design Engines — Default to desktop 'windows' shell so all icons & taskbar are immediately accessible
+  // Mobile Client Device Detection (window width <= 768 or mobile UserAgent)
+  const [isMobileClient, setIsMobileClient] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.innerWidth <= 768 || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+  });
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const mob = window.innerWidth <= 768 || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+      setIsMobileClient(mob);
+    };
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Shell & Design Engines — Default to 'android' mobile shell on mobile devices, or 'windows' on desktop
   const [shellMode, setShellMode] = useState<ShellMode>(() => {
-    return (persistedSettings.shellMode as ShellMode) ?? 'windows';
+    if (persistedSettings.shellMode) return persistedSettings.shellMode as ShellMode;
+    if (typeof window !== 'undefined' && (window.innerWidth <= 768 || /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent))) {
+      return 'android';
+    }
+    return 'windows';
   });
   const [taskbarStyle, setTaskbarStyle] = useState<WindowsTaskbarStyle>(persistedSettings.taskbarStyle ?? 'modern');
   const [designEngine, setDesignEngine] = useState<DesignEngine>(persistedSettings.designEngine ?? 'liquid-glass');
@@ -1620,13 +1643,19 @@ export function OSProvider({ children }: { children: ReactNode }) {
 
   const closeWindow = useCallback((id: string) => {
     playSound('click');
-    // Keep window in allWindows with closed: true so React component state & user progress are preserved
-    setWindows((ws) => ws.map((w) => (w.id === id ? { ...w, closed: true, minimized: false } : w)));
+    // Remove window from allWindows completely so state/progress is reset; only minimize preserves progress
+    setWindows((ws) => ws.filter((w) => w.id !== id));
   }, [playSound]);
 
   const minimizeWindow = useCallback((id: string) => {
     playSound('click');
+    // Keep window in allWindows with minimized: true so internal state & user progress are preserved
     setWindows((ws) => ws.map((w) => (w.id === id ? { ...w, minimized: true } : w)));
+  }, [playSound]);
+
+  const closeAllWindows = useCallback(() => {
+    playSound('click');
+    setWindows([]);
   }, [playSound]);
 
   const restoreWindow = useCallback(
@@ -2199,6 +2228,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
     addDeskNote,
     updateDeskNote,
     deleteDeskNote,
+    closeAllWindows,
+    isMobileClient,
   };
 
   return <OSContext.Provider value={value}>{children}</OSContext.Provider>;

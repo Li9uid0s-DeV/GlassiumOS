@@ -34,6 +34,7 @@ import {
   GlassiumNoteApp,
   GlassiumTsxRunnerApp,
 } from './apps/GlassiumOfficeSuite';
+import { GarageBandApp } from './apps/GarageBand';
 import { renderExtraApp } from './apps/ExtraAppsSuite';
 import { Icon } from './Icon';
 import { AppId, TASKBAR_APPS, DESKTOP_ICON_SIZE_PRESETS } from './types';
@@ -114,6 +115,8 @@ function renderApp(appId: string, payload?: unknown) {
       const tsxPayload = payload as { tsxSource?: string; title?: string } | undefined;
       return <GlassiumTsxRunnerApp initialCode={tsxPayload?.tsxSource} initialTitle={tsxPayload?.title} />;
     }
+    case 'garageband':
+      return <GarageBandApp />;
     default: {
       const extra = renderExtraApp(appId);
       if (extra) return extra;
@@ -598,29 +601,31 @@ export function Desktop() {
       {/* u4 Dynamic World Live Wallpaper (Time, Wind Speed, Wind Direction, Weather, Season, Halloween & Christmas Events) */}
       {useDynamicWorld && !customWallpaper && <DynamicWorldWallpaper showControllerHud={true} />}
 
-      {/* Quick Switcher Pill when not on dynamic-world */}
-      {!useDynamicWorld && (
-        <div className="fixed top-9 right-4 z-20 pointer-events-auto flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedCustomId(null);
-              setWallpaper('dynamic-world');
-            }}
-            className="px-3 py-1.5 rounded-xl bg-black/55 hover:bg-black/75 backdrop-blur-xl border border-cyan-400/35 text-[11px] text-cyan-200 font-semibold flex items-center gap-1.5 shadow-xl transition cursor-pointer"
-          >
-            <span className="material-symbols-rounded text-sm text-cyan-300">public</span>
-            <span>動的環境壁紙に切替</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowWhatsNewModal(true)}
-            className="px-2.5 py-1.5 rounded-xl bg-black/55 hover:bg-black/75 backdrop-blur-xl border border-white/15 text-[11px] text-white/85 font-semibold transition cursor-pointer"
-          >
-            u4 新機能
-          </button>
-        </div>
-      )}
+      {/* Quick Wallpaper Switcher Pill Bar (Black Hole 3D / Dynamic World / What's New) */}
+      <div className="fixed top-9 right-4 z-20 pointer-events-auto flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedCustomId(null);
+            setWallpaper(wallpaper === 'space' ? 'dynamic-world' : 'space');
+          }}
+          className={`px-3 py-1.5 rounded-xl backdrop-blur-xl border text-[11px] font-semibold flex items-center gap-1.5 shadow-xl transition cursor-pointer ${
+            wallpaper === 'space'
+              ? 'bg-amber-950/70 border-amber-500/50 text-amber-200 hover:bg-amber-900/80'
+              : 'bg-black/60 border-cyan-400/40 text-cyan-200 hover:bg-black/80'
+          }`}
+          title={wallpaper === 'space' ? '動的環境壁紙に戻す' : '3Dブラックホール (アインシュタインリング・降着円盤) に切替'}
+        >
+          <span>{wallpaper === 'space' ? '🌍 動的環境壁紙に切替' : '🕳️ ブラックホール壁紙'}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setShowWhatsNewModal(true)}
+          className="px-2.5 py-1.5 rounded-xl bg-black/55 hover:bg-black/75 backdrop-blur-xl border border-white/15 text-[11px] text-white/85 font-semibold transition cursor-pointer"
+        >
+          u4 新機能
+        </button>
+      </div>
 
       {/* 2D Interactive Aurora Silk & PS5 Golden Sparkle Live Wallpaper */}
       {useLive2D && !customWallpaper && (
@@ -1607,6 +1612,35 @@ export function Desktop() {
               <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${showGlasiusWidget ? 'os-accent-soft' : 'opacity-45'}`}>
                 {showGlasiusWidget ? 'ON' : 'OFF'}
               </span>
+            </button>
+            <div className={`my-1 border-t ${theme === 'light' ? 'border-slate-200' : 'border-white/10'}`} />
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCustomId(null);
+                setWallpaper('space');
+                setContextMenu(null);
+              }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition ${
+                theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-white/10'
+              }`}
+            >
+              <span className="text-sm">🕳️</span>
+              <span>3Dブラックホール壁紙 (Gargantua)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCustomId(null);
+                setWallpaper('dynamic-world');
+                setContextMenu(null);
+              }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition ${
+                theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-white/10'
+              }`}
+            >
+              <span className="text-sm">🌍</span>
+              <span>動的環境壁紙 (季節・気象・時刻連動)</span>
             </button>
             <div className={`my-1 border-t ${theme === 'light' ? 'border-slate-200' : 'border-white/10'}`} />
             <button

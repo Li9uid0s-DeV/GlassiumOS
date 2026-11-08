@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Icon } from '../Icon';
 import { useOS } from '../OSContext';
+import { VintageAndroidWeatherSky } from './VintageAndroidWeatherSky';
+import { WeatherConditionKey } from '../weatherConsensus';
 
 export interface SavedWeatherLocation {
   id: string;
@@ -124,6 +126,20 @@ export function WeatherApp() {
   const [radarPlaying, setRadarPlaying] = useState<boolean>(false);
   const [radarOpacity, setRadarOpacity] = useState<number>(0.75);
   const [showWindOverlay, setShowWindOverlay] = useState<boolean>(true);
+
+  // 3D Weather Sky background state
+  const [show3dSky, setShow3dSky] = useState<boolean>(true);
+  const [wiperActive, setWiperActive] = useState<boolean>(true);
+
+  const conditionKey: WeatherConditionKey = useMemo(() => {
+    const cond = (weather?.condition || '').toLowerCase();
+    if (cond.includes('雷') || cond.includes('thunder') || cond.includes('storm')) return 'Thunderstorm';
+    if (cond.includes('雪') || cond.includes('snow') || cond.includes('氷') || cond.includes('sleet')) return 'Snow';
+    if (cond.includes('雨') || cond.includes('rain') || cond.includes('drizzle') || cond.includes('shower')) return 'Rainy';
+    if (cond.includes('曇') || cond.includes('cloud') || cond.includes('overcast')) return 'Cloudy';
+    if (cond.includes('aurora') || cond.includes('オーロラ')) return 'Aurora';
+    return 'Sunny';
+  }, [weather?.condition]);
 
   useEffect(() => {
     try {
@@ -543,6 +559,40 @@ export function WeatherApp() {
               </button>
             </div>
 
+            {/* 3D Dynamic Sky Background Toggle */}
+            <button
+              type="button"
+              onClick={() => setShow3dSky((v) => !v)}
+              style={show3dSky ? { borderColor: resolvedAccentHex, color: resolvedAccentHex } : undefined}
+              className={`px-2.5 py-1 rounded-xl border text-xs font-bold flex items-center gap-1 cursor-pointer transition ${
+                show3dSky
+                  ? 'bg-cyan-500/15 text-cyan-400 border-cyan-400/40 shadow-sm'
+                  : isLight
+                  ? 'bg-slate-100 border-slate-200 opacity-60 hover:opacity-100'
+                  : 'bg-white/5 border-white/10 opacity-60 hover:opacity-100'
+              }`}
+              title="Three.js 3D動的天空・気象背景の表示/非表示を切り替え"
+            >
+              <span>3D天球: {show3dSky ? 'ON' : 'OFF'}</span>
+            </button>
+
+            {show3dSky && (
+              <button
+                type="button"
+                onClick={() => setWiperActive((v) => !v)}
+                className={`px-2 py-1 rounded-xl border text-[11px] font-medium flex items-center gap-1 cursor-pointer transition ${
+                  wiperActive
+                    ? 'bg-sky-500/15 text-sky-300 border-sky-400/30'
+                    : isLight
+                    ? 'bg-slate-100 border-slate-200 opacity-50'
+                    : 'bg-white/5 border-white/10 opacity-50'
+                }`}
+                title="ワイパー効果のON/OFF"
+              >
+                <span>ワイパー {wiperActive ? '✓' : '—'}</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => setUnit(unit === 'C' ? 'F' : 'C')}
@@ -625,7 +675,19 @@ export function WeatherApp() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="relative flex-1 overflow-hidden">
+        {/* 3D Dynamic Sky Background Layer */}
+        {show3dSky && (
+          <div className="absolute inset-0 z-0 pointer-events-auto overflow-hidden opacity-90">
+            <VintageAndroidWeatherSky
+              condition={conditionKey}
+              enableWiper={wiperActive}
+              className="w-full h-full"
+            />
+          </div>
+        )}
+
+        <div className="relative z-10 h-full overflow-y-auto p-4 space-y-4">
         {errorMsg && (
           <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs">
             {errorMsg}
@@ -967,6 +1029,7 @@ export function WeatherApp() {
             </div>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

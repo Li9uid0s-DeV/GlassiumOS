@@ -70,7 +70,8 @@ export type FluentIconType =
   | 'glassexcel'
   | 'glassppt'
   | 'glassnote'
-  | 'tsxrunner';
+  | 'tsxrunner'
+  | 'garageband';
 
 const ICON_MAP: Record<string, FluentIconType> = {
   // Core Apps & Store IDs
@@ -109,6 +110,7 @@ const ICON_MAP: Record<string, FluentIconType> = {
   glassppt: 'glassppt',
   glassnote: 'glassnote',
   tsxrunner: 'tsxrunner',
+  garageband: 'garageband',
   ShoppingBag: 'appstore',
 
   // Lucide icon name mappings
@@ -1468,6 +1470,35 @@ export function FluentAppIcon({ name, size = 24, className = '', onClick }: Flue
           {/* TSX Badge at Bottom */}
           <rect x="13" y="32" width="22" height="6.5" rx="3" fill="#0284c7" />
           <path d="M17 34.2H20M18.5 34.2V37.2M23 34.2L26 37.2M26 34.2L23 37.2M28.5 34.2L31 35.7L28.5 37.2" stroke="#ffffff" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      )}
+
+      {/* 65. GARAGEBAND STUDIO (DIGITAL AUDIO WORKSTATION) */}
+      {type === 'garageband' && (
+        <>
+          <defs>
+            <linearGradient id={g1} x1="6" y1="6" x2="42" y2="42" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#ea580c" />
+              <stop offset="50%" stopColor="#dc2626" />
+              <stop offset="100%" stopColor="#7c2d12" />
+            </linearGradient>
+            <radialGradient id={g2} cx="24" cy="24" r="16" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#fef08a" stopOpacity="0.9" />
+              <stop offset="60%" stopColor="#f97316" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="#b45309" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <rect x="6" y="6" width="36" height="36" rx="9" fill={`url(#${g1})`} filter={`url(#${sh})`} stroke="#fb923c" strokeOpacity="0.75" strokeWidth="1.3" />
+          <circle cx="24" cy="24" r="14" fill={`url(#${g2})`} />
+          {/* Electric Guitar & Acoustic Soundwave */}
+          <path d="M14 34L28 14M24 10L36 22M22 16L32 26" stroke="#ffffff" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="16" cy="32" r="5" fill="#f59e0b" stroke="#ffffff" strokeWidth="1.5" />
+          <path d="M25 11L35 21" stroke="#fbbf24" strokeWidth="3" strokeLinecap="round" />
+          {/* Audio EQ level bars */}
+          <rect x="10" y="20" width="2" height="6" rx="1" fill="#ffffff" opacity="0.8" />
+          <rect x="13" y="16" width="2" height="10" rx="1" fill="#ffffff" opacity="0.9" />
+          <rect x="33" y="24" width="2" height="8" rx="1" fill="#ffffff" opacity="0.9" />
+          <rect x="36" y="27" width="2" height="5" rx="1" fill="#ffffff" opacity="0.7" />
         </>
       )}
 

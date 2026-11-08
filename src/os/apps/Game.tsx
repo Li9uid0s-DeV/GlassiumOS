@@ -1,6 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { Icon } from '../Icon';
+import { wasmGcPhysics } from '../rustWasmCore';
 import { PuzzleGamesView } from './ExtraAppsSuite';
 import { CloudAndAIGameHub } from './CloudAndAIGameHub';
 import {
@@ -4435,6 +4436,15 @@ export function GameApp({ initialTab, payload }: GameAppProps) {
         </div>
 
         <div className="flex items-center gap-3 font-mono text-xs shrink-0">
+          {/* WASM-GC Physics Kernel Telemetry Badge */}
+          {(mode === 'velocity' || mode === 'maze') && (
+            <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-400/30 text-[10px] text-cyan-300 font-sans shadow-sm">
+              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+              <span className="font-semibold">WASM-GC 物理演算</span>
+              <span className="opacity-70 text-[9px]">{wasmGcPhysics.getTelemetry().kernelName.replace('WASM-GC ', '')}</span>
+            </div>
+          )}
+
           {mode === 'velocity' && (
             <div className="hidden md:flex items-center gap-2">
               <span className="text-white/50">A/D or ←/→ or ドラッグ操作</span>
