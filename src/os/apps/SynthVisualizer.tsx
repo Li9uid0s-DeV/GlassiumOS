@@ -1271,6 +1271,8 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     [activeNav, isPlaying, loadLyricsForTrack, searchQuery]
   );
 
+  const [showBrowseEqPanel, setShowBrowseEqPanel] = useState<boolean>(true);
+
   // Auto-search with 420ms debounce when typing in the search box
   useEffect(() => {
     const trimmed = searchQuery.trim();
@@ -3588,8 +3590,28 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   >
                     {isSearchingOnline ? '検索中...' : '検索'}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowBrowseEqPanel((v) => !v)}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold shrink-0 transition flex items-center gap-1.5 border cursor-pointer ${
+                      showBrowseEqPanel
+                        ? 'bg-cyan-500 text-slate-950 border-cyan-300 shadow-[0_0_16px_rgba(34,211,238,0.4)]'
+                        : 'bg-cyan-500/15 text-cyan-200 border-cyan-400/35 hover:bg-cyan-500/25'
+                    }`}
+                  >
+                    <span className="material-symbols-rounded text-[15px]">equalizer</span>
+                    <span>{showBrowseEqPanel ? 'EQパネルを隠す' : 'EQ / AIEQパネルを表示'}</span>
+                  </button>
                 </form>
               </div>
+
+              {/* Inline Equalizer (Rock, Pop, Jazz, Classical + Draggable Faders + JBL Charge 5 / Echo Studio / Quantum / ZEALOT AIEQ) */}
+              {showBrowseEqPanel && (
+                <MusicEqualizerPanel
+                  currentTrackGenre={currentTrack.genre}
+                  onStatusMessage={(msg) => setStatusBanner(msg)}
+                />
+              )}
 
               {/* 12-Genre Full-Length Server Music Category Bar */}
               <div className="space-y-2">

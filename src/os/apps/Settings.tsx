@@ -12,8 +12,14 @@ import {
   DesktopIconSize,
   DESKTOP_ICON_SIZE_PRESETS,
   ACCENT_COLOR_PRESETS,
+  ThemeMode,
   NebulaPreset,
 } from '../types';
+import {
+  DynamicWorldWallpaperConfig,
+  loadDynamicWorldConfig,
+  saveDynamicWorldConfig,
+} from '../DynamicWorldWallpaper';
 import { WALLPAPERS } from '../wallpapers';
 import { Icon } from '../Icon';
 import { requestAIChat } from '../aiClient';
@@ -758,9 +764,11 @@ export function SettingsApp() {
     selectedCustomId,
     setSelectedCustomId,
     theme,
-    setTheme,
+    themeMode,
+    setThemeMode,
     accentColor,
     setAccentColor,
+    resolvedAccentHex,
     language,
     setLanguage,
     setUiStyle,
@@ -820,6 +828,14 @@ export function SettingsApp() {
   } = useOS();
 
   const isLight = theme === 'light';
+  const [dynWorldCfg, setDynWorldCfg] = useState<DynamicWorldWallpaperConfig>(() => loadDynamicWorldConfig());
+  const updateDynWorld = (patch: Partial<DynamicWorldWallpaperConfig>) => {
+    setDynWorldCfg((prev) => {
+      const next = { ...prev, ...patch };
+      saveDynamicWorldConfig(next);
+      return next;
+    });
+  };
   const [activeCategory, setActiveCategory] = useState<NavCategory>('system');
   const [systemSubView, setSystemSubView] = useState<SystemSubView>('main');
   const [personalSubView, setPersonalSubView] = useState<PersonalizationSubView>('main');
@@ -1135,14 +1151,20 @@ export function SettingsApp() {
           </nav>
         </div>
 
-        {/* System Version Tag */}
+        {/* System Version Tag & u3 Release Notes Button */}
         <div
-          className={`px-2.5 pt-3 text-[11px] opacity-45 border-t flex items-center justify-between font-mono ${
+          className={`px-2.5 pt-3 text-[11px] border-t flex items-center justify-between font-mono ${
             isLight ? 'border-slate-200/90' : 'border-white/[0.07]'
           }`}
         >
-          <span>GlassiumOS 5 u2</span>
-          <span>GlasispectUI</span>
+          <span className="opacity-65 font-bold">GlassiumOS 5 u3</span>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('open-glassium-u3-notes'))}
+            className="px-2 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-300 text-[10px] font-bold transition cursor-pointer"
+          >
+            u3 新機能
+          </button>
         </div>
       </div>
 
@@ -1161,15 +1183,25 @@ export function SettingsApp() {
             >
               {systemSubView === 'main' ? (
                 <>
-                  <div className="mb-5">
-                    <h1 className="text-2xl font-bold tracking-tight">
-                      {isJa ? 'システム' : 'System'}
-                    </h1>
-                    <p className="text-xs opacity-50 mt-1">
-                      {isJa
-                        ? 'ディスプレイ、背景、サウンド、電源、マルチタスク環境を管理します'
-                        : 'Manage display, backgrounds, audio, power, and multitasking behavior'}
-                    </p>
+                  <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <h1 className="text-2xl font-bold tracking-tight">
+                        {isJa ? 'システム (GlassiumOS 5 u3)' : 'System (GlassiumOS 5 u3)'}
+                      </h1>
+                      <p className="text-xs opacity-50 mt-1">
+                        {isJa
+                          ? 'ディスプレイ、動的環境背景 (u3)、サウンド、電源、マルチタスク環境を管理します'
+                          : 'Manage display, dynamic world backgrounds (u3), audio, power, and multitasking behavior'}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => window.dispatchEvent(new CustomEvent('open-glassium-u3-notes'))}
+                      className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-fuchsia-500/25 hover:from-cyan-500/40 hover:to-fuchsia-500/40 border border-cyan-400/40 text-xs font-bold text-cyan-200 flex items-center gap-2 transition cursor-pointer shadow-md"
+                    >
+                      <Icon name="Sparkles" size={15} className="text-cyan-300" />
+                      <span>GlassiumOS 5 u3 新機能ショーケースを見る</span>
+                    </button>
                   </div>
 
                   <div className={`${cardSurfaceClass} divide-y ${dividerClass}`}>
@@ -1290,6 +1322,140 @@ export function SettingsApp() {
                 /* ---------------- DISPLAY & WALLPAPERS SUB-PAGE ---------------- */
                 <div className="space-y-6">
                   {renderBreadcrumbHeader('ディスプレイと背景', 'Display & Wallpapers', () => setSystemSubView('main'))}
+
+                  {/* 0. GlassiumOS 5 u3 Dynamic World Wallpaper Control Studio */}
+                  <div className={`${cardSurfaceClass} p-4 space-y-3 border border-cyan-400/30`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-[10px] font-extrabold text-cyan-300">
+                            u3 NEW
+                          </span>
+                          <h3 className="text-[13px] font-bold tracking-tight">
+                            動的環境デスクトップ背景 (時間・風速・風向・天候・季節・ハロウィン/クリスマス連動)
+                          </h3>
+                        </div>
+                        <p className="text-[11px] opacity-65 mt-0.5">
+                          時刻・風向き・風速・天気・四季・季節イベントに合わせて空や雲、桜・紅葉・雪・ハロウィン・クリスマスがリアルタイムに変化します
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playSound('click');
+                          setSelectedCustomId(null);
+                          setWallpaper('dynamic-world');
+                        }}
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                          wallpaper === 'dynamic-world' && !selectedCustomId
+                            ? 'bg-[var(--os-accent)] text-black shadow-md'
+                            : 'bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 border border-cyan-400/30'
+                        }`}
+                      >
+                        {wallpaper === 'dynamic-world' && !selectedCustomId ? '✓ 適用中 (Dynamic World)' : 'この動的背景を適用'}
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 text-xs">
+                      <div>
+                        <label className="block text-[10px] opacity-65 mb-1 font-semibold">季節 (Season)</label>
+                        <select
+                          value={dynWorldCfg.season}
+                          onChange={(e) => {
+                            setSelectedCustomId(null);
+                            setWallpaper('dynamic-world');
+                            updateDynWorld({ season: e.target.value as DynamicWorldWallpaperConfig['season'] });
+                          }}
+                          className={`w-full p-2 rounded-lg text-xs border outline-none ${
+                            isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-black/40 border-white/15 text-white'
+                          }`}
+                        >
+                          <option value="auto">自動 (現在の月)</option>
+                          <option value="spring">春 (桜吹雪)</option>
+                          <option value="summer">夏 (入道雲・蛍)</option>
+                          <option value="autumn">秋 (紅葉・落ち葉)</option>
+                          <option value="winter">冬 (結晶雪)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] opacity-65 mb-1 font-semibold">イベント (Event)</label>
+                        <select
+                          value={dynWorldCfg.event}
+                          onChange={(e) => {
+                            setSelectedCustomId(null);
+                            setWallpaper('dynamic-world');
+                            updateDynWorld({ event: e.target.value as DynamicWorldWallpaperConfig['event'] });
+                          }}
+                          className={`w-full p-2 rounded-lg text-xs border outline-none ${
+                            isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-black/40 border-white/15 text-white'
+                          }`}
+                        >
+                          <option value="auto">日付自動判定</option>
+                          <option value="none">通常 (イベントなし)</option>
+                          <option value="halloween">🎃 ハロウィン</option>
+                          <option value="christmas">🎄 クリスマス</option>
+                          <option value="newyear">🎍 お正月・初日の出</option>
+                          <option value="tanabata">🎋 七夕・天の川</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] opacity-65 mb-1 font-semibold">
+                          風速 ({dynWorldCfg.windSpeedMs.toFixed(1)} m/s) / 風向 ({dynWorldCfg.windDirection})
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="range"
+                            min={0}
+                            max={30}
+                            step={0.5}
+                            value={dynWorldCfg.windSpeedMs}
+                            onChange={(e) => {
+                              setSelectedCustomId(null);
+                              setWallpaper('dynamic-world');
+                              updateDynWorld({ autoSyncLiveWeather: false, windSpeedMs: Number(e.target.value) });
+                            }}
+                            className="flex-1 accent-cyan-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateDynWorld({
+                                windDirection: dynWorldCfg.windDirection === 'W→E' ? 'E→W' : 'W→E',
+                              })
+                            }
+                            className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-[10px] font-mono font-bold"
+                          >
+                            {dynWorldCfg.windDirection}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] opacity-65 mb-1 font-semibold">
+                          時間帯 (Time of Day)
+                        </label>
+                        <select
+                          value={dynWorldCfg.timeOfDay}
+                          onChange={(e) => {
+                            setSelectedCustomId(null);
+                            setWallpaper('dynamic-world');
+                            updateDynWorld({ timeOfDay: e.target.value as DynamicWorldWallpaperConfig['timeOfDay'] });
+                          }}
+                          className={`w-full p-2 rounded-lg text-xs border outline-none ${
+                            isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-black/40 border-white/15 text-white'
+                          }`}
+                        >
+                          <option value="auto">自動 (現在時刻連動)</option>
+                          <option value="dawn">🌅 夜明け・朝焼け</option>
+                          <option value="day">☀️ 昼 (青空)</option>
+                          <option value="dusk">🌇 夕暮れ (サンセット)</option>
+                          <option value="night">🌙 夜・星空</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* 1. Built-In Wallpapers with Guaranteed Inline CSS Previews */}
                   <div>
@@ -2330,47 +2496,90 @@ export function SettingsApp() {
                   </div>
 
                   <div className={`${cardSurfaceClass} divide-y ${dividerClass}`}>
-                    <div className="py-4 px-4 flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/25 to-slate-500/10 border border-indigo-400/30 text-indigo-300 flex items-center justify-center shrink-0">
-                          <Icon name="Moon" size={19} />
-                        </div>
-                        <div>
-                          <div className="text-[13px] font-bold tracking-tight">
-                            {isJa ? '外観モード' : 'Appearance Mode'}
+                    <div className="py-4 px-4 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500/25 to-slate-500/10 border border-indigo-400/30 text-indigo-300 flex items-center justify-center shrink-0">
+                            <Icon name="Moon" size={19} />
                           </div>
-                          <div className="text-[11px] opacity-50 mt-0.5">
-                            {isJa ? 'ダークモードとライトモードを切り替えます' : 'Switch between dark and light system surfaces'}
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[13px] font-bold tracking-tight">
+                                {isJa ? 'ライト / ダークモード (外観モード)' : 'Appearance Mode'}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full bg-white/10 text-[10px] font-mono opacity-80">
+                                現在: {theme === 'dark' ? 'ダーク' : 'ライト'}
+                              </span>
+                            </div>
+                            <div className="text-[11px] opacity-50 mt-0.5">
+                              {isJa
+                                ? 'ダーク、ライト、OSに合わせる、日没・日の出に合わせるから選択できます'
+                                : 'Choose Dark, Light, Sync with OS, or Sunset/Sunrise automatic switching'}
+                            </div>
                           </div>
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => setTheme('dark')}
-                          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
-                            theme === 'dark'
-                              ? 'bg-[var(--os-accent)] text-black font-bold'
-                              : isLight
-                              ? 'bg-slate-200 text-slate-800'
-                              : 'bg-white/10 text-white'
-                          }`}
-                        >
-                          {isJa ? 'ダーク' : 'Dark'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setTheme('light')}
-                          className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition ${
-                            theme === 'light'
-                              ? 'bg-[var(--os-accent)] text-black font-bold'
-                              : isLight
-                              ? 'bg-slate-200 text-slate-800'
-                              : 'bg-white/10 text-white'
-                          }`}
-                        >
-                          {isJa ? 'ライト' : 'Light'}
-                        </button>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                        {(
+                          [
+                            {
+                              id: 'dark' as ThemeMode,
+                              labelJa: 'ダーク',
+                              labelEn: 'Dark',
+                              subJa: '常時ダークモード',
+                              icon: 'Moon',
+                            },
+                            {
+                              id: 'light' as ThemeMode,
+                              labelJa: 'ライト',
+                              labelEn: 'Light',
+                              subJa: '常時ライトモード',
+                              icon: 'Sun',
+                            },
+                            {
+                              id: 'system' as ThemeMode,
+                              labelJa: 'OSに合わせる',
+                              labelEn: 'Match OS',
+                              subJa: 'デバイスの外観設定と連動',
+                              icon: 'Monitor',
+                            },
+                            {
+                              id: 'sunset-sunrise' as ThemeMode,
+                              labelJa: '日没・日の出に合わせる',
+                              labelEn: 'Sunset / Sunrise',
+                              subJa: '日の出〜日没はライト / 夜はダーク',
+                              icon: 'CloudSun',
+                            },
+                          ] as const
+                        ).map((opt) => {
+                          const active = themeMode === opt.id;
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => {
+                                playSound('click');
+                                setThemeMode(opt.id);
+                              }}
+                              className={`p-2.5 rounded-xl text-left transition flex flex-col justify-between border cursor-pointer ${
+                                active
+                                  ? 'bg-[var(--os-accent)] text-black font-bold border-transparent shadow-md'
+                                  : isLight
+                                  ? 'bg-slate-200/75 hover:bg-slate-300/75 text-slate-800 border-slate-300/80'
+                                  : 'bg-white/5 hover:bg-white/10 text-white border-white/10'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-1.5">
+                                <span className="text-xs font-bold">{isJa ? opt.labelJa : opt.labelEn}</span>
+                                <Icon name={opt.icon} size={14} />
+                              </div>
+                              <span className={`text-[10px] mt-1 leading-tight ${active ? 'opacity-85' : 'opacity-55'}`}>
+                                {opt.subJa}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -2492,17 +2701,23 @@ export function SettingsApp() {
                         </div>
                         <div>
                           <div className="text-[13px] font-bold tracking-tight group-hover:text-[var(--os-accent)] transition-colors">
-                            {isJa ? 'アクセントカラー' : 'Accent Color'}
+                            {isJa ? 'アクセントカラー (動的・プリセット)' : 'Accent Color (Dynamic & Presets)'}
                           </div>
                           <div className="text-[11px] opacity-50 mt-0.5">
                             {isJa
-                              ? 'システム全体の強調色とアクティブインジケーターの色'
-                              : 'Primary highlight color across buttons, badges, and active states'}
+                              ? '背景の色やアップロードした画像にあわせてアクセントカラー、ダーク、ライトかで変動する「動的」モード対応'
+                              : 'Supports Dynamic mode that adapts to background color, uploaded image, and dark/light mode'}
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2.5 shrink-0">
-                        <span className="text-[11px] font-medium opacity-45 capitalize">{accentColor}</span>
+                        <span
+                          className="w-3.5 h-3.5 rounded-full border border-white/30 shadow-xs"
+                          style={{ backgroundColor: resolvedAccentHex }}
+                        />
+                        <span className="text-[11px] font-medium opacity-65">
+                          {accentColor === 'dynamic' ? '動的 (Dynamic)' : accentColor}
+                        </span>
                         <Icon
                           name="ChevronRight"
                           size={15}
@@ -2617,6 +2832,8 @@ export function SettingsApp() {
                   <div className={`${cardSurfaceClass} divide-y ${dividerClass}`}>
                     {ACCENT_COLOR_PRESETS.map((p) => {
                       const selected = accentColor === p.id;
+                      const isDynamic = p.id === 'dynamic';
+                      const swatchColor = isDynamic ? resolvedAccentHex : p.hex;
                       return (
                         <button
                           key={p.id}
@@ -2625,17 +2842,45 @@ export function SettingsApp() {
                             playSound('click');
                             setAccentColor(p.id);
                           }}
-                          className={`w-full py-3.5 px-4 flex items-center justify-between transition ${
+                          className={`w-full py-4 px-4 flex items-center justify-between transition text-left ${
                             selected ? 'bg-[var(--os-accent)]/10 font-bold' : rowHoverClass
                           }`}
                         >
-                          <div className="flex items-center gap-3">
-                            <span className="w-5 h-5 rounded-full shrink-0 shadow-sm" style={{ backgroundColor: p.hex }} />
-                            <span className={`text-[13px] font-bold tracking-tight ${selected ? 'text-[var(--os-accent)]' : ''}`}>
-                              {p.labelJa}
+                          <div className="flex items-center gap-3.5 min-w-0 pr-3">
+                            <span
+                              className="w-6 h-6 rounded-full shrink-0 shadow-sm border border-white/25 flex items-center justify-center"
+                              style={{
+                                background: isDynamic
+                                  ? `conic-gradient(from 0deg, #38bdf8, #a855f7, #f43f5e, #f59e0b, #10b981, #38bdf8)`
+                                  : swatchColor,
+                              }}
+                            >
+                              {isDynamic && (
+                                <span
+                                  className="w-3 h-3 rounded-full border border-white/80"
+                                  style={{ backgroundColor: resolvedAccentHex }}
+                                />
+                              )}
                             </span>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-[13px] font-bold tracking-tight ${selected ? 'text-[var(--os-accent)]' : ''}`}>
+                                  {isDynamic ? '動的 (Dynamic)' : p.labelJa}
+                                </span>
+                                {isDynamic && (
+                                  <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-mono">
+                                    現在色: {resolvedAccentHex} ({theme === 'dark' ? 'ダーク最適化' : 'ライト最適化'})
+                                  </span>
+                                )}
+                              </div>
+                              {p.descJa && (
+                                <div className="text-[11px] opacity-60 mt-0.5 leading-relaxed">
+                                  {p.descJa}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          {selected && <Icon name="CheckCircle2" size={18} className="text-[var(--os-accent)]" />}
+                          {selected && <Icon name="CheckCircle2" size={18} className="text-[var(--os-accent)] shrink-0" />}
                         </button>
                       );
                     })}

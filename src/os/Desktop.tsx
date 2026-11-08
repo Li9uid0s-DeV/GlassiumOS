@@ -8,6 +8,7 @@ import { WALLPAPERS, WallpaperOrbs } from './wallpapers';
 import { LiquidShader } from './LiquidShader';
 import { SpaceWallpaper } from './SpaceWallpaper';
 import { Live2DWallpaper } from './Live2DWallpaper';
+import { DynamicWorldWallpaper, loadDynamicEnvironmentConfig, saveDynamicEnvironmentConfig } from './DynamicWorldWallpaper';
 import { LockScreen } from './LockScreen';
 import { TerminalApp } from './apps/Terminal';
 import { NotepadApp } from './apps/Notepad';
@@ -164,8 +165,10 @@ export function Desktop() {
     windows,
     mountedWindows,
     wallpaper,
+    setWallpaper,
     customWallpapers,
     selectedCustomId,
+    setSelectedCustomId,
     theme,
     accentColor,
     uiStyle,
@@ -240,9 +243,15 @@ export function Desktop() {
     return localStorage.getItem('glassium_show_desktop_widget') === 'true';
   });
   const [showWhatsNewModal, setShowWhatsNewModal] = useState<boolean>(() => {
-    const dismissed = localStorage.getItem('glassium_v5.0_u2_whats_new_dismissed');
+    const dismissed = localStorage.getItem('glassium_v5.0_u3_whats_new_dismissed');
     return !dismissed;
   });
+
+  useEffect(() => {
+    const handleOpenU3Notes = () => setShowWhatsNewModal(true);
+    window.addEventListener('open-glassium-u3-notes', handleOpenU3Notes);
+    return () => window.removeEventListener('open-glassium-u3-notes', handleOpenU3Notes);
+  }, []);
 
   // Global OS Music State & Floating Bottom Liquid Glass Dock State
   const [musicState, setMusicState] = useState<{
@@ -325,6 +334,7 @@ export function Desktop() {
   const dateStr = time.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 
   const customWallpaper = customWallpapers.find((c) => c.id === selectedCustomId);
+  const useDynamicWorld = wallpaper === 'dynamic-world' && !liteMode;
   const useLive2D = (wallpaper === 'live2d' || wallpaper === 'golden-sparkle') && !liteMode;
   const useShader = wallpaper === 'shader' && !liteMode;
   const useSpace = wallpaper === 'space' && !liteMode;
@@ -529,6 +539,33 @@ export function Desktop() {
         />
       )}
 
+      {/* u3 Dynamic World Live Wallpaper (Time, Wind Speed, Wind Direction, Weather, Season, Halloween & Christmas Events) */}
+      {useDynamicWorld && !customWallpaper && <DynamicWorldWallpaper showControllerHud={true} />}
+
+      {/* Quick Switcher Pill when not on dynamic-world */}
+      {!useDynamicWorld && (
+        <div className="fixed top-9 right-4 z-20 pointer-events-auto flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedCustomId(null);
+              setWallpaper('dynamic-world');
+            }}
+            className="px-3 py-1.5 rounded-xl bg-black/55 hover:bg-black/75 backdrop-blur-xl border border-cyan-400/35 text-[11px] text-cyan-200 font-semibold flex items-center gap-1.5 shadow-xl transition cursor-pointer"
+          >
+            <span className="material-symbols-rounded text-sm text-cyan-300">public</span>
+            <span>u3 動的環境壁紙 (時間・風・天候・季節・イベント) に切替</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowWhatsNewModal(true)}
+            className="px-2.5 py-1.5 rounded-xl bg-black/55 hover:bg-black/75 backdrop-blur-xl border border-white/15 text-[11px] text-white/85 font-semibold transition cursor-pointer"
+          >
+            u3 新機能
+          </button>
+        </div>
+      )}
+
       {/* 2D Interactive Aurora Silk & PS5 Golden Sparkle Live Wallpaper */}
       {useLive2D && !customWallpaper && (
         <Live2DWallpaper
@@ -544,7 +581,7 @@ export function Desktop() {
       {useShader && !customWallpaper && <LiquidShader lite={false} opacity={shaderOpacity} />}
 
       {/* Floating orbs */}
-      {!liteMode && !useLive2D && !useShader && !useSpace && !customWallpaper && <WallpaperOrbs />}
+      {!liteMode && !useDynamicWorld && !useLive2D && !useShader && !useSpace && !customWallpaper && <WallpaperOrbs />}
 
       {/* ========================================================
           1. MAC DESKTOP SHELL: Top Menu Bar + Magnified Bottom Dock
@@ -557,7 +594,7 @@ export function Desktop() {
               <div className="cursor-pointer hover:opacity-80" onClick={() => openApp('settings')}>
                 <AppLogo size={16} />
               </div>
-              <span className="font-bold tracking-tight">GlassiumOS 5 u2</span>
+              <span className="font-bold tracking-tight">GlassiumOS 5 u3</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('explorer')}>Files</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('settings')}>Settings</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => setShellMode('windows')}>View</span>
@@ -1877,7 +1914,7 @@ export function Desktop() {
         )}
       </AnimatePresence>
 
-      {/* What's New Release Notes Modal (GlassiumOS 5 u2) */}
+      {/* What's New Release Notes & Interactive Feature Showcase Modal (GlassiumOS 5 u3) */}
       <AnimatePresence>
         {showWhatsNewModal && (
           <motion.div
@@ -1886,7 +1923,7 @@ export function Desktop() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-6"
             onClick={() => {
-              localStorage.setItem('glassium_v5.0_u2_whats_new_dismissed', 'true');
+              localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
               setShowWhatsNewModal(false);
             }}
           >
@@ -1896,27 +1933,29 @@ export function Desktop() {
               exit={{ scale: 0.96, y: 12 }}
               transition={{ duration: 0.18 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-2xl max-h-[86vh] liquid-glass-window rounded-2xl border border-white/20 p-6 sm:p-8 shadow-2xl flex flex-col gap-5 overflow-hidden relative text-white"
+              className="w-full max-w-3xl max-h-[88vh] liquid-glass-window rounded-2xl border border-white/20 p-6 sm:p-8 shadow-2xl flex flex-col gap-5 overflow-hidden relative text-white"
             >
               {/* Header */}
               <div className="flex items-center justify-between border-b border-white/10 pb-4">
                 <div className="flex items-center gap-3">
-                  <AppLogo size={28} />
+                  <AppLogo size={30} />
                   <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="text-lg font-bold tracking-tight">GlassiumOS 5 u2 更新内容</h2>
-                      <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 border border-cyan-400/30 text-cyan-300 text-[10px] font-mono font-bold">
-                        UPDATE 2 (u1 以降の新機能)
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="text-lg sm:text-xl font-bold tracking-tight">
+                        GlassiumOS 5 u3 大型アップデート新機能ガイド
+                      </h2>
+                      <span className="px-2.5 py-0.5 rounded-md bg-gradient-to-r from-cyan-500/30 to-fuchsia-500/30 border border-cyan-400/40 text-cyan-200 text-[10px] font-mono font-bold">
+                        UPDATE 3 (u2 以降の追加機能すべて収録)
                       </span>
                     </div>
-                    <p className="text-xs text-white/50 font-mono mt-0.5">
-                      GlassiumOS 5 u2 · GlasispectUI Release Notes
+                    <p className="text-xs text-white/60 font-mono mt-0.5">
+                      GlassiumOS 5.0 u3 · TypeScript UI × Rust/WebAssembly Hybrid Engine
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => {
-                    localStorage.setItem('glassium_v5.0_u2_whats_new_dismissed', 'true');
+                    localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
                     setShowWhatsNewModal(false);
                   }}
                   className="p-1.5 text-white/60 hover:text-white transition cursor-pointer"
@@ -1925,74 +1964,167 @@ export function Desktop() {
                 </button>
               </div>
 
-              {/* Release Notes Content List */}
-              <div className="flex-1 overflow-y-auto pr-1 text-xs divide-y divide-white/10">
-                <div className="py-3.5 first:pt-0 flex flex-col gap-1">
-                  <div className="font-semibold text-cyan-300 flex items-center gap-2">
-                    <span>1. Music フル尺高速再生エンジン（30秒制限の完全解消）＆ 厳密一致の同期歌詞</span>
+              {/* Release Notes Content List with Interactive 'Try Now' Launchers */}
+              <div className="flex-1 overflow-y-auto pr-1 text-xs divide-y divide-white/10 space-y-1">
+                <div className="py-3.5 first:pt-0 flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-bold text-cyan-300 text-sm">
+                      1. 音楽 10バンド・イコライザー（Rock / Pop / Jazz / Classical ＋ ドラッグ縦フェーダー）＆ AI Speaker Auto-EQ
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
+                        setShowWhatsNewModal(false);
+                        openApp('synth');
+                      }}
+                      className="px-3 py-1 rounded-lg bg-cyan-500/25 hover:bg-cyan-500/40 border border-cyan-400/40 text-cyan-200 text-[11px] font-bold transition cursor-pointer"
+                    >
+                      Music EQを開く →
+                    </button>
                   </div>
-                  <p className="text-white/70 leading-relaxed">
-                    VIP試聴クリップ（30秒）を自動検知して除外し、320kbpsフル尺ストリームへ即座に接続するマルチソース解決エンジンを搭載。さらにLRCLIBタイムスタンプ同期歌詞に曲名・アーティスト名の厳密一致検証を導入し、別曲の歌詞が表示される問題を解消しました。
+                  <p className="text-white/75 leading-relaxed">
+                    「Rock」「Pop」「Jazz」「Classical」「Flat」のジャンル別プリセットに加え、ドラッグ可能な10帯域縦フェーダー（32Hz〜16kHz）と直接ドラッグ描画できる周波数特性グラフを実装。さらにAIEQには <strong>JBL Charge 5 (Bluetooth &amp; Wi-Fi)</strong>、<strong>Amazon Echo Studio (Gen 1)</strong>、<strong>JBL Quantum 910 Wireless シリーズ</strong>、<strong>ZEALOT ZE-41</strong> などの専用音響補正プロファイルを追加しました。
                   </p>
                 </div>
 
-                <div className="py-3.5 flex flex-col gap-1">
-                  <div className="font-semibold text-cyan-300 flex items-center gap-2">
-                    <span>2. 専用アーティストページ刷新（人気曲・アルバム収録曲展開・シングル &amp; EP・公式MV）</span>
+                <div className="py-3.5 flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-bold text-amber-300 text-sm">
+                      2. 時間・風速・風向き・天候・季節・イベント（ハロウィン / クリスマス等）動的デスクトップ背景
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCustomId(null);
+                          setWallpaper('dynamic-world');
+                          const cur = loadDynamicEnvironmentConfig();
+                          saveDynamicEnvironmentConfig({ ...cur, event: 'halloween' });
+                          localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
+                          setShowWhatsNewModal(false);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-orange-500/25 hover:bg-orange-500/40 border border-orange-400/40 text-orange-200 text-[10px] font-bold transition cursor-pointer"
+                      >
+                        🎃 ハロウィン背景を試す
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedCustomId(null);
+                          setWallpaper('dynamic-world');
+                          const cur = loadDynamicEnvironmentConfig();
+                          saveDynamicEnvironmentConfig({ ...cur, event: 'christmas' });
+                          localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
+                          setShowWhatsNewModal(false);
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-500/25 hover:bg-emerald-500/40 border border-emerald-400/40 text-emerald-200 text-[10px] font-bold transition cursor-pointer"
+                      >
+                        🎄 クリスマス背景を試す
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-white/70 leading-relaxed">
-                    再生中の歌手名をクリックするとその歌手の専用アーティストページへ直行。Monochrome / Apple Musicからアーティスト画像・人気曲・アルバム（クリックで収録曲一覧を展開＆直接再生）・シングル＆EP・公式MVを取得し、厳格な歌手名フィルタリングにより別の歌手の曲が混入しないよう完全分離しました。
+                  <p className="text-white/75 leading-relaxed">
+                    時間帯（朝焼け・昼・夕暮れ・夜）、風の強さ（m/s）と風向き（8方位）、天候（快晴・雨・雷雨・雪・オーロラ）、季節（春の桜吹雪・夏の新緑と蛍・秋の紅葉・冬の銀世界）、さらにハロウィン（赤い満月・コウモリ・ジャックオーランタン）やクリスマス（サンタとトナカイのソリ・イルミネーションツリー・降雪）に応じてリアルタイムに変化する新背景「Dynamic World u3」を搭載しました。画面右上の環境ピルからいつでもカスタマイズ可能です。
                   </p>
                 </div>
 
-                <div className="py-3.5 flex flex-col gap-1">
-                  <div className="font-semibold text-cyan-300 flex items-center gap-2">
-                    <span>3. Dolby Atmos 3D 空間オーディオ ＆ Music 詳細設定タブ</span>
+                <div className="py-3.5 flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-bold text-orange-300 text-sm">
+                      3. TypeScript (フロントエンドUI) × Rust / WebAssembly (重い演算ロジック) ハイブリッドエンジン
+                    </span>
+                    <span className="px-2 py-0.5 rounded bg-orange-500/20 border border-orange-400/40 text-[10px] font-mono text-orange-200">
+                      🦀 rust-core (wasm32) Active
+                    </span>
                   </div>
-                  <p className="text-white/70 leading-relaxed">
-                    Musicアプリ内に「設定」タブを追加し、ストリーミング音質（Hi-Res Lossless / 320kbps / 192kbps）、取得サイト優先度、ダウンロード品質（FLAC / MP3 320kbps）、MV画質（4K UHD / 1080p / 720p）を自在に変更可能に。3Dサラウンドリバーブ＆ダイナミックEQによる「Dolby Atmos」空間オーディオにも対応しました。
+                  <p className="text-white/75 leading-relaxed">
+                    UI層はTypeScript/Reactで構築し、高負荷な数値処理（10バンドIIRパラメトリックEQの周波数伝達曲線計算、3D気象パーティクルの重力・風速・境界ラップ物理ステップ、2Dハッシュノイズによる3D山岳地形ハイトマップ生成、カラオケの歌い出しリードイン計算）を Rust (`#![no_std]` WebAssembly) 側でネイティブ実行するハイブリッド構成に進化しました。
                   </p>
                 </div>
 
-                <div className="py-3.5 flex flex-col gap-1">
-                  <div className="font-semibold text-cyan-300 flex items-center gap-2">
-                    <span>4. Liquid Glass 再生ピル（自由ドラッグ移動・ミニピル最小化）＆ 最大化連動グラデーション</span>
+                <div className="py-3.5 flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-bold text-sky-300 text-sm">
+                      4. 天気アプリ：マルチサイト多数決コンセンサス予測 ＆ Three.js 3D立体気象ジオラマ背景
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
+                        setShowWhatsNewModal(false);
+                        openApp('weather');
+                      }}
+                      className="px-3 py-1 rounded-lg bg-sky-500/25 hover:bg-sky-500/40 border border-sky-400/40 text-sky-200 text-[11px] font-bold transition cursor-pointer"
+                    >
+                      3D天気アプリを開く →
+                    </button>
                   </div>
-                  <p className="text-white/70 leading-relaxed">
-                    画面下部のLiquid Glass音楽ドック（ピル）を画面内の好きな位置へドラッグ移動したり、コンパクトなミニピルへ最小化できるようになりました。また上部の「いま聴く」バーを廃止し、背景の動的グラデーションはアートワーク最大化時（歌詞フル画面／最大化表示）のみ発色するよう改善しました。
+                  <p className="text-white/75 leading-relaxed">
+                    複数の気象データソースから最も多く予想された天気を算出する多数決コンセンサスエンジンと、現在の天気に自動連動する Three.js 3D立体ジオラマ空間（3D山岳地形・多層3Dクラウド・3D雨雪パーティクル・3D稲妻発光・気象観測スパイア）を実装しました。
                   </p>
                 </div>
 
-                <div className="py-3.5 flex flex-col gap-1">
-                  <div className="font-bold text-cyan-300 flex items-center gap-2">
-                    <span>5. GlasiusCard デスクトップウィジェット・48時間降水マップ・Entertainment 軽量化</span>
+                <div className="py-3.5 flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-bold text-rose-300 text-sm">
+                      5. リアルタイム・カラオケモード（歌い出しカウントダウン・発音ルビ・カラオケ色変化・歌詞日本語通訳）
+                    </span>
                   </div>
-                  <p className="text-white/55 leading-relaxed">
-                    デスクトップ上でドラッグ移動できる「GlasiusCard」ウィジェット（時計・天気・予定統合）、Calendarアプリの48時間降水予報アニメーションマップ＆天気連動アドバイス、Jina Cloud Readerの完全削除およびEntertainmentアプリの高速・軽量化を実装しました。
+                  <p className="text-white/75 leading-relaxed">
+                    歌詞の歌い出しタイミング（3・2・1リードイン）と発音ガイド（かな／ローマ字ルビ）を自動検知し、進行に合わせて色が変化するカラオケハイライト表示と日本語通訳（歌詞通訳）レイヤーをMusicアプリに追加しました。
                   </p>
                 </div>
 
-                <div className="py-3.5 flex flex-col gap-1">
-                  <div className="font-bold text-amber-300 flex items-center gap-2">
-                    <span>6. 新背景「Golden Sparkle (PS5スタイル)」＆ GlassiumOS 4.7 マウス連動オーロラ・純正級UI刷新</span>
+                <div className="py-3.5 flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-bold text-emerald-300 text-sm">
+                      6. ウィンドウ状態の完全保存・再開 ＆ Entertainment 全映画検索・Browser 3大スキン・AI検索バー
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
+                          setShowWhatsNewModal(false);
+                          openApp('entertainment');
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold transition cursor-pointer"
+                      >
+                        映画・アニメ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
+                          setShowWhatsNewModal(false);
+                          openApp('ai');
+                        }}
+                        className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold transition cursor-pointer"
+                      >
+                        AIアシスタント
+                      </button>
+                    </div>
                   </div>
-                  <p className="text-white/55 leading-relaxed">
-                    PS5のホーム画面に着想を得た黄金の光の波とダイヤモンド粒子が煌めく新ライブ背景「Golden Sparkle」を追加。さらに背景オーロラの形状をGlassiumOS 4.7のS字シルクカーテンへ復元し、マウス移動に滑らかに追従するよう進化しました。UI全体の文字コントラスト強化、機械的な日英併記の排除、専用グラデーションアイコンバッジ、MusicドックのMaterial Symbolsアイコン統一を実施しています。
+                  <p className="text-white/75 leading-relaxed">
+                    ウィンドウを閉じても進行内容や画面状態を保持して再開できるセッション保存機構、映画・アニメのマルチサーバー検索＆再生、Browserの Opera GX / Chrome / Firefox UI切替＆YouTubeプロキシ再生、ロック画面のBing日替わり自然壁紙＆上スライドぼかし解除、Quick Controlsの音楽プレイヤー統合、時計の25分超長時間タイマー、AIアシスタントの過去チャット検索バーを実装しました。
                   </p>
                 </div>
               </div>
 
               {/* Modal Footer */}
               <div className="pt-3 border-t border-white/10 flex items-center justify-between">
-                <span className="text-[11px] text-white/40 font-mono">GlassiumOS 5 u2 · GlasispectUI</span>
+                <span className="text-[11px] text-white/50 font-mono">
+                  GlassiumOS 5.0 u3 · GlasispectUI Hybrid Edition
+                </span>
                 <button
                   onClick={() => {
-                    localStorage.setItem('glassium_v5.0_u2_whats_new_dismissed', 'true');
+                    localStorage.setItem('glassium_v5.0_u3_whats_new_dismissed', 'true');
                     setShowWhatsNewModal(false);
                   }}
-                  className="px-5 py-1.5 rounded-lg bg-cyan-400 text-slate-950 font-bold text-xs hover:bg-cyan-300 transition cursor-pointer"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-cyan-400 to-sky-400 text-slate-950 font-black text-xs hover:brightness-110 transition cursor-pointer shadow-lg"
                 >
-                  GlassiumOS 5 u2 をはじめる
+                  GlassiumOS 5 u3 をはじめる
                 </button>
               </div>
             </motion.div>

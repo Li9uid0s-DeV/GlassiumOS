@@ -37,10 +37,38 @@ export interface EqPresetDefinition {
 export const BUILTIN_EQ_PRESETS: EqPresetDefinition[] = [
   {
     id: 'flat',
-    name: 'Flat (原音モニター)',
-    desc: '色付けなしのフラットなスタジオ原音特性',
+    name: 'Flat',
+    desc: '色付けなしのフラットなスタジオ原音モニター特性 (0dB)',
     preampDb: 0,
     bands: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  },
+  {
+    id: 'rock',
+    name: 'Rock',
+    desc: 'バスドラムの重厚なアタックとエレキギターのエッジ感・シンバルの抜けを強調',
+    preampDb: -1.5,
+    bands: [5.0, 4.2, 3.0, -1.5, -0.5, 2.5, 4.0, 4.5, 3.8, 3.2],
+  },
+  {
+    id: 'pop',
+    name: 'Pop',
+    desc: 'ボーカルの艶やかな存在感とタイトなリズム隊を前面に引き出すポップス最適設定',
+    preampDb: -1.0,
+    bands: [-1.0, 2.0, 3.8, 4.2, 2.5, 0.5, 1.8, 3.2, 2.8, 2.2],
+  },
+  {
+    id: 'jazz',
+    name: 'Jazz',
+    desc: 'ウッドベースの豊かな胴鳴りとサックス・ピアノの温かいアコースティック倍音',
+    preampDb: -1.0,
+    bands: [3.8, 3.2, 1.8, 2.2, -1.2, -1.2, 0.5, 1.8, 3.0, 3.5],
+  },
+  {
+    id: 'classical',
+    name: 'Classical',
+    desc: 'オーケストラの広大なダイナミックレンジと弦楽器・ホール残響の繊細な空気感',
+    preampDb: -0.5,
+    bands: [4.2, 3.5, 2.5, 0.5, -1.0, -1.0, 0.0, 2.2, 3.5, 4.2],
   },
   {
     id: 'harman',
@@ -48,13 +76,6 @@ export const BUILTIN_EQ_PRESETS: EqPresetDefinition[] = [
     desc: '人間の聴覚特性に最も心地よいサブベース＋高域の伸び',
     preampDb: -1.5,
     bands: [5.5, 4.5, 2.0, -0.5, -1.0, 0.5, 2.5, 3.8, 3.0, 2.5],
-  },
-  {
-    id: 'jpop-vocal',
-    name: 'J-Pop / Vocal Clear',
-    desc: 'ボーカルの息遣いとピアノ・ストリングスを前面に引き出す設定',
-    preampDb: -1.0,
-    bands: [2.0, 2.5, 1.0, -1.5, 1.5, 3.8, 4.2, 3.0, 2.5, 2.0],
   },
   {
     id: 'bass-boost',
@@ -69,20 +90,6 @@ export const BUILTIN_EQ_PRESETS: EqPresetDefinition[] = [
     desc: 'ドンシャリ傾向のクラブサウンドと煌びやかなシンセ高域',
     preampDb: -2.0,
     bands: [6.5, 5.5, 2.5, -1.5, -2.0, 0, 2.5, 4.5, 5.5, 5.0],
-  },
-  {
-    id: 'rock-live',
-    name: 'Rock / Live Band',
-    desc: 'エレキギターのエッジ感とバスドラム・スネアの迫力を強調',
-    preampDb: -1.5,
-    bands: [4.5, 3.8, 2.5, -1.0, -0.5, 2.0, 3.8, 4.2, 3.5, 3.0],
-  },
-  {
-    id: 'acoustic-jazz',
-    name: 'Acoustic / Warm Jazz',
-    desc: 'ウッドベースの温かみとアコースティック楽器の自然な倍音',
-    preampDb: -0.5,
-    bands: [3.0, 3.5, 2.0, 1.0, 0.5, 1.0, 1.5, 2.0, 2.8, 2.2],
   },
   {
     id: 'small-speaker-rescue',

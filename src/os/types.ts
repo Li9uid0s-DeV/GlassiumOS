@@ -143,22 +143,34 @@ export const DESKTOP_ICON_SIZE_PRESETS: Record<
   },
 };
 
-export type AccentColor = 'cyan' | 'blue' | 'violet' | 'emerald' | 'rose' | 'amber';
+export type ThemeMode = 'dark' | 'light' | 'system' | 'sunset-sunrise';
+
+export type AccentColor = 'dynamic' | 'cyan' | 'blue' | 'violet' | 'emerald' | 'rose' | 'amber';
 
 export const ACCENT_COLOR_PRESETS: {
   id: AccentColor;
   label: string;
   labelJa: string;
+  descJa?: string;
   hex: string;
   rgb: string;
 }[] = [
-  { id: 'cyan', label: 'Cyan', labelJa: 'シアン', hex: '#06b6d4', rgb: '6, 182, 212' },
-  { id: 'blue', label: 'Blue', labelJa: 'ブルー', hex: '#3b82f6', rgb: '59, 130, 246' },
-  { id: 'violet', label: 'Violet', labelJa: 'バイオレット', hex: '#8b5cf6', rgb: '139, 92, 246' },
-  { id: 'emerald', label: 'Emerald', labelJa: 'エメラルド', hex: '#10b981', rgb: '16, 185, 129' },
-  { id: 'rose', label: 'Rose', labelJa: 'ローズ', hex: '#f43f5e', rgb: '244, 63, 94' },
-  { id: 'amber', label: 'Amber', labelJa: 'アンバー', hex: '#f59e0b', rgb: '245, 158, 11' },
+  {
+    id: 'dynamic',
+    label: 'Dynamic',
+    labelJa: '動的 (背景・画像・ダーク/ライト連動)',
+    descJa: '背景の色やアップロードした画像にあわせてアクセントカラー、ダーク、ライトかで変動する',
+    hex: '#38bdf8',
+    rgb: '56, 189, 248',
+  },
+  { id: 'cyan', label: 'Cyan', labelJa: 'シアン', descJa: '透明感ある標準ネオンシアン', hex: '#06b6d4', rgb: '6, 182, 212' },
+  { id: 'blue', label: 'Blue', labelJa: 'ブルー', descJa: '鮮やかで知的なコバルトブルー', hex: '#3b82f6', rgb: '59, 130, 246' },
+  { id: 'violet', label: 'Violet', labelJa: 'バイオレット', descJa: '深みのあるアメジストバイオレット', hex: '#8b5cf6', rgb: '139, 92, 246' },
+  { id: 'emerald', label: 'Emerald', labelJa: 'エメラルド', descJa: '自然で鮮やかなエメラルドグリーン', hex: '#10b981', rgb: '16, 185, 129' },
+  { id: 'rose', label: 'Rose', labelJa: 'ローズ', descJa: '華やかなクリムゾンローズ', hex: '#f43f5e', rgb: '244, 63, 94' },
+  { id: 'amber', label: 'Amber', labelJa: 'アンバー', descJa: '温かみのあるゴールデンアンバー', hex: '#f59e0b', rgb: '245, 158, 11' },
 ];
+
 
 export type OSLanguage = 'en' | 'ja';
 

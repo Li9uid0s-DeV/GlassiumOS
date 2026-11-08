@@ -4265,7 +4265,42 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     let speakerCategory = 'フルレンジ・オーディオシステム';
     let acousticAnalysis = `${speakerModel} のエンクロージャー共振とドライバー特性を計算し、低域の量感とボーカル帯域（1kHz〜4kHz）の明瞭度を両立するHarmanターゲット補正を適用しました。`;
 
-    if (/jbl|flip|charge|xtreme|go\s*\d|clip|anker|soundcore|bose\s*soundlink|ult\s*field|srs-|emberton|marshall/i.test(norm)) {
+    if (/charge\s*5\s*(wi-?fi|wifi)/i.test(norm)) {
+      speakerCategory = 'JBL Charge 5 Wi-Fi (Wi-Fi Lossless / 2ウェイ・デュアルパッシブラジエーター)';
+      bands = [5.8, 4.2, -1.2, -2.2, 0.4, 1.8, 3.0, 3.6, 4.2, 4.5];
+      preampDb = -2.0;
+      acousticAnalysis = `${speakerModel} のWi-Fiロスレス広帯域再生（20mmツイーター＋52×90mmレーストラックウーファー）に合わせ、125Hz〜250Hzのバスレフ膨張を-2.2dB整え、32Hzの超低域沈み込みと8kHz〜16kHzのハイレゾ空気感を最大化しました。`;
+    } else if (/charge\s*5/i.test(norm)) {
+      speakerCategory = 'JBL Charge 5 (2ウェイ・セパレート構成 ポータブルスピーカー)';
+      bands = [6.4, 4.6, -1.8, -2.8, 0.5, 2.0, 3.4, 3.8, 4.5, 4.0];
+      preampDb = -2.2;
+      acousticAnalysis = `${speakerModel} の独立20mmツイーター＋レーストラックウーファー構成を解析。125Hz〜250Hzのパッシブラジエーター箱鳴りを-2.8dB引き締め、32Hz〜64Hzの重低音パンチとボーカルの定位感を大幅に向上させました。`;
+    } else if (/echo\s*studio/i.test(norm)) {
+      speakerCategory = 'Amazon Echo Studio (Gen 1) (5ドライバー 3D Dolby Atmos スマートスピーカー)';
+      bands = [3.5, 1.8, -2.8, -3.2, -0.5, 1.8, 3.5, 4.2, 4.6, 4.0];
+      preampDb = -1.8;
+      acousticAnalysis = `${speakerModel} の下向き5.25インチウーファーによる壁面・卓上反射の中低域（125Hz〜250Hz）のブーミーな膨らみを-3.2dB精密カットし、3基の2インチミッドレンジと1インチツイーターの3D空間分離・ボーカル明瞭度を解放しました。`;
+    } else if (/quantum\s*(910|810|610|400|one|tws)|jbl\s*quantum/i.test(norm)) {
+      const is910 = /910/.test(norm);
+      const isTws = /tws/.test(norm);
+      speakerCategory = is910
+        ? 'JBL Quantum 910 Wireless (50mm Hi-Res ドライバー + QuantumSPHERE 360)'
+        : isTws
+        ? 'JBL Quantum TWS (10mm ゲーミング・音楽ハイブリッド完全ワイヤレス)'
+        : 'JBL Quantum シリーズ (50mm QuantumSURROUND ゲーミング＆音楽ヘッドセット)';
+      bands = is910
+        ? [4.2, 3.5, 0.8, -2.4, -1.2, 1.6, 3.6, 4.4, 3.8, 3.5]
+        : isTws
+        ? [5.2, 4.0, 1.2, -1.8, -0.8, 1.8, 3.4, 4.0, 3.6, 3.2]
+        : [3.8, 3.2, 0.5, -2.6, -1.5, 1.5, 3.2, 4.2, 3.5, 3.0];
+      preampDb = -1.8;
+      acousticAnalysis = `${speakerModel} のハイレスポンス50mmネオジムドライバーに最適化。250Hz〜500Hzの密閉ハウジングこもりを除去し、32Hz〜64Hzのサブベース迫力と2kHz〜8kHzの3D空間定位・楽器分離をプロフェッショナル水準へ引き上げました。`;
+    } else if (/zealot|ze-?41|s51|s67|s78|s53/i.test(norm)) {
+      speakerCategory = 'ZEALOT ZE-41 / Sシリーズ (大出力デュアルドライバー・アウトドアスピーカー)';
+      bands = [7.0, 5.2, -2.2, -3.5, -1.5, 2.2, 3.8, 4.8, 5.2, 4.6];
+      preampDb = -2.5;
+      acousticAnalysis = `${speakerModel} 特有の樹脂エンクロージャーによる250Hz〜500Hzの中低域ピーク（箱鳴り・こもり感）を-3.5dB強力に補正し、不足しがちな32Hz〜64Hzの深みと4kHz〜16kHzのクリアな高域の伸びを劇的に改善しました。`;
+    } else if (/jbl|flip|xtreme|go\s*\d|clip|anker|soundcore|bose\s*soundlink|ult\s*field|srs-|emberton|marshall/i.test(norm)) {
       speakerCategory = 'ポータブル Bluetooth スピーカー (パッシブラジエーター搭載)';
       bands = [6.5, 4.8, -1.5, -2.8, 0.5, 2.2, 3.5, 4.2, 4.8, 4.0];
       preampDb = -2.2;

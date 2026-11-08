@@ -1,8 +1,9 @@
-import {
+import React, {
   createContext,
   useContext,
   useState,
   useCallback,
+  useMemo,
   useRef,
   useEffect,
   ReactNode,
@@ -13,6 +14,7 @@ import {
   TaskbarAlign,
   DesktopIconSize,
   DESKTOP_ICON_SIZE_PRESETS,
+  ThemeMode,
   AccentColor,
   ACCENT_COLOR_PRESETS,
   ShellMode,
@@ -48,6 +50,7 @@ export interface DeskStickyNote {
 }
 
 export type Wallpaper =
+  | 'dynamic-world'
   | 'live2d'
   | 'golden-sparkle'
   | 'space'
@@ -130,8 +133,12 @@ export interface OSContextValue {
   setSelectedCustomId: (id: string | null) => void;
   theme: Theme;
   setTheme: (t: Theme) => void;
+  themeMode: ThemeMode;
+  setThemeMode: (m: ThemeMode) => void;
   accentColor: AccentColor;
   setAccentColor: (c: AccentColor) => void;
+  resolvedAccentHex: string;
+  resolvedAccentRgb: string;
   language: OSLanguage;
   setLanguage: (lang: OSLanguage) => void;
 
@@ -443,7 +450,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     if (!Array.isArray(saved)) return [];
     return saved.filter((w) => w && typeof w.id === 'string' && typeof w.appId === 'string');
   });
-  const windows = React.useMemo(() => allWindows.filter((w) => !w.closed), [allWindows]);
+  const windows = useMemo(() => allWindows.filter((w) => !w.closed), [allWindows]);
   const mountedWindows = allWindows;
   const zCounter = useRef(
     allWindows.reduce((max, w) => Math.max(max, w.zIndex || 60), 60) + 1
@@ -520,12 +527,37 @@ export function OSProvider({ children }: { children: ReactNode }) {
     loadPersisted<VirtualFolder>(LS_FS_KEY, getInitialFileSystem())
   );
 
-  // Default to 'live2d' (2D Aurora Live Wallpaper) on initial startup instead of Black Hole ('space')
-  const [wallpaper, setWallpaper] = useState<Wallpaper>(persistedSettings.wallpaper ?? 'live2d');
+  // Default to 'dynamic-world' (u3 Time/Wind/Weather/Season/Event Dynamic Wallpaper) on u3 upgrade
+  const [wallpaper, setWallpaper] = useState<Wallpaper>(() => {
+    try {
+      const u3Migrated = localStorage.getItem('glassium_v5.0_u3_wallpaper_migrated');
+      if (!u3Migrated) {
+        localStorage.setItem('glassium_v5.0_u3_wallpaper_migrated', 'true');
+        return 'dynamic-world';
+      }
+    } catch {
+      // ignore
+    }
+    return (persistedSettings.wallpaper as Wallpaper) ?? 'dynamic-world';
+  });
   const [customWallpapers, setCustomWallpapers] = useState<CustomWallpaper[]>(persistedSettings.customWallpapers ?? []);
   const [selectedCustomId, setSelectedCustomId] = useState<string | null>(persistedSettings.selectedCustomId ?? null);
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(
+    (persistedSettings.themeMode as ThemeMode) ?? (persistedSettings.theme as ThemeMode) ?? 'dark'
+  );
   const [theme, setThemeState] = useState<Theme>(persistedSettings.theme ?? 'dark');
-  const [accentColor, setAccentColor] = useState<AccentColor>(persistedSettings.accentColor ?? 'cyan');
+  const [accentColor, setAccentColor] = useState<AccentColor>(() => {
+    try {
+      const u3AccentMigrated = localStorage.getItem('glassium_v5.0_u3_accent_migrated');
+      if (!u3AccentMigrated) {
+        localStorage.setItem('glassium_v5.0_u3_accent_migrated', 'true');
+        return (persistedSettings.accentColor as AccentColor) ?? 'dynamic';
+      }
+    } catch {
+      // ignore
+    }
+    return (persistedSettings.accentColor as AccentColor) ?? 'dynamic';
+  });
   const [language, setLanguageState] = useState<OSLanguage>(() => {
     return loadPersisted<OSLanguage>('glassium-os-lang-v2', 'ja');
   });
@@ -541,6 +573,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
     }
   }, []);
   const [customWallpaperBright, setCustomWallpaperBright] = useState<boolean>(false);
+  const [customWallpaperRgb, setCustomWallpaperRgb] = useState<[number, number, number] | null>(null);
+  const [dynamicWorldTick, setDynamicWorldTick] = useState<number>(0);
 
   // UI Styles & Shell Modes
   const [uiStyle, setUiStyleState] = useState<UIStyle>(() => {
@@ -789,15 +823,90 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const toggleLaunchpad = useCallback(() => setLaunchpadOpen((v) => !v), []);
 
   const setTheme = useCallback((t: Theme) => {
+    setThemeModeState(t);
     setThemeState(t);
     setQuickSettings((q) => ({ ...q, darkMode: t === 'dark' }));
   }, []);
 
-  // Automatically sample custom wallpaper luminance to detect bright/white backgrounds
+  const setThemeMode = useCallback((m: ThemeMode) => {
+    setThemeModeState(m);
+    if (m === 'dark' || m === 'light') {
+      setThemeState(m);
+      setQuickSettings((q) => ({ ...q, darkMode: m === 'dark' }));
+    }
+  }, []);
+
+  // Sync theme when themeMode is 'system' (OSに合わせる) or 'sunset-sunrise' (日没・日の出に合わせる)
+  useEffect(() => {
+    if (themeMode === 'dark' || themeMode === 'light') {
+      setThemeState(themeMode);
+      setQuickSettings((q) => ({ ...q, darkMode: themeMode === 'dark' }));
+      return;
+    }
+
+    if (themeMode === 'system') {
+      if (typeof window === 'undefined' || !window.matchMedia) return;
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
+      const applySystemPreference = (isDark: boolean) => {
+        const resolved: Theme = isDark ? 'dark' : 'light';
+        setThemeState(resolved);
+        setQuickSettings((q) => ({ ...q, darkMode: isDark }));
+      };
+      applySystemPreference(mq.matches);
+      const handler = (e: MediaQueryListEvent) => applySystemPreference(e.matches);
+      mq.addEventListener('change', handler);
+      return () => mq.removeEventListener('change', handler);
+    }
+
+    if (themeMode === 'sunset-sunrise') {
+      const computeSunTheme = () => {
+        let hour = new Date().getHours() + new Date().getMinutes() / 60;
+        try {
+          const raw = localStorage.getItem('glasis_dynamic_world_wallpaper_v1');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed?.timeOfDay === 'dawn' || parsed?.timeOfDay === 'day') hour = 12;
+            else if (parsed?.timeOfDay === 'dusk' || parsed?.timeOfDay === 'night') hour = 21;
+          }
+        } catch {
+          // ignore
+        }
+        // Sunrise ~06:00 to Sunset ~17:30 -> Light mode; Sunset to Sunrise -> Dark mode
+        const isDaylight = hour >= 6.0 && hour < 17.5;
+        const resolved: Theme = isDaylight ? 'light' : 'dark';
+        setThemeState(resolved);
+        setQuickSettings((q) => ({ ...q, darkMode: resolved === 'dark' }));
+      };
+      computeSunTheme();
+      const timer = setInterval(computeSunTheme, 30000);
+      const onWorldChange = () => computeSunTheme();
+      window.addEventListener('glassium-dynamic-world-change', onWorldChange);
+      window.addEventListener('glasis-dynamic-env-changed', onWorldChange);
+      return () => {
+        clearInterval(timer);
+        window.removeEventListener('glassium-dynamic-world-change', onWorldChange);
+        window.removeEventListener('glasis-dynamic-env-changed', onWorldChange);
+      };
+    }
+  }, [themeMode]);
+
+  // Listen to dynamic world state updates so Dynamic Accent Color reacts immediately
+  useEffect(() => {
+    const onWorldUpdate = () => setDynamicWorldTick((t) => t + 1);
+    window.addEventListener('glassium-dynamic-world-change', onWorldUpdate);
+    window.addEventListener('glasis-dynamic-env-changed', onWorldUpdate);
+    return () => {
+      window.removeEventListener('glassium-dynamic-world-change', onWorldUpdate);
+      window.removeEventListener('glasis-dynamic-env-changed', onWorldUpdate);
+    };
+  }, []);
+
+  // Automatically sample custom wallpaper luminance and dominant vibrant color
   useEffect(() => {
     const customWp = customWallpapers.find((c) => c.id === selectedCustomId);
     if (!customWp) {
       setCustomWallpaperBright(false);
+      setCustomWallpaperRgb(null);
       return;
     }
     let cancelled = false;
@@ -807,21 +916,47 @@ export function OSProvider({ children }: { children: ReactNode }) {
       if (cancelled) return;
       try {
         const canvas = document.createElement('canvas');
-        canvas.width = 16;
-        canvas.height = 16;
+        canvas.width = 24;
+        canvas.height = 24;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
-        ctx.drawImage(img, 0, 0, 16, 16);
-        const data = ctx.getImageData(0, 0, 16, 16).data;
+        ctx.drawImage(img, 0, 0, 24, 24);
+        const data = ctx.getImageData(0, 0, 24, 24).data;
         let totalLum = 0;
+        let rSum = 0;
+        let gSum = 0;
+        let bSum = 0;
+        let weightSum = 0;
         const count = data.length / 4;
         for (let i = 0; i < data.length; i += 4) {
-          totalLum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          totalLum += lum;
+          const maxC = Math.max(r, g, b);
+          const minC = Math.min(r, g, b);
+          const sat = maxC - minC;
+          // Prefer saturated, non-extreme pixels for the extracted accent color
+          const midToneFactor = lum > 25 && lum < 235 ? 1.5 : 0.4;
+          const w = (sat + 18) * midToneFactor;
+          rSum += r * w;
+          gSum += g * w;
+          bSum += b * w;
+          weightSum += w;
         }
         const avgLum = totalLum / count;
         setCustomWallpaperBright(avgLum > 145);
+        if (weightSum > 0) {
+          setCustomWallpaperRgb([
+            Math.round(rSum / weightSum),
+            Math.round(gSum / weightSum),
+            Math.round(bSum / weightSum),
+          ]);
+        }
       } catch {
         setCustomWallpaperBright(false);
+        setCustomWallpaperRgb(null);
       }
     };
     img.src = customWp.dataUrl;
@@ -834,25 +969,112 @@ export function OSProvider({ children }: { children: ReactNode }) {
     ? customWallpaperBright
     : Boolean(WALLPAPERS[wallpaper]?.isBright);
 
+  // Compute resolved accent color (supports 'dynamic' which adapts to background/uploaded image + Dark/Light mode)
+  const { resolvedAccentHex, resolvedAccentRgb } = useMemo(() => {
+    void dynamicWorldTick;
+    if (accentColor !== 'dynamic') {
+      const preset = ACCENT_COLOR_PRESETS.find((p) => p.id === accentColor) ?? ACCENT_COLOR_PRESETS[1];
+      return { resolvedAccentHex: preset.hex, resolvedAccentRgb: preset.rgb };
+    }
+
+    // 1. Determine base RGB from uploaded custom image OR active wallpaper
+    let baseRgb: [number, number, number] = [56, 189, 248];
+    if (selectedCustomId && customWallpaperRgb) {
+      baseRgb = customWallpaperRgb;
+    } else if (wallpaper === 'dynamic-world') {
+      const m = new Date().getMonth() + 1;
+      let season = m >= 3 && m <= 5 ? 'spring' : m >= 6 && m <= 8 ? 'summer' : m >= 9 && m <= 11 ? 'autumn' : 'winter';
+      let eventMode = 'none';
+      let hour = new Date().getHours();
+      try {
+        const raw = localStorage.getItem('glasis_dynamic_world_wallpaper_v1');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed.season && parsed.season !== 'auto') season = parsed.season;
+          if (parsed.event && parsed.event !== 'auto') eventMode = parsed.event;
+          if (parsed.timeOfDay === 'dawn') hour = 6;
+          else if (parsed.timeOfDay === 'day') hour = 12;
+          else if (parsed.timeOfDay === 'dusk') hour = 17.5;
+          else if (parsed.timeOfDay === 'night') hour = 22;
+        }
+      } catch {
+        // ignore
+      }
+      if (eventMode === 'halloween') baseRgb = [249, 115, 22];
+      else if (eventMode === 'christmas') baseRgb = [16, 185, 129];
+      else if (eventMode === 'newyear') baseRgb = [245, 158, 11];
+      else if (eventMode === 'tanabata') baseRgb = [56, 189, 248];
+      else if (hour >= 16.5 && hour < 19) baseRgb = [244, 114, 62]; // Sunset warm amber-coral
+      else if (hour >= 5 && hour < 7) baseRgb = [236, 72, 153]; // Dawn rose-gold
+      else if (season === 'spring') baseRgb = [244, 114, 182]; // Sakura pink
+      else if (season === 'summer') baseRgb = [14, 165, 233]; // Ocean cyan-blue
+      else if (season === 'autumn') baseRgb = [245, 158, 11]; // Autumn maple amber
+      else baseRgb = [56, 189, 248]; // Winter crystal sky
+    } else if (wallpaper === 'live2d') {
+      if (auroraColor === 'golden-sparkle' || auroraColor === 'solar-gold') baseRgb = [245, 158, 11];
+      else if (auroraColor === 'crimson-rose-nebula' || auroraColor === 'rose-gold' || auroraColor === 'sakura-silk' || auroraColor === 'sunset-magenta' || auroraColor === 'classic-synthwave-sun') baseRgb = [244, 63, 94];
+      else if (auroraColor === 'polar-emerald-aurora' || auroraColor === 'emerald-sky' || auroraColor === 'classic-matrix-rain' || auroraColor === 'classic-fireflies-forest') baseRgb = [16, 185, 129];
+      else if (auroraColor === 'amethyst-cyan-silk' || auroraColor === 'neon-cyber-dusk' || auroraColor === 'classic-galaxy-vortex' || auroraColor === 'classic-plasma-nebula') baseRgb = [139, 92, 246];
+      else if (auroraColor === 'abyssal-deep-ocean' || auroraColor === 'ocean-blue' || auroraColor === 'classic-deep-ocean') baseRgb = [59, 130, 246];
+      else baseRgb = [6, 182, 212];
+    } else if (wallpaper === 'golden-sparkle') {
+      baseRgb = [245, 158, 11];
+    } else if (wallpaper === 'sunset') {
+      baseRgb = [244, 63, 94];
+    } else if (wallpaper === 'forest' || wallpaper === 'aurora') {
+      baseRgb = [16, 185, 129];
+    } else if (wallpaper === 'space' || wallpaper === 'cosmic' || wallpaper === 'shader') {
+      baseRgb = [139, 92, 246];
+    } else if (wallpaper === 'ocean' || wallpaper === 'bloom') {
+      baseRgb = [59, 130, 246];
+    }
+
+    // 2. Adapt luminance & saturation based on whether Dark or Light mode is active
+    let [r, g, b] = baseRgb;
+    // Boost chroma slightly so even muted custom images yield an expressive accent
+    const avg = (r + g + b) / 3;
+    r = Math.round(avg + (r - avg) * 1.35);
+    g = Math.round(avg + (g - avg) * 1.35);
+    b = Math.round(avg + (b - avg) * 1.35);
+
+    if (theme === 'dark') {
+      // Dark mode: ensure bright, luminous neon/pastel pop on dark surfaces
+      r = Math.min(255, Math.max(40, Math.round(r * 0.85 + 48)));
+      g = Math.min(255, Math.max(40, Math.round(g * 0.85 + 48)));
+      b = Math.min(255, Math.max(40, Math.round(b * 0.85 + 48)));
+    } else {
+      // Light mode: deepen tone for crisp contrast against white/light glass surfaces
+      r = Math.min(220, Math.max(12, Math.round(r * 0.78)));
+      g = Math.min(220, Math.max(12, Math.round(g * 0.78)));
+      b = Math.min(220, Math.max(12, Math.round(b * 0.78)));
+    }
+
+    const toHex = (n: number) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0');
+    return {
+      resolvedAccentHex: `#${toHex(r)}${toHex(g)}${toHex(b)}`,
+      resolvedAccentRgb: `${r}, ${g}, ${b}`,
+    };
+  }, [accentColor, selectedCustomId, customWallpaperRgb, wallpaper, auroraColor, theme, dynamicWorldTick]);
+
   // Sync CSS variables & data attributes with custom slider, theme, wallpaper tone, and accent color values
   useEffect(() => {
-    const preset = ACCENT_COLOR_PRESETS.find((p) => p.id === accentColor) ?? ACCENT_COLOR_PRESETS[0];
     document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.setAttribute('data-theme-mode', themeMode);
     document.documentElement.setAttribute('data-accent', accentColor);
     document.documentElement.setAttribute('data-ui-style', uiStyle);
     document.documentElement.setAttribute('data-shell-mode', shellMode);
     document.documentElement.setAttribute('data-design-engine', designEngine);
     document.documentElement.setAttribute('data-wallpaper-tone', isWallpaperBright ? 'bright' : 'dark');
     document.documentElement.lang = language;
-    document.documentElement.style.setProperty('--os-accent', preset.hex);
-    document.documentElement.style.setProperty('--os-accent-rgb', preset.rgb);
+    document.documentElement.style.setProperty('--os-accent', resolvedAccentHex);
+    document.documentElement.style.setProperty('--os-accent-rgb', resolvedAccentRgb);
     document.documentElement.style.setProperty('--theme-blur', `${blurAmount}px`);
     document.documentElement.style.setProperty('--theme-opacity', `${(100 - transparency) / 100}`);
     document.documentElement.style.setProperty('--theme-radius', `${cornerRadius}px`);
     document.documentElement.style.setProperty('--glass-curvature', `${glassCurvature}px`);
     document.documentElement.style.setProperty('--glass-specular', `${glassSpecular / 100}`);
     document.documentElement.style.setProperty('--glass-wobble', `${glassWobble / 100}`);
-  }, [theme, accentColor, language, uiStyle, shellMode, designEngine, isWallpaperBright, blurAmount, transparency, cornerRadius, glassCurvature, glassSpecular, glassWobble]);
+  }, [theme, themeMode, accentColor, resolvedAccentHex, resolvedAccentRgb, language, uiStyle, shellMode, designEngine, isWallpaperBright, blurAmount, transparency, cornerRadius, glassCurvature, glassSpecular, glassWobble]);
 
   // Persist Settings
   useEffect(() => {
@@ -865,6 +1087,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
           customWallpapers,
           selectedCustomId,
           theme,
+          themeMode,
           accentColor,
           language,
           desktopIconSize,
@@ -908,6 +1131,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     customWallpapers,
     selectedCustomId,
     theme,
+    themeMode,
     accentColor,
     language,
     desktopIconSize,
@@ -1827,8 +2051,12 @@ export function OSProvider({ children }: { children: ReactNode }) {
     setSelectedCustomId,
     theme,
     setTheme,
+    themeMode,
+    setThemeMode,
     accentColor,
     setAccentColor,
+    resolvedAccentHex,
+    resolvedAccentRgb,
     language,
     setLanguage,
     uiStyle,
