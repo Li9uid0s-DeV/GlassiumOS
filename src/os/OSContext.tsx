@@ -11,43 +11,19 @@ import {
   AppId,
   WindowState,
   TaskbarAlign,
-  DesktopIconSize,
-  DESKTOP_ICON_SIZE_PRESETS,
-  AccentColor,
-  ACCENT_COLOR_PRESETS,
   ShellMode,
   WindowsTaskbarStyle,
   DesignEngine,
   NebulaPreset,
-  LockScreenStyle,
   InstalledApp,
   StoreApp,
   STORE_CATALOG,
-  StoreTheme,
-  STORE_THEMES,
   CalendarTask,
   UserProfile,
-  NotificationItem,
-  VirtualDesktop,
-  UIStyle,
-  SleepClockStyle,
-  SleepBackground,
-  ClockPosition,
 } from './types';
 import { VirtualFolder, getInitialFileSystem, VirtualNode } from './fileSystem';
-import { WALLPAPERS } from './wallpapers';
-import { soundService } from './soundService';
-
-export interface DeskStickyNote {
-  id: string;
-  text: string;
-  color: 'cyan' | 'violet' | 'amber' | 'emerald' | 'rose';
-  x: number;
-  y: number;
-}
 
 export type Wallpaper =
-  | 'live2d'
   | 'space'
   | 'aurora'
   | 'sunset'
@@ -58,7 +34,6 @@ export type Wallpaper =
   | 'shader';
 
 export type Theme = 'dark' | 'light';
-export type AuroraColor = 'cyan-violet' | 'emerald-sky' | 'rose-gold' | 'ocean-blue' | 'sunset-magenta';
 
 export interface CustomWallpaper {
   id: string;
@@ -74,7 +49,7 @@ export interface OpenOptions {
   icon?: string;
 }
 
-export interface OSContextValue {
+interface OSContextValue {
   windows: WindowState[];
   openApp: (appId: AppId, opts?: OpenOptions) => void;
   closeWindow: (id: string) => void;
@@ -90,9 +65,6 @@ export interface OSContextValue {
   createFolder: (path: string[], folderName: string) => void;
   deleteNode: (path: string[], nodeName: string) => void;
   openFileNode: (node: VirtualNode) => void;
-  recycleFile: (path: string[], nodeName: string) => void;
-  emptyRecycleBin: () => void;
-  restoreRecycleFile: (nodeName: string) => void;
 
   wallpaper: Wallpaper;
   setWallpaper: (w: Wallpaper) => void;
@@ -102,12 +74,8 @@ export interface OSContextValue {
   setSelectedCustomId: (id: string | null) => void;
   theme: Theme;
   setTheme: (t: Theme) => void;
-  accentColor: AccentColor;
-  setAccentColor: (c: AccentColor) => void;
 
   // Customization & Shell Engines
-  uiStyle: UIStyle;
-  setUiStyle: (style: UIStyle) => void;
   shellMode: ShellMode;
   setShellMode: (mode: ShellMode) => void;
   taskbarStyle: WindowsTaskbarStyle;
@@ -116,15 +84,8 @@ export interface OSContextValue {
   setDesignEngine: (engine: DesignEngine) => void;
   nebulaPreset: NebulaPreset;
   setNebulaPreset: (preset: NebulaPreset) => void;
-  sleepClockStyle: SleepClockStyle;
-  setSleepClockStyle: (style: SleepClockStyle) => void;
-  sleepBackground: SleepBackground;
-  setSleepBackground: (bg: SleepBackground) => void;
-  clockPosition: ClockPosition;
-  setClockPosition: (pos: ClockPosition) => void;
-  temperature: number;
 
-  // Fine-grain sliders & 3D Liquid Glass Physics
+  // Fine-grain sliders
   blurAmount: number;
   setBlurAmount: (v: number) => void;
   cornerRadius: number;
@@ -133,48 +94,9 @@ export interface OSContextValue {
   setTransparency: (v: number) => void;
   animSpeed: number;
   setAnimSpeed: (v: number) => void;
-  glassCurvature: number;
-  setGlassCurvature: (v: number) => void;
-  glassSpecular: number;
-  setGlassSpecular: (v: number) => void;
-  glassWobble: number;
-  setGlassWobble: (v: number) => void;
-  glassDispersion: number;
-  setGlassDispersion: (v: number) => void;
-  glassNoise: number;
-  setGlassNoise: (v: number) => void;
-
-  // 2D Aurora Live Wallpaper Settings
-  auroraColor: AuroraColor;
-  setAuroraColor: (c: AuroraColor) => void;
-  auroraSpeed: number;
-  setAuroraSpeed: (v: number) => void;
-  auroraIntensity: number;
-  setAuroraIntensity: (v: number) => void;
-  auroraParticles: boolean;
-  setAuroraParticles: (v: boolean) => void;
 
   quickSettings: { wifi: boolean; bluetooth: boolean; darkMode: boolean };
   toggleQuick: (key: 'wifi' | 'bluetooth' | 'darkMode') => void;
-
-  // Android & iOS Mobile Quick Controls
-  androidQuickSettings: {
-    wifi: boolean;
-    bluetooth: boolean;
-    flashlight: boolean;
-    airplane: boolean;
-    batterySaver: boolean;
-    doNotDisturb: boolean;
-  };
-  toggleAndroidQuick: (key: 'wifi' | 'bluetooth' | 'flashlight' | 'airplane' | 'batterySaver' | 'doNotDisturb') => void;
-  volume: number;
-  setVolume: (v: number) => void;
-  brightness: number;
-  setBrightness: (v: number) => void;
-
-  // Dynamic Island
-  dynamicIslandEvent: { title: string; subtitle?: string; icon?: string } | null;
-  triggerDynamicIsland: (title: string, subtitle?: string, icon?: string) => void;
 
   liteMode: boolean;
   setLiteMode: (v: boolean) => void;
@@ -187,20 +109,11 @@ export interface OSContextValue {
 
   // App Store & Installed Apps
   installedApps: InstalledApp[];
-  installApp: (app: Partial<StoreApp> & { name: string; icon: string; description: string; author: string; category: 'utilities' | 'games' }) => void;
+  installApp: (app: StoreApp) => void;
   uninstallApp: (appId: string) => void;
   launchInstalledApp: (appId: string) => void;
   isInstalled: (appId: string) => boolean;
   storeCatalog: StoreApp[];
-
-  // Themes Catalog & Downloads
-  storeThemes: StoreTheme[];
-  installedThemeIds: string[];
-  currentThemeId: string | null;
-  installTheme: (themeId: string) => void;
-  uninstallTheme: (themeId: string) => void;
-  applyThemeConfig: (themeId: string) => void;
-  isThemeInstalled: (themeId: string) => boolean;
 
   // Calendar & Task Scheduler
   calendarTasks: CalendarTask[];
@@ -219,137 +132,35 @@ export interface OSContextValue {
   showWelcome: boolean;
   setWelcome: (v: boolean) => void;
 
-  // Notification Center
-  notifications: NotificationItem[];
-  addNotification: (n: Omit<NotificationItem, 'id' | 'timestamp'>) => void;
-  clearNotifications: () => void;
-  dismissNotification: (id: string) => void;
-
-  // System Flyouts
-  widgetsOpen: boolean;
-  toggleWidgets: () => void;
-  copilotOpen: boolean;
-  toggleCopilot: () => void;
-  controlCenterOpen: boolean;
-  toggleControlCenter: () => void;
-  launchpadOpen: boolean;
-  toggleLaunchpad: () => void;
-
-  // Lock Screen Customizer & Touch Mode
-  lockScreenStyle: LockScreenStyle;
-  setLockScreenStyle: (style: LockScreenStyle) => void;
-  touchMode: boolean;
-  setTouchMode: (val: boolean | ((prev: boolean) => boolean)) => void;
-
-  // Sound effects & window management
-  soundEnabled: boolean;
-  setSoundEnabled: (v: boolean) => void;
-  snapAllWindows5050: () => void;
+  // Sound effects
   playSound: (type: 'open' | 'click' | 'lock' | 'notify') => void;
-
-  // Virtual Desktops ("デスク機能" / Task View)
-  desktops: VirtualDesktop[];
-  activeDesktopId: string;
-  taskViewOpen: boolean;
-  setTaskViewOpen: (v: boolean) => void;
-  toggleTaskView: () => void;
-  switchDesktop: (id: string) => void;
-  createDesktop: () => void;
-  removeDesktop: (id: string) => void;
-  moveWindowToDesktop: (winId: string, desktopId: string) => void;
-
-  // Grid-Snapped Desktop Icon Positions & Sizing
-  desktopIconPositions: Record<string, { x: number; y: number }>;
-  updateDesktopIconPosition: (id: string, x: number, y: number) => void;
-  resetDesktopIconPositions: (snapToGrid?: boolean) => void;
-  desktopIconSize: DesktopIconSize;
-  setDesktopIconSize: (size: DesktopIconSize) => void;
-  gridSnapEnabled: boolean;
-  setGridSnapEnabled: (v: boolean) => void;
-  isWallpaperBright: boolean;
-
-  // Desk Sticky Notes ("デスク付箋")
-  deskNotes: DeskStickyNote[];
-  addDeskNote: () => void;
-  updateDeskNote: (id: string, patch: Partial<DeskStickyNote>) => void;
-  deleteDeskNote: (id: string) => void;
 }
 
 const OSContext = createContext<OSContextValue | null>(null);
 
 const APP_DEFAULTS: Record<AppId, { title: string; icon: string; width: number; height: number }> = {
-  explorer: { title: 'Files', icon: 'FolderOpen', width: 800, height: 530 },
-  browser: { title: 'Browser', icon: 'Globe', width: 920, height: 600 },
+  explorer: { title: 'File Explorer', icon: 'FolderOpen', width: 800, height: 530 },
+  browser: { title: 'Liquid Browser', icon: 'Globe', width: 920, height: 600 },
   terminal: { title: 'Terminal', icon: 'SquareTerminal', width: 700, height: 450 },
   settings: { title: 'Settings', icon: 'Settings', width: 780, height: 560 },
-  notepad: { title: 'Editor', icon: 'FileText', width: 640, height: 500 },
-  game: { title: 'Arcade Games', icon: 'Gamepad2', width: 880, height: 590 },
+  notepad: { title: 'Notepad', icon: 'FileText', width: 640, height: 500 },
+  game: { title: '3D Games Matrix', icon: 'Gamepad2', width: 840, height: 580 },
   appstore: { title: 'App Store', icon: 'Store', width: 850, height: 610 },
-  calculator: { title: 'Calculator', icon: 'Calculator', width: 380, height: 540 },
-  taskmanager: { title: 'Task Manager', icon: 'Cpu', width: 740, height: 510 },
   sysmon: { title: 'System Monitor', icon: 'Activity', width: 740, height: 520 },
-  calendar: { title: 'Calendar', icon: 'Calendar', width: 820, height: 550 },
-  synth: { title: 'Music', icon: 'Music', width: 880, height: 580 },
-  weather: { title: 'Weather', icon: 'CloudSun', width: 840, height: 580 },
-  clock: { title: 'Clock', icon: 'Clock', width: 780, height: 540 },
-  ai: { title: 'AI Assistant', icon: 'Sparkles', width: 860, height: 600 },
-  studio: { title: 'Glassium Studio', icon: 'Code2', width: 900, height: 620 },
-  retrocade: { title: 'RetroCade', icon: 'Gamepad2', width: 880, height: 600 },
+  calendar: { title: 'Calendar & Tasks', icon: 'Calendar', width: 820, height: 550 },
+  synth: { title: 'Translucent Synth', icon: 'Music', width: 760, height: 500 },
 };
 
 const INITIAL_TASKS: CalendarTask[] = [
-  { id: 'task-1', title: 'Review GlassiumOS V4.0 UI Guidelines', date: '2026-08-27', time: '14:00', category: 'system', completed: true, priority: 'high' },
-  { id: 'task-2', title: 'Update 2.5D Glass Refraction Presets', date: '2026-08-27', time: '16:30', category: 'work', completed: false, priority: 'medium' },
-  { id: 'task-3', title: 'Prepare Release Documentation', date: '2026-08-28', time: '11:00', category: 'personal', completed: false, priority: 'low' },
+  { id: 'task-1', title: 'Calibrate Gravitational Lensing Shader', date: '2026-08-27', time: '14:00', category: 'system', completed: true, priority: 'high' },
+  { id: 'task-2', title: 'Inspect Liquid Glass Refraction Scale', date: '2026-08-27', time: '16:30', category: 'work', completed: false, priority: 'medium' },
+  { id: 'task-3', title: 'Synthesize Ambient Space Harmonics', date: '2026-08-28', time: '11:00', category: 'personal', completed: false, priority: 'low' },
 ];
 
-const LS_KEY = 'glassium-os-v4.0-settings';
-const LS_APPS_KEY = 'glassium-os-v4.0-installed-apps';
-const LS_THEMES_KEY = 'glassium-os-v4.0-installed-themes';
-const LS_CURRENT_THEME_KEY = 'glassium-os-v4.0-current-theme';
-const LS_TASKS_KEY = 'glassium-os-v4.0-calendar-tasks';
-const LS_FS_KEY = 'glassium-os-v4.0-filesystem';
-const LS_ICON_POS_KEY = 'glassium-os-v4.0-icon-positions';
-const LS_DESK_NOTES_KEY = 'glassium-os-v4.0-desk-notes';
-const LS_DESKTOPS_KEY = 'glassium-os-v4.0-desktops';
-
-export const DEFAULT_DESKTOP_ICON_ORDER = [
-  'browser',
-  'notepad',
-  'terminal',
-  'calculator',
-  'explorer',
-  'settings',
-  'game',
-  'synth',
-  'calendar',
-  'weather',
-  'clock',
-  'ai',
-  'studio',
-  'retrocade',
-  'taskmanager',
-  'appstore',
-  'recycle',
-];
-
-export function computeDefaultIconPositions(
-  iconSize: DesktopIconSize = 'medium'
-): Record<string, { x: number; y: number }> {
-  const preset = DESKTOP_ICON_SIZE_PRESETS[iconSize] ?? DESKTOP_ICON_SIZE_PRESETS.medium;
-  const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-  const maxRows = Math.max(3, Math.floor((vh - 76) / preset.cellH));
-  const map: Record<string, { x: number; y: number }> = {};
-  DEFAULT_DESKTOP_ICON_ORDER.forEach((id, idx) => {
-    const col = Math.floor(idx / maxRows);
-    const row = idx % maxRows;
-    map[id] = {
-      x: 16 + col * preset.cellW,
-      y: 16 + row * preset.cellH,
-    };
-  });
-  return map;
-}
+const LS_KEY = 'liquid-os-v3-settings';
+const LS_APPS_KEY = 'liquid-os-v3-installed-apps';
+const LS_TASKS_KEY = 'liquid-os-v3-calendar-tasks';
+const LS_FS_KEY = 'liquid-os-v3-filesystem';
 
 function loadPersisted<T>(key: string, fallback: T): T {
   try {
@@ -362,178 +173,32 @@ function loadPersisted<T>(key: string, fallback: T): T {
 }
 
 export function OSProvider({ children }: { children: ReactNode }) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const persistedSettings = loadPersisted<Record<string, any>>(LS_KEY, {});
+  const persistedSettings = loadPersisted<Record<string, unknown>>(LS_KEY, {});
 
   const [windows, setWindows] = useState<WindowState[]>([]);
-  const zCounter = useRef(60);
+  const zCounter = useRef(10);
   const idCounter = useRef(0);
-
-  // Virtual Desktops ("デスク機能")
-  const [desktops, setDesktops] = useState<VirtualDesktop[]>(() =>
-    loadPersisted<VirtualDesktop[]>(LS_DESKTOPS_KEY, [
-      { id: 'desk-1', name: 'デスクトップ 1' },
-      { id: 'desk-2', name: 'デスクトップ 2' },
-    ])
-  );
-  const [activeDesktopId, setActiveDesktopId] = useState<string>('desk-1');
-  const [taskViewOpen, setTaskViewOpen] = useState<boolean>(false);
-
-  const [desktopIconSize, setDesktopIconSizeState] = useState<DesktopIconSize>(
-    (persistedSettings.desktopIconSize as DesktopIconSize) ?? 'medium'
-  );
-  const [gridSnapEnabled, setGridSnapEnabled] = useState<boolean>(
-    persistedSettings.gridSnapEnabled ?? true
-  );
-
-  // Grid-Snapped Desktop Icon Positions
-  const [desktopIconPositions, setDesktopIconPositions] = useState<Record<string, { x: number; y: number }>>(() => {
-    const initialSize = (persistedSettings.desktopIconSize as DesktopIconSize) ?? 'medium';
-    const preset = DESKTOP_ICON_SIZE_PRESETS[initialSize] ?? DESKTOP_ICON_SIZE_PRESETS.medium;
-    const defaults = computeDefaultIconPositions(initialSize);
-    const saved = loadPersisted<Record<string, { x: number; y: number }>>(LS_ICON_POS_KEY, {});
-    const merged = { ...defaults, ...saved };
-    // Ensure all initial positions are aligned to grid slots
-    const snapped: Record<string, { x: number; y: number }> = {};
-    const occupied = new Set<string>();
-    Object.entries(merged).forEach(([key, pos]) => {
-      let col = Math.max(0, Math.round((pos.x - 16) / preset.cellW));
-      let row = Math.max(0, Math.round((pos.y - 16) / preset.cellH));
-      while (occupied.has(`${col},${row}`)) {
-        row += 1;
-        if (row > 6) {
-          row = 0;
-          col += 1;
-        }
-      }
-      occupied.add(`${col},${row}`);
-      snapped[key] = {
-        x: 16 + col * preset.cellW,
-        y: 16 + row * preset.cellH,
-      };
-    });
-    return snapped;
-  });
-
-  // Desk Sticky Notes ("デスク付箋")
-  const [deskNotes, setDeskNotes] = useState<DeskStickyNote[]>(() =>
-    loadPersisted<DeskStickyNote[]>(LS_DESK_NOTES_KEY, [])
-  );
 
   const [fileSystem, setFileSystem] = useState<VirtualFolder>(() =>
     loadPersisted<VirtualFolder>(LS_FS_KEY, getInitialFileSystem())
   );
 
-  // Default to 'live2d' (2D Aurora Live Wallpaper) on initial startup instead of Black Hole ('space')
-  const [wallpaper, setWallpaper] = useState<Wallpaper>(persistedSettings.wallpaper ?? 'live2d');
+  const [wallpaper, setWallpaper] = useState<Wallpaper>(persistedSettings.wallpaper ?? 'space');
   const [customWallpapers, setCustomWallpapers] = useState<CustomWallpaper[]>(persistedSettings.customWallpapers ?? []);
   const [selectedCustomId, setSelectedCustomId] = useState<string | null>(persistedSettings.selectedCustomId ?? null);
-  const [theme, setThemeState] = useState<Theme>(persistedSettings.theme ?? 'dark');
-  const [accentColor, setAccentColor] = useState<AccentColor>(persistedSettings.accentColor ?? 'cyan');
-  const [customWallpaperBright, setCustomWallpaperBright] = useState<boolean>(false);
+  const [theme, setTheme] = useState<Theme>(persistedSettings.theme ?? 'dark');
 
-  // UI Styles & Shell Modes
-  const [uiStyle, setUiStyleState] = useState<UIStyle>(() => {
-    return loadPersisted<UIStyle>('glassium-ui-style', (persistedSettings.uiStyle as UIStyle) ?? 'glassium');
-  });
-  const setUiStyle = useCallback((style: UIStyle) => {
-    setUiStyleState(style);
-    try {
-      localStorage.setItem('glassium-ui-style', style);
-    } catch {
-      // ignore
-    }
-    // Automatically adapt shell layout per UI Style
-    if (style === 'macos') {
-      setShellMode('mac');
-    } else if (style === 'one-ui') {
-      setShellMode('dex');
-    } else if (style === 'material3') {
-      setShellMode('chromeos');
-    } else {
-      setShellMode('windows');
-    }
-  }, []);
-
-  const [sleepClockStyle, setSleepClockStyleState] = useState<SleepClockStyle>(() => {
-    return loadPersisted<SleepClockStyle>('glassium-sleep-clock', 'depth');
-  });
-  const setSleepClockStyle = useCallback((style: SleepClockStyle) => {
-    setSleepClockStyleState(style);
-    try {
-      localStorage.setItem('glassium-sleep-clock', style);
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  const [sleepBackground, setSleepBackgroundState] = useState<SleepBackground>(() => {
-    return loadPersisted<SleepBackground>('glassium-sleep-bg', 'aurora');
-  });
-  const setSleepBackground = useCallback((bg: SleepBackground) => {
-    setSleepBackgroundState(bg);
-    try {
-      localStorage.setItem('glassium-sleep-bg', bg);
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  const [clockPosition, setClockPositionState] = useState<ClockPosition>(() => {
-    return loadPersisted<ClockPosition>('glassium-clock-pos', 'center');
-  });
-  const setClockPosition = useCallback((pos: ClockPosition) => {
-    setClockPositionState(pos);
-    try {
-      localStorage.setItem('glassium-clock-pos', pos);
-    } catch {
-      // ignore
-    }
-  }, []);
-
-  const [temperature] = useState<number>(21);
-
-  // Shell & Design Engines — Default to desktop 'windows' shell so all icons & taskbar are immediately accessible
-  const [shellMode, setShellMode] = useState<ShellMode>(() => {
-    return (persistedSettings.shellMode as ShellMode) ?? 'windows';
-  });
+  // Shell & Design Engines
+  const [shellMode, setShellMode] = useState<ShellMode>(persistedSettings.shellMode ?? 'windows');
   const [taskbarStyle, setTaskbarStyle] = useState<WindowsTaskbarStyle>(persistedSettings.taskbarStyle ?? 'modern');
   const [designEngine, setDesignEngine] = useState<DesignEngine>(persistedSettings.designEngine ?? 'liquid-glass');
   const [nebulaPreset, setNebulaPreset] = useState<NebulaPreset>(persistedSettings.nebulaPreset ?? 'gargantua');
 
-  // Touch Device Detection without forcefully breaking window management
-  useEffect(() => {
-    const handleTouch = (e: TouchEvent | PointerEvent) => {
-      if ('pointerType' in e && e.pointerType !== 'touch') return;
-      // Mark touchMode as enabled for touch-friendly UI spacing & controls
-      setTouchMode(true);
-    };
-
-    window.addEventListener('touchstart', handleTouch, { passive: true });
-    window.addEventListener('pointerdown', handleTouch, { passive: true });
-
-    return () => {
-      window.removeEventListener('touchstart', handleTouch);
-      window.removeEventListener('pointerdown', handleTouch);
-    };
-  }, []);
-
-  // Sliders & 3D Glass Physics
+  // Sliders
   const [blurAmount, setBlurAmount] = useState<number>(persistedSettings.blurAmount ?? 24);
-  const [cornerRadius, setCornerRadius] = useState<number>(persistedSettings.cornerRadius ?? 18);
-  const [transparency, setTransparency] = useState<number>(persistedSettings.transparency ?? 78);
+  const [cornerRadius, setCornerRadius] = useState<number>(persistedSettings.cornerRadius ?? 16);
+  const [transparency, setTransparency] = useState<number>(persistedSettings.transparency ?? 75);
   const [animSpeed, setAnimSpeed] = useState<number>(persistedSettings.animSpeed ?? 1.0);
-  const [glassCurvature, setGlassCurvature] = useState<number>(persistedSettings.glassCurvature ?? 32);
-  const [glassSpecular, setGlassSpecular] = useState<number>(persistedSettings.glassSpecular ?? 75);
-  const [glassWobble, setGlassWobble] = useState<number>(persistedSettings.glassWobble ?? 75);
-  const [glassDispersion, setGlassDispersion] = useState<number>(persistedSettings.glassDispersion ?? 6);
-  const [glassNoise, setGlassNoise] = useState<number>(persistedSettings.glassNoise ?? 18);
-
-  // Aurora Live Wallpaper Controls
-  const [auroraColor, setAuroraColor] = useState<AuroraColor>(persistedSettings.auroraColor ?? 'cyan-violet');
-  const [auroraSpeed, setAuroraSpeed] = useState<number>(persistedSettings.auroraSpeed ?? 1.0);
-  const [auroraIntensity, setAuroraIntensity] = useState<number>(persistedSettings.auroraIntensity ?? 78);
-  const [auroraParticles, setAuroraParticles] = useState<boolean>(persistedSettings.auroraParticles ?? true);
 
   const [quickSettings, setQuickSettings] = useState<{ wifi: boolean; bluetooth: boolean; darkMode: boolean }>(
     persistedSettings.quickSettings ?? { wifi: true, bluetooth: false, darkMode: true }
@@ -542,15 +207,26 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const [taskbarAlign, setTaskbarAlign] = useState<TaskbarAlign>(persistedSettings.taskbarAlign ?? 'center');
   const [startOpen, setStartOpen] = useState(false);
 
-  const [installedApps, setInstalledApps] = useState<InstalledApp[]>(() => {
-    const loaded = loadPersisted<InstalledApp[]>(LS_APPS_KEY, [
+  const [installedApps, setInstalledApps] = useState<InstalledApp[]>(() =>
+    loadPersisted<InstalledApp[]>(LS_APPS_KEY, [
+      {
+        id: 'sysmon',
+        appId: 'sysmon',
+        name: 'System Monitor Pro',
+        icon: 'Activity',
+        description: 'Real-time CPU and FPS counter',
+        author: 'Liquid Systems',
+        category: 'utilities',
+        installedAt: Date.now(),
+        builtInAppId: 'sysmon',
+      },
       {
         id: 'calendar',
         appId: 'calendar',
-        name: 'Calendar & Tasks',
+        name: 'Cosmic Calendar',
         icon: 'Calendar',
         description: 'Interactive agenda grid',
-        author: 'Glassium Core',
+        author: 'Liquid Labs',
         category: 'utilities',
         installedAt: Date.now(),
         builtInAppId: 'calendar',
@@ -558,187 +234,31 @@ export function OSProvider({ children }: { children: ReactNode }) {
       {
         id: 'synth',
         appId: 'synth',
-        name: 'Monochrome Music',
+        name: 'Translucent Synth',
         icon: 'Music',
-        description: 'Hi-Fi music streaming and synced lyrics',
-        author: 'Monochrome Audio',
+        description: 'Web Audio synthesizer',
+        author: 'Aura Audio',
         category: 'utilities',
         installedAt: Date.now(),
         builtInAppId: 'synth',
       },
-    ]);
-    return loaded.filter((a) => a.id !== 'sysmon' && a.appId !== 'sysmon');
-  });
-
-  const [installedThemeIds, setInstalledThemeIds] = useState<string[]>(() =>
-    loadPersisted<string[]>(LS_THEMES_KEY, ['win11-mica', 'vista-aero', 'xp-luna'])
-  );
-  const [currentThemeId, setCurrentThemeId] = useState<string | null>(() =>
-    loadPersisted<string | null>(LS_CURRENT_THEME_KEY, 'win11-mica')
+    ])
   );
 
   const [calendarTasks, setCalendarTasks] = useState<CalendarTask[]>(() =>
     loadPersisted<CalendarTask[]>(LS_TASKS_KEY, INITIAL_TASKS)
   );
 
-  // Dynamic Island state & trigger
-  const [dynamicIslandEvent, setDynamicIslandEvent] = useState<{ title: string; subtitle?: string; icon?: string } | null>(null);
-  const dynamicIslandTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const triggerDynamicIsland = useCallback((title: string, subtitle?: string, icon?: string) => {
-    setDynamicIslandEvent({ title, subtitle, icon });
-    if (dynamicIslandTimer.current) clearTimeout(dynamicIslandTimer.current);
-    dynamicIslandTimer.current = setTimeout(() => {
-      setDynamicIslandEvent(null);
-    }, 4000);
-  }, []);
-
-  // Android Quick Settings & Mobile Controls
-  const [androidQuickSettings, setAndroidQuickSettings] = useState({
-    wifi: true,
-    bluetooth: false,
-    flashlight: false,
-    airplane: false,
-    batterySaver: false,
-    doNotDisturb: false,
-  });
-  const [volume, setVolume] = useState<number>(persistedSettings.volume ?? 80);
-  const [brightness, setBrightness] = useState<number>(persistedSettings.brightness ?? 95);
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(persistedSettings.soundEnabled ?? true);
-
-  const toggleAndroidQuick = useCallback((key: 'wifi' | 'bluetooth' | 'flashlight' | 'airplane' | 'batterySaver' | 'doNotDisturb') => {
-    setAndroidQuickSettings((prev) => {
-      const next = { ...prev, [key]: !prev[key] };
-      triggerDynamicIsland(`${key.toUpperCase()} ${next[key] ? 'Enabled' : 'Disabled'}`, 'Quick Settings', 'SlidersHorizontal');
-      return next;
-    });
-  }, [triggerDynamicIsland]);
-
   const [locked, setLocked] = useState(false);
-  const [lockScreenStyle, setLockScreenStyle] = useState<LockScreenStyle>(
-    (persistedSettings.lockScreenStyle as LockScreenStyle) ?? 'hyperos3'
-  );
-  const [touchMode, setTouchMode] = useState<boolean>(persistedSettings.touchMode === true);
   const [user, setUserState] = useState<UserProfile | null>(persistedSettings.user ?? null);
   const [showWelcome, setWelcome] = useState(false);
 
-  // Notifications State & Initial Seed
-  const [notifications, setNotifications] = useState<NotificationItem[]>(() => [
-    {
-      id: 'notif-welcome',
-      title: 'GlassiumOS-V4.0',
-      message: 'GlassiumOS-V4.0 desktop environment is ready.',
-      time: 'Just now',
-      app: 'System',
-      icon: 'Shield',
-      unread: true,
-      timestamp: Date.now(),
-    },
-    {
-      id: 'notif-driver',
-      title: '2.5D Glass Compositor',
-      message: 'Translucent glass layers and live aurora are active.',
-      time: '1 min ago',
-      app: 'Settings',
-      icon: 'Monitor',
-      unread: false,
-      timestamp: Date.now() - 60000,
-    },
-  ]);
-
-  const addNotification = useCallback((n: Omit<NotificationItem, 'id' | 'timestamp'>) => {
-    const newNotif: NotificationItem = {
-      ...n,
-      id: 'notif-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-      timestamp: Date.now(),
-      unread: true,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
-  }, []);
-
-  const dismissNotification = useCallback((id: string) => {
-    setNotifications((prev) => prev.filter((item) => item.id !== id));
-  }, []);
-
-  const clearNotifications = useCallback(() => {
-    setNotifications([]);
-  }, []);
-
-  // System Flyouts State
-  const [widgetsOpen, setWidgetsOpen] = useState(false);
-  const toggleWidgets = useCallback(() => setWidgetsOpen((v) => !v), []);
-
-  const [copilotOpen, setCopilotOpen] = useState(false);
-  const toggleCopilot = useCallback(() => setCopilotOpen((v) => !v), []);
-
-  const [controlCenterOpen, setControlCenterOpen] = useState(false);
-  const toggleControlCenter = useCallback(() => setControlCenterOpen((v) => !v), []);
-
-  const [launchpadOpen, setLaunchpadOpen] = useState(false);
-  const toggleLaunchpad = useCallback(() => setLaunchpadOpen((v) => !v), []);
-
-  const setTheme = useCallback((t: Theme) => {
-    setThemeState(t);
-    setQuickSettings((q) => ({ ...q, darkMode: t === 'dark' }));
-  }, []);
-
-  // Automatically sample custom wallpaper luminance to detect bright/white backgrounds
+  // Sync CSS variables with custom slider values
   useEffect(() => {
-    const customWp = customWallpapers.find((c) => c.id === selectedCustomId);
-    if (!customWp) {
-      setCustomWallpaperBright(false);
-      return;
-    }
-    let cancelled = false;
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      if (cancelled) return;
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = 16;
-        canvas.height = 16;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0, 16, 16);
-        const data = ctx.getImageData(0, 0, 16, 16).data;
-        let totalLum = 0;
-        const count = data.length / 4;
-        for (let i = 0; i < data.length; i += 4) {
-          totalLum += 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-        }
-        const avgLum = totalLum / count;
-        setCustomWallpaperBright(avgLum > 145);
-      } catch {
-        setCustomWallpaperBright(false);
-      }
-    };
-    img.src = customWp.dataUrl;
-    return () => {
-      cancelled = true;
-    };
-  }, [customWallpapers, selectedCustomId]);
-
-  const isWallpaperBright = selectedCustomId
-    ? customWallpaperBright
-    : Boolean(WALLPAPERS[wallpaper]?.isBright);
-
-  // Sync CSS variables & data attributes with custom slider, theme, wallpaper tone, and accent color values
-  useEffect(() => {
-    const preset = ACCENT_COLOR_PRESETS.find((p) => p.id === accentColor) ?? ACCENT_COLOR_PRESETS[0];
-    document.documentElement.setAttribute('data-theme', theme);
-    document.documentElement.setAttribute('data-accent', accentColor);
-    document.documentElement.setAttribute('data-ui-style', uiStyle);
-    document.documentElement.setAttribute('data-wallpaper-tone', isWallpaperBright ? 'bright' : 'dark');
-    document.documentElement.style.setProperty('--os-accent', preset.hex);
-    document.documentElement.style.setProperty('--os-accent-rgb', preset.rgb);
     document.documentElement.style.setProperty('--theme-blur', `${blurAmount}px`);
     document.documentElement.style.setProperty('--theme-opacity', `${(100 - transparency) / 100}`);
     document.documentElement.style.setProperty('--theme-radius', `${cornerRadius}px`);
-    document.documentElement.style.setProperty('--glass-curvature', `${glassCurvature}px`);
-    document.documentElement.style.setProperty('--glass-specular', `${glassSpecular / 100}`);
-    document.documentElement.style.setProperty('--glass-wobble', `${glassWobble / 100}`);
-  }, [theme, accentColor, uiStyle, isWallpaperBright, blurAmount, transparency, cornerRadius, glassCurvature, glassSpecular, glassWobble]);
+  }, [blurAmount, transparency, cornerRadius]);
 
   // Persist Settings
   useEffect(() => {
@@ -746,14 +266,10 @@ export function OSProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(
         LS_KEY,
         JSON.stringify({
-          uiStyle,
           wallpaper,
           customWallpapers,
           selectedCustomId,
           theme,
-          accentColor,
-          desktopIconSize,
-          gridSnapEnabled,
           shellMode,
           taskbarStyle,
           designEngine,
@@ -762,38 +278,20 @@ export function OSProvider({ children }: { children: ReactNode }) {
           cornerRadius,
           transparency,
           animSpeed,
-          glassCurvature,
-          glassSpecular,
-          glassWobble,
-          glassDispersion,
-          glassNoise,
-          auroraColor,
-          auroraSpeed,
-          auroraIntensity,
-          auroraParticles,
           quickSettings,
           liteMode,
           taskbarAlign,
           user,
-          lockScreenStyle,
-          touchMode,
-          volume,
-          brightness,
-          soundEnabled,
         })
       );
     } catch {
       // Ignore quota error
     }
   }, [
-    uiStyle,
     wallpaper,
     customWallpapers,
     selectedCustomId,
     theme,
-    accentColor,
-    desktopIconSize,
-    gridSnapEnabled,
     shellMode,
     taskbarStyle,
     designEngine,
@@ -802,24 +300,10 @@ export function OSProvider({ children }: { children: ReactNode }) {
     cornerRadius,
     transparency,
     animSpeed,
-    glassCurvature,
-    glassSpecular,
-    glassWobble,
-    glassDispersion,
-    glassNoise,
-    auroraColor,
-    auroraSpeed,
-    auroraIntensity,
-    auroraParticles,
     quickSettings,
     liteMode,
     taskbarAlign,
     user,
-    lockScreenStyle,
-    touchMode,
-    volume,
-    brightness,
-    soundEnabled,
   ]);
 
   // Persist Apps
@@ -830,23 +314,6 @@ export function OSProvider({ children }: { children: ReactNode }) {
       // Ignore quota error
     }
   }, [installedApps]);
-
-  // Persist Themes
-  useEffect(() => {
-    try {
-      localStorage.setItem(LS_THEMES_KEY, JSON.stringify(installedThemeIds));
-    } catch {
-      // Ignore quota error
-    }
-  }, [installedThemeIds]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(LS_CURRENT_THEME_KEY, JSON.stringify(currentThemeId));
-    } catch {
-      // Ignore quota error
-    }
-  }, [currentThemeId]);
 
   // Persist Calendar Tasks
   useEffect(() => {
@@ -866,262 +333,55 @@ export function OSProvider({ children }: { children: ReactNode }) {
     }
   }, [fileSystem]);
 
-  // Stylish tactile audio feedback using soundService scaled by volume & soundEnabled
+  // Synthetic Audio feedback using Web Audio API
   const playSound = useCallback((type: 'open' | 'click' | 'lock' | 'notify') => {
-    if (!soundEnabled || volume <= 0) return;
     try {
-      if (type === 'click') soundService.playClick();
-      else if (type === 'open') soundService.playOpen();
-      else if (type === 'lock') soundService.playLock();
-      else if (type === 'notify') soundService.playNotify();
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      const now = ctx.currentTime;
+      if (type === 'click') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(800, now);
+        osc.frequency.exponentialRampToValueAtTime(400, now + 0.04);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.linearRampToValueAtTime(0.001, now + 0.04);
+        osc.start(now);
+        osc.stop(now + 0.04);
+      } else if (type === 'open') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(640, now + 0.12);
+        gain.gain.setValueAtTime(0.1, now);
+        gain.gain.linearRampToValueAtTime(0.001, now + 0.12);
+        osc.start(now);
+        osc.stop(now + 0.12);
+      } else if (type === 'lock') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(220, now + 0.25);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.linearRampToValueAtTime(0.001, now + 0.25);
+        osc.start(now);
+        osc.stop(now + 0.25);
+      } else if (type === 'notify') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(523.25, now); // C5
+        osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.linearRampToValueAtTime(0.001, now + 0.2);
+        osc.start(now);
+        osc.stop(now + 0.2);
+      }
     } catch {
       // AudioContext might be blocked until user gesture
     }
-  }, [soundEnabled, volume]);
-
-  // Persist Icon Positions, Virtual Desktops & Desk Notes
-  useEffect(() => {
-    try {
-      localStorage.setItem(LS_ICON_POS_KEY, JSON.stringify(desktopIconPositions));
-    } catch {
-      // Ignore quota error
-    }
-  }, [desktopIconPositions]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(LS_DESKTOPS_KEY, JSON.stringify(desktops));
-    } catch {
-      // Ignore quota error
-    }
-  }, [desktops]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(LS_DESK_NOTES_KEY, JSON.stringify(deskNotes));
-    } catch {
-      // Ignore quota error
-    }
-  }, [deskNotes]);
-
-  const setDesktopIconSize = useCallback(
-    (newSize: DesktopIconSize) => {
-      playSound('click');
-      setDesktopIconSizeState((oldSize) => {
-        const oldPreset = DESKTOP_ICON_SIZE_PRESETS[oldSize] ?? DESKTOP_ICON_SIZE_PRESETS.medium;
-        const newPreset = DESKTOP_ICON_SIZE_PRESETS[newSize] ?? DESKTOP_ICON_SIZE_PRESETS.medium;
-        const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
-        const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-        const maxCols = Math.max(2, Math.floor((vw - 24) / newPreset.cellW));
-        const maxRows = Math.max(3, Math.floor((vh - 76) / newPreset.cellH));
-
-        setDesktopIconPositions((prev) => {
-          const next: Record<string, { x: number; y: number }> = {};
-          const occupied = new Set<string>();
-          Object.entries(prev).forEach(([key, pos]) => {
-            let col = Math.max(0, Math.min(maxCols - 1, Math.round((pos.x - 16) / oldPreset.cellW)));
-            let row = Math.max(0, Math.min(maxRows - 1, Math.round((pos.y - 16) / oldPreset.cellH)));
-            while (occupied.has(`${col},${row}`)) {
-              row += 1;
-              if (row >= maxRows) {
-                row = 0;
-                col += 1;
-              }
-            }
-            occupied.add(`${col},${row}`);
-            next[key] = {
-              x: 16 + col * newPreset.cellW,
-              y: 16 + row * newPreset.cellH,
-            };
-          });
-          return next;
-        });
-        return newSize;
-      });
-    },
-    [playSound]
-  );
-
-  const updateDesktopIconPosition = useCallback(
-    (id: string, x: number, y: number) => {
-      const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
-      const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-      const preset = DESKTOP_ICON_SIZE_PRESETS[desktopIconSize] ?? DESKTOP_ICON_SIZE_PRESETS.medium;
-
-      if (!gridSnapEnabled) {
-        const clampedX = Math.max(8, Math.min(vw - preset.boxW - 8, Math.round(x)));
-        const clampedY = Math.max(8, Math.min(vh - preset.boxH - 56, Math.round(y)));
-        setDesktopIconPositions((prev) => ({
-          ...prev,
-          [id]: { x: clampedX, y: clampedY },
-        }));
-        return;
-      }
-
-      const maxCols = Math.max(2, Math.floor((vw - 24) / preset.cellW));
-      const maxRows = Math.max(3, Math.floor((vh - 76) / preset.cellH));
-      const targetCol = Math.max(0, Math.min(maxCols - 1, Math.round((x - 16) / preset.cellW)));
-      const targetRow = Math.max(0, Math.min(maxRows - 1, Math.round((y - 16) / preset.cellH)));
-      const snappedX = 16 + targetCol * preset.cellW;
-      const snappedY = 16 + targetRow * preset.cellH;
-
-      setDesktopIconPositions((prev) => {
-        const prevPos = prev[id];
-        const next = { ...prev };
-
-        // Check if another icon already occupies this grid slot
-        const collidingEntry = Object.entries(prev).find(([otherId, pos]) => {
-          if (otherId === id) return false;
-          const cCol = Math.round((pos.x - 16) / preset.cellW);
-          const cRow = Math.round((pos.y - 16) / preset.cellH);
-          return cCol === targetCol && cRow === targetRow;
-        });
-
-        next[id] = { x: snappedX, y: snappedY };
-
-        if (collidingEntry) {
-          const [otherId] = collidingEntry;
-          if (prevPos) {
-            // Swap with previous slot of dragged icon
-            const prevCol = Math.max(0, Math.min(maxCols - 1, Math.round((prevPos.x - 16) / preset.cellW)));
-            const prevRow = Math.max(0, Math.min(maxRows - 1, Math.round((prevPos.y - 16) / preset.cellH)));
-            next[otherId] = {
-              x: 16 + prevCol * preset.cellW,
-              y: 16 + prevRow * preset.cellH,
-            };
-          } else {
-            // Find first open slot
-            const occupied = new Set(
-              Object.entries(next)
-                .filter(([k]) => k !== otherId)
-                .map(([, p]) => `${Math.round((p.x - 16) / preset.cellW)},${Math.round((p.y - 16) / preset.cellH)}`)
-            );
-            let fCol = 0;
-            let fRow = 0;
-            while (occupied.has(`${fCol},${fRow}`)) {
-              fRow += 1;
-              if (fRow >= maxRows) {
-                fRow = 0;
-                fCol += 1;
-              }
-            }
-            next[otherId] = {
-              x: 16 + fCol * preset.cellW,
-              y: 16 + fRow * preset.cellH,
-            };
-          }
-        }
-        return next;
-      });
-    },
-    [desktopIconSize, gridSnapEnabled]
-  );
-
-  const resetDesktopIconPositions = useCallback(
-    (snapToGrid?: boolean) => {
-      playSound('click');
-      const preset = DESKTOP_ICON_SIZE_PRESETS[desktopIconSize] ?? DESKTOP_ICON_SIZE_PRESETS.medium;
-      if (snapToGrid) {
-        setDesktopIconPositions((prev) => {
-          const next: Record<string, { x: number; y: number }> = {};
-          const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
-          const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-          const maxCols = Math.max(2, Math.floor((vw - 24) / preset.cellW));
-          const maxRows = Math.max(3, Math.floor((vh - 76) / preset.cellH));
-          const occupied = new Set<string>();
-          Object.entries(prev).forEach(([key, pos]) => {
-            let col = Math.max(0, Math.min(maxCols - 1, Math.round((pos.x - 16) / preset.cellW)));
-            let row = Math.max(0, Math.min(maxRows - 1, Math.round((pos.y - 16) / preset.cellH)));
-            while (occupied.has(`${col},${row}`)) {
-              row += 1;
-              if (row >= maxRows) {
-                row = 0;
-                col += 1;
-              }
-            }
-            occupied.add(`${col},${row}`);
-            next[key] = {
-              x: 16 + col * preset.cellW,
-              y: 16 + row * preset.cellH,
-            };
-          });
-          return next;
-        });
-      } else {
-        setDesktopIconPositions(computeDefaultIconPositions(desktopIconSize));
-      }
-    },
-    [playSound, desktopIconSize]
-  );
-
-  const toggleTaskView = useCallback(() => {
-    playSound('click');
-    setTaskViewOpen((v) => !v);
-  }, [playSound]);
-
-  const switchDesktop = useCallback((id: string) => {
-    playSound('click');
-    setActiveDesktopId(id);
-    setTaskViewOpen(false);
-  }, [playSound]);
-
-  const createDesktop = useCallback(() => {
-    playSound('open');
-    setDesktops((prev) => {
-      const nextNum = prev.length + 1;
-      const newDesk: VirtualDesktop = {
-        id: `desk-${Date.now()}`,
-        name: `デスクトップ ${nextNum}`,
-      };
-      setActiveDesktopId(newDesk.id);
-      return [...prev, newDesk];
-    });
-  }, [playSound]);
-
-  const removeDesktop = useCallback((id: string) => {
-    playSound('click');
-    setDesktops((prev) => {
-      if (prev.length <= 1) return prev;
-      const remaining = prev.filter((d) => d.id !== id);
-      const fallbackId = remaining[0].id;
-      setWindows((ws) =>
-        ws.map((w) => (w.desktopId === id ? { ...w, desktopId: fallbackId } : w))
-      );
-      setActiveDesktopId((curr) => (curr === id ? fallbackId : curr));
-      return remaining;
-    });
-  }, [playSound]);
-
-  const moveWindowToDesktop = useCallback((winId: string, desktopId: string) => {
-    playSound('click');
-    setWindows((ws) =>
-      ws.map((w) => (w.id === winId ? { ...w, desktopId, minimized: false } : w))
-    );
-  }, [playSound]);
-
-  const addDeskNote = useCallback(() => {
-    playSound('open');
-    const colors: DeskStickyNote['color'][] = ['cyan', 'violet', 'amber', 'emerald', 'rose'];
-    setDeskNotes((prev) => [
-      ...prev,
-      {
-        id: `note-${Date.now()}`,
-        text: 'デスクメモをここに入力...',
-        color: colors[prev.length % colors.length],
-        x: 240 + (prev.length % 5) * 32,
-        y: 80 + (prev.length % 5) * 32,
-      },
-    ]);
-  }, [playSound]);
-
-  const updateDeskNote = useCallback((id: string, patch: Partial<DeskStickyNote>) => {
-    setDeskNotes((prev) => prev.map((n) => (n.id === id ? { ...n, ...patch } : n)));
   }, []);
-
-  const deleteDeskNote = useCallback((id: string) => {
-    playSound('click');
-    setDeskNotes((prev) => prev.filter((n) => n.id !== id));
-  }, [playSound]);
 
   const focusWindow = useCallback((id: string) => {
     zCounter.current += 1;
@@ -1132,162 +392,120 @@ export function OSProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const openApp = useCallback(
-    (rawAppId: AppId, opts?: OpenOptions) => {
-      const appId: AppId = rawAppId === 'sysmon' ? 'taskmanager' : rawAppId;
+    (appId: AppId, opts?: OpenOptions) => {
       playSound('open');
-      setTaskViewOpen(false);
-      setWindows((ws) => {
-        // If window exists on current or any other virtual desktop, bring it to current desktop and unminimize
-        const existing = ws.find((w) => w.appId === appId);
-        if (existing && appId !== 'notepad' && !opts?.payload) {
-          zCounter.current += 1;
-          const z = zCounter.current;
-          return ws.map((w) =>
-            w.id === existing.id
-              ? { ...w, zIndex: z, minimized: false, desktopId: activeDesktopId }
-              : w
-          );
-        }
-        const def = APP_DEFAULTS[appId] ?? {
-          title: 'Application',
-          icon: 'Sparkles',
-          width: 760,
-          height: 520,
-        };
-        idCounter.current += 1;
-        const id = `win-${idCounter.current}`;
-        zCounter.current += 1;
-        const count = ws.filter((w) => !w.desktopId || w.desktopId === activeDesktopId).length;
-        const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
-        const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-        const width = Math.min(vw - 20, opts?.width ?? def.width);
-        const height = Math.min(vh - 70, opts?.height ?? def.height);
-        const maxX = Math.max(16, vw - width - 24);
-        const maxY = Math.max(16, vh - height - 64);
-        const x = Math.max(16, Math.min(maxX, 72 + (count % 8) * 36));
-        const y = Math.max(16, Math.min(maxY, 36 + (count % 8) * 30));
-        const win: WindowState = {
-          id,
-          appId,
-          title: opts?.title ?? def.title,
-          icon: opts?.icon ?? def.icon,
-          x,
-          y,
-          width,
-          height,
-          zIndex: zCounter.current,
-          minimized: false,
-          maximized: false,
-          desktopId: activeDesktopId,
-          payload: opts?.payload,
-        };
-        return [...ws, win];
-      });
+      const existing = windows.find((w) => w.appId === appId);
+      if (existing && appId !== 'notepad') {
+        focusWindow(existing.id);
+        return;
+      }
+      const def = APP_DEFAULTS[appId] ?? {
+        title: 'Application',
+        icon: 'Sparkles',
+        width: 760,
+        height: 520,
+      };
+      idCounter.current += 1;
+      const id = `win-${idCounter.current}`;
+      zCounter.current += 1;
+      const count = windows.length;
+      const width = opts?.width ?? def.width;
+      const height = opts?.height ?? def.height;
+      const win: WindowState = {
+        id,
+        appId,
+        title: opts?.title ?? def.title,
+        icon: opts?.icon ?? def.icon,
+        x: Math.min(window.innerWidth - width - 40, Math.max(40, 100 + count * 28)),
+        y: Math.min(window.innerHeight - height - 80, Math.max(40, 60 + count * 24)),
+        width,
+        height,
+        zIndex: zCounter.current,
+        minimized: false,
+        maximized: false,
+        payload: opts?.payload,
+      };
+      setWindows((ws) => [...ws, win]);
     },
-    [activeDesktopId, playSound]
+    [windows, focusWindow, playSound]
   );
 
   const launchInstalledApp = useCallback(
     (appId: string) => {
       playSound('open');
-      setTaskViewOpen(false);
       const storeItem = STORE_CATALOG.find((s) => s.id === appId);
       if (storeItem?.builtInAppId) {
-        openApp(storeItem.builtInAppId, { payload: { gameId: storeItem.id } });
+        openApp(storeItem.builtInAppId);
         return;
       }
       const app = installedApps.find((a) => a.appId === appId || a.id === appId);
       if (!app) return;
       if (app.builtInAppId) {
-        openApp(app.builtInAppId, { payload: { gameId: app.id } });
+        openApp(app.builtInAppId);
         return;
       }
-      setWindows((ws) => {
-        const existing = ws.find(
-          (w) => w.appId === app.appId && (!w.desktopId || w.desktopId === activeDesktopId)
-        );
-        if (existing) {
-          zCounter.current += 1;
-          const z = zCounter.current;
-          return ws.map((w) =>
-            w.id === existing.id ? { ...w, zIndex: z, minimized: false } : w
-          );
-        }
-        idCounter.current += 1;
-        const id = `win-${idCounter.current}`;
-        zCounter.current += 1;
-        const count = ws.filter((w) => !w.desktopId || w.desktopId === activeDesktopId).length;
-        const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
-        const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-        const width = Math.min(vw - 20, 840);
-        const height = Math.min(vh - 70, 560);
-        const maxX = Math.max(16, vw - width - 24);
-        const maxY = Math.max(16, vh - height - 64);
-        const x = Math.max(16, Math.min(maxX, 76 + (count % 8) * 36));
-        const y = Math.max(16, Math.min(maxY, 40 + (count % 8) * 30));
-        const win: WindowState = {
-          id,
-          appId: app.appId,
-          title: app.name,
-          icon: app.icon,
-          x,
-          y,
-          width,
-          height,
-          zIndex: zCounter.current,
-          minimized: false,
-          maximized: false,
-          desktopId: activeDesktopId,
-          payload: { appInfo: app, url: app.url, isCustomApp: Boolean(app.url) },
-        };
-        return [...ws, win];
-      });
+      const existing = windows.find((w) => w.appId === app.appId);
+      if (existing) {
+        focusWindow(existing.id);
+        return;
+      }
+      idCounter.current += 1;
+      const id = `win-${idCounter.current}`;
+      zCounter.current += 1;
+      const count = windows.length;
+      const win: WindowState = {
+        id,
+        appId: app.appId,
+        title: app.name,
+        icon: app.icon,
+        x: 130 + count * 28,
+        y: 80 + count * 24,
+        width: 840,
+        height: 560,
+        zIndex: zCounter.current,
+        minimized: false,
+        maximized: false,
+        payload: { appInfo: app },
+      };
+      setWindows((ws) => [...ws, win]);
     },
-    [installedApps, activeDesktopId, openApp, playSound]
+    [installedApps, windows, focusWindow, openApp, playSound]
   );
 
   const closeWindow = useCallback((id: string) => {
-    playSound('click');
     setWindows((ws) => ws.filter((w) => w.id !== id));
-  }, [playSound]);
+  }, []);
 
   const minimizeWindow = useCallback((id: string) => {
-    playSound('click');
     setWindows((ws) => ws.map((w) => (w.id === id ? { ...w, minimized: true } : w)));
-  }, [playSound]);
+  }, []);
 
   const restoreWindow = useCallback(
     (id: string) => {
-      zCounter.current += 1;
-      const z = zCounter.current;
       setWindows((ws) =>
-        ws.map((w) => (w.id === id ? { ...w, minimized: false, zIndex: z } : w))
+        ws.map((w) => (w.id === id ? { ...w, minimized: false } : w))
       );
+      focusWindow(id);
     },
-    []
+    [focusWindow]
   );
 
   const toggleMaximize = useCallback((id: string) => {
-    playSound('click');
-    zCounter.current += 1;
-    const z = zCounter.current;
     setWindows((ws) =>
       ws.map((w) => {
         if (w.id !== id) return w;
-        if (w.maximized) {
-          const fallbackRect = { x: 80, y: 50, width: 820, height: 540 };
-          const { x, y, width, height } = w.prevRect ?? fallbackRect;
-          return { ...w, maximized: false, zIndex: z, x, y, width, height, prevRect: undefined };
+        if (w.maximized && w.prevRect) {
+          const { x, y, width, height } = w.prevRect;
+          return { ...w, maximized: false, x, y, width, height, prevRect: undefined };
         }
         return {
           ...w,
           maximized: true,
-          zIndex: z,
           prevRect: { x: w.x, y: w.y, width: w.width, height: w.height },
         };
       })
     );
-  }, [playSound]);
+  }, []);
 
   const updateWindowRect = useCallback(
     (id: string, rect: Partial<Pick<WindowState, 'x' | 'y' | 'width' | 'height'>>) => {
@@ -1351,6 +569,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
           name: folderName,
           kind: 'folder',
           children: [],
+          createdAt: Date.now(),
         });
       }
       return clone;
@@ -1370,64 +589,6 @@ export function OSProvider({ children }: { children: ReactNode }) {
       return clone;
     });
   }, []);
-
-  const recycleFile = useCallback((path: string[], nodeName: string) => {
-    setFileSystem((fs) => {
-      const clone: VirtualFolder = JSON.parse(JSON.stringify(fs));
-      let folder = clone;
-      for (const seg of path) {
-        const next = folder.children.find((c) => c.name === seg && c.kind === 'folder');
-        if (!next || next.kind !== 'folder') return fs;
-        folder = next;
-      }
-      const targetIdx = folder.children.findIndex((c) => c.name === nodeName);
-      if (targetIdx === -1) return fs;
-      const [item] = folder.children.splice(targetIdx, 1);
-
-      // Find or create recycle bin folder in root
-      let trashFolder = clone.children.find((c) => c.id === 'trash' || c.name.toLowerCase().includes('recycle') || c.name.toLowerCase().includes('trash'));
-      if (!trashFolder || trashFolder.kind !== 'folder') {
-        trashFolder = { id: 'trash', name: 'Recycle Bin', kind: 'folder', children: [] };
-        clone.children.push(trashFolder);
-      }
-      (trashFolder as VirtualFolder).children.push(item);
-      return clone;
-    });
-    playSound('notify');
-  }, [playSound]);
-
-  const emptyRecycleBin = useCallback(() => {
-    setFileSystem((fs) => {
-      const clone: VirtualFolder = JSON.parse(JSON.stringify(fs));
-      const trashFolder = clone.children.find((c) => c.id === 'trash' || c.name.toLowerCase().includes('recycle') || c.name.toLowerCase().includes('trash'));
-      if (trashFolder && trashFolder.kind === 'folder') {
-        trashFolder.children = [];
-      }
-      return clone;
-    });
-    playSound('click');
-  }, [playSound]);
-
-  const restoreRecycleFile = useCallback((nodeName: string) => {
-    setFileSystem((fs) => {
-      const clone: VirtualFolder = JSON.parse(JSON.stringify(fs));
-      const trashFolder = clone.children.find((c) => c.id === 'trash' || c.name.toLowerCase().includes('recycle') || c.name.toLowerCase().includes('trash'));
-      if (!trashFolder || trashFolder.kind !== 'folder') return fs;
-      const targetIdx = trashFolder.children.findIndex((c) => c.name === nodeName);
-      if (targetIdx === -1) return fs;
-      const [item] = trashFolder.children.splice(targetIdx, 1);
-
-      // Restore into Documents or root
-      const docsFolder = clone.children.find((c) => c.id === 'documents' || c.name === 'Documents');
-      if (docsFolder && docsFolder.kind === 'folder') {
-        docsFolder.children.push(item);
-      } else {
-        clone.children.push(item);
-      }
-      return clone;
-    });
-    playSound('open');
-  }, [playSound]);
 
   const openFileNode = useCallback(
     (node: VirtualNode) => {
@@ -1455,7 +616,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const toggleQuick = useCallback((key: 'wifi' | 'bluetooth' | 'darkMode') => {
     setQuickSettings((q) => {
       const next = { ...q, [key]: !q[key] };
-      if (key === 'darkMode') setThemeState(next.darkMode ? 'dark' : 'light');
+      if (key === 'darkMode') setTheme(next.darkMode ? 'dark' : 'light');
       return next;
     });
   }, []);
@@ -1468,17 +629,15 @@ export function OSProvider({ children }: { children: ReactNode }) {
 
   const toggleStart = useCallback(() => setStartOpen((v) => !v), []);
 
-  const installApp = useCallback((app: Partial<StoreApp> & { name: string; icon: string; description: string; author: string; category: 'utilities' | 'games' }) => {
+  const installApp = useCallback((app: StoreApp) => {
     playSound('notify');
     setInstalledApps((list) => {
-      const id = app.id || `custom-${Date.now()}`;
-      if (list.some((a) => a.id === id)) return list;
-      const appId = app.builtInAppId ?? (app.url ? `custom:${id}` : id);
+      if (list.some((a) => a.id === app.id)) return list;
       return [
         ...list,
         {
-          id,
-          appId,
+          id: app.id,
+          appId: app.builtInAppId ?? app.id,
           name: app.name,
           icon: app.icon,
           description: app.description,
@@ -1486,8 +645,6 @@ export function OSProvider({ children }: { children: ReactNode }) {
           category: app.category,
           installedAt: Date.now(),
           builtInAppId: app.builtInAppId,
-          url: app.url,
-          isCustom: Boolean(app.url),
         },
       ];
     });
@@ -1502,57 +659,6 @@ export function OSProvider({ children }: { children: ReactNode }) {
     (appId: string) => installedApps.some((a) => a.id === appId || a.appId === appId),
     [installedApps]
   );
-
-  // Theme Operations
-  const isThemeInstalled = useCallback(
-    (themeId: string) => installedThemeIds.includes(themeId),
-    [installedThemeIds]
-  );
-
-  const installTheme = useCallback((themeId: string) => {
-    playSound('notify');
-    setInstalledThemeIds((prev) => (prev.includes(themeId) ? prev : [...prev, themeId]));
-    const target = STORE_THEMES.find((t) => t.id === themeId);
-    if (target) {
-      addNotification({
-        title: 'Theme Downloaded',
-        message: `${target.name} has been added to your theme library.`,
-        icon: 'Palette',
-      });
-      triggerDynamicIsland(target.name, 'Theme Downloaded', 'Palette');
-    }
-  }, [playSound, addNotification, triggerDynamicIsland]);
-
-  const uninstallTheme = useCallback((themeId: string) => {
-    playSound('click');
-    setInstalledThemeIds((prev) => prev.filter((id) => id !== themeId));
-    if (currentThemeId === themeId) {
-      setCurrentThemeId(null);
-    }
-  }, [playSound, currentThemeId]);
-
-  const applyThemeConfig = useCallback((themeId: string) => {
-    const target = STORE_THEMES.find((t) => t.id === themeId);
-    if (!target) return;
-    playSound('open');
-    setShellMode(target.config.shellMode);
-    setDesignEngine(target.config.designEngine);
-    setWallpaper(target.config.wallpaper);
-    setTheme(target.config.theme);
-    if (target.config.blurAmount !== undefined) setBlurAmount(target.config.blurAmount);
-    if (target.config.cornerRadius !== undefined) setCornerRadius(target.config.cornerRadius);
-    if (target.config.transparency !== undefined) setTransparency(target.config.transparency);
-    setCurrentThemeId(themeId);
-
-    setInstalledThemeIds((prev) => (prev.includes(themeId) ? prev : [...prev, themeId]));
-
-    addNotification({
-      title: 'Theme Applied',
-      message: `Active theme changed to ${target.name}.`,
-      icon: 'Palette',
-    });
-    triggerDynamicIsland(target.name, 'Theme Activated', 'Check');
-  }, [playSound, addNotification, triggerDynamicIsland]);
 
   // Calendar Task Operations
   const addTask = useCallback((task: Omit<CalendarTask, 'id'>) => {
@@ -1626,31 +732,6 @@ export function OSProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [lockSystem]);
 
-  const snapAllWindows5050 = useCallback(() => {
-    const vw = typeof window !== 'undefined' ? window.innerWidth : 1200;
-    const vh = typeof window !== 'undefined' ? window.innerHeight - 48 : 750;
-    setWindows((ws) => {
-      const visible = ws.filter((w) => !w.minimized);
-      if (visible.length === 0) return ws;
-      if (visible.length === 1) {
-        return ws.map((w) =>
-          w.id === visible[0].id ? { ...w, maximized: false, x: 12, y: 12, width: vw - 24, height: vh - 24 } : w
-        );
-      }
-      const halfW = Math.floor((vw - 36) / 2);
-      return ws.map((w) => {
-        const idx = visible.findIndex((v) => v.id === w.id);
-        if (idx === 0) {
-          return { ...w, maximized: false, x: 12, y: 12, width: halfW, height: vh - 24 };
-        }
-        if (idx === 1) {
-          return { ...w, maximized: false, x: 24 + halfW, y: 12, width: halfW, height: vh - 24 };
-        }
-        return w;
-      });
-    });
-  }, []);
-
   const value: OSContextValue = {
     windows,
     openApp,
@@ -1666,9 +747,6 @@ export function OSProvider({ children }: { children: ReactNode }) {
     createFolder,
     deleteNode,
     openFileNode,
-    recycleFile,
-    emptyRecycleBin,
-    restoreRecycleFile,
     wallpaper,
     setWallpaper,
     customWallpapers,
@@ -1677,10 +755,6 @@ export function OSProvider({ children }: { children: ReactNode }) {
     setSelectedCustomId,
     theme,
     setTheme,
-    accentColor,
-    setAccentColor,
-    uiStyle,
-    setUiStyle,
     shellMode,
     setShellMode,
     taskbarStyle,
@@ -1689,13 +763,6 @@ export function OSProvider({ children }: { children: ReactNode }) {
     setDesignEngine,
     nebulaPreset,
     setNebulaPreset,
-    sleepClockStyle,
-    setSleepClockStyle,
-    sleepBackground,
-    setSleepBackground,
-    clockPosition,
-    setClockPosition,
-    temperature,
     blurAmount,
     setBlurAmount,
     cornerRadius,
@@ -1704,34 +771,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
     setTransparency,
     animSpeed,
     setAnimSpeed,
-    glassCurvature,
-    setGlassCurvature,
-    glassSpecular,
-    setGlassSpecular,
-    glassWobble,
-    setGlassWobble,
-    glassDispersion,
-    setGlassDispersion,
-    glassNoise,
-    setGlassNoise,
-    auroraColor,
-    setAuroraColor,
-    auroraSpeed,
-    setAuroraSpeed,
-    auroraIntensity,
-    setAuroraIntensity,
-    auroraParticles,
-    setAuroraParticles,
     quickSettings,
     toggleQuick,
-    androidQuickSettings,
-    toggleAndroidQuick,
-    volume,
-    setVolume,
-    brightness,
-    setBrightness,
-    dynamicIslandEvent,
-    triggerDynamicIsland,
     liteMode,
     setLiteMode,
     taskbarAlign,
@@ -1745,13 +786,6 @@ export function OSProvider({ children }: { children: ReactNode }) {
     launchInstalledApp,
     isInstalled,
     storeCatalog: STORE_CATALOG,
-    storeThemes: STORE_THEMES,
-    installedThemeIds,
-    currentThemeId,
-    installTheme,
-    uninstallTheme,
-    applyThemeConfig,
-    isThemeInstalled,
     calendarTasks,
     addTask,
     toggleTask,
@@ -1763,47 +797,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     setUser,
     showWelcome,
     setWelcome,
-    notifications,
-    addNotification,
-    clearNotifications,
-    dismissNotification,
-    widgetsOpen,
-    toggleWidgets,
-    copilotOpen,
-    toggleCopilot,
-    controlCenterOpen,
-    toggleControlCenter,
-    launchpadOpen,
-    toggleLaunchpad,
-    lockScreenStyle,
-    setLockScreenStyle,
-    touchMode,
-    setTouchMode,
-    soundEnabled,
-    setSoundEnabled,
-    snapAllWindows5050,
     playSound,
-    desktops,
-    activeDesktopId,
-    taskViewOpen,
-    setTaskViewOpen,
-    toggleTaskView,
-    switchDesktop,
-    createDesktop,
-    removeDesktop,
-    moveWindowToDesktop,
-    desktopIconPositions,
-    updateDesktopIconPosition,
-    resetDesktopIconPositions,
-    desktopIconSize,
-    setDesktopIconSize,
-    gridSnapEnabled,
-    setGridSnapEnabled,
-    isWallpaperBright,
-    deskNotes,
-    addDeskNote,
-    updateDeskNote,
-    deleteDeskNote,
   };
 
   return <OSContext.Provider value={value}>{children}</OSContext.Provider>;

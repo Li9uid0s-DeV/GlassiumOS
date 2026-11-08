@@ -7,14 +7,7 @@ interface AppLogoProps {
   glow?: boolean;
 }
 
-/**
- * GlassiumOS-V4.0 Official Brand Emblem: Abstracted Flat 2D Gradient Mark
- * Deconstructed, asymmetric geometric ribbon flow inspired by Microsoft 365 / Copilot
- * that subtly hints at a "G" vortex without being a literal letterform. Pure flat 2D.
- */
-export function AppLogo({ size = 32, className = '', variant = 'raw' }: AppLogoProps) {
-  const uid = React.useId().replace(/:/g, '');
-
+export function AppLogo({ size = 32, className = '', variant = 'raw', glow = false }: AppLogoProps) {
   const svgContent = (
     <svg
       viewBox="0 0 256 256"
@@ -22,47 +15,70 @@ export function AppLogo({ size = 32, className = '', variant = 'raw' }: AppLogoP
       height={size}
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className="shrink-0 transition-transform duration-300"
+      className={`shrink-0 ${glow ? 'filter drop-shadow-[0_0_12px_rgba(0,198,255,0.65)]' : ''}`}
     >
       <defs>
-        {/* Ribbon 1 (Top-Left Diagonal Sweep): Pink -> Magenta -> Amethyst */}
-        <linearGradient id={`g-abs-1-${uid}`} x1="188" y1="28" x2="32" y2="164" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#f472b6" />
-          <stop offset="45%" stopColor="#d946ef" />
-          <stop offset="100%" stopColor="#7c3aed" />
+        {/* Main Swirl Gradient */}
+        <linearGradient id="liquid-logo-grad1" x1="40" y1="30" x2="220" y2="230" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#38bdf8" />
+          <stop offset="35%" stopColor="#0284c7" />
+          <stop offset="70%" stopColor="#0369a1" />
+          <stop offset="100%" stopColor="#0284c7" />
         </linearGradient>
 
-        {/* Ribbon 2 (Bottom Asymmetric Arc): Amethyst -> Indigo -> Royal Blue */}
-        <linearGradient id={`g-abs-2-${uid}`} x1="48" y1="168" x2="224" y2="184" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#9333ea" />
-          <stop offset="50%" stopColor="#6366f1" />
-          <stop offset="100%" stopColor="#2563eb" />
+        {/* Secondary Lower Fluid Lap Gradient */}
+        <linearGradient id="liquid-logo-grad2" x1="180" y1="120" x2="90" y2="240" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#38bdf8" />
+          <stop offset="50%" stopColor="#0ea5e9" />
+          <stop offset="100%" stopColor="#0369a1" />
         </linearGradient>
 
-        {/* Ribbon 3 (Floating Diagonal Inner Wing): Cobalt -> Cyan -> Bright Aqua */}
-        <linearGradient id={`g-abs-3-${uid}`} x1="108" y1="148" x2="228" y2="88" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#3b82f6" />
-          <stop offset="55%" stopColor="#06b6d4" />
-          <stop offset="100%" stopColor="#2dd4bf" />
+        {/* Inner Tongue Ribbon Wave */}
+        <linearGradient id="liquid-logo-grad3" x1="120" y1="110" x2="220" y2="190" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#0284c7" />
+          <stop offset="45%" stopColor="#38bdf8" />
+          <stop offset="100%" stopColor="#67e8f9" />
+        </linearGradient>
+
+        {/* Floating Droplet Gradient */}
+        <linearGradient id="liquid-logo-drop" x1="160" y1="75" x2="190" y2="105" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#38bdf8" />
+          <stop offset="100%" stopColor="#0284c7" />
+        </linearGradient>
+
+        {/* Subtle Soft Highlight */}
+        <linearGradient id="liquid-logo-highlight" x1="60" y1="40" x2="100" y2="140" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.4" />
+          <stop offset="100%" stopColor="#ffffff" stopOpacity="0.0" />
         </linearGradient>
       </defs>
 
-      {/* Part 1: Deconstructed Upper-Left Sweeping Blade (Tilted & Tapered) */}
+      {/* Main Outer Fluid Loop (G / Droplet Swirl) */}
       <path
-        d="M178 36C132 20 76 38 46 82C24 114 24 154 42 184C48 194 62 194 68 184C73 176 72 166 68 156C58 134 62 106 80 86C102 62 138 56 166 68C178 73 192 66 194 54C196 44 188 39 178 36Z"
-        fill={`url(#g-abs-1-${uid})`}
+        d="M138 36C82 36 50 78 50 134C50 188 92 226 150 226C198 226 226 194 220 178C214 162 178 184 148 184C108 184 86 156 86 126C86 92 110 58 142 58C162 58 174 70 170 82C166 94 150 96 142 96C126 96 112 108 112 124C112 140 128 152 148 152C182 152 216 130 216 110C216 66 186 36 138 36Z"
+        fill="url(#liquid-logo-grad1)"
       />
 
-      {/* Part 2: Detached Lower-Right Flowing Ribbon with Negative-Space Gap */}
+      {/* Fluid Overlapping Curved Base Ribbon */}
       <path
-        d="M78 206C114 232 168 228 202 194C222 174 232 146 228 118C226 106 214 100 204 106L182 119C187 138 182 158 168 172C146 194 112 196 88 178C78 170 64 174 62 186C60 194 68 200 78 206Z"
-        fill={`url(#g-abs-2-${uid})`}
+        d="M62 144C62 188 98 224 148 224C190 224 218 196 218 180C202 194 172 204 142 204C98 204 74 174 74 144C74 136 76 128 80 120C68 128 62 136 62 144Z"
+        fill="url(#liquid-logo-grad2)"
+        opacity="0.85"
       />
 
-      {/* Part 3: Stylized Floating Diagonal Wing (Replaces literal horizontal G bar) */}
+      {/* Inner Fluid Wave Swirl */}
       <path
-        d="M112 142C104 132 108 116 120 110L192 74C206 67 222 74 226 88C230 100 222 114 210 120L138 156C128 161 118 150 112 142Z"
-        fill={`url(#g-abs-3-${uid})`}
+        d="M116 132C116 116 130 110 148 110C176 110 214 134 214 156C214 172 192 188 166 188C140 188 116 172 116 152C116 145 116 138 116 132Z"
+        fill="url(#liquid-logo-grad3)"
+      />
+
+      {/* Top Right Floating Celestial Liquid Droplet */}
+      <circle cx="178" cy="88" r="16" fill="url(#liquid-logo-drop)" />
+      
+      {/* Specular Inner Rim */}
+      <path
+        d="M138 40C88 40 56 80 56 134C56 154 62 172 74 186C68 172 64 154 64 134C64 84 94 48 138 48C154 48 164 54 168 62C162 52 150 40 138 40Z"
+        fill="url(#liquid-logo-highlight)"
       />
     </svg>
   );
@@ -70,7 +86,7 @@ export function AppLogo({ size = 32, className = '', variant = 'raw' }: AppLogoP
   if (variant === 'squircle') {
     return (
       <div
-        className={`rounded-2xl bg-slate-900/70 p-1.5 flex items-center justify-center ${className}`}
+        className={`rounded-2xl bg-white/95 p-1.5 shadow-xl flex items-center justify-center ${className}`}
         style={{ width: size * 1.3, height: size * 1.3 }}
       >
         {svgContent}
@@ -81,7 +97,7 @@ export function AppLogo({ size = 32, className = '', variant = 'raw' }: AppLogoP
   if (variant === 'glass') {
     return (
       <div
-        className={`rounded-xl bg-slate-900/50 p-1 flex items-center justify-center ${className}`}
+        className={`rounded-xl liquid-glass-window p-1 flex items-center justify-center ${className}`}
         style={{ width: size * 1.25, height: size * 1.25 }}
       >
         {svgContent}

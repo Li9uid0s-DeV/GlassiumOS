@@ -97,7 +97,7 @@ export function CalendarApp() {
         </div>
 
         {/* Quick Stats Summary */}
-        <div className="pt-3 border-t border-white/10 space-y-1 text-xs">
+        <div className="glass-panel p-3 rounded-xl space-y-1 text-xs">
           <div className="text-[11px] text-white/50">Scheduled Tasks</div>
           <div className="flex justify-between items-center text-white font-semibold">
             <span>Total Tasks</span>
@@ -111,8 +111,8 @@ export function CalendarApp() {
       </div>
 
       {/* Right Content / Tasks Agenda List */}
-      <div className="flex-1 flex flex-col p-5 overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
+      <div className="flex-1 flex flex-col p-4 overflow-y-auto">
+        <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="text-base font-bold text-white">Agenda for {selectedDate}</h3>
             <p className="text-xs text-white/50">Manage scheduled system tasks and milestones.</p>
@@ -120,18 +120,18 @@ export function CalendarApp() {
         </div>
 
         {/* Add Task Input Form */}
-        <form onSubmit={handleCreateTask} className="pb-4 mb-4 border-b border-white/10 flex flex-col gap-2.5">
+        <form onSubmit={handleCreateTask} className="glass-panel p-3 rounded-xl mb-4 flex flex-col gap-2">
           <div className="flex gap-2">
             <input
               type="text"
               value={newTitle}
               onChange={(e) => setNewTitle(e.target.value)}
               placeholder="Add new task or reminder..."
-              className="flex-1 bg-white/[0.05] border border-white/15 rounded-lg px-3 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-orange-400"
+              className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-white/40 focus:outline-none focus:border-orange-400"
             />
             <button
               type="submit"
-              className="px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold flex items-center gap-1.5 transition shadow"
+              className="px-4 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold flex items-center gap-1.5 transition shadow"
             >
               <Icon name="Plus" size={14} />
               Add Task
@@ -144,7 +144,7 @@ export function CalendarApp() {
               <select
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value as 'system' | 'work' | 'personal')}
-                className="bg-white/10 border border-white/15 rounded px-2 py-1 text-white text-xs focus:outline-none"
+                className="bg-black/40 border border-white/10 rounded px-2 py-0.5 text-white text-xs focus:outline-none"
               >
                 <option value="system">System</option>
                 <option value="work">Work</option>
@@ -157,7 +157,7 @@ export function CalendarApp() {
               <select
                 value={newPriority}
                 onChange={(e) => setNewPriority(e.target.value as 'low' | 'medium' | 'high')}
-                className="bg-white/10 border border-white/15 rounded px-2 py-1 text-white text-xs focus:outline-none"
+                className="bg-black/40 border border-white/10 rounded px-2 py-0.5 text-white text-xs focus:outline-none"
               >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
@@ -168,23 +168,22 @@ export function CalendarApp() {
         </form>
 
         {/* Tasks List */}
-        <div className="flex-1">
+        <div className="flex-1 space-y-2">
           {tasksForSelectedDate.length === 0 ? (
-            <div className="h-44 flex flex-col items-center justify-center text-white/40 gap-2 border-y border-white/10 py-10">
+            <div className="h-44 flex flex-col items-center justify-center text-white/40 gap-2">
               <Icon name="ListTodo" size={32} />
               <p className="text-xs">No tasks scheduled for this day.</p>
             </div>
           ) : (
-            <div className="divide-y divide-white/10 border-y border-white/10">
-              {tasksForSelectedDate.map((task) => (
-                <motion.div
-                  key={task.id}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className={`py-3 px-2 flex items-center justify-between group transition ${
-                    task.completed ? 'opacity-50' : 'hover:bg-white/[0.04]'
-                  }`}
-                >
+            tasksForSelectedDate.map((task) => (
+              <motion.div
+                key={task.id}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`glass-panel p-3 rounded-xl flex items-center justify-between group transition ${
+                  task.completed ? 'opacity-50' : 'hover:bg-white/10'
+                }`}
+              >
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => toggleTask(task.id)}
@@ -227,10 +226,9 @@ export function CalendarApp() {
                   <Icon name="Trash2" size={14} />
                 </button>
               </motion.div>
-            ))}
-          </div>
-        )}
-      </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

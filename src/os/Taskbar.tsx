@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useOS } from './OSContext';
 import { TASKBAR_APPS, AppId } from './types';
 import { Icon } from './Icon';
@@ -11,73 +10,16 @@ interface TaskbarProps {
   onLock?: () => void;
 }
 
-const SEARCHABLE_APPS: { appId: AppId; label: string; keywords: string; icon: string }[] = [
-  { appId: 'browser', label: 'Browser', keywords: 'web internet search ブラウザ', icon: 'Globe' },
-  { appId: 'notepad', label: 'Editor', keywords: 'text code note メモ エディタ', icon: 'FileText' },
-  { appId: 'terminal', label: 'Terminal', keywords: 'shell console bash 端末 ターミナル', icon: 'SquareTerminal' },
-  { appId: 'explorer', label: 'Files', keywords: 'folder directory explorer ファイル', icon: 'FolderOpen' },
-  { appId: 'calculator', label: 'Calculator', keywords: 'math calc 電卓 計算', icon: 'Calculator' },
-  { appId: 'settings', label: 'Settings', keywords: 'config preferences theme 設定', icon: 'Settings' },
-  { appId: 'game', label: 'Games', keywords: 'play arcade 2048 snake tetris ゲーム', icon: 'Gamepad2' },
-  { appId: 'synth', label: 'Music', keywords: 'audio synth player 音楽', icon: 'Music' },
-  { appId: 'calendar', label: 'Calendar', keywords: 'date schedule tasks カレンダー', icon: 'Calendar' },
-  { appId: 'weather', label: 'Weather', keywords: 'forecast temperature 天気', icon: 'CloudSun' },
-  { appId: 'clock', label: 'Clock', keywords: 'time alarm timer 時計', icon: 'Clock' },
-  { appId: 'ai', label: 'AI Assistant', keywords: 'gemini chat copilot アシスタント', icon: 'Sparkles' },
-  { appId: 'taskmanager', label: 'Task Manager', keywords: 'processes windows cpu memory タスク', icon: 'Cpu' },
-  { appId: 'appstore', label: 'App Store', keywords: 'install store ストア', icon: 'Store' },
-];
-
-export function Taskbar(_props?: TaskbarProps) {
-  void _props;
+export function Taskbar({ onLock }: TaskbarProps) {
   const {
-    windows,
-    openApp,
-    focusWindow,
-    minimizeWindow,
-    restoreWindow,
-    closeWindow,
-    quickSettings,
-    toggleQuick,
-    taskbarAlign,
-    startOpen,
-    setStartOpen,
-    installedApps,
-    launchInstalledApp,
-    shellMode,
-    volume,
-    setVolume,
-    soundEnabled,
-    setSoundEnabled,
-    activeDesktopId,
-    taskViewOpen,
-    setTaskViewOpen,
-    toggleTaskView,
-    theme,
+    windows, openApp, focusWindow, minimizeWindow, restoreWindow,
+    quickSettings, toggleQuick, taskbarAlign, startOpen, setStartOpen,
+    installedApps, launchInstalledApp, setShellMode,
   } = useOS();
-  const isLight = theme === 'light';
-
-  const currentDesktopWindows = windows.filter(
-    (w) => !w.desktopId || w.desktopId === activeDesktopId
-  );
-
   const [trayOpen, setTrayOpen] = useState(false);
-  const [calendarFlyoutOpen, setCalendarFlyoutOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchFocused, setSearchFocused] = useState(false);
   const [now, setNow] = useState(new Date());
-  const [hoveredApp, setHoveredApp] = useState<string | null>(null);
-  const [hoverPos, setHoverPos] = useState<{ x: number } | null>(null);
   const startBtnRef = useRef<HTMLButtonElement>(null);
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-  const searchDropdownRef = useRef<HTMLDivElement>(null);
   const [startPos, setStartPos] = useState<{ x: number; width: number } | null>(null);
-
-  const handleMouseEnterIcon = (e: React.MouseEvent<HTMLDivElement>, appId: string) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    setHoverPos({ x: rect.left + rect.width / 2 });
-    setHoveredApp(appId);
-  };
 
   const updateStartPos = useCallback(() => {
     if (startBtnRef.current) {
@@ -96,49 +38,20 @@ export function Taskbar(_props?: TaskbarProps) {
     };
   }, [updateStartPos, taskbarAlign]);
 
-  useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        searchContainerRef.current &&
-        !searchContainerRef.current.contains(target) &&
-        (!searchDropdownRef.current || !searchDropdownRef.current.contains(target))
-      ) {
-        setSearchFocused(false);
-      }
-    };
-    window.addEventListener('mousedown', handleOutsideClick);
-    return () => window.removeEventListener('mousedown', handleOutsideClick);
-  }, []);
-
-  const filteredSearchApps = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return SEARCHABLE_APPS.slice(0, 6);
-    return SEARCHABLE_APPS.filter(
-      (a) => a.label.toLowerCase().includes(q) || a.keywords.toLowerCase().includes(q)
-    ).slice(0, 6);
-  }, [searchQuery]);
-
   const handleStartClick = () => {
     updateStartPos();
-    setSearchFocused(false);
-    setTrayOpen(false);
-    setTaskViewOpen(false);
     setStartOpen(!startOpen);
   };
 
   const handleAppClick = (appId: AppId) => {
-    const wins = currentDesktopWindows.filter((w) => w.appId === appId);
+    const wins = windows.filter((w) => w.appId === appId);
     if (wins.length === 0) {
       openApp(appId);
     } else {
       const top = wins.reduce((a, b) => (a.zIndex > b.zIndex ? a : b));
       if (top.minimized) restoreWindow(top.id);
       else {
-        const visibleWins = currentDesktopWindows.filter((w) => !w.minimized);
-        const isTopmost =
-          visibleWins.length > 0 &&
-          visibleWins.reduce((a, b) => (a.zIndex > b.zIndex ? a : b)).id === top.id;
+        const isTopmost = windows.reduce((a, b) => (a.zIndex > b.zIndex ? a : b)).id === top.id;
         if (isTopmost) minimizeWindow(top.id);
         else focusWindow(top.id);
       }
@@ -146,17 +59,14 @@ export function Taskbar(_props?: TaskbarProps) {
   };
 
   const handleInstalledAppClick = (appId: string) => {
-    const wins = currentDesktopWindows.filter((w) => w.appId === appId);
+    const wins = windows.filter((w) => w.appId === appId);
     if (wins.length === 0) {
       launchInstalledApp(appId);
     } else {
       const top = wins.reduce((a, b) => (a.zIndex > b.zIndex ? a : b));
       if (top.minimized) restoreWindow(top.id);
       else {
-        const visibleWins = currentDesktopWindows.filter((w) => !w.minimized);
-        const isTopmost =
-          visibleWins.length > 0 &&
-          visibleWins.reduce((a, b) => (a.zIndex > b.zIndex ? a : b)).id === top.id;
+        const isTopmost = windows.reduce((a, b) => (a.zIndex > b.zIndex ? a : b)).id === top.id;
         if (isTopmost) minimizeWindow(top.id);
         else focusWindow(top.id);
       }
@@ -166,820 +76,132 @@ export function Taskbar(_props?: TaskbarProps) {
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dateStr = now.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
 
-  const isXP = shellMode === 'xp';
-  const isVista = shellMode === 'vista';
-  const isWin10 = shellMode === 'windows10';
-  const isDeX = shellMode === 'dex';
-  const isChromeOS = shellMode === 'chromeos';
-  const isZorin = shellMode === 'zorin';
-
   return (
     <>
       <StartMenu open={startOpen} onClose={() => setStartOpen(false)} startPos={startPos} />
 
-      {/* ==============================================================
-          1. WINDOWS XP LUNA TASKBAR
-         ============================================================== */}
-      {isXP && (
-        <div
-          className="fixed bottom-0 inset-x-0 h-10 w-screen z-[5000] flex items-center justify-between select-none shadow-2xl font-sans"
-          style={{
-            background: 'linear-gradient(to bottom, #245edb 0%, #3f88f8 8%, #1f57ce 50%, #1545ad 100%)',
-            borderTop: '2px solid #3876fc',
-          }}
-        >
-          <div className="flex items-center h-full">
-            <button
-              ref={startBtnRef}
-              onClick={handleStartClick}
-              className="h-full px-4 rounded-r-2xl flex items-center gap-2 shadow-lg transition active:brightness-95 group font-bold italic"
-              style={{
-                background: 'linear-gradient(to bottom, #388200 0%, #5aa700 20%, #3c8200 80%, #205900 100%)',
-                boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.6), 2px 0 4px rgba(0,0,0,0.4)',
-                borderRight: '1px solid #1a4d00',
-              }}
-              title="Start"
-            >
-              <AppLogo size={18} />
-              <span className="text-white text-base tracking-wide font-black drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-                start
-              </span>
-            </button>
-
-            <div className="flex items-center gap-1 px-2 overflow-x-auto max-w-xl">
-              {windows.map((win) => {
-                const isActive = !win.minimized;
-                return (
-                  <button
-                    key={win.id}
-                    onClick={() => {
-                      if (win.minimized) restoreWindow(win.id);
-                      else focusWindow(win.id);
-                    }}
-                    className={`h-7 px-2.5 rounded-sm flex items-center gap-1.5 text-xs text-white max-w-[140px] truncate border font-medium ${
-                      isActive
-                        ? 'bg-[#1545ad] border-[#0e307c] shadow-inner font-bold'
-                        : 'bg-[#2f71cd] hover:bg-[#3d83e6] border-[#4b8ff5]'
-                    }`}
-                    title={win.title}
-                  >
-                    <Icon name={win.icon} size={13} className="text-amber-200 shrink-0" />
-                    <span className="truncate">{win.title}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
+      {/* Locked Full-Width Bottom Taskbar */}
+      <div
+        className="fixed bottom-0 inset-x-0 h-12 w-screen z-30 liquid-glass-taskbar flex items-center justify-between px-3 select-none"
+        style={{ position: 'fixed', bottom: 0, left: 0, right: 0, width: '100vw', borderRadius: 0 }}
+      >
+        {/* Left: Weather & Widgets / Spacing / Tablet Mode Switch */}
+        <div className="flex items-center gap-2 min-w-0 w-36 sm:w-44">
           <div
-            className="flex items-center gap-2 h-full px-3 text-white border-l-2 border-[#1545ad]"
-            style={{ background: 'linear-gradient(to bottom, #092484 0%, #153fb5 50%, #0d2e96 100%)' }}
+            onClick={() => setShellMode('metro')}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition cursor-pointer text-xs group"
+            title="Switch to Windows 8 Metro Live Tiles"
           >
-            <div className="flex items-center gap-1.5 text-white/90">
-              <Icon name="Volume2" size={14} className="hover:text-amber-300 cursor-pointer" onClick={() => setTrayOpen(!trayOpen)} />
-              <Icon name="Wifi" size={14} />
-            </div>
-            <div className="text-xs font-bold text-white tabular-nums tracking-wide font-mono pl-1">
-              {timeStr}
-            </div>
+            <Icon name="LayoutGrid" size={14} className="text-cyan-400 group-hover:scale-110 transition" />
+            <span className="font-medium text-[11px] hidden sm:inline">Tiles</span>
+          </div>
+
+          <div className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition cursor-pointer text-xs">
+            <Icon name="Sun" size={13} className="text-amber-400 shrink-0" />
+            <span className="font-medium text-[11px]">21°C</span>
           </div>
         </div>
-      )}
 
-      {/* ==============================================================
-          2. WINDOWS VISTA AERO GLASS TASKBAR
-         ============================================================== */}
-      {isVista && (
-        <div
-          className="fixed bottom-0 inset-x-0 h-10 w-screen z-[5000] flex items-center justify-between select-none shadow-2xl font-sans bg-slate-900/60 backdrop-blur-xl border-t border-sky-400/30"
-        >
-          <div className="flex items-center h-full pl-2">
-            <button
-              ref={startBtnRef}
-              onClick={handleStartClick}
-              className="relative -top-1 w-10 h-10 rounded-full flex items-center justify-center transition active:scale-95 shadow-xl bg-slate-900/80 border border-white/40"
-              title="Start"
-            >
-              <AppLogo size={20} glow={startOpen} />
-            </button>
-
-            <div className="flex items-center gap-1.5 px-3 overflow-x-auto max-w-xl">
-              {windows.map((win) => {
-                const isActive = !win.minimized;
-                return (
-                  <button
-                    key={win.id}
-                    onClick={() => {
-                      if (win.minimized) restoreWindow(win.id);
-                      else focusWindow(win.id);
-                    }}
-                    className={`h-7 px-3 rounded-md flex items-center gap-2 text-xs text-white max-w-[150px] truncate border transition ${
-                      isActive
-                        ? 'bg-sky-500/25 border-sky-400/60 shadow-lg shadow-sky-500/20 font-semibold'
-                        : 'bg-white/5 hover:bg-white/10 border-white/10'
-                    }`}
-                    title={win.title}
-                  >
-                    <Icon name={win.icon} size={14} className="text-sky-300 shrink-0" />
-                    <span className="truncate">{win.title}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 h-full px-4 text-white">
-            <AIAssistant />
-            <div className="flex items-center gap-1.5 text-white/80 cursor-pointer" onClick={() => setTrayOpen(!trayOpen)}>
-              <Icon name="Wifi" size={14} />
-              <Icon name="Volume2" size={14} />
-            </div>
-            <div className="text-right leading-tight">
-              <div className="text-xs font-semibold text-white/95 tabular-nums font-mono">{timeStr}</div>
-              <div className="text-[9px] text-white/50">{dateStr}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==============================================================
-          3. WINDOWS 10 TASKBAR
-         ============================================================== */}
-      {isWin10 && (
-        <div
-          className="fixed bottom-0 inset-x-0 h-10 w-screen z-[5000] flex items-center justify-between select-none shadow-2xl font-sans bg-zinc-950/90 backdrop-blur-md border-t border-zinc-800 text-white"
-        >
-          <div className="flex items-center h-full">
-            <button
-              ref={startBtnRef}
-              onClick={handleStartClick}
-              className={`h-10 w-12 flex items-center justify-center hover:bg-white/10 transition ${
-                startOpen ? 'bg-white/20' : ''
-              }`}
-              title="GlassiumOS Start"
-            >
-              <AppLogo size={18} glow={startOpen} />
-            </button>
-
-            <div className="flex items-center h-full">
-              {TASKBAR_APPS.map((app) => {
-                const wins = windows.filter((w) => w.appId === app.appId);
-                const active = wins.length > 0;
-                const anyVisible = wins.some((w) => !w.minimized);
-                return (
-                  <button
-                    key={app.appId}
-                    onClick={() => handleAppClick(app.appId)}
-                    className={`relative h-10 w-11 flex items-center justify-center hover:bg-white/10 transition ${
-                      anyVisible ? 'bg-white/15' : ''
-                    }`}
-                    title={app.label}
-                  >
-                    <Icon name={app.icon} size={16} className="text-white" />
-                    {active && (
-                      <span className={`absolute bottom-0 left-0 right-0 h-0.5 bg-cyan-400 ${anyVisible ? 'opacity-100' : 'opacity-50'}`} />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="flex items-center h-full px-2 gap-1 text-white">
-            <AIAssistant />
-            <div className="flex items-center gap-1.5 px-2 hover:bg-white/10 h-full cursor-pointer" onClick={() => setTrayOpen(!trayOpen)}>
-              <Icon name="Wifi" size={13} />
-              <Icon name="Volume2" size={13} />
-            </div>
-            <div className="px-2 hover:bg-white/10 h-full flex flex-col justify-center text-right leading-tight cursor-pointer" onClick={() => setCalendarFlyoutOpen(!calendarFlyoutOpen)}>
-              <div className="text-[11px] font-mono">{timeStr}</div>
-              <div className="text-[9px] text-white/60">{dateStr}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==============================================================
-          4. SAMSUNG DEX / CHROMEOS / ZORIN SHELLS
-         ============================================================== */}
-      {(isDeX || isChromeOS || isZorin) && (
-        <div
-          className="fixed bottom-0 inset-x-0 h-11 w-screen z-[5000] flex items-center justify-between px-3 select-none font-sans bg-slate-900/60 backdrop-blur-2xl shadow-[0_-8px_32px_rgba(0,0,0,0.45)] text-white"
-        >
-          <div className="flex items-center gap-2">
-            <button
-              ref={startBtnRef}
-              onClick={handleStartClick}
-              className="h-8 w-8 rounded-xl flex items-center justify-center bg-white/10 hover:bg-white/15 transition"
-              title="GlassiumOS Menu"
-            >
-              <AppLogo size={18} glow={startOpen} />
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {TASKBAR_APPS.map((app) => {
-              const wins = windows.filter((w) => w.appId === app.appId);
-              const active = wins.length > 0;
-              return (
-                <button
-                  key={app.appId}
-                  onClick={() => handleAppClick(app.appId)}
-                  className={`relative h-8 w-8 rounded-xl flex items-center justify-center transition ${
-                    active ? 'bg-white/20' : 'hover:bg-white/10'
-                  }`}
-                  title={app.label}
-                >
-                  <Icon name={app.icon} size={16} className="text-white" />
-                  {active && <span className="absolute bottom-0.5 w-1.5 h-0.5 rounded-full bg-cyan-400" />}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <AIAssistant />
-            <button
-              onClick={() => setTrayOpen(!trayOpen)}
-              className="flex items-center gap-2 px-3 py-1 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-mono"
-            >
-              <Icon name="Wifi" size={13} className="text-cyan-400" />
-              <Icon name="Volume2" size={13} className="text-fuchsia-400" />
-              <span className="font-semibold text-white">{timeStr}</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ==============================================================
-          5. GLASSIUMOS-V4.0 FLAT TASKBAR (DEFAULT)
-         ============================================================== */}
-      {!isXP && !isVista && !isWin10 && !isDeX && !isChromeOS && !isZorin && (
-        <div
-          className={`fixed bottom-0 inset-x-0 h-12 w-screen z-[5000] backdrop-blur-2xl flex items-center justify-between px-3 select-none transition-colors duration-200 shadow-[0_-8px_32px_rgba(0,0,0,0.3)] ${
-            isLight
-              ? 'bg-slate-100/45 text-slate-900 shadow-[0_-8px_32px_rgba(0,0,0,0.08)]'
-              : 'bg-slate-900/38 text-white'
-          }`}
-          style={{ position: 'fixed', bottom: 0, left: 0, right: 0, width: '100vw', borderRadius: 0 }}
-        >
-          {/* Left: Start Button + Flat App Search Bar + Task View */}
-          <div className="flex items-center gap-2 min-w-0" ref={searchContainerRef}>
-            <button
-              ref={startBtnRef}
-              type="button"
-              onClick={handleStartClick}
-              className={`h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-150 shrink-0 ${
-                startOpen
-                  ? 'os-accent-soft border scale-95'
-                  : isLight
-                  ? 'bg-slate-900/5 hover:bg-slate-900/10 active:scale-95'
-                  : 'bg-white/[0.06] hover:bg-white/[0.12] active:scale-95'
-              }`}
-              title="GlassiumOS-V4.0 Start"
-            >
-              <AppLogo size={20} glow={startOpen} />
-            </button>
-
-            {/* Flat Search Bar */}
-            <div className="relative">
-              <div
-                className={`flex items-center gap-2 h-8 px-3 rounded-lg border transition-all duration-200 ${
-                  searchFocused
-                    ? isLight
-                      ? 'w-44 sm:w-56 bg-white border-slate-300 shadow-sm'
-                      : 'w-44 sm:w-56 bg-slate-950/80 border-white/20 shadow-sm'
-                    : isLight
-                    ? 'w-32 sm:w-44 bg-slate-900/5 hover:bg-slate-900/8 border-slate-900/10'
-                    : 'w-32 sm:w-44 bg-white/[0.06] hover:bg-white/[0.10] border-white/10'
-                }`}
-              >
-                <Icon
-                  name="Search"
-                  size={13}
-                  className={searchFocused ? 'os-accent-text shrink-0' : 'opacity-50 shrink-0'}
-                />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onFocus={() => {
-                    setStartOpen(false);
-                    setTrayOpen(false);
-                    setTaskViewOpen(false);
-                    setSearchFocused(true);
-                  }}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setSearchFocused(true);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && filteredSearchApps.length > 0) {
-                      openApp(filteredSearchApps[0].appId);
-                      setSearchQuery('');
-                      setSearchFocused(false);
-                    } else if (e.key === 'Escape') {
-                      setSearchFocused(false);
-                    }
-                  }}
-                  placeholder="検索"
-                  className={`w-full bg-transparent border-0 outline-none text-xs ${
-                    isLight ? 'text-slate-900 placeholder:text-slate-400' : 'text-white/95 placeholder:text-white/45'
-                  }`}
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="opacity-45 hover:opacity-90 transition"
-                  >
-                    <Icon name="X" size={12} />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Windows 11 Task View / Virtual Desktops Button */}
-            <button
-              type="button"
-              onClick={toggleTaskView}
-              className={`h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-150 shrink-0 ${
-                taskViewOpen
-                  ? 'os-accent-soft border'
-                  : isLight
-                  ? 'bg-slate-900/5 hover:bg-slate-900/10 text-slate-700 hover:text-slate-900 active:scale-95'
-                  : 'bg-white/[0.06] hover:bg-white/[0.12] text-white/80 hover:text-white active:scale-95'
-              }`}
-              title="タスクビュー ＆ 仮想デスクトップ (Desk View)"
-            >
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-                <rect x="2.5" y="4.5" width="13" height="11" rx="2" stroke="currentColor" strokeWidth="1.8" fill="currentColor" fillOpacity="0.15" />
-                <path d="M8.5 19.5H19C20.3807 19.5 21.5 18.3807 21.5 17V8.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Center: Curated Essential Taskbar Icons */}
-          <div
-            className={`flex items-center gap-1 ${
-              taskbarAlign === 'left' ? 'justify-start pl-3' : 'justify-center'
-            } flex-1 max-w-xl px-2`}
-          >
-            {TASKBAR_APPS.map((app) => {
-              const wins = currentDesktopWindows.filter((w) => w.appId === app.appId);
-              const active = wins.length > 0;
-              const anyVisible = wins.some((w) => !w.minimized);
-              return (
-                <div
-                  key={app.appId}
-                  className="relative group shrink-0"
-                  onMouseEnter={(e) => handleMouseEnterIcon(e, app.appId)}
-                  onMouseLeave={() => { setHoveredApp(null); setHoverPos(null); }}
-                >
-                  <button
-                    onClick={() => handleAppClick(app.appId)}
-                    className={`relative h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-150 group ${
-                      anyVisible
-                        ? isLight
-                          ? 'bg-slate-900/10'
-                          : 'bg-white/15'
-                        : isLight
-                        ? 'hover:bg-slate-900/6 active:scale-95'
-                        : 'hover:bg-white/10 active:scale-95'
-                    }`}
-                    title={app.label}
-                  >
-                    <Icon
-                      name={app.appId}
-                      size={22}
-                      className="transition-transform duration-150 group-hover:scale-105"
-                    />
-                    {active && (
-                      <span
-                        className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 rounded-full os-accent-bg transition-all ${
-                          anyVisible ? 'w-4' : 'w-1.5 opacity-70'
-                        }`}
-                      />
-                    )}
-                  </button>
-
-                  {/* Windows 11 Interactive Taskbar Window Hover Preview Card */}
-                  <AnimatePresence>
-                    {hoveredApp === app.appId && hoverPos && wins.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 6, scale: 0.96 }}
-                        transition={{ duration: 0.12 }}
-                        style={{ left: hoverPos.x, transform: 'translateX(-50%)' }}
-                        onMouseEnter={() => setHoveredApp(app.appId)}
-                        onMouseLeave={() => { setHoveredApp(null); setHoverPos(null); }}
-                        className="fixed bottom-14 z-[5500] flex items-center gap-2 p-2 rounded-xl bg-slate-900/95 backdrop-blur-2xl border border-white/15 shadow-2xl pointer-events-auto text-white font-sans max-w-[90vw] overflow-x-auto"
-                      >
-                        {wins.map((win) => (
-                          <div
-                            key={win.id}
-                            className="w-48 flex flex-col gap-1.5 p-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.07] border border-white/10 hover:border-cyan-400/40 transition group shrink-0"
-                          >
-                            <div className="flex items-center justify-between gap-1 px-1">
-                              <div className="flex items-center gap-1.5 min-w-0">
-                                <Icon name={app.appId} size={13} className="text-cyan-400 shrink-0" />
-                                <span className="text-[11px] font-medium text-white/90 truncate">{win.title}</span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  closeWindow(win.id);
-                                  if (wins.length <= 1) {
-                                    setHoveredApp(null);
-                                    setHoverPos(null);
-                                  }
-                                }}
-                                className="w-5 h-5 rounded flex items-center justify-center text-white/50 hover:text-white hover:bg-rose-600 transition shrink-0"
-                                title="閉じる"
-                              >
-                                <Icon name="X" size={12} />
-                              </button>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (win.minimized) restoreWindow(win.id);
-                                else focusWindow(win.id);
-                                setHoveredApp(null);
-                                setHoverPos(null);
-                              }}
-                              className="h-28 w-full bg-black/60 rounded border border-white/10 group-hover:border-cyan-400/30 overflow-hidden relative flex flex-col justify-between p-2 text-left transition cursor-pointer"
-                            >
-                              <div className="w-full h-4 bg-white/10 rounded-sm flex items-center px-1.5 gap-1 shrink-0">
-                                <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
-                                <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
-                                <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
-                                <span className="text-[9px] text-white/50 truncate ml-1 font-mono">{win.title}</span>
-                              </div>
-
-                              <div className="flex-1 my-1 flex items-center justify-center">
-                                <Icon name={app.appId} size={28} className="text-white/30 group-hover:scale-110 group-hover:text-cyan-400/70 transition-all" />
-                              </div>
-
-                              <div className="text-[9px] text-white/40 font-mono truncate text-center">
-                                {win.minimized ? '最小化中 (クリックで再開)' : 'クリックでアクティブ化'}
-                              </div>
-                            </button>
-                          </div>
-                        ))}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              );
-            })}
-
-            {/* Open non-pinned windows */}
-            {currentDesktopWindows
-              .filter(
-                (w, idx, arr) =>
-                  !TASKBAR_APPS.some((t) => t.appId === w.appId) &&
-                  !installedApps.some((i) => i.appId === w.appId) &&
-                  arr.findIndex((x) => x.appId === w.appId) === idx
-              )
-              .map((win) => {
-                const anyVisible = !win.minimized;
-                const wins = currentDesktopWindows.filter((w) => w.appId === win.appId);
-                return (
-                  <div
-                    key={win.id}
-                    className="relative group shrink-0"
-                    onMouseEnter={(e) => handleMouseEnterIcon(e, win.appId)}
-                    onMouseLeave={() => { setHoveredApp(null); setHoverPos(null); }}
-                  >
-                    <button
-                      onClick={() => handleAppClick(win.appId as AppId)}
-                      className={`relative h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-150 group ${
-                        anyVisible
-                          ? isLight
-                            ? 'bg-slate-900/10'
-                            : 'bg-white/15'
-                          : isLight
-                          ? 'hover:bg-slate-900/6 active:scale-95'
-                          : 'hover:bg-white/10 active:scale-95'
-                      }`}
-                      title={win.title}
-                    >
-                      <Icon name={win.appId} size={22} className="transition-transform duration-150 group-hover:scale-105" />
-                      <span
-                        className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 rounded-full os-accent-bg transition-all ${
-                          anyVisible ? 'w-4' : 'w-1.5 opacity-70'
-                        }`}
-                      />
-                    </button>
-
-                    {/* Windows 11 Live Preview Card */}
-                    <AnimatePresence>
-                      {hoveredApp === win.appId && hoverPos && wins.length > 0 && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 6, scale: 0.96 }}
-                          transition={{ duration: 0.12 }}
-                          style={{ left: hoverPos.x, transform: 'translateX(-50%)' }}
-                          onMouseEnter={() => setHoveredApp(win.appId)}
-                          onMouseLeave={() => { setHoveredApp(null); setHoverPos(null); }}
-                          className="fixed bottom-14 z-[5500] flex items-center gap-2 p-2 rounded-xl bg-slate-900/95 backdrop-blur-2xl border border-white/15 shadow-2xl pointer-events-auto text-white font-sans max-w-[90vw] overflow-x-auto"
-                        >
-                          {wins.map((w) => (
-                            <div
-                              key={w.id}
-                              className="w-48 flex flex-col gap-1.5 p-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.07] border border-white/10 hover:border-cyan-400/40 transition group shrink-0"
-                            >
-                              <div className="flex items-center justify-between gap-1 px-1">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <Icon name={w.appId} size={13} className="text-cyan-400 shrink-0" />
-                                  <span className="text-[11px] font-medium text-white/90 truncate">{w.title}</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    closeWindow(w.id);
-                                    if (wins.length <= 1) {
-                                      setHoveredApp(null);
-                                      setHoverPos(null);
-                                    }
-                                  }}
-                                  className="w-5 h-5 rounded flex items-center justify-center text-white/50 hover:text-white hover:bg-rose-600 transition shrink-0"
-                                  title="閉じる"
-                                >
-                                  <Icon name="X" size={12} />
-                                </button>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (w.minimized) restoreWindow(w.id);
-                                  else focusWindow(w.id);
-                                  setHoveredApp(null);
-                                  setHoverPos(null);
-                                }}
-                                className="h-28 w-full bg-black/60 rounded border border-white/10 group-hover:border-cyan-400/30 overflow-hidden relative flex flex-col justify-between p-2 text-left transition cursor-pointer"
-                              >
-                                <div className="w-full h-4 bg-white/10 rounded-sm flex items-center px-1.5 gap-1 shrink-0">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
-                                  <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
-                                  <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
-                                  <span className="text-[9px] text-white/50 truncate ml-1 font-mono">{w.title}</span>
-                                </div>
-
-                                <div className="flex-1 my-1 flex items-center justify-center">
-                                  <Icon name={w.appId} size={28} className="text-white/30 group-hover:scale-110 group-hover:text-cyan-400/70 transition-all" />
-                                </div>
-
-                                <div className="text-[9px] text-white/40 font-mono truncate text-center">
-                                  {w.minimized ? '最小化中 (クリックで再開)' : 'クリックでアクティブ化'}
-                                </div>
-                              </button>
-                            </div>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                );
-              })}
-
-            {/* Installed apps */}
-            {installedApps.length > 0 && (
-              <div className={`h-4 w-px mx-0.5 shrink-0 ${isLight ? 'bg-slate-900/15' : 'bg-white/10'}`} />
-            )}
-            {installedApps
-              .filter(
-                (app, idx, arr) =>
-                  !TASKBAR_APPS.some((t) => t.appId === app.appId) &&
-                  arr.findIndex((x) => (x.id || x.appId) === (app.id || app.appId)) === idx
-              )
-              .slice(0, 3)
-              .map((app, idx) => {
-                const wins = currentDesktopWindows.filter((w) => w.appId === app.appId);
-                const active = wins.length > 0;
-                const anyVisible = wins.some((w) => !w.minimized);
-                return (
-                  <div
-                    key={`${app.id || app.appId}-${idx}`}
-                    className="relative group shrink-0"
-                    onMouseEnter={(e) => handleMouseEnterIcon(e, app.id || app.appId)}
-                    onMouseLeave={() => { setHoveredApp(null); setHoverPos(null); }}
-                  >
-                    <button
-                      onClick={() => handleInstalledAppClick(app.id || app.appId)}
-                      className={`relative h-9 w-9 rounded-lg flex items-center justify-center transition-all duration-150 group ${
-                        anyVisible
-                          ? isLight
-                            ? 'bg-slate-900/10'
-                            : 'bg-white/15'
-                          : isLight
-                          ? 'hover:bg-slate-900/6 active:scale-95'
-                          : 'hover:bg-white/10 active:scale-95'
-                      }`}
-                      title={app.name}
-                    >
-                      <Icon name={app.icon} size={22} className="transition-transform duration-150 group-hover:scale-105" />
-                      {active && (
-                        <span
-                          className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 rounded-full os-accent-bg transition-all ${
-                            anyVisible ? 'w-4' : 'w-1.5 opacity-60'
-                          }`}
-                        />
-                      )}
-                    </button>
-
-                    {/* Live Preview Card for Installed Apps */}
-                    <AnimatePresence>
-                      {hoveredApp === (app.id || app.appId) && hoverPos && wins.length > 0 && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 6, scale: 0.96 }}
-                          transition={{ duration: 0.12 }}
-                          style={{ left: hoverPos.x, transform: 'translateX(-50%)' }}
-                          onMouseEnter={() => setHoveredApp(app.id || app.appId)}
-                          onMouseLeave={() => { setHoveredApp(null); setHoverPos(null); }}
-                          className="fixed bottom-14 z-[5500] flex items-center gap-2 p-2 rounded-xl bg-slate-900/95 backdrop-blur-2xl border border-white/15 shadow-2xl pointer-events-auto text-white font-sans max-w-[90vw] overflow-x-auto"
-                        >
-                          {wins.map((w) => (
-                            <div
-                              key={w.id}
-                              className="w-48 flex flex-col gap-1.5 p-1.5 rounded-lg bg-white/[0.03] hover:bg-white/[0.07] border border-white/10 hover:border-cyan-400/40 transition group shrink-0"
-                            >
-                              <div className="flex items-center justify-between gap-1 px-1">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <Icon name={app.icon} size={13} className="text-cyan-400 shrink-0" />
-                                  <span className="text-[11px] font-medium text-white/90 truncate">{w.title}</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    closeWindow(w.id);
-                                    if (wins.length <= 1) {
-                                      setHoveredApp(null);
-                                      setHoverPos(null);
-                                    }
-                                  }}
-                                  className="w-5 h-5 rounded flex items-center justify-center text-white/50 hover:text-white hover:bg-rose-600 transition shrink-0"
-                                  title="閉じる"
-                                >
-                                  <Icon name="X" size={12} />
-                                </button>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (w.minimized) restoreWindow(w.id);
-                                  else focusWindow(w.id);
-                                  setHoveredApp(null);
-                                  setHoverPos(null);
-                                }}
-                                className="h-28 w-full bg-black/60 rounded border border-white/10 group-hover:border-cyan-400/30 overflow-hidden relative flex flex-col justify-between p-2 text-left transition cursor-pointer"
-                              >
-                                <div className="w-full h-4 bg-white/10 rounded-sm flex items-center px-1.5 gap-1 shrink-0">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
-                                  <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
-                                  <div className="w-1.5 h-1.5 rounded-full bg-white/30" />
-                                  <span className="text-[9px] text-white/50 truncate ml-1 font-mono">{w.title}</span>
-                                </div>
-
-                                <div className="flex-1 my-1 flex items-center justify-center">
-                                  <Icon name={app.icon} size={28} className="text-white/30 group-hover:scale-110 group-hover:text-cyan-400/70 transition-all" />
-                                </div>
-
-                                <div className="text-[9px] text-white/40 font-mono truncate text-center">
-                                  {w.minimized ? '最小化中 (クリックで再開)' : 'クリックでアクティブ化'}
-                                </div>
-                              </button>
-                            </div>
-                          ))}
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                );
-              })}
-          </div>
-
-          {/* Right: Flat System Tray */}
-          <div className="flex items-center gap-1.5 min-w-0 justify-end">
-            <AIAssistant />
-            <div className={`h-4 w-px mx-0.5 shrink-0 ${isLight ? 'bg-slate-900/15' : 'bg-white/10'}`} />
-            <button
-              onClick={() => setTrayOpen((v) => !v)}
-              className={`flex items-center gap-2 px-2.5 py-1 rounded-lg transition ${
-                isLight
-                  ? 'bg-slate-900/5 hover:bg-slate-900/10 text-slate-900'
-                  : 'bg-white/[0.05] hover:bg-white/[0.12] text-white'
-              }`}
-              title="System Controls"
-            >
-              <div className="flex items-center gap-1.5">
-                <Icon name="Wifi" size={13} className={quickSettings.wifi ? 'os-accent-text' : 'opacity-40'} />
-                <Icon
-                  name={soundEnabled && volume > 0 ? 'Volume2' : 'VolumeX'}
-                  size={13}
-                  className={soundEnabled && volume > 0 ? 'os-accent-text' : 'opacity-40'}
-                />
-              </div>
-              <div className="text-right leading-tight hidden sm:block">
-                <div className="text-[11px] font-medium tabular-nums font-mono">{timeStr}</div>
-                <div className="text-[9px] opacity-55">{dateStr}</div>
-              </div>
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Instant App Search Dropdown */}
-      <AnimatePresence>
-        {searchFocused && (
-          <motion.div
-            ref={searchDropdownRef}
-            initial={{ opacity: 0, y: 8, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.98 }}
-            transition={{ duration: 0.14 }}
-            className={`fixed bottom-14 left-3 z-[5200] w-64 rounded-xl backdrop-blur-2xl border p-2 overflow-hidden shadow-2xl ${
-              isLight
-                ? 'bg-white/95 border-slate-900/12 text-slate-900'
-                : 'bg-slate-900/90 border-white/15 text-white'
+        {/* Center: Windows 11 Fluent Center Launcher & App Icons */}
+        <div className={`flex items-center gap-1.5 ${taskbarAlign === 'left' ? 'justify-start' : 'justify-center'} flex-1 max-w-2xl px-2`}>
+          {/* Start Button with Official LiquidOS Fluid Logo */}
+          <button
+            ref={startBtnRef}
+            onClick={handleStartClick}
+            className={`h-9 w-9 rounded-xl flex items-center justify-center transition shrink-0 ${
+              startOpen
+                ? 'bg-white/20 shadow-inner scale-95'
+                : 'hover:bg-white/10 active:scale-95'
             }`}
+            title="LiquidOS Start"
           >
-            <div className="px-2.5 py-1 text-[10px] font-medium uppercase tracking-wider opacity-45">
-              Applications
-            </div>
-            <div className="space-y-0.5">
-              {filteredSearchApps.length > 0 ? (
-                filteredSearchApps.map((item) => (
-                  <button
-                    key={item.appId}
-                    type="button"
-                    onClick={() => {
-                      openApp(item.appId);
-                      setSearchQuery('');
-                      setSearchFocused(false);
-                    }}
-                    className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-lg text-left transition group ${
-                      isLight ? 'hover:bg-slate-900/5' : 'hover:bg-white/10'
-                    }`}
-                  >
-                    <div className="w-7 h-7 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                      <Icon name={item.appId} size={22} />
-                    </div>
-                    <span className="text-xs font-medium truncate">
-                      {item.label}
-                    </span>
-                  </button>
-                ))
-              ) : (
-                <div className="px-3 py-4 text-center text-xs opacity-45">
-                  該当するアプリがありません
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <AppLogo size={22} glow={startOpen} />
+          </button>
 
-      {/* Flat Quick Settings Flyout (Brightness removed as requested) */}
+          <div className="h-5 w-px bg-white/10 mx-0.5 shrink-0" />
+
+          {/* Built-in apps */}
+          {TASKBAR_APPS.map((app) => {
+            const wins = windows.filter((w) => w.appId === app.appId);
+            const active = wins.length > 0;
+            const anyVisible = wins.some((w) => !w.minimized);
+            return (
+              <button
+                key={app.appId}
+                onClick={() => handleAppClick(app.appId)}
+                className={`relative h-9 w-9 rounded-xl flex items-center justify-center transition shrink-0 ${
+                  anyVisible ? 'bg-white/15' : 'hover:bg-white/10 active:scale-95'
+                }`}
+                title={app.label}
+              >
+                <Icon name={app.icon} size={18} className="text-white/90" />
+                {active && (
+                  <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 rounded-full bg-cyan-400 transition-all ${anyVisible ? 'w-3.5' : 'w-1.5 opacity-60'}`} />
+                )}
+              </button>
+            );
+          })}
+
+          {/* Installed custom apps */}
+          {installedApps.length > 0 && (
+            <div className="h-5 w-px bg-white/10 mx-0.5 shrink-0" />
+          )}
+          {installedApps.map((app) => {
+            const wins = windows.filter((w) => w.appId === app.appId);
+            const active = wins.length > 0;
+            const anyVisible = wins.some((w) => !w.minimized);
+            return (
+              <button
+                key={app.appId}
+                onClick={() => handleInstalledAppClick(app.appId)}
+                className={`relative h-9 w-9 rounded-xl flex items-center justify-center transition shrink-0 ${
+                  anyVisible ? 'bg-white/15' : 'hover:bg-white/10 active:scale-95'
+                }`}
+                title={app.name}
+              >
+                <Icon name={app.icon} size={18} className="text-white/90" />
+                {active && (
+                  <span className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 h-0.5 rounded-full bg-cyan-400 transition-all ${anyVisible ? 'w-3.5' : 'w-1.5 opacity-60'}`} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Right: System Tray */}
+        <div className="flex items-center gap-1 min-w-0 w-36 sm:w-44 justify-end">
+          <AIAssistant onLock={onLock} />
+          <div className="h-5 w-px bg-white/10 mx-0.5 shrink-0" />
+          <button
+            onClick={() => setTrayOpen((v) => !v)}
+            className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-white/10 transition"
+            title="Quick settings"
+          >
+            <div className="flex items-center gap-1 text-white/70">
+              <Icon name="Wifi" size={13} />
+              <Icon name={quickSettings.sound ? 'Volume2' : 'VolumeX'} size={13} />
+              <Icon name="Battery" size={13} />
+            </div>
+            <div className="text-right leading-tight hidden lg:block">
+              <div className="text-[11px] text-white/90 tabular-nums font-mono">{timeStr}</div>
+              <div className="text-[9px] text-white/40">{dateStr}</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* Quick settings panel */}
       <AnimatePresence>
         {trayOpen && (
           <>
-            <div className="fixed inset-0 z-[5100]" onClick={() => setTrayOpen(false)} />
+            <div className="fixed inset-0 z-40" onClick={() => setTrayOpen(false)} />
             <motion.div
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              initial={{ opacity: 0, y: 20, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 12, scale: 0.98 }}
-              transition={{ type: 'spring', stiffness: 420, damping: 32 }}
-              className={`fixed bottom-14 right-3 z-[5200] w-72 max-w-[calc(100vw-24px)] rounded-xl p-4 backdrop-blur-2xl border shadow-2xl ${
-                isLight
-                  ? 'bg-white/95 border-slate-900/12 text-slate-900'
-                  : 'bg-slate-900/90 border-white/15 text-white'
-              }`}
+              exit={{ opacity: 0, y: 20, scale: 0.97 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              className="glass fixed bottom-14 right-3 z-50 w-72 rounded-2xl p-4"
             >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-semibold tracking-wide">Quick Controls</span>
-                <button
-                  onClick={() => {
-                    setTrayOpen(false);
-                    openApp('settings');
-                  }}
-                  className="text-[11px] os-accent-text hover:underline flex items-center gap-1 transition"
-                >
-                  <Icon name="Settings" size={12} />
-                  <span>Settings</span>
-                </button>
-              </div>
-
               <div className="grid grid-cols-3 gap-2 mb-4">
                 {[
                   { key: 'wifi' as const, label: 'Wi-Fi', icon: 'Wifi' },
@@ -989,112 +211,26 @@ export function Taskbar(_props?: TaskbarProps) {
                   <button
                     key={q.key}
                     onClick={() => toggleQuick(q.key)}
-                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-lg border transition ${
-                      quickSettings[q.key]
-                        ? 'os-accent-bg border-transparent'
-                        : isLight
-                        ? 'bg-slate-900/5 border-slate-900/10 text-slate-700 hover:bg-slate-900/10'
-                        : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'
+                    className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl transition ${
+                      quickSettings[q.key] ? 'bg-cyan-500/30 border border-cyan-400/40 text-cyan-300' : 'bg-white/5 border border-white/10 text-white/70 hover:bg-white/10'
                     }`}
                   >
-                    <Icon name={q.icon} size={15} />
-                    <span className="text-[10px] font-medium">{q.label}</span>
+                    <Icon name={q.icon} size={16} />
+                    <span className="text-[10px]">{q.label}</span>
                   </button>
                 ))}
               </div>
-
-              <div
-                className={`rounded-lg p-3 border ${
-                  isLight ? 'bg-slate-900/[0.03] border-slate-900/10' : 'bg-white/[0.04] border-white/10'
-                }`}
-              >
-                <div className="flex items-center justify-between text-xs mb-1.5">
-                  <button
-                    onClick={() => setSoundEnabled(!soundEnabled)}
-                    className="flex items-center gap-1.5 hover:opacity-80 transition"
-                  >
-                    <Icon
-                      name={soundEnabled && volume > 0 ? 'Volume2' : 'VolumeX'}
-                      size={13}
-                      className="os-accent-text"
-                    />
-                    <span>Master Volume</span>
-                  </button>
-                  <span className="font-mono text-[11px] opacity-65">
-                    {soundEnabled ? `${volume}%` : 'Muted'}
-                  </span>
+              <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                <div className="flex items-center gap-2 text-xs text-white/70 mb-2">
+                  <Icon name="Sun" size={14} className="text-amber-400" /> Brightness
                 </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={soundEnabled ? volume : 0}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    setVolume(val);
-                    if (val > 0 && !soundEnabled) setSoundEnabled(true);
-                  }}
-                  className="glass-slider w-full"
-                />
+                <input type="range" defaultValue={80} className="w-full accent-cyan-400" />
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* Standalone Calendar Flyout Popup */}
-      <AnimatePresence>
-        {calendarFlyoutOpen && (
-          <>
-            <div className="fixed inset-0 z-[5200]" onClick={() => setCalendarFlyoutOpen(false)} />
-            <motion.div
-              initial={{ opacity: 0, y: 16, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 16, scale: 0.95 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="fixed right-3 bottom-14 z-[5300] w-80 p-4 rounded-3xl bg-slate-900/90 backdrop-blur-2xl shadow-[0_24px_64px_rgba(0,0,0,0.6)] text-white select-none flex flex-col gap-3"
-            >
-              <div className="flex items-center justify-between pb-2">
-                <div className="text-sm font-bold flex items-center gap-2">
-                  <Icon name="Calendar" size={16} className="text-cyan-400" />
-                  <span>{now.toLocaleDateString('ja-JP', { month: 'long', year: 'numeric' })}</span>
+              <div className="bg-white/5 border border-white/10 rounded-xl p-3 mt-2">
+                <div className="flex items-center gap-2 text-xs text-white/70 mb-2">
+                  <Icon name="Volume2" size={14} className="text-cyan-400" /> Volume
                 </div>
-                <button
-                  onClick={() => setCalendarFlyoutOpen(false)}
-                  className="p-1 rounded-full hover:bg-white/10 text-white/60 hover:text-white"
-                >
-                  <Icon name="X" size={14} />
-                </button>
-              </div>
-
-              {/* Mini Month Grid */}
-              <div className="grid grid-cols-7 gap-1 text-center text-xs">
-                {['日', '月', '火', '水', '木', '金', '土'].map((d, i) => (
-                  <div key={d} className={`font-semibold py-1 ${i === 0 ? 'text-rose-400' : i === 6 ? 'text-sky-400' : 'text-white/65'}`}>
-                    {d}
-                  </div>
-                ))}
-                {Array.from({ length: 31 }, (_, i) => {
-                  const day = i + 1;
-                  const isToday = day === now.getDate();
-                  return (
-                    <div
-                      key={day}
-                      className={`h-7 rounded-xl flex items-center justify-center text-xs font-medium transition ${
-                        isToday
-                          ? 'bg-cyan-500 text-black font-bold shadow-md'
-                          : 'hover:bg-white/10 text-white/90'
-                      }`}
-                    >
-                      {day}
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-white/70">
-                <span className="font-mono">{timeStr}</span>
-                <span className="text-cyan-300 font-medium">予定 2件</span>
+                <input type="range" defaultValue={65} className="w-full accent-cyan-400" />
               </div>
             </motion.div>
           </>

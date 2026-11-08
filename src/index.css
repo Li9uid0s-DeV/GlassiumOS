@@ -2,38 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-:root,
-[data-theme='dark'] {
-  --os-accent: #06b6d4;
-  --os-accent-rgb: 6, 182, 212;
-  --os-surface: rgba(15, 23, 42, 0.84);
-  --os-surface-solid: #0f172a;
-  --os-surface-elevated: rgba(30, 41, 59, 0.72);
-  --os-surface-panel: rgba(255, 255, 255, 0.04);
-  --os-surface-hover: rgba(255, 255, 255, 0.08);
-  --os-border: rgba(255, 255, 255, 0.1);
-  --os-border-strong: rgba(255, 255, 255, 0.18);
-  --os-text: #f8fafc;
-  --os-text-muted: rgba(248, 250, 252, 0.62);
-  --os-text-subtle: rgba(248, 250, 252, 0.42);
-  --os-titlebar: rgba(15, 23, 42, 0.65);
-  --theme-blur: 20px;
-  --theme-opacity: 0.84;
-  --theme-radius: 12px;
-}
-
-[data-theme='light'] {
-  --os-surface: rgba(248, 250, 252, 0.9);
-  --os-surface-solid: #f8fafc;
-  --os-surface-elevated: rgba(255, 255, 255, 0.85);
-  --os-surface-panel: rgba(15, 23, 42, 0.04);
-  --os-surface-hover: rgba(15, 23, 42, 0.07);
-  --os-border: rgba(15, 23, 42, 0.11);
-  --os-border-strong: rgba(15, 23, 42, 0.2);
-  --os-text: #0f172a;
-  --os-text-muted: rgba(15, 23, 42, 0.66);
-  --os-text-subtle: rgba(15, 23, 42, 0.46);
-  --os-titlebar: rgba(241, 245, 249, 0.88);
+:root {
+  --glass-border: rgba(255, 255, 255, 0.04);
+  --glass-border-dark: rgba(255, 255, 255, 0.02);
+  --glass-highlight: rgba(255, 255, 255, 0.06);
+  --theme-blur: 24px;
+  --theme-opacity: 0.03;
+  --theme-radius: 16px;
 }
 
 * {
@@ -49,330 +24,265 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
-  font-family: 'Inter', 'Segoe UI Variable', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
   user-select: none;
-  color: var(--os-text);
 }
 
 /* ============================================================
-   ZERO BORDER LINE CONCEPT & LIQUID GLASS SURFACES
-   No 1px outline borders; depth created through optical elevation,
-   specular highlights (inset 0 1px 0), and backdrop refraction.
+   TRUE LIQUID GLASS — SVG #liquid-glass-lens Refraction Engine
+   100% Transparency with Fluid Optical Displacement
+   Zero Generic White Outlines — Defined solely by refraction & specular sheen
    ============================================================ */
 
-.liquid-glass-window,
-.liquid-glass-card {
-  background: var(--os-surface);
-  backdrop-filter: blur(var(--theme-blur, 24px)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--theme-blur, 24px)) saturate(160%);
-  border: none !important;
+/* ===== LIQUID GLASS WINDOW ===== */
+.liquid-glass-window {
+  position: relative;
+  background: rgba(255, 255, 255, var(--theme-opacity, 0.03));
+  backdrop-filter: url(#liquid-glass-lens) blur(14px) saturate(180%);
+  -webkit-backdrop-filter: url(#liquid-glass-lens) blur(14px) saturate(180%);
+  border: none;
   border-radius: var(--theme-radius, 16px);
   box-shadow:
-    0 20px 54px rgba(0, 0, 0, 0.44),
-    0 4px 14px rgba(0, 0, 0, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.14);
-  color: var(--os-text);
+    0 24px 60px rgba(0, 0, 0, 0.65),
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 2px 0 rgba(0, 0, 0, 0.35);
   isolation: isolate;
-  will-change: transform, opacity;
-  transition:
-    background-color 0.18s ease,
-    box-shadow 0.18s ease,
-    color 0.18s ease;
+  transition: box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-[data-theme='light'] .liquid-glass-window,
-[data-theme='light'] .liquid-glass-card {
+/* Focused Window Sheen & Refractive Aura */
+.liquid-glass-window.is-focused {
   box-shadow:
-    0 18px 48px rgba(15, 23, 42, 0.14),
-    0 4px 12px rgba(15, 23, 42, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 0.85);
+    0 28px 70px rgba(0, 0, 0, 0.75),
+    0 8px 24px rgba(0, 0, 0, 0.5),
+    0 0 36px rgba(56, 189, 248, 0.12),
+    inset 0 1px 2px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 3px 0 rgba(0, 0, 0, 0.45);
 }
 
-.liquid-glass-window.is-focused,
-.liquid-glass-card.is-focused {
-  border: none !important;
-  box-shadow:
-    0 24px 64px rgba(0, 0, 0, 0.52),
-    0 0 0 1.5px rgba(var(--os-accent-rgb), 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.22);
-}
-
-[data-theme='light'] .liquid-glass-window.is-focused,
-[data-theme='light'] .liquid-glass-card.is-focused {
-  box-shadow:
-    0 22px 56px rgba(15, 23, 42, 0.2),
-    0 0 0 1.5px rgba(var(--os-accent-rgb), 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.95);
-}
-
+/* Drag fallback — ultra smooth 60fps GPU performance */
 .liquid-glass-window.is-dragging {
-  box-shadow:
-    0 32px 76px rgba(0, 0, 0, 0.62),
-    0 0 0 1.5px rgba(var(--os-accent-rgb), 0.5);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.8);
 }
 
-/* ===== AUTHENTIC WINDOWS 10/11 CAPTION BUTTONS ===== */
+/* Glossy specular top sheen */
+.liquid-glass-window::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.03) 22%,
+    rgba(255, 255, 255, 0.0) 45%,
+    rgba(255, 255, 255, 0.0) 70%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: overlay;
+}
+
+/* Inner viscous edge refraction */
+.liquid-glass-window::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.1), inset 0 -1px 2px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Window Control Buttons MUST be unblockable */
 .window-controls-container {
   position: relative;
   z-index: 99999 !important;
   pointer-events: auto !important;
-  display: flex;
-  align-items: stretch;
-  height: 100%;
 }
 
-.win-caption-btn {
-  width: 46px;
-  height: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--os-text-muted);
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  transition: background-color 0.12s ease, color 0.12s ease;
-  cursor: default;
-}
-
-.win-caption-btn:hover {
-  background-color: var(--os-surface-hover);
-  color: var(--os-text);
-}
-
-.win-caption-btn:active {
-  background-color: rgba(128, 128, 128, 0.22);
-}
-
-.win-caption-close {
-  width: 46px;
-  height: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--os-text-muted);
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  transition: background-color 0.12s ease, color 0.12s ease;
-  cursor: default;
-}
-
-.win-caption-close:hover {
-  background-color: #e81123 !important;
-  color: #ffffff !important;
-}
-
-.win-caption-close:active {
-  background-color: #f1707a !important;
-  color: #ffffff !important;
-}
-
-/* ===== ZERO BORDER TASKBAR ===== */
+/* ===== LIQUID GLASS FULL-WIDTH TASKBAR ===== */
 .liquid-glass-taskbar {
   position: fixed;
   bottom: 0;
   left: 0;
   right: 0;
   width: 100vw;
-  background: var(--os-surface);
-  backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  border: none !important;
-  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.12);
-  color: var(--os-text);
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: url(#frosted-dock) blur(20px) saturate(180%);
+  -webkit-backdrop-filter: url(#frosted-dock) blur(20px) saturate(180%);
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 -8px 32px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
   isolation: isolate;
-  transition: background-color 0.22s ease, box-shadow 0.22s ease, color 0.22s ease;
 }
 
-[data-theme='light'] .liquid-glass-taskbar {
-  box-shadow: 0 -6px 24px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8);
-}
-
-/* ===== ZERO BORDER CONTROLS: GLASS JELLY ===== */
-.glass-jelly {
-  position: relative;
-  background: var(--os-surface-panel);
-  border: none !important;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition:
-    transform 0.18s ease,
-    background-color 0.18s ease,
-    box-shadow 0.18s ease;
-}
-
-.glass-jelly:hover {
-  background: var(--os-surface-hover);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
-
-.glass-jelly:active {
-  transform: scale(0.98);
-}
-
-/* Flat Accent Slider */
-input[type='range'].glass-slider {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 6px;
-  border-radius: 9999px;
-  background: rgba(var(--os-accent-rgb), 0.32);
-  outline: none;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-input[type='range'].glass-slider:hover {
-  background: rgba(var(--os-accent-rgb), 0.48);
-}
-
-input[type='range'].glass-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border-radius: 9999px;
-  background: var(--os-accent);
-  border: 2px solid #ffffff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-  transition: transform 0.15s ease, background-color 0.15s ease;
-}
-
-input[type='range'].glass-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.12);
-}
-
-input[type='range'].glass-slider::-webkit-slider-thumb:active {
-  transform: scale(0.95);
-}
-
-input[type='range'].glass-slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 9999px;
-  background: var(--os-accent);
-  border: 2px solid #ffffff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
-  cursor: pointer;
-}
-
-/* Flat Accent Toggle Switch */
-.glass-switch {
-  position: relative;
-  width: 44px;
-  height: 22px;
-  border-radius: 9999px;
-  background: rgba(148, 163, 184, 0.3);
-  border: 1px solid var(--os-border-strong);
-  cursor: pointer;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-
-.glass-switch.is-on {
-  background: var(--os-accent);
-  border-color: var(--os-accent);
-}
-
-.glass-switch-thumb {
+.liquid-glass-taskbar::before {
+  content: '';
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 9999px;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.01) 50%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: overlay;
 }
 
-.glass-switch.is-on .glass-switch-thumb {
-  transform: translateX(22px);
-}
-
-/* ===== FLAT PANELS ===== */
+/* ===== BASE GLASS PANELS & START MENU ===== */
 .glass {
-  background: var(--os-surface);
-  backdrop-filter: blur(20px) saturate(150%);
-  -webkit-backdrop-filter: blur(20px) saturate(150%);
-  border: 1px solid var(--os-border);
-  border-radius: 12px;
-  color: var(--os-text);
+  position: relative;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: url(#frosted-menu) blur(24px) saturate(190%);
+  -webkit-backdrop-filter: url(#frosted-menu) blur(24px) saturate(190%);
+  border: none;
+  border-radius: 16px;
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.7),
+    0 4px 16px rgba(0, 0, 0, 0.4),
+    inset 0 1px 1px 0 rgba(255, 255, 255, 0.14),
+    inset 0 -1px 2px 0 rgba(0, 0, 0, 0.4);
   isolation: isolate;
 }
 
 .glass-panel {
-  background: var(--os-surface-panel);
-  border: 1px solid var(--os-border);
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .glass-panel-hover:hover {
-  background: var(--os-surface-hover);
-  border-color: var(--os-border-strong);
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
-/* Accent Utility Classes */
-.os-accent-bg {
-  background-color: var(--os-accent);
-  color: #ffffff;
-}
+/* ============================================================
+   ALTERNATIVE DESIGN ENGINES
+   ============================================================ */
 
-.os-accent-soft {
-  background-color: rgba(var(--os-accent-rgb), 0.14);
-  color: var(--os-accent);
-  border-color: rgba(var(--os-accent-rgb), 0.35);
-}
-
-.os-accent-text {
-  color: var(--os-accent);
-}
-
-.os-accent-border {
-  border-color: var(--os-accent);
-}
-
-/* Alternative Engines */
+/* 1. Frosted Blur Theme */
 .engine-frosted-blur .liquid-glass-window,
 .engine-frosted-blur .liquid-glass-taskbar,
 .engine-frosted-blur .glass {
-  backdrop-filter: blur(28px) saturate(160%) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(160%) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  background: rgba(18, 18, 28, 0.25);
+  border: none;
 }
 
+/* 2. Pure Liquid Refraction Theme */
 .engine-windows-mica .liquid-glass-window,
 .engine-windows-mica .liquid-glass-taskbar,
 .engine-windows-mica .glass {
-  backdrop-filter: blur(20px) saturate(140%) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
+  backdrop-filter: url(#liquid-glass-lens) blur(18px) saturate(200%) !important;
+  -webkit-backdrop-filter: url(#liquid-glass-lens) blur(18px) saturate(200%) !important;
+  background: rgba(255, 255, 255, 0.02);
+  border: none;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
 }
 
+/* 3. Dark Cosmic Slate Theme */
 .engine-dark-slate .liquid-glass-window,
 .engine-dark-slate .liquid-glass-taskbar,
 .engine-dark-slate .glass {
-  backdrop-filter: blur(16px) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  background: rgba(10, 12, 18, 0.45);
+  border: none;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
 }
 
+/* 4. Cyberpunk Neon Grid Theme */
+.engine-cyberpunk-neon .liquid-glass-window {
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  background: rgba(10, 6, 24, 0.4);
+  border: 1px solid rgba(0, 255, 204, 0.4);
+  box-shadow: 0 0 24px rgba(0, 255, 204, 0.25), 0 16px 40px rgba(0, 0, 0, 0.6);
+}
+
+.engine-cyberpunk-neon .liquid-glass-taskbar {
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  background: rgba(8, 4, 20, 0.5);
+  border-top: 1px solid rgba(255, 0, 127, 0.4);
+  box-shadow: 0 0 20px rgba(255, 0, 127, 0.25);
+}
+
+/* ============================================================
+   NEON SPECULAR AURA GLOWS
+   ============================================================ */
+.liquid-glow {
+  box-shadow: 0 0 24px rgba(249, 115, 22, 0.45), 0 0 48px rgba(234, 88, 12, 0.2);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 24px rgba(6, 182, 212, 0.45), 0 0 48px rgba(14, 165, 233, 0.2);
+}
+
+.glow-violet {
+  box-shadow: 0 0 24px rgba(168, 85, 247, 0.45), 0 0 48px rgba(147, 51, 234, 0.2);
+}
+
+/* ============================================================
+   MAC DOCK MAGNIFICATION & UBUNTU LAUNCHER
+   ============================================================ */
 .mac-dock-item {
-  transition: transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), margin 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .mac-dock-item:hover {
-  transform: translateY(-6px) scale(1.14);
+  transform: translateY(-8px) scale(1.22);
 }
 
+/* Active running app indicator dot */
 .app-active-pip {
   position: absolute;
   bottom: 2px;
   left: 50%;
   transform: translateX(-50%);
-  width: 6px;
-  height: 3px;
+  width: 4px;
+  height: 4px;
   border-radius: 9999px;
-  background: var(--os-accent);
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
 }
 
+/* ============================================================
+   WINDOWS 8 METRO LIVE TILES
+   ============================================================ */
+.metro-tile {
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.metro-tile:hover {
+  transform: scale(1.025) translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35), 0 0 20px rgba(255, 255, 255, 0.2);
+}
+
+.metro-tile:active {
+  transform: scale(0.98);
+}
+
+/* Custom Scrollbar for all apps */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -383,226 +293,10 @@ input[type='range'].glass-slider::-moz-range-thumb {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.3);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.5);
+  background: rgba(255, 255, 255, 0.4);
 }
-
-/* ============================================================
-   AUTOMATIC DARK/BLACK TEXT ON WHITE OR BRIGHT BACKGROUNDS
-   ============================================================ */
-
-[data-theme='light'] .liquid-glass-window,
-[data-theme='light'] .liquid-glass-card,
-[data-theme='light'] .liquid-glass-taskbar {
-  color: #0f172a;
-}
-
-/* Convert hardcoded white text utilities inside windows/taskbar to dark slate in Light Mode */
-[data-theme='light'] .liquid-glass-window .text-white,
-[data-theme='light'] .liquid-glass-window .text-white\/95,
-[data-theme='light'] .liquid-glass-window .text-white\/90,
-[data-theme='light'] .liquid-glass-window .text-white\/85,
-[data-theme='light'] .liquid-glass-window .text-white\/80,
-[data-theme='light'] .liquid-glass-taskbar .text-white,
-[data-theme='light'] .liquid-glass-taskbar .text-white\/95,
-[data-theme='light'] .liquid-glass-taskbar .text-white\/90 {
-  color: #0f172a !important;
-}
-
-[data-theme='light'] .liquid-glass-window .text-white\/75,
-[data-theme='light'] .liquid-glass-window .text-white\/70,
-[data-theme='light'] .liquid-glass-window .text-white\/65,
-[data-theme='light'] .liquid-glass-window .text-white\/60,
-[data-theme='light'] .liquid-glass-taskbar .text-white\/70,
-[data-theme='light'] .liquid-glass-taskbar .text-white\/60 {
-  color: rgba(15, 23, 42, 0.72) !important;
-}
-
-[data-theme='light'] .liquid-glass-window .text-white\/55,
-[data-theme='light'] .liquid-glass-window .text-white\/50,
-[data-theme='light'] .liquid-glass-window .text-white\/45,
-[data-theme='light'] .liquid-glass-window .text-white\/40,
-[data-theme='light'] .liquid-glass-window .text-white\/35,
-[data-theme='light'] .liquid-glass-window .text-white\/30 {
-  color: rgba(15, 23, 42, 0.54) !important;
-}
-
-/* Keep white text on accent buttons and explicit colored badges */
-[data-theme='light'] .liquid-glass-window .os-accent-bg,
-[data-theme='light'] .liquid-glass-window .os-accent-bg .text-white {
-  color: #ffffff !important;
-}
-
-/* Adapt dark app container backgrounds inside windows when Light Mode is active */
-[data-theme='light'] .liquid-glass-window .bg-zinc-950,
-[data-theme='light'] .liquid-glass-window .bg-zinc-950\/90,
-[data-theme='light'] .liquid-glass-window .bg-slate-950,
-[data-theme='light'] .liquid-glass-window .bg-slate-950\/60,
-[data-theme='light'] .liquid-glass-window .bg-slate-950\/70,
-[data-theme='light'] .liquid-glass-window .bg-slate-950\/80 {
-  background-color: #f8fafc !important;
-  color: #0f172a !important;
-}
-
-[data-theme='light'] .liquid-glass-window .bg-zinc-900,
-[data-theme='light'] .liquid-glass-window .bg-zinc-900\/80,
-[data-theme='light'] .liquid-glass-window .bg-slate-900,
-[data-theme='light'] .liquid-glass-window .bg-slate-900\/55,
-[data-theme='light'] .liquid-glass-window .bg-slate-900\/60,
-[data-theme='light'] .liquid-glass-window .bg-slate-900\/70,
-[data-theme='light'] .liquid-glass-window .bg-slate-900\/80 {
-  background-color: #ffffff !important;
-  color: #0f172a !important;
-}
-
-[data-theme='light'] .liquid-glass-window .border-white\/5,
-[data-theme='light'] .liquid-glass-window .border-white\/10,
-[data-theme='light'] .liquid-glass-window .border-white\/15,
-[data-theme='light'] .liquid-glass-window .border-white\/20 {
-  border-color: rgba(15, 23, 42, 0.12) !important;
-}
-
-/* ============================================================
-   UI STYLE ENGINES (AUTHENTIC & FUN PRESETS)
-   ============================================================ */
-
-/* 1. Glassium (Zero Border Line Standard) */
-[data-ui-style='glassium'] {
-  --os-accent: #06b6d4;
-  --os-accent-rgb: 6, 182, 212;
-}
-[data-ui-style='glassium'] .liquid-glass-window {
-  border-radius: 18px;
-  box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.48),
-    0 4px 16px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16);
-}
-
-/* 2. macOS (Apple Human Interface Guidelines) */
-[data-ui-style='macos'] {
-  --os-accent: #3b82f6;
-  --os-accent-rgb: 59, 130, 246;
-  --theme-radius: 14px;
-}
-[data-ui-style='macos'] .liquid-glass-window {
-  border-radius: 14px;
-  backdrop-filter: blur(36px) saturate(190%);
-  -webkit-backdrop-filter: blur(36px) saturate(190%);
-  box-shadow:
-    0 26px 70px rgba(0, 0, 0, 0.5),
-    0 2px 10px rgba(0, 0, 0, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
-[data-ui-style='macos'] .liquid-glass-taskbar {
-  backdrop-filter: blur(32px) saturate(200%);
-  -webkit-backdrop-filter: blur(32px) saturate(200%);
-}
-
-/* 3. One UI (Samsung Reachability & Comfort Curve) */
-[data-ui-style='one-ui'] {
-  --os-accent: #2563eb;
-  --os-accent-rgb: 37, 99, 235;
-  --theme-radius: 26px;
-}
-[data-ui-style='one-ui'] .liquid-glass-window {
-  border-radius: 26px;
-  box-shadow:
-    0 20px 48px rgba(0, 0, 0, 0.4),
-    0 4px 16px rgba(0, 0, 0, 0.18),
-    inset 0 1.5px 0 rgba(255, 255, 255, 0.14);
-}
-[data-ui-style='one-ui'] button,
-[data-ui-style='one-ui'] .rounded-xl {
-  border-radius: 20px !important;
-}
-
-/* 4. MIUI (Alive Aesthetics & Kenya Hara Superellipse) */
-[data-ui-style='miui'] {
-  --os-accent: #f97316;
-  --os-accent-rgb: 249, 115, 22;
-  --theme-radius: 22px;
-}
-[data-ui-style='miui'] .liquid-glass-window {
-  border-radius: 22px;
-  backdrop-filter: blur(28px) saturate(175%);
-  -webkit-backdrop-filter: blur(28px) saturate(175%);
-  box-shadow:
-    0 24px 64px rgba(0, 0, 0, 0.45),
-    0 0 0 1px rgba(249, 115, 22, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-
-/* 5. Material 3 (Google Material You Dynamic Tonal) */
-[data-ui-style='material3'] {
-  --os-accent: #8b5cf6;
-  --os-accent-rgb: 139, 92, 246;
-  --theme-radius: 28px;
-}
-[data-ui-style='material3'] .liquid-glass-window {
-  border-radius: 28px;
-  background: rgba(26, 21, 38, 0.88);
-  box-shadow:
-    0 16px 44px rgba(0, 0, 0, 0.4),
-    0 2px 10px rgba(0, 0, 0, 0.16);
-}
-[data-ui-style='material3'] button {
-  border-radius: 9999px !important;
-}
-
-/* 6. The AI (Neural Matrix Cyber Sci-Fi) */
-[data-ui-style='the-ai'] {
-  --os-accent: #10b981;
-  --os-accent-rgb: 16, 185, 129;
-  --theme-radius: 10px;
-}
-[data-ui-style='the-ai'] .liquid-glass-window {
-  border-radius: 10px;
-  background: rgba(3, 14, 10, 0.9);
-  box-shadow:
-    0 24px 60px rgba(0, 0, 0, 0.7),
-    0 0 24px rgba(16, 185, 129, 0.15),
-    inset 0 1px 0 rgba(16, 185, 129, 0.25);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-[data-ui-style='the-ai'] .liquid-glass-taskbar {
-  background: rgba(2, 10, 8, 0.94);
-  box-shadow: 0 -4px 20px rgba(16, 185, 129, 0.12);
-}
-
-/* 7. Nyan Cat (Rainbow Arcade Pop) */
-[data-ui-style='nyan-cat'] {
-  --os-accent: #ec4899;
-  --os-accent-rgb: 236, 72, 153;
-  --theme-radius: 20px;
-}
-[data-ui-style='nyan-cat'] .liquid-glass-window {
-  border-radius: 20px;
-  box-shadow:
-    0 22px 55px rgba(236, 72, 153, 0.2),
-    0 4px 16px rgba(0, 0, 0, 0.4),
-    inset 0 2px 0 rgba(244, 114, 182, 0.4);
-}
-[data-ui-style='nyan-cat'] .liquid-glass-taskbar {
-  background: linear-gradient(90deg, rgba(239, 68, 68, 0.35), rgba(249, 115, 22, 0.35), rgba(234, 179, 8, 0.35), rgba(34, 197, 94, 0.35), rgba(59, 130, 246, 0.35), rgba(168, 85, 247, 0.35)), rgba(15, 23, 42, 0.85);
-}
-
-/* 8. Meme (Much OS, Such Window, Very Doge) */
-[data-ui-style='meme'] {
-  --os-accent: #eab308;
-  --os-accent-rgb: 234, 179, 8;
-  --theme-radius: 18px;
-}
-[data-ui-style='meme'] .liquid-glass-window {
-  border-radius: 18px;
-  box-shadow:
-    0 24px 60px rgba(234, 179, 8, 0.18),
-    0 4px 18px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(253, 224, 71, 0.4);
-}
-
-

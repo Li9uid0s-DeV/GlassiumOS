@@ -6,9 +6,9 @@ interface Line {
   text: string;
 }
 
-const BANNER = `GlassiumOS-V4.0 Terminal
-(c) GlassiumOS Project. All rights reserved.
-Type 'help' for a list of available commands.`;
+const BANNER = `Liquid OS Terminal [Version 2.0.0]
+(c) Liquid Corporation. All rights reserved.
+Type 'help' for a list of commands.`;
 
 const MOCK_WEATHER = [
   { city: 'New York', temp: '72°F', cond: 'Partly cloudy', wind: '8 mph SW' },
@@ -33,7 +33,7 @@ function tryEval(expr: string): string | null {
 }
 
 export function TerminalApp() {
-  const { fileSystem, openApp, lockSystem, setWallpaper, setShellMode, windows, closeWindow } = useOS();
+  const { fileSystem, openApp, lockSystem, setWallpaper } = useOS();
   const [lines, setLines] = useState<Line[]>([
     { type: 'output', text: BANNER },
     { type: 'output', text: '' },
@@ -61,91 +61,29 @@ export function TerminalApp() {
     const [name, ...args] = cmd.split(/\s+/);
     switch (name.toLowerCase()) {
       case 'help':
-        print('GlassiumOS-V4.0 Commands:');
-        print('  help               Show this help index');
-        print('  clear              Clear the terminal screen');
-        print('  ls                 List directory contents');
-        print('  cd <dir>           Change working directory');
-        print('  pwd                Print working directory');
-        print('  cat <file>         Output contents of a file');
-        print('  date               Show current system timestamp');
-        print('  whoami             Print current user');
-        print('  uname -a           Print system version');
-        print('  echo <text>        Print text to output');
-        print('  ps / top           List active window processes');
-        print('  kill <id>          Close a running window');
-        print('  open <app>         Launch application (browser, notepad, calculator, settings, etc.)');
-        print('  neofetch           Display system summary');
-        print('  calc <expr>        Evaluate mathematical expression');
-        print('  lock               Lock screen');
+        print('Available commands:');
+        print('  help        Show this help message');
+        print('  clear       Clear the terminal screen');
+        print('  ls          List directory contents');
+        print('  cd <dir>    Change directory');
+        print('  pwd         Print working directory');
+        print('  date        Show current date and time');
+        print('  whoami      Print current user');
+        print('  echo <t>    Print text');
+        print('  about       About Liquid OS');
+        print('  open <app>  Open an app');
+        print('  neofetch    System information with ASCII art');
+        print('  sysinfo     Display virtual system specifications');
+        print('  weather [city]  Mock weather forecast');
+        print('  calc <expr>  Evaluate a math expression');
+        print('  theme <name>  Switch wallpaper theme');
+        print('  history     Show command history');
+        print('  lock        Lock the system');
+        print('  sleep       Put the system to sleep');
         break;
       case 'clear':
         setLines([]);
         return;
-      case 'uname':
-        print('GlassiumOS-V4.0 WebOS x86_64 (2.5D Glass Compositor)');
-        break;
-      case 'ps':
-      case 'top': {
-        print('PID    PROCESS NAME             STATE       MEMORY');
-        print('--------------------------------------------------');
-        print('1      glassium-core            Running     32 MB');
-        print('2      glassium-compositor      Running     64 MB');
-        windows.forEach((w, idx) => {
-          print(`${100 + idx}    ${w.title.padEnd(24, ' ')} ${w.minimized ? 'Suspended' : 'Running'}   48 MB`);
-        });
-        break;
-      }
-      case 'kill': {
-        const target = args[0];
-        if (!target) { print('kill: specify process PID or title substring'); break; }
-        const win = windows.find((w, i) => String(100 + i) === target || w.title.toLowerCase().includes(target.toLowerCase()));
-        if (win) {
-          closeWindow(win.id);
-          print(`Process '${win.title}' (ID: ${win.id}) terminated.`);
-        } else {
-          print(`kill: process '${target}' not found.`);
-        }
-        break;
-      }
-      case 'shell': {
-        const targetShell = args[0]?.toLowerCase();
-        const validShells = ['windows', 'mac', 'ubuntu', 'android', 'ios', 'metro'];
-        if (targetShell && validShells.includes(targetShell)) {
-          setShellMode(targetShell as never);
-          print(`[SYSTEM] Switched active shell mode to: ${targetShell.toUpperCase()}`);
-        } else {
-          print(`shell: unknown shell '${args[0] ?? ''}'. Available: ${validShells.join(', ')}`);
-        }
-        break;
-      }
-      case 'cat': {
-        const filename = args[0];
-        if (!filename) { print('cat: specify file name'); break; }
-        let folder = fileSystem;
-        for (const seg of cwd) {
-          const next = folder.children.find((c) => c.name === seg && c.kind === 'folder');
-          if (!next || next.kind !== 'folder') break;
-          folder = next;
-        }
-        const file = folder.children.find((c) => c.name.toLowerCase() === filename.toLowerCase() && c.kind === 'file');
-        if (file && file.kind === 'file') {
-          print(file.content);
-        } else {
-          print(`cat: ${filename}: No such file`);
-        }
-        break;
-      }
-      case 'sudo':
-        if (args.join(' ').includes('apt update') || args.join(' ').includes('apt upgrade')) {
-          print('Hit:1 https://packages.liquidos.org/release v4.0.0 InRelease');
-          print('Get:2 https://security.liquidos.org/updates core-security [1,048 kB]');
-          print('Fetched 1,048 kB in 0.12s (8,733 kB/s)');
-          print('All system packages are up to date (0 upgradable).');
-        } else {
-          print(`[sudo] executed command: ${args.join(' ')} with root privilege.`);
-        }
-        break;
       case 'ls': {
         let folder = fileSystem;
         for (const seg of cwd) {
@@ -170,9 +108,9 @@ export function TerminalApp() {
           folder = next;
         }
         const found = folder.children.find(
-          (c) => c.name.toLowerCase() === target.toLowerCase() && c.kind === 'folder'
+          (c) => c.name === target && c.kind === 'folder'
         );
-        if (found) setCwd((c) => [...c, found.name]);
+        if (found) setCwd((c) => [...c, target]);
         else print(`cd: no such directory: ${target}`);
         break;
       }
@@ -183,42 +121,45 @@ export function TerminalApp() {
         print(new Date().toString());
         break;
       case 'whoami':
-        print('liquid-administrator (uid=1000 gid=1000)');
+        print('liquid-user');
         break;
       case 'echo':
         print(args.join(' '));
         break;
       case 'about':
-        print('LiquidOS v4.0.0 — High-density Web Operating System.');
-        print('Refined with SVG Displacement Refraction (#glass-distortion).');
-        print('Multi-OS Shell Architecture (Windows, macOS, Ubuntu, Android, iOS, Metro).');
+        print('Liquid OS — a web-based desktop environment.');
+        print('Built with React, TypeScript, Tailwind CSS & Framer Motion.');
+        print('UI style: Liquid Glass (advanced Glassmorphism with SVG refraction).');
         break;
       case 'open': {
-        const valid = ['explorer', 'browser', 'settings', 'notepad', 'terminal', 'game', 'appstore', 'calculator', 'taskmanager', 'sysmon', 'calendar', 'synth', 'music', 'monochrome'];
+        const valid = ['explorer', 'browser', 'settings', 'notepad', 'terminal', 'game', 'appstore'];
         const app = args[0]?.toLowerCase();
         if (app && valid.includes(app)) {
-          const target = app === 'music' || app === 'monochrome' ? 'synth' : app;
-          openApp(target as never);
-          print(`[OK] Launching application process: ${app}`);
+          openApp(app as 'explorer' | 'browser' | 'settings' | 'notepad' | 'game' | 'appstore');
+          print(`Opening ${app}...`);
         } else {
-          print(`open: unknown app '${args[0] ?? ''}'. Available: ${valid.join(', ')}`);
+          print(`open: unknown app '${args[0] ?? ''}'. Try: ${valid.join(', ')}`);
         }
         break;
       }
       case 'neofetch':
-        print('    .-------.       user@glassium-os');
-        print('   /   ___   \\      ----------------');
-        print('  |   /   \\   |     OS: GlassiumOS-V4.0');
-        print('  |  |  G  |  |     Runtime: Vite + TypeScript + Tailwind CSS');
-        print('  |   \\___/   |     UI: 2.5D Glassmorphism & Fluid Gradients');
-        print('   \\         /      Uptime: ' + Math.floor(performance.now() / 1000) + 's');
-        print('    `-------\'       Display: ' + window.innerWidth + 'x' + window.innerHeight);
+        print('       .--.        liquid-user@liquid-os');
+        print('      |o_o |       ----------------------');
+        print('      |:_/ |       OS: Liquid OS 2.0.0 (Glass)');
+        print('     //   \\ \\      Shell: Liquid Shell');
+        print('    (|     | )     UI: Liquid Glass SVG Refraction');
+        print('   /\'\\_   _/`\\     Resolution: ' + window.innerWidth + 'x' + window.innerHeight);
+        print('   \\___)=(___/     Theme: Glassmorphism');
         break;
       case 'sysinfo': {
-        print('=== GlassiumOS-V4.0 System Summary ===');
-        print(`Architecture: WebOS Container (TypeScript + Vite)`);
-        print(`CPU Threads:  ${navigator.hardwareConcurrency ?? '8'} logical cores`);
-        print(`Viewport:     ${window.innerWidth}x${window.innerHeight}`);
+        print('=== System Information ===');
+        print(`OS:           Liquid OS 2.0.0 (Glass)`);
+        print(`Kernel:       React 18.3 + TypeScript 5.5`);
+        print(`CPU:          ${navigator.hardwareConcurrency ?? 'Unknown'} cores`);
+        print(`Memory:       ${(navigator as Navigator & { deviceMemory?: number }).deviceMemory ? (navigator as Navigator & { deviceMemory?: number }).deviceMemory + ' GB' : 'Unknown'}`);
+        print(`Resolution:   ${window.innerWidth}x${window.innerHeight}`);
+        print(`GPU:          WebGL ${(() => { try { const c = document.createElement('canvas'); return c.getContext('webgl2') ? '2.0' : '1.0'; } catch { return 'N/A'; } })()}`);
+        print(`Browser:      ${navigator.userAgent.split(' ').pop() ?? 'Unknown'}`);
         print(`Uptime:       ${Math.floor(performance.now() / 1000)}s`);
         break;
       }
@@ -278,7 +219,7 @@ export function TerminalApp() {
     }
   };
 
-  const prompt = () => 'glassium@os:' + (cwd.length ? '/' + cwd.join('/') : '~') + '$';
+  const prompt = () => 'liquid@os:' + (cwd.length ? '/' + cwd.join('/') : '~') + '$';
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
