@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { backendFetch } from '../backendConfig';
+import { backendFetch, resolveBackendUrl } from '../backendConfig';
 
 export type EntertainmentTab = 'movies' | 'anime' | 'youtube' | 'shorts';
 export type StreamingProvider = 'vidlink' | 'mapple-fun' | 'streamex' | 'flixhd' | 'mapletv' | 'youtube';
@@ -47,40 +47,40 @@ const PROVIDER_METADATA: Record<
   { name: string; badge: string; color: string; desc: string }
 > = {
   vidlink: {
-    name: 'VidLink Pro (1080p HD)',
+    name: 'VidCore 1080p (Sandbox解除済)',
     badge: '最推奨 (Primary)',
     color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    desc: 'マルチオーディオ・字幕対応 1080p シネマストリーム',
+    desc: 'Sandboxチェック不要・高速1080pダイレクトシネマサーバー',
   },
   'mapple-fun': {
-    name: 'VidSrc CC / Mapple',
+    name: 'VidLink Pro HD',
     badge: '高速サーバー 1',
     color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-    desc: '映画・アニメ・海外ドラマ高速ストリームサーバー',
+    desc: '映画・アニメ・海外ドラマ マルチオーディオ対応ストリーム',
   },
   streamex: {
-    name: 'AutoEmbed HD',
-    badge: 'ミラー 2 (Fast)',
+    name: 'AutoEmbed.me (Proxy)',
+    badge: 'ミラー 2 (Proxy)',
     color: 'bg-sky-500/20 text-sky-400 border-sky-500/30',
-    desc: '低遅延・自動マルチソース切り替えプレイヤー',
+    desc: 'サーバー側Sandbox無害化プロキシ経由プレイヤー',
   },
   flixhd: {
-    name: '2Embed Cinema',
+    name: '2Embed Cinema (Proxy)',
     badge: 'ミラー 3 (IMDb/TMDB)',
     color: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-    desc: 'IMDb / TMDB ID 連動バックアップサーバー',
+    desc: 'document.domainブロック解除済 2Embed / VidCore連動サーバー',
   },
   mapletv: {
-    name: 'Embed.su Pro',
+    name: 'VidFast / NontonGo',
     badge: 'ミラー 4 (Edge)',
     color: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-    desc: '分散エッジ中継サーバー',
+    desc: '分散エッジ中継シネマ＆アニメサーバー',
   },
   youtube: {
-    name: 'YouTube / 公式PV',
-    badge: '公式トレイラー・本予告',
+    name: 'YouTube / 公式PV・Direct HD',
+    badge: '公式トレイラー・Direct MP4',
     color: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
-    desc: 'YouTube NoCookie 埋め込みプレイヤー',
+    desc: 'TMDB公式YouTube本予告＆Apple iTunes Direct HDストリーム',
   },
 };
 
@@ -857,85 +857,37 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     [filteredCatalog, visibleCardCount]
   );
 
-  // Compute embed URL for current player & provider — NEVER fall back to Frieren (209867) for other movies!
+  // Compute embed URL via our own-origin /api/entertainment/player Cinema Gateway so iframes never fail with X-Frame-Options or Sandbox blocks!
   const currentEmbedUrl = useMemo(() => {
     if (!selectedMedia) return '';
 
-    const tmdbId = selectedMedia.tmdbId;
-    const imdbId = selectedMedia.imdbId;
+    // If item has a direct .m4v / .mp4 video file URL and user hasn't picked a specific external provider
+    if (
+      selectedMedia.embedUrl &&
+      (selectedMedia.embedUrl.includes('.m4v') || selectedMedia.embedUrl.includes('.mp4')) &&
+      !selectedMedia.tmdbId &&
+      !selectedMedia.imdbId
+    ) {
+      return selectedMedia.embedUrl;
+    }
+
+    const tmdbId = selectedMedia.tmdbId ? String(selectedMedia.tmdbId) : '';
+    const imdbId = selectedMedia.imdbId || '';
     const ep = currentEpisode || 1;
-    const isMovie = selectedMedia.type === 'movie';
+    const ytId = selectedMedia.youtubeId || '';
 
-    if (provider === 'youtube') {
-      if (selectedMedia.youtubeId) {
-        return `https://www.youtube-nocookie.com/embed/${selectedMedia.youtubeId}?autoplay=1&rel=0`;
-      }
-      if (selectedMedia.embedUrl && selectedMedia.embedUrl.includes('youtube')) {
-        return selectedMedia.embedUrl;
-      }
-    }
+    const params = new URLSearchParams({
+      tmdbId,
+      imdbId,
+      type: selectedMedia.type,
+      ep: String(ep),
+      title: selectedMedia.title,
+      originalTitle: selectedMedia.originalTitle || selectedMedia.title,
+      provider,
+      ytId,
+    });
 
-    // If item has a direct embedUrl (e.g. Jikan trailer or iTunes preview) and no tmdbId/imdbId
-    if (!tmdbId && !imdbId) {
-      if (selectedMedia.embedUrl) return selectedMedia.embedUrl;
-      if (selectedMedia.youtubeId) {
-        return `https://www.youtube-nocookie.com/embed/${selectedMedia.youtubeId}?autoplay=1&rel=0`;
-      }
-    }
-
-    const targetId = tmdbId || imdbId || 693134;
-
-    switch (provider) {
-      case 'vidlink':
-        if (tmdbId) {
-          return isMovie
-            ? `https://vidlink.pro/movie/${tmdbId}?autoplay=true`
-            : `https://vidlink.pro/tv/${tmdbId}/1/${ep}?autoplay=true`;
-        }
-        return isMovie
-          ? `https://www.2embed.cc/embed/${targetId}`
-          : `https://www.2embed.cc/embedtv/${targetId}&s=1&e=${ep}`;
-
-      case 'mapple-fun':
-        if (tmdbId) {
-          return isMovie
-            ? `https://vidsrc.cc/v2/embed/movie/${tmdbId}`
-            : `https://vidsrc.cc/v2/embed/tv/${tmdbId}/1/${ep}`;
-        }
-        return `https://www.2embed.cc/embed/${targetId}`;
-
-      case 'streamex':
-        if (tmdbId) {
-          return isMovie
-            ? `https://player.autoembed.cc/embed/movie/${tmdbId}`
-            : `https://player.autoembed.cc/embed/tv/${tmdbId}/1/${ep}`;
-        }
-        return `https://vidsrc.me/embed/movie?imdb=${imdbId || 'tt15239678'}`;
-
-      case 'flixhd':
-        if (imdbId) {
-          return isMovie
-            ? `https://www.2embed.cc/embed/${imdbId}`
-            : `https://www.2embed.cc/embedtv/${imdbId}&s=1&e=${ep}`;
-        }
-        return isMovie
-          ? `https://www.2embed.cc/embed/${targetId}`
-          : `https://www.2embed.cc/embedtv/${targetId}&s=1&e=${ep}`;
-
-      case 'mapletv':
-        if (tmdbId) {
-          return isMovie
-            ? `https://embed.su/embed/movie/${tmdbId}`
-            : `https://embed.su/embed/tv/${tmdbId}/1/${ep}`;
-        }
-        return `https://www.2embed.cc/embed/${targetId}`;
-
-      case 'youtube':
-      default: {
-        const ytId = selectedMedia.youtubeId || 'Way9Dexny3w';
-        return `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&rel=0`;
-      }
-    }
+    return resolveBackendUrl(`/api/entertainment/player?${params.toString()}`);
   }, [selectedMedia, provider, currentEpisode]);
 
   const parseYoutubeInput = (raw: string): string | null => {
@@ -1116,12 +1068,12 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
                       <div className="flex items-center gap-1 bg-black/80 backdrop-blur-md p-1 rounded-full border border-white/20 pointer-events-auto overflow-x-auto max-w-full">
                         {(
                           [
-                            ['vidlink', 'VidLink 1080p'],
-                            ['mapple-fun', 'VidSrc CC'],
-                            ['streamex', 'AutoEmbed'],
-                            ['flixhd', '2Embed'],
-                            ['mapletv', 'Embed.su'],
-                            ['youtube', '公式PV/YouTube'],
+                            ['vidlink', 'VidCore 1080p'],
+                            ['mapple-fun', 'VidLink Pro'],
+                            ['flixhd', '2Embed (Sandbox解除)'],
+                            ['streamex', 'AutoEmbed.me'],
+                            ['mapletv', 'VidFast / NontonGo'],
+                            ['youtube', '公式PV / Direct HD'],
                           ] as Array<[StreamingProvider, string]>
                         ).map(([provKey, label]) => (
                           <button

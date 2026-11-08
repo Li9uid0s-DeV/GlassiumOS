@@ -89,7 +89,7 @@ const RECOMMENDED_ITEMS: {
     appId: 'notepad',
     payload: {
       fileName: 'GlassiumOS_Notes.md',
-      content: '# GlassiumOS 5 u1 (GlasispectUI)\n\nMinimal Refractive Glass & Integrated AI Desktop Environment.\n',
+      content: '# GlassiumOS 5 u4 (GlasispectUI)\n\nMinimal Refractive Glass & Integrated Desktop Environment.\n',
     },
   },
   {
@@ -756,7 +756,7 @@ export function StartMenu({ open, onClose }: Props) {
                       {userInitial}
                     </div>
                     <span className="font-medium">{userName}</span>
-                    <span className="text-[10px] font-mono opacity-45">GlassiumOS 5 u1 · GlasispectUI</span>
+                    <span className="text-[10px] font-mono opacity-45">GlassiumOS 5 u4 · GlasispectUI</span>
                   </button>
 
                   <div className="flex items-center gap-4">

@@ -902,50 +902,13 @@ class GlobalAudioManager {
       }
     }
 
-    // Stage 3: Client-side Standalone Direct Stream (for static hosts like jsDelivr / GitHub Pages / Mobile)
+    // Stage 3: Client-side Direct Stream URL (if resolved via /api/music/info)
     if (this.pendingTrack === track) {
       try {
-        let clientAudioUrl: string | null = null;
-        if (track.sourceUrl && track.sourceUrl.startsWith('http')) {
-          clientAudioUrl = track.sourceUrl;
-        } else if (numericId) {
-          const gdRes = await fetch(
-            `https://music-api.gdstudio.xyz/api.php?types=url&source=netease&id=${encodeURIComponent(numericId)}&br=${brVal}`,
-            { signal: AbortSignal.timeout(5500) }
-          );
-          if (gdRes.ok) {
-            const gdData = (await gdRes.json()) as { url?: string };
-            if (gdData?.url && gdData.url.startsWith('http')) {
-              clientAudioUrl = gdData.url.replace(/^http:\/\//i, 'https://');
-            }
-          }
-        }
-
-        if (!clientAudioUrl) {
-          const query = `${track.title} ${cleanArtist}`.trim();
-          const sRes = await fetch(
-            `https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(query)}&count=5`,
-            { signal: AbortSignal.timeout(5500) }
-          );
-          if (sRes.ok) {
-            const list = (await sRes.json()) as Array<{ id?: string | number; url_id?: string | number }>;
-            if (Array.isArray(list) && list.length > 0) {
-              const matchedId = String(list[0].url_id || list[0].id || '');
-              if (matchedId) {
-                const gdRes2 = await fetch(
-                  `https://music-api.gdstudio.xyz/api.php?types=url&source=netease&id=${encodeURIComponent(matchedId)}&br=${brVal}`,
-                  { signal: AbortSignal.timeout(5500) }
-                );
-                if (gdRes2.ok) {
-                  const gdData2 = (await gdRes2.json()) as { url?: string };
-                  if (gdData2?.url && gdData2.url.startsWith('http')) {
-                    clientAudioUrl = gdData2.url.replace(/^http:\/\//i, 'https://');
-                  }
-                }
-              }
-            }
-          }
-        }
+        const directStream = await resolveFullLengthAudioStream(track.title, cleanArtist, numericId);
+        const clientAudioUrl =
+          directStream?.audioUrl ||
+          (track.sourceUrl && track.sourceUrl.startsWith('http') ? track.sourceUrl : null);
 
         if (clientAudioUrl && this.pendingTrack === track) {
           this.audio.src = clientAudioUrl;
@@ -956,7 +919,7 @@ class GlobalAudioManager {
             isPlaying: true,
             isBuffering: false,
             error: null,
-            statusMessage: `フル尺再生中 (jsDelivr Direct 320kbps): ${track.title} — ${cleanArtist}`,
+            statusMessage: `フル尺再生中 (Direct 320kbps): ${track.title} — ${cleanArtist}`,
           });
           return;
         }

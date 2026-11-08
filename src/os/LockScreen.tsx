@@ -82,9 +82,9 @@ export const LockScreen: React.FC<LockScreenProps> = ({
     Array<{ url: string; title: string; copyright: string; startdate?: string }>
   >([
     {
-      url: 'https://www.bing.com/th?id=OHR.BanffSnow_ROW6870286334_1920x1080.jpg',
-      title: 'Banff National Park, Alberta, Canada',
-      copyright: '© Bing Daily Nature Archive',
+      url: '/api/bing-image?idx=0',
+      title: 'Bing 日替わり自然壁紙',
+      copyright: '© Microsoft Bing Daily Wallpaper',
     },
   ]);
   const [bingIndex, setBingIndex] = useState(0);
@@ -102,14 +102,14 @@ export const LockScreen: React.FC<LockScreenProps> = ({
           setBingImages([
             {
               url: data.url,
-              title: data.title || 'Bing Daily Nature Wallpaper',
+              title: data.title || 'Bing 日替わり自然壁紙',
               copyright: data.copyright || '© Microsoft Bing',
             },
           ]);
         }
       })
       .catch(() => {
-        // Keep default Bing nature image
+        // Keep default proxied Bing nature image
       });
     return () => {
       cancelled = true;
@@ -126,6 +126,33 @@ export const LockScreen: React.FC<LockScreenProps> = ({
     }
     return DEFAULT_CUSTOM_INFO;
   });
+
+  // Sync Lock Screen weather with server-backed 5-minute /api/weather endpoint
+  useEffect(() => {
+    let active = true;
+    const syncLockWeather = () => {
+      fetch('/api/weather?lat=35.6762&lon=139.6503&name=%E6%9D%B1%E4%BA%AC')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((w) => {
+          if (!active || !w || typeof w.temp !== 'number') return;
+          setCustomInfo((prev) => ({
+            ...prev,
+            tempC: Math.round(w.temp),
+            condition: w.condition || prev.condition,
+            highC: typeof w.high === 'number' ? w.high : prev.highC,
+            lowC: typeof w.low === 'number' ? w.low : prev.lowC,
+            rainChance: w.daily?.[0]?.precipProb ?? prev.rainChance,
+          }));
+        })
+        .catch(() => {});
+    };
+    syncLockWeather();
+    const interval = setInterval(syncLockWeather, 5 * 60 * 1000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
   const [isEditingTopLeft, setIsEditingTopLeft] = useState(false);
 
   // Bottom-Left Volume & Audio Quick Control
@@ -513,7 +540,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
               <div>
                 <div className="text-[10px] font-mono uppercase tracking-wider text-white/60 flex items-center gap-1.5">
                   <span className="ios27-liquid-circle-dot scale-75" />
-                  <span>GLASSIUM OS · BING NATURE LOCK</span>
+                  <span>GlassiumOS 5 u4 · BING DAILY LOCK</span>
                 </div>
                 <div className="text-xs font-bold text-white truncate max-w-[150px]">
                   {userName}

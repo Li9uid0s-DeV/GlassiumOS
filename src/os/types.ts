@@ -46,9 +46,15 @@ export type AppId =
   | 'periodic'
   | 'dictionary'
   | 'entertainment'
-  | 'sysinfo';
+  | 'sysinfo'
+  | 'sonicstudio'
+  | 'glassword'
+  | 'glassexcel'
+  | 'glassppt'
+  | 'glassnote'
+  | 'tsxrunner';
 
-// Custom installed apps use a string ID prefixed with 'custom:'
+// Custom installed apps use a string ID prefixed with 'custom:' or 'tsx:'
 export type WindowAppId = AppId | string;
 
 export interface WindowState {
@@ -237,7 +243,7 @@ export interface StoreApp {
   id: string;
   name: string;
   description: string;
-  category: 'utilities' | 'games';
+  category: 'utilities' | 'games' | 'office' | 'audio';
   icon: string;
   author: string;
   rating: number;
@@ -245,171 +251,233 @@ export interface StoreApp {
   version: string;
   builtInAppId?: AppId;
   url?: string;
+  tsxSource?: string;
+  fileName?: string;
 }
 
 export const STORE_CATALOG: StoreApp[] = [
   {
+    id: 'sonicstudio',
+    name: 'Glassium Sonic 3D',
+    description: 'OS全体の音声に対する立体音響（3Dサラウンド・空間配置）および10バンドイコライザー設定アプリ。',
+    category: 'audio',
+    icon: 'Volume2',
+    author: 'Glassium Audio',
+    rating: 5.0,
+    size: '2.4 MB',
+    version: '5.0 u4',
+    builtInAppId: 'sonicstudio',
+  },
+  {
+    id: 'glassword',
+    name: 'Glassium Write (Word)',
+    description: '見出し・段落装飾・テンプレート・文字数集計・ファイル保存に対応した文書作成アプリ。',
+    category: 'office',
+    icon: 'FileText',
+    author: 'Glassium Office',
+    rating: 4.9,
+    size: '3.2 MB',
+    version: '5.0 u4',
+    builtInAppId: 'glassword',
+  },
+  {
+    id: 'glassexcel',
+    name: 'Glassium Sheet (Excel)',
+    description: 'SUM / AVERAGE などの数式計算・複数シート管理・CSV出力に対応した表計算アプリ。',
+    category: 'office',
+    icon: 'Grid3x3',
+    author: 'Glassium Office',
+    rating: 4.9,
+    size: '3.5 MB',
+    version: '5.0 u4',
+    builtInAppId: 'glassexcel',
+  },
+  {
+    id: 'glassppt',
+    name: 'Glassium Stage (PowerPoint)',
+    description: 'スライド作成・レイアウトテーマ切替・全画面プレゼンテーション再生に対応した発表資料アプリ。',
+    category: 'office',
+    icon: 'Monitor',
+    author: 'Glassium Office',
+    rating: 4.8,
+    size: '3.8 MB',
+    version: '5.0 u4',
+    builtInAppId: 'glassppt',
+  },
+  {
+    id: 'glassnote',
+    name: 'Glassium Note (OneNote)',
+    description: 'ノートブック・セクション・ページ階層でメモやチェックリスト、手書きスケッチを整理できるデジタルノート。',
+    category: 'office',
+    icon: 'BookOpen',
+    author: 'Glassium Office',
+    rating: 4.9,
+    size: '2.9 MB',
+    version: '5.0 u4',
+    builtInAppId: 'glassnote',
+  },
+  {
     id: 'calendar',
-    name: 'Calendar & Tasks',
-    description: 'Interactive agenda grid and task scheduler with local persistence.',
+    name: 'Glassium Calendar',
+    description: 'スケジュール管理とタスク登録を行うカレンダーアプリ。',
     category: 'utilities',
     icon: 'Calendar',
     author: 'Glassium Core',
     rating: 4.8,
     size: '1.8 MB',
-    version: '4.0.0',
+    version: '5.0 u4',
     builtInAppId: 'calendar',
   },
   {
     id: 'synth',
-    name: 'Monochrome Music & Synced Lyrics',
-    description: 'Stream Hi-Fi lossless music and real-time lyrics via Scramjet & Ultraviolet proxy tunnel.',
-    category: 'utilities',
+    name: 'Glassium Music',
+    description: '楽曲検索、プレイリスト取込、同期歌詞・自動翻訳、音質・EQ設定を備えた音楽プレーヤー。',
+    category: 'audio',
     icon: 'Music',
-    author: 'Monochrome Audio',
+    author: 'Glassium Audio',
     rating: 5.0,
     size: '3.1 MB',
-    version: '4.0.0',
+    version: '5.0 u4',
     builtInAppId: 'synth',
   },
   {
     id: 'cosmic-maze',
-    name: '3D Cosmic Maze',
-    description: 'Navigate a neon metallic sphere through 3D floating labyrinth corridors.',
+    name: 'Glassium 3D Maze',
+    description: '3D迷路ステージをボールを転がしてゴールへ導くパズルゲーム。',
     category: 'games',
     icon: 'Gamepad2',
-    author: 'Cosmic Interactive',
+    author: 'Glassium Games',
     rating: 4.9,
     size: '3.5 MB',
-    version: '3.0.0',
+    version: '5.0 u4',
     builtInAppId: 'game',
   },
   {
     id: 'slope-runner',
-    name: 'Neon Slope Runner',
-    description: 'High-velocity endless 3D physics runner down tilting ramps toward the event horizon.',
+    name: 'Glassium Slope Runner',
+    description: '障害物を避けながらコースを進む3Dランニングゲーム。',
     category: 'games',
     icon: 'Zap',
-    author: 'Velocity Studios',
+    author: 'Glassium Games',
     rating: 4.9,
     size: '2.8 MB',
-    version: '3.0.0',
+    version: '5.0 u4',
     builtInAppId: 'game',
   },
   {
     id: 'markdown-studio',
-    name: 'Markdown Pro Studio',
-    description: 'Distraction-free markdown workspace with live preview and syntax formatting.',
+    name: 'Glassium Editor',
+    description: 'ライブプレビュー付きのMarkdown・テキストエディタ。',
     category: 'utilities',
     icon: 'PenTool',
-    author: 'TextCraft',
+    author: 'Glassium Core',
     rating: 4.7,
     size: '1.5 MB',
-    version: '2.4.1',
+    version: '5.0 u4',
     builtInAppId: 'notepad',
   },
   {
     id: 'retro-2048',
-    name: '2048 Hologram Edition',
-    description: 'Slide and merge radiant liquid tiles to reach the 2048 singularity.',
+    name: 'Glassium 2048',
+    description: '同じ数字のタイルをスライドして合体させる定番パズルゲーム。',
     category: 'games',
     icon: 'Grid3x3',
-    author: 'PuzzleCraft',
+    author: 'Glassium Games',
     rating: 4.8,
     size: '950 KB',
-    version: '2.0.0',
+    version: '5.0 u4',
     builtInAppId: 'game',
   },
   {
     id: 'retro-snake',
-    name: 'Neon Quantum Snake',
-    description: 'Classic snake with cybernetic neon powerups and particle explosions.',
+    name: 'Glassium Snake',
+    description: 'アイテムを集めてスコアを伸ばすクラシックなスネークゲーム。',
     category: 'games',
     icon: 'Sparkles',
-    author: 'RetroByte',
+    author: 'Glassium Games',
     rating: 4.6,
     size: '800 KB',
-    version: '1.9.0',
+    version: '5.0 u4',
     builtInAppId: 'game',
   },
   {
     id: 'weather',
-    name: 'Cosmic Weather Forecast',
-    description: 'Dynamic real-time atmospheric radar, 7-day orbital forecasts, and meteorological telemetry.',
+    name: 'Glassium Weather',
+    description: '地点検索・地点登録、雨雲レーダーマップ、5分ごとの自動更新に対応した天気予報アプリ。',
     category: 'utilities',
     icon: 'CloudSun',
-    author: 'Orbital Weather Lab',
+    author: 'Glassium Core',
     rating: 4.9,
     size: '2.4 MB',
-    version: '4.1.0',
+    version: '5.0 u4',
     builtInAppId: 'weather',
   },
   {
     id: 'clock',
-    name: 'Clock, Alarms & Chrono',
-    description: 'World clocks across galactic time zones, customizable alarms with audio synthesizers, and precision lap stopwatch.',
+    name: 'Glassium Clock',
+    description: '世界時計、アラーム、ストップウォッチ、タイマーを備えた時計アプリ。',
     category: 'utilities',
     icon: 'Clock',
-    author: 'Liquid Chronometry',
+    author: 'Glassium Core',
     rating: 4.9,
     size: '1.9 MB',
-    version: '4.1.0',
+    version: '5.0 u4',
     builtInAppId: 'clock',
   },
   {
     id: 'ai',
-    name: 'Liquid Copilot Pro AI',
-    description: 'Autonomous AI assistant with Gemini 3.8 Flash, system automation, code generation, and prompt templates.',
+    name: 'Glassium AI Assistant',
+    description: '質問応答、文章作成補助、OS設定の操作を行えるアシスタントアプリ。',
     category: 'utilities',
     icon: 'Bot',
-    author: 'AI Studio Core',
+    author: 'Glassium Core',
     rating: 5.0,
     size: '4.8 MB',
-    version: '4.7.0',
+    version: '5.0 u4',
     builtInAppId: 'ai',
   },
   {
     id: 'entertainment',
-    name: 'Entertainment',
-    description: 'Prime Shows, StreameX, FlixHD, Maple TV, YouTube & Shorts multi-source streaming hub.',
+    name: 'Glassium Media Hub',
+    description: '動画・アニメ・映画の検索と再生を行うメディアプレーヤー。',
     category: 'utilities',
     icon: 'Tv',
     author: 'Glassium Media',
     rating: 5.0,
     size: '3.4 MB',
-    version: '5.0.0',
+    version: '5.0 u4',
     builtInAppId: 'entertainment',
   },
-  { id: 'paint', name: 'Spect Studio', description: 'GlasispectUI digital canvas with brushes, layers, color palette, and PNG export.', category: 'utilities', icon: 'Palette', author: 'Glasispect Creative', rating: 4.9, size: '1.4 MB', version: '5.0 u2', builtInAppId: 'paint' },
-  { id: 'pomodoro', name: 'Pomodoro Timer', description: '25/5 focus and break timer for deep productivity.', category: 'utilities', icon: 'Clock', author: 'Glassium Core', rating: 4.9, size: '920 KB', version: '4.7.0', builtInAppId: 'pomodoro' },
-  { id: 'unitconverter', name: 'Unit Converter', description: 'Convert length, weight, temperature, and digital storage.', category: 'utilities', icon: 'SlidersHorizontal', author: 'Glassium Tools', rating: 4.8, size: '880 KB', version: '4.7.0', builtInAppId: 'unitconverter' },
-  { id: 'colorpicker', name: 'Color Studio', description: 'RGB/HSL mixer, HEX generator, and color palettes.', category: 'utilities', icon: 'Palette', author: 'Glassium Creative', rating: 4.9, size: '1.1 MB', version: '4.7.0', builtInAppId: 'colorpicker' },
-  { id: 'passgen', name: 'Password Generator', description: 'Cryptographic password generator with entropy controls.', category: 'utilities', icon: 'Key', author: 'Glassium Security', rating: 4.9, size: '750 KB', version: '4.7.0', builtInAppId: 'passgen' },
-  { id: 'qrcode', name: 'QR Matrix Studio', description: 'Generate visual matrix codes for URLs and text.', category: 'utilities', icon: 'Grid3x3', author: 'Glassium Tools', rating: 4.8, size: '990 KB', version: '4.7.0', builtInAppId: 'qrcode' },
-  { id: 'jsonformat', name: 'JSON Formatter', description: 'Format, validate, and minify JSON payloads.', category: 'utilities', icon: 'Code2', author: 'Glassium Dev', rating: 4.9, size: '840 KB', version: '4.7.0', builtInAppId: 'jsonformat' },
-  { id: 'regex', name: 'Regex Tester', description: 'Test regular expressions with real-time match highlighting.', category: 'utilities', icon: 'Search', author: 'Glassium Dev', rating: 4.8, size: '910 KB', version: '4.7.0', builtInAppId: 'regex' },
-  { id: 'markdown', name: 'Markdown Reader', description: 'Side-by-side live Markdown editor and reader.', category: 'utilities', icon: 'FileText', author: 'TextCraft', rating: 4.9, size: '1.2 MB', version: '4.7.0', builtInAppId: 'markdown' },
-  { id: 'kanban', name: 'Kanban Board', description: 'Agile task management across Todo, Doing, and Done.', category: 'utilities', icon: 'LayoutGrid', author: 'Glassium Work', rating: 5.0, size: '1.6 MB', version: '4.7.0', builtInAppId: 'kanban' },
-  { id: 'habit', name: 'Habit Tracker', description: 'Track daily routines and weekly completion streaks.', category: 'utilities', icon: 'CheckCircle2', author: 'Glassium Life', rating: 4.8, size: '1.1 MB', version: '4.7.0', builtInAppId: 'habit' },
-  { id: 'expense', name: 'Expense Ledger', description: 'Personal budget and expense tracker.', category: 'utilities', icon: 'Calculator', author: 'Glassium Finance', rating: 4.9, size: '1.3 MB', version: '4.7.0', builtInAppId: 'expense' },
-  { id: 'bmi', name: 'Health & BMI', description: 'Calculate BMI and ideal weight range.', category: 'utilities', icon: 'Activity', author: 'Glassium Health', rating: 4.7, size: '820 KB', version: '4.7.0', builtInAppId: 'bmi' },
-  { id: 'worldclock', name: 'World Clock Hub', description: 'Compare global time zones simultaneously.', category: 'utilities', icon: 'Globe', author: 'Liquid Chronometry', rating: 4.9, size: '1.0 MB', version: '4.7.0', builtInAppId: 'worldclock' },
-  { id: 'morse', name: 'Morse & Cipher', description: 'Encode/decode Morse code instantly.', category: 'utilities', icon: 'Zap', author: 'Glassium Tools', rating: 4.7, size: '780 KB', version: '4.7.0', builtInAppId: 'morse' },
-  { id: 'base64', name: 'Base64 & URL Tool', description: 'UTF-8 Base64 and URL encoder/decoder.', category: 'utilities', icon: 'Code2', author: 'Glassium Dev', rating: 4.8, size: '790 KB', version: '4.7.0', builtInAppId: 'base64' },
-  { id: 'diff', name: 'Text Diff Viewer', description: 'Compare two texts line-by-line to spot changes.', category: 'utilities', icon: 'Layers', author: 'Glassium Dev', rating: 4.8, size: '940 KB', version: '4.7.0', builtInAppId: 'diff' },
-  { id: 'wordcount', name: 'Word Analyzer', description: 'Count characters, words, lines, and reading time.', category: 'utilities', icon: 'FileText', author: 'TextCraft', rating: 4.9, size: '720 KB', version: '4.7.0', builtInAppId: 'wordcount' },
-  { id: 'flashcards', name: 'Flashcards Deck', description: 'Interactive flip cards for studying tech and languages.', category: 'utilities', icon: 'BookOpen', author: 'Glassium Study', rating: 4.9, size: '1.1 MB', version: '4.7.0', builtInAppId: 'flashcards' },
-  { id: 'whiteboard', name: 'Idea Board', description: 'Organize brainstorm cards by priority.', category: 'utilities', icon: 'PenTool', author: 'Glassium Work', rating: 4.8, size: '1.2 MB', version: '4.7.0', builtInAppId: 'whiteboard' },
-  { id: 'drumpad', name: '808 Drum Pad', description: 'Synthesized 9-pad beat maker with WebAudio.', category: 'utilities', icon: 'Music', author: 'Monochrome Audio', rating: 5.0, size: '1.8 MB', version: '4.7.0', builtInAppId: 'drumpad' },
-  { id: 'tuner', name: 'Frequency Synth', description: 'Audio pitch and waveform generator (80Hz - 1200Hz).', category: 'utilities', icon: 'Volume2', author: 'Monochrome Audio', rating: 4.8, size: '960 KB', version: '4.7.0', builtInAppId: 'tuner' },
-  { id: 'minesweeper', name: 'Cyber Minesweeper', description: 'Classic logic grid puzzle.', category: 'games', icon: 'Gamepad2', author: 'PuzzleCraft', rating: 4.9, size: '1.1 MB', version: '4.7.0', builtInAppId: 'minesweeper' },
-  { id: 'tictactoe', name: 'Tic-Tac-Toe AI', description: 'Play Tic-Tac-Toe on a sleek grid.', category: 'games', icon: 'Grid3x3', author: 'PuzzleCraft', rating: 4.8, size: '740 KB', version: '4.7.0', builtInAppId: 'tictactoe' },
-  { id: 'memory', name: 'Memory Match', description: 'Flip and match pairs of icons.', category: 'games', icon: 'Sparkles', author: 'RetroByte', rating: 4.9, size: '950 KB', version: '4.7.0', builtInAppId: 'memory' },
-  { id: 'typing', name: 'Typing Trainer', description: 'Test your WPM speed and accuracy with code & phrases.', category: 'games', icon: 'SquareTerminal', author: 'Velocity Studios', rating: 4.9, size: '1.2 MB', version: '4.7.0', builtInAppId: 'typing' },
-  { id: 'sudoku', name: 'Mini Sudoku', description: 'Logic number puzzle with instant verification.', category: 'games', icon: 'Grid3x3', author: 'PuzzleCraft', rating: 4.8, size: '890 KB', version: '4.7.0', builtInAppId: 'sudoku' },
-  { id: 'periodic', name: 'Periodic Table', description: 'Interactive chemical elements reference.', category: 'utilities', icon: 'Sparkles', author: 'Glassium Science', rating: 5.0, size: '1.5 MB', version: '4.7.0', builtInAppId: 'periodic' },
-  { id: 'dictionary', name: 'Tech Lexicon', description: 'Searchable dictionary of software and AI terms.', category: 'utilities', icon: 'BookOpen', author: 'Glassium Study', rating: 4.8, size: '1.3 MB', version: '4.7.0', builtInAppId: 'dictionary' },
-  { id: 'sysinfo', name: 'System Diagnostics', description: 'Hardware, display, and browser runtime diagnostics.', category: 'utilities', icon: 'Cpu', author: 'Glassium Core', rating: 4.9, size: '900 KB', version: '4.7.0', builtInAppId: 'sysinfo' },
+  { id: 'paint', name: 'Glassium Paint', description: 'ブラシ・レイヤー・カラーパレット・PNG保存に対応したペイントツール。', category: 'utilities', icon: 'Palette', author: 'Glassium Creative', rating: 4.9, size: '1.4 MB', version: '5.0 u4', builtInAppId: 'paint' },
+  { id: 'pomodoro', name: 'Glassium Pomodoro', description: '25分作業＋5分休憩のサイクルで集中を支援するタイマー。', category: 'utilities', icon: 'Clock', author: 'Glassium Core', rating: 4.9, size: '920 KB', version: '5.0 u4', builtInAppId: 'pomodoro' },
+  { id: 'unitconverter', name: 'Glassium Converter', description: '長さ、重さ、温度、データ容量の単位を相互変換するツール。', category: 'utilities', icon: 'SlidersHorizontal', author: 'Glassium Tools', rating: 4.8, size: '880 KB', version: '5.0 u4', builtInAppId: 'unitconverter' },
+  { id: 'colorpicker', name: 'Glassium Color Picker', description: 'RGB / HSL / HEX カラーコードの作成とパレット管理ツール。', category: 'utilities', icon: 'Palette', author: 'Glassium Creative', rating: 4.9, size: '1.1 MB', version: '5.0 u4', builtInAppId: 'colorpicker' },
+  { id: 'passgen', name: 'Glassium PassGen', description: '文字種や長さを指定して安全なパスワードを生成するツール。', category: 'utilities', icon: 'Key', author: 'Glassium Security', rating: 4.9, size: '750 KB', version: '5.0 u4', builtInAppId: 'passgen' },
+  { id: 'qrcode', name: 'Glassium QR Maker', description: 'URLやテキストからQRコードを生成するツール。', category: 'utilities', icon: 'Grid3x3', author: 'Glassium Tools', rating: 4.8, size: '990 KB', version: '5.0 u4', builtInAppId: 'qrcode' },
+  { id: 'jsonformat', name: 'Glassium JSON Tool', description: 'JSONデータの整形・構文チェック・圧縮ツール。', category: 'utilities', icon: 'Code2', author: 'Glassium Dev', rating: 4.9, size: '840 KB', version: '5.0 u4', builtInAppId: 'jsonformat' },
+  { id: 'regex', name: 'Glassium Regex Tester', description: '正規表現のパターンマッチをリアルタイムに確認するツール。', category: 'utilities', icon: 'Search', author: 'Glassium Dev', rating: 4.8, size: '910 KB', version: '5.0 u4', builtInAppId: 'regex' },
+  { id: 'markdown', name: 'Glassium Markdown', description: '左右分割画面でリアルタイムプレビューできるMarkdownリーダー。', category: 'utilities', icon: 'FileText', author: 'Glassium Office', rating: 4.9, size: '1.2 MB', version: '5.0 u4', builtInAppId: 'markdown' },
+  { id: 'kanban', name: 'Glassium Kanban', description: '未着手・進行中・完了の3列でタスクを整理するカンバンボード。', category: 'office', icon: 'LayoutGrid', author: 'Glassium Office', rating: 5.0, size: '1.6 MB', version: '5.0 u4', builtInAppId: 'kanban' },
+  { id: 'habit', name: 'Glassium Habit', description: '日々の習慣や目標の達成状況を記録するトラッカー。', category: 'utilities', icon: 'CheckCircle2', author: 'Glassium Life', rating: 4.8, size: '1.1 MB', version: '5.0 u4', builtInAppId: 'habit' },
+  { id: 'expense', name: 'Glassium Ledger', description: '収支の記録と集計を行うシンプルな家計簿ツール。', category: 'office', icon: 'Calculator', author: 'Glassium Office', rating: 4.9, size: '1.3 MB', version: '5.0 u4', builtInAppId: 'expense' },
+  { id: 'bmi', name: 'Glassium BMI Calc', description: '身長と体重からBMIと適正体重を計算するツール。', category: 'utilities', icon: 'Activity', author: 'Glassium Health', rating: 4.7, size: '820 KB', version: '5.0 u4', builtInAppId: 'bmi' },
+  { id: 'worldclock', name: 'Glassium World Clock', description: '主要都市の現在時刻を一覧表示する世界時計。', category: 'utilities', icon: 'Globe', author: 'Glassium Core', rating: 4.9, size: '1.0 MB', version: '5.0 u4', builtInAppId: 'worldclock' },
+  { id: 'morse', name: 'Glassium Morse', description: 'テキストとモールス信号を相互変換するツール。', category: 'utilities', icon: 'Zap', author: 'Glassium Tools', rating: 4.7, size: '780 KB', version: '5.0 u4', builtInAppId: 'morse' },
+  { id: 'base64', name: 'Glassium Base64', description: '文字列のBase64およびURLエンコード・デコードツール。', category: 'utilities', icon: 'Code2', author: 'Glassium Dev', rating: 4.8, size: '790 KB', version: '5.0 u4', builtInAppId: 'base64' },
+  { id: 'diff', name: 'Glassium Diff', description: '2つのテキストを行単位で比較して差分を表示するツール。', category: 'utilities', icon: 'Layers', author: 'Glassium Dev', rating: 4.8, size: '940 KB', version: '5.0 u4', builtInAppId: 'diff' },
+  { id: 'wordcount', name: 'Glassium WordCount', description: '文字数、単語数、行数をリアルタイムに集計するツール。', category: 'utilities', icon: 'FileText', author: 'Glassium Office', rating: 4.9, size: '720 KB', version: '5.0 u4', builtInAppId: 'wordcount' },
+  { id: 'flashcards', name: 'Glassium Flashcards', description: '表裏の暗記カードを作成して学習できるツール。', category: 'utilities', icon: 'BookOpen', author: 'Glassium Study', rating: 4.9, size: '1.1 MB', version: '5.0 u4', builtInAppId: 'flashcards' },
+  { id: 'whiteboard', name: 'Glassium Idea Board', description: '付箋カードを並べてアイデアを整理するボード。', category: 'office', icon: 'PenTool', author: 'Glassium Office', rating: 4.8, size: '1.2 MB', version: '5.0 u4', builtInAppId: 'whiteboard' },
+  { id: 'drumpad', name: 'Glassium Drum Pad', description: 'Web Audioシンセサイザーによる9パッドのドラムマシン。', category: 'audio', icon: 'Music', author: 'Glassium Audio', rating: 5.0, size: '1.8 MB', version: '5.0 u4', builtInAppId: 'drumpad' },
+  { id: 'tuner', name: 'Glassium Tone Gen', description: '指定した周波数（80Hz〜1200Hz）のテストトーンを再生するツール。', category: 'audio', icon: 'Volume2', author: 'Glassium Audio', rating: 4.8, size: '960 KB', version: '5.0 u4', builtInAppId: 'tuner' },
+  { id: 'minesweeper', name: 'Glassium Minesweeper', description: '地雷の位置を推理してマスを開けるマインスイーパー。', category: 'games', icon: 'Gamepad2', author: 'Glassium Games', rating: 4.9, size: '1.1 MB', version: '5.0 u4', builtInAppId: 'minesweeper' },
+  { id: 'tictactoe', name: 'Glassium Tic-Tac-Toe', description: 'CPUまたは2人で対戦できる三目並べゲーム。', category: 'games', icon: 'Grid3x3', author: 'Glassium Games', rating: 4.8, size: '740 KB', version: '5.0 u4', builtInAppId: 'tictactoe' },
+  { id: 'memory', name: 'Glassium Memory Match', description: 'カードをめくって同じ絵柄を揃える神経衰弱ゲーム。', category: 'games', icon: 'Sparkles', author: 'Glassium Games', rating: 4.9, size: '950 KB', version: '5.0 u4', builtInAppId: 'memory' },
+  { id: 'typing', name: 'Glassium Typing', description: '入力速度（WPM）と正確性を測定するタイピング練習ゲーム。', category: 'games', icon: 'SquareTerminal', author: 'Glassium Games', rating: 4.9, size: '1.2 MB', version: '5.0 u4', builtInAppId: 'typing' },
+  { id: 'sudoku', name: 'Glassium Sudoku', description: '縦・横・ブロックで数字を揃えるナンバープレースパズル。', category: 'games', icon: 'Grid3x3', author: 'Glassium Games', rating: 4.8, size: '890 KB', version: '5.0 u4', builtInAppId: 'sudoku' },
+  { id: 'periodic', name: 'Glassium Elements', description: '元素記号・原子番号・性質を確認できる元素周期表。', category: 'utilities', icon: 'Sparkles', author: 'Glassium Science', rating: 5.0, size: '1.5 MB', version: '5.0 u4', builtInAppId: 'periodic' },
+  { id: 'dictionary', name: 'Glassium Lexicon', description: 'IT・ソフトウェア用語を検索できる用語辞典。', category: 'utilities', icon: 'BookOpen', author: 'Glassium Study', rating: 4.8, size: '1.3 MB', version: '5.0 u4', builtInAppId: 'dictionary' },
+  { id: 'sysinfo', name: 'Glassium Diagnostics', description: '画面解像度やブラウザ実行環境を確認するシステム情報ツール。', category: 'utilities', icon: 'Cpu', author: 'Glassium Core', rating: 4.9, size: '900 KB', version: '5.0 u4', builtInAppId: 'sysinfo' },
 ];
 
 export interface InstalledApp {
@@ -419,11 +487,13 @@ export interface InstalledApp {
   icon: string;
   description: string;
   author: string;
-  category: 'utilities' | 'games';
+  category: 'utilities' | 'games' | 'office' | 'audio';
   installedAt: number;
   isCustom?: boolean;
   builtInAppId?: AppId;
   url?: string;
+  tsxSource?: string;
+  fileName?: string;
 }
 
 export interface StoreTheme {
@@ -770,12 +840,12 @@ export const UI_STYLES: UIStyleInfo[] = [
   {
     id: 'glassium',
     name: 'GlasispectUI',
-    sub: 'Zero Border Line · GlassiumOS 5 u1',
+    sub: 'Zero Border Line · GlassiumOS 5 u4',
     category: 'authentic',
     accent: '#06b6d4',
-    badge: 'GlassiumOS 5 u1',
+    badge: 'GlassiumOS 5 u4',
     previewGradient: 'linear-gradient(135deg, rgba(6,182,212,0.8), rgba(99,102,241,0.8))',
-    description: 'GlassiumOS 5 u1 標準の GlasispectUI。枠線を排したZero Border Lineと液体ガラス屈折サーフェス。',
+    description: 'GlassiumOS 5 u4 標準の GlasispectUI。枠線を排したZero Border Lineと液体ガラス屈折サーフェス。',
   },
   {
     id: 'macos',

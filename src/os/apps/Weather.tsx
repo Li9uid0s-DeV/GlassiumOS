@@ -1,632 +1,850 @@
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Icon } from '../Icon';
 import { useOS } from '../OSContext';
-import { VintageAndroidWeatherSky } from './VintageAndroidWeatherSky';
-import {
-  fetchMultiSourceWeatherConsensus,
-  WeatherConsensusResult,
-  WeatherConditionKey,
-} from '../weatherConsensus';
 
-interface CityWeather {
+export interface SavedWeatherLocation {
   id: string;
   name: string;
-  country: string;
-  temp: number;
-  condition: 'Sunny' | 'Cloudy' | 'Rainy' | 'Thunderstorm' | 'Aurora' | 'Cosmic Dust';
-  high: number;
-  low: number;
-  humidity: number;
-  windSpeed: number;
-  uvIndex: number;
-  pressure: number;
-  visibility: string;
-  sunrise: string;
-  sunset: string;
-  airQuality: { aqi: number; status: string; color: string };
-  hourly: { time: string; temp: number; icon: string; pop: number }[];
-  weekly: { day: string; condition: string; icon: string; high: number; low: number }[];
+  region?: string;
+  lat: number;
+  lon: number;
 }
 
-const CITIES: CityWeather[] = [
-  {
-    id: 'tokyo',
-    name: 'Tokyo',
-    country: 'Japan',
-    temp: 21,
-    condition: 'Sunny',
-    high: 24,
-    low: 15,
-    humidity: 48,
-    windSpeed: 12,
-    uvIndex: 5,
-    pressure: 1014,
-    visibility: '10 km',
-    sunrise: '05:58',
-    sunset: '17:05',
-    airQuality: { aqi: 28, status: 'Excellent', color: 'text-emerald-400' },
-    hourly: [
-      { time: 'Now', temp: 21, icon: 'Sun', pop: 0 },
-      { time: '14:00', temp: 23, icon: 'Sun', pop: 0 },
-      { time: '16:00', temp: 22, icon: 'CloudSun', pop: 10 },
-      { time: '18:00', temp: 19, icon: 'Cloud', pop: 15 },
-      { time: '20:00', temp: 17, icon: 'Moon', pop: 5 },
-      { time: '22:00', temp: 16, icon: 'Moon', pop: 0 },
-      { time: '00:00', temp: 15, icon: 'Moon', pop: 0 },
-      { time: '02:00', temp: 14, icon: 'Moon', pop: 0 },
-    ],
-    weekly: [
-      { day: 'Today', condition: 'Sunny & Clear', icon: 'Sun', high: 24, low: 15 },
-      { day: 'Wed', condition: 'Partly Cloudy', icon: 'CloudSun', high: 22, low: 14 },
-      { day: 'Thu', condition: 'Mild Rain', icon: 'CloudRain', high: 19, low: 13 },
-      { day: 'Fri', condition: 'Overcast', icon: 'Cloud', high: 20, low: 12 },
-      { day: 'Sat', condition: 'Clear Sky', icon: 'Sun', high: 23, low: 15 },
-      { day: 'Sun', condition: 'Breezy & Mild', icon: 'Wind', high: 21, low: 14 },
-      { day: 'Mon', condition: 'Sunny', icon: 'Sun', high: 24, low: 16 },
-    ],
-  },
-  {
-    id: 'neo-tokyo',
-    name: 'Neo-Tokyo',
-    country: 'Cyber District',
-    temp: 26,
-    condition: 'Aurora',
-    high: 29,
-    low: 21,
-    humidity: 62,
-    windSpeed: 18,
-    uvIndex: 8,
-    pressure: 1009,
-    visibility: '12 km',
-    sunrise: '05:40',
-    sunset: '18:15',
-    airQuality: { aqi: 42, status: 'Good', color: 'text-teal-400' },
-    hourly: [
-      { time: 'Now', temp: 26, icon: 'Sparkles', pop: 5 },
-      { time: '14:00', temp: 28, icon: 'Sparkles', pop: 5 },
-      { time: '16:00', temp: 27, icon: 'Zap', pop: 20 },
-      { time: '18:00', temp: 24, icon: 'CloudSun', pop: 10 },
-      { time: '20:00', temp: 23, icon: 'Moon', pop: 0 },
-      { time: '22:00', temp: 22, icon: 'Moon', pop: 0 },
-    ],
-    weekly: [
-      { day: 'Today', condition: 'Neon Aurora Glow', icon: 'Sparkles', high: 29, low: 21 },
-      { day: 'Wed', condition: 'Cyber Showers', icon: 'CloudRain', high: 26, low: 20 },
-      { day: 'Thu', condition: 'Quantum Breeze', icon: 'Wind', high: 25, low: 19 },
-      { day: 'Fri', condition: 'Clear Neon Sky', icon: 'Sun', high: 28, low: 22 },
-      { day: 'Sat', condition: 'Magnetic Storm', icon: 'Zap', high: 24, low: 18 },
-      { day: 'Sun', condition: 'Aurora Glow', icon: 'Sparkles', high: 27, low: 21 },
-      { day: 'Mon', condition: 'Warm & Humid', icon: 'Sun', high: 30, low: 23 },
-    ],
-  },
-  {
-    id: 'gargantua',
-    name: 'Gargantua Colony',
-    country: 'Deep Space Station',
-    temp: 18,
-    condition: 'Cosmic Dust',
-    high: 20,
-    low: 12,
-    humidity: 35,
-    windSpeed: 4,
-    uvIndex: 0,
-    pressure: 1013,
-    visibility: '100 km',
-    sunrise: 'Artificial 06:00',
-    sunset: 'Artificial 22:00',
-    airQuality: { aqi: 10, status: 'Pure Synthesized', color: 'text-cyan-400' },
-    hourly: [
-      { time: 'Now', temp: 18, icon: 'Compass', pop: 0 },
-      { time: 'Orb 1', temp: 19, icon: 'Sparkles', pop: 0 },
-      { time: 'Orb 2', temp: 18, icon: 'Compass', pop: 0 },
-      { time: 'Orb 3', temp: 17, icon: 'Moon', pop: 0 },
-      { time: 'Orb 4', temp: 16, icon: 'Moon', pop: 0 },
-    ],
-    weekly: [
-      { day: 'Cycle 1', condition: 'Gravitational Lensing', icon: 'Compass', high: 20, low: 12 },
-      { day: 'Cycle 2', condition: 'Accretion Flare', icon: 'Sparkles', high: 22, low: 13 },
-      { day: 'Cycle 3', condition: 'Solar Proton Wind', icon: 'Wind', high: 19, low: 11 },
-      { day: 'Cycle 4', condition: 'Sub-light Cruise', icon: 'Compass', high: 18, low: 12 },
-      { day: 'Cycle 5', condition: 'Nebula Transit', icon: 'Cloud', high: 17, low: 10 },
-      { day: 'Cycle 6', condition: 'Station Stabilization', icon: 'Shield', high: 18, low: 12 },
-      { day: 'Cycle 7', condition: 'Event Horizon Clear', icon: 'Sun', high: 20, low: 13 },
-    ],
-  },
-  {
-    id: 'newyork',
-    name: 'New York',
-    country: 'United States',
-    temp: 16,
-    condition: 'Cloudy',
-    high: 19,
-    low: 11,
-    humidity: 55,
-    windSpeed: 16,
-    uvIndex: 4,
-    pressure: 1018,
-    visibility: '9 km',
-    sunrise: '06:22',
-    sunset: '18:10',
-    airQuality: { aqi: 35, status: 'Good', color: 'text-emerald-400' },
-    hourly: [
-      { time: 'Now', temp: 16, icon: 'Cloud', pop: 15 },
-      { time: '14:00', temp: 18, icon: 'CloudSun', pop: 20 },
-      { time: '16:00', temp: 17, icon: 'Cloud', pop: 10 },
-      { time: '18:00', temp: 15, icon: 'Moon', pop: 5 },
-      { time: '20:00', temp: 13, icon: 'Moon', pop: 0 },
-      { time: '22:00', temp: 12, icon: 'Moon', pop: 0 },
-    ],
-    weekly: [
-      { day: 'Today', condition: 'Partly Cloudy', icon: 'Cloud', high: 19, low: 11 },
-      { day: 'Wed', condition: 'Showers Likely', icon: 'CloudRain', high: 15, low: 9 },
-      { day: 'Thu', condition: 'Cool Autumn Breeze', icon: 'Wind', high: 17, low: 10 },
-      { day: 'Fri', condition: 'Crisp Sunshine', icon: 'Sun', high: 20, low: 12 },
-      { day: 'Sat', condition: 'Overcast Skies', icon: 'Cloud', high: 18, low: 11 },
-      { day: 'Sun', condition: 'Sunny & Crisp', icon: 'Sun', high: 21, low: 13 },
-      { day: 'Mon', condition: 'Cloudy with Wind', icon: 'Cloud', high: 19, low: 12 },
-    ],
-  },
-  {
-    id: 'london',
-    name: 'London',
-    country: 'United Kingdom',
-    temp: 14,
-    condition: 'Rainy',
-    high: 16,
-    low: 9,
-    humidity: 78,
-    windSpeed: 22,
-    uvIndex: 2,
-    pressure: 1005,
-    visibility: '6 km',
-    sunrise: '06:45',
-    sunset: '17:50',
-    airQuality: { aqi: 22, status: 'Excellent', color: 'text-emerald-400' },
-    hourly: [
-      { time: 'Now', temp: 14, icon: 'CloudRain', pop: 85 },
-      { time: '14:00', temp: 15, icon: 'CloudRain', pop: 90 },
-      { time: '16:00', temp: 15, icon: 'Cloud', pop: 40 },
-      { time: '18:00', temp: 13, icon: 'Cloud', pop: 20 },
-      { time: '20:00', temp: 11, icon: 'Moon', pop: 10 },
-      { time: '22:00', temp: 10, icon: 'Moon', pop: 5 },
-    ],
-    weekly: [
-      { day: 'Today', condition: 'Light Rain & Drizzle', icon: 'CloudRain', high: 16, low: 9 },
-      { day: 'Wed', condition: 'Thick Mist & Cloud', icon: 'Cloud', high: 15, low: 8 },
-      { day: 'Thu', condition: 'Intermittent Rain', icon: 'CloudRain', high: 14, low: 8 },
-      { day: 'Fri', condition: 'Mild Breaks of Sun', icon: 'CloudSun', high: 17, low: 10 },
-      { day: 'Sat', condition: 'Brisk Wind & Rain', icon: 'CloudRain', high: 15, low: 9 },
-      { day: 'Sun', condition: 'Mostly Overcast', icon: 'Cloud', high: 16, low: 10 },
-      { day: 'Mon', condition: 'Showers in Afternoon', icon: 'CloudRain', high: 15, low: 9 },
-    ],
-  },
+interface HourlyForecastItem {
+  time: string;
+  temp: number;
+  precipProb: number;
+  precipMm: number;
+  windSpeed: number;
+  icon: string;
+  condition: string;
+}
+
+interface DailyForecastItem {
+  date: string;
+  day: string;
+  icon: string;
+  condition: string;
+  high: number;
+  low: number;
+  precipProb: number;
+  precipSum: number;
+}
+
+interface RadarFrame {
+  time: number;
+  path: string;
+}
+
+interface WeatherApiResponse {
+  location: { name: string; lat: number; lon: number };
+  temp: number;
+  feelsLike: number;
+  humidity: number;
+  wind: number;
+  windDirection: number;
+  pressure: number;
+  precipitation: number;
+  uvIndex: number;
+  sunrise: string;
+  sunset: string;
+  condition: string;
+  icon: string;
+  high: number;
+  low: number;
+  hourly: HourlyForecastItem[];
+  daily: DailyForecastItem[];
+  radar?: {
+    host: string;
+    frames: RadarFrame[];
+  };
+  serverTimestamp: number;
+  nextUpdateAt: number;
+  updateIntervalMinutes: number;
+}
+
+const DEFAULT_LOCATIONS: SavedWeatherLocation[] = [
+  { id: '35.676,139.650', name: '東京', region: '東京都, 日本', lat: 35.6762, lon: 139.6503 },
+  { id: '34.694,135.502', name: '大阪', region: '大阪府, 日本', lat: 34.6937, lon: 135.5023 },
+  { id: '43.062,141.354', name: '札幌', region: '北海道, 日本', lat: 43.0618, lon: 141.3545 },
+  { id: '33.590,130.402', name: '福岡', region: '福岡県, 日本', lat: 33.5902, lon: 130.4017 },
+  { id: '26.212,127.681', name: '那覇', region: '沖縄県, 日本', lat: 26.2124, lon: 127.6809 },
 ];
 
+const LS_SAVED_LOCATIONS_KEY = 'glassium_weather_saved_locations_v4';
+const FIVE_MINUTES_MS = 5 * 60 * 1000;
+
+function lon2tile(lon: number, zoom: number): number {
+  return ((lon + 180) / 360) * Math.pow(2, zoom);
+}
+
+function lat2tile(lat: number, zoom: number): number {
+  const rad = (lat * Math.PI) / 180;
+  return (
+    ((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) *
+    Math.pow(2, zoom)
+  );
+}
+
 export function WeatherApp() {
-  const { playSound } = useOS();
-  const [selectedCityId, setSelectedCityId] = useState('tokyo');
+  const { theme, resolvedAccentHex } = useOS();
+  const isLight = theme === 'light';
+
+  const [savedLocations, setSavedLocations] = useState<SavedWeatherLocation[]>(() => {
+    try {
+      const raw = localStorage.getItem(LS_SAVED_LOCATIONS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_LOCATIONS;
+  });
+
+  const [activeLoc, setActiveLoc] = useState<SavedWeatherLocation>(() => savedLocations[0] || DEFAULT_LOCATIONS[0]);
   const [unit, setUnit] = useState<'C' | 'F'>('C');
-  const [refreshing, setRefreshing] = useState(false);
-  const [consensusData, setConsensusData] = useState<WeatherConsensusResult | null>(null);
-  const [previewCondition, setPreviewCondition] = useState<WeatherConditionKey | null>(null);
+  const [activeTab, setActiveTab] = useState<'forecast' | 'radar'>('forecast');
 
-  const city = useMemo(() => {
-    return CITIES.find((c) => c.id === selectedCityId) ?? CITIES[0];
-  }, [selectedCityId]);
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<SavedWeatherLocation[]>([]);
+  const [searching, setSearching] = useState(false);
 
-  const loadConsensus = (cityName: string) => {
-    fetchMultiSourceWeatherConsensus(cityName).then((res) => {
-      setConsensusData(res);
-    });
-  };
+  // Weather data state
+  const [weather, setWeather] = useState<WeatherApiResponse | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [countdownSec, setCountdownSec] = useState<number>(300);
+
+  // Radar map state
+  const [mapZoom, setMapZoom] = useState<number>(6);
+  const [radarFrameIdx, setRadarFrameIdx] = useState<number>(0);
+  const [radarPlaying, setRadarPlaying] = useState<boolean>(false);
+  const [radarOpacity, setRadarOpacity] = useState<number>(0.75);
+  const [showWindOverlay, setShowWindOverlay] = useState<boolean>(true);
 
   useEffect(() => {
-    setConsensusData(null);
-    loadConsensus(city.name);
-  }, [city.name]);
+    try {
+      localStorage.setItem(LS_SAVED_LOCATIONS_KEY, JSON.stringify(savedLocations));
+    } catch {
+      // ignore
+    }
+  }, [savedLocations]);
 
-  const convertTemp = (celsius: number) => {
-    if (unit === 'F') return Math.round((celsius * 9) / 5 + 32);
-    return Math.round(celsius);
+  const fetchWeatherForLocation = useCallback(
+    async (loc: SavedWeatherLocation, force = false) => {
+      setLoading(true);
+      setErrorMsg(null);
+      try {
+        const url = `/api/weather?lat=${encodeURIComponent(loc.lat)}&lon=${encodeURIComponent(loc.lon)}&name=${encodeURIComponent(loc.name)}${force ? '&force=1' : ''}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('天気データの取得に失敗しました');
+        const data = (await res.json()) as WeatherApiResponse;
+        setWeather(data);
+        if (data.radar?.frames && data.radar.frames.length > 0) {
+          setRadarFrameIdx(data.radar.frames.length - 1);
+        }
+        const remSec = Math.max(
+          10,
+          Math.round(((data.nextUpdateAt || Date.now() + FIVE_MINUTES_MS) - Date.now()) / 1000)
+        );
+        setCountdownSec(remSec);
+      } catch {
+        setErrorMsg('サーバーから天気情報を取得できませんでした。');
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  // Initial fetch & 5-minute automatic server sync
+  useEffect(() => {
+    fetchWeatherForLocation(activeLoc, false);
+    const interval = setInterval(() => {
+      fetchWeatherForLocation(activeLoc, true);
+    }, FIVE_MINUTES_MS);
+    return () => clearInterval(interval);
+  }, [activeLoc, fetchWeatherForLocation]);
+
+  // 1-second countdown display for the 5-minute auto-update cycle
+  useEffect(() => {
+    const t = setInterval(() => {
+      setCountdownSec((prev) => {
+        if (prev <= 1) {
+          fetchWeatherForLocation(activeLoc, true);
+          return 300;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [activeLoc, fetchWeatherForLocation]);
+
+  // Radar animation loop
+  useEffect(() => {
+    const frames = weather?.radar?.frames || [];
+    if (!radarPlaying || frames.length <= 1) return;
+    const id = setInterval(() => {
+      setRadarFrameIdx((prev) => (prev + 1) % frames.length);
+    }, 850);
+    return () => clearInterval(id);
+  }, [radarPlaying, weather?.radar?.frames]);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const q = searchQuery.trim();
+    if (!q) return;
+    setSearching(true);
+    try {
+      const res = await fetch(`/api/weather/search?q=${encodeURIComponent(q)}`);
+      if (res.ok) {
+        const data = (await res.json()) as { results?: SavedWeatherLocation[] };
+        setSearchResults(data.results || []);
+      }
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setSearching(false);
+    }
   };
 
-  const handleRefresh = () => {
-    playSound('click');
-    setRefreshing(true);
-    setPreviewCondition(null);
-    loadConsensus(city.name);
-    setTimeout(() => setRefreshing(false), 800);
+  const isLocationSaved = useMemo(
+    () => savedLocations.some((s) => s.id === activeLoc.id || (Math.abs(s.lat - activeLoc.lat) < 0.02 && Math.abs(s.lon - activeLoc.lon) < 0.02)),
+    [savedLocations, activeLoc]
+  );
+
+  const toggleSaveActiveLocation = () => {
+    if (isLocationSaved) {
+      if (savedLocations.length <= 1) return; // keep at least 1 saved location
+      const next = savedLocations.filter(
+        (s) => s.id !== activeLoc.id && !(Math.abs(s.lat - activeLoc.lat) < 0.02 && Math.abs(s.lon - activeLoc.lon) < 0.02)
+      );
+      setSavedLocations(next);
+    } else {
+      setSavedLocations((prev) => [...prev, activeLoc]);
+    }
   };
 
-  // Automatically select background based on consensus weather (or city's weather while loading)
-  const autoDetectedCondition: WeatherConditionKey = consensusData
-    ? consensusData.consensusCondition
-    : (city.condition as WeatherConditionKey);
+  const removeSavedLocation = (locId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (savedLocations.length <= 1) return;
+    const next = savedLocations.filter((s) => s.id !== locId);
+    setSavedLocations(next);
+    if (activeLoc.id === locId && next.length > 0) {
+      setActiveLoc(next[0]);
+    }
+  };
 
-  const activeCondition: WeatherConditionKey = previewCondition ?? autoDetectedCondition;
+  const fmtTemp = (c: number) => (unit === 'C' ? Math.round(c) : Math.round((c * 9) / 5 + 32));
+
+  // Compute 3x3 slippy map tiles around activeLoc (lat, lon)
+  const tileGrid = useMemo(() => {
+    const exactX = lon2tile(activeLoc.lon, mapZoom);
+    const exactY = lat2tile(activeLoc.lat, mapZoom);
+    const centerTileX = Math.floor(exactX);
+    const centerTileY = Math.floor(exactY);
+    const offsetX = (exactX - centerTileX) * 256;
+    const offsetY = (exactY - centerTileY) * 256;
+    const maxTile = Math.pow(2, mapZoom);
+
+    const tiles: Array<{ dx: number; dy: number; x: number; y: number; z: number }> = [];
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const tx = ((centerTileX + dx) % maxTile + maxTile) % maxTile;
+        const ty = Math.max(0, Math.min(maxTile - 1, centerTileY + dy));
+        tiles.push({ dx, dy, x: tx, y: ty, z: mapZoom });
+      }
+    }
+    return { tiles, offsetX, offsetY };
+  }, [activeLoc.lat, activeLoc.lon, mapZoom]);
+
+  const radarFrames = weather?.radar?.frames || [];
+  const activeRadarFrame = radarFrames[radarFrameIdx] || radarFrames[radarFrames.length - 1];
+  const radarHost = weather?.radar?.host || 'https://tilecache.rainviewer.com';
+
+  const lastSyncStr = weather?.serverTimestamp
+    ? new Date(weather.serverTimestamp).toLocaleTimeString('ja-JP', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '--:--';
+
+  const nextMin = Math.floor(countdownSec / 60);
+  const nextSec = String(countdownSec % 60).padStart(2, '0');
 
   return (
-    <div className="h-full w-full flex flex-col bg-slate-950 text-white select-none overflow-y-auto relative">
-      {/* THREE.JS + RUST/WASM 3D VOLUMETRIC WEATHER SKY & TERRAIN ENGINE */}
-      <VintageAndroidWeatherSky condition={activeCondition} />
-
-      {/* Top Header & City Switcher Bar */}
-      <div className="p-4 border-b border-white/[0.1] bg-slate-950/80 flex flex-wrap items-center justify-between gap-3 shrink-0 sticky top-0 z-20 shadow-md">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center text-cyan-400 shadow">
-            <Icon name="CloudSun" size={18} />
-          </div>
-          <div>
-            <div className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
-              <span>Weather 3D</span>
-              <span className="text-white/40 font-normal">·</span>
-              <span className="text-xs text-white/75 font-normal">
-                {city.name}, {city.country}
-              </span>
-            </div>
-            <p className="text-[11px] text-white/55 font-mono">
-              {consensusData
-                ? `多機関照合済み (${consensusData.updatedAt}) · 3D背景: ${
-                    previewCondition ? `プレビュー (${previewCondition})` : `天気に自動連動 (${autoDetectedCondition})`
-                  }`
-                : 'マルチモデル集計中...'}
-            </p>
-          </div>
-        </div>
-
-        {/* City Select Segmented Control */}
-        <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-white/15">
-          {CITIES.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => {
-                playSound('click');
-                setSelectedCityId(c.id);
-                setPreviewCondition(null);
-              }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
-                c.id === selectedCityId
-                  ? 'bg-cyan-500 text-slate-950 font-bold shadow-sm'
-                  : 'text-white/65 hover:text-white hover:bg-white/[0.08]'
+    <div
+      className={`h-full flex flex-col overflow-hidden select-none ${
+        isLight ? 'bg-slate-50 text-slate-900' : 'bg-slate-950/90 text-white'
+      }`}
+    >
+      {/* Top Bar: Location Search, Saved Locations, View Tabs, 5-Min Sync Status */}
+      <div
+        className={`px-4 py-3 border-b flex flex-col gap-2.5 shrink-0 ${
+          isLight ? 'bg-white/80 border-slate-200' : 'bg-slate-900/70 border-white/10'
+        } backdrop-blur-xl`}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          {/* Location Search Form */}
+          <form onSubmit={handleSearch} className="relative flex items-center gap-1.5 flex-1 min-w-[220px] max-w-md">
+            <div
+              className={`flex items-center gap-2 flex-1 px-3 py-1.5 rounded-xl border ${
+                isLight ? 'bg-slate-100 border-slate-300' : 'bg-black/40 border-white/15'
               }`}
             >
-              {c.name}
-            </button>
-          ))}
-        </div>
-
-        {/* Unit Toggle and Refresh */}
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="flex rounded-lg bg-slate-900/90 p-0.5 border border-white/15">
-            <button
-              onClick={() => setUnit('C')}
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
-                unit === 'C' ? 'bg-cyan-500 text-black font-bold' : 'text-white/60 hover:text-white'
-              }`}
-            >
-              °C
-            </button>
-            <button
-              onClick={() => setUnit('F')}
-              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
-                unit === 'F' ? 'bg-cyan-500 text-black font-bold' : 'text-white/60 hover:text-white'
-              }`}
-            >
-              °F
-            </button>
-          </div>
-
-          <button
-            onClick={handleRefresh}
-            className={`p-1.5 rounded-lg bg-slate-900/90 border border-white/15 hover:bg-slate-800 transition cursor-pointer ${
-              refreshing ? 'animate-spin text-cyan-400' : 'text-white/75'
-            }`}
-            title="最新データを再集計"
-          >
-            <Icon name="RotateCw" size={14} />
-          </button>
-        </div>
-      </div>
-
-      {/* THREE.JS 3D WEATHER BACKGROUND AUTO-SYNC & SCENE SELECTOR */}
-      <div className="relative z-10 px-6 pt-4 max-w-5xl mx-auto w-full flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2 text-xs font-semibold text-white/95 bg-slate-950/75 px-3 py-1.5 rounded-xl border border-white/15">
-          <span className="material-symbols-rounded text-sm text-cyan-400">view_in_ar</span>
-          <span>Three.js + Rust 立体3D気象背景:</span>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => {
-              playSound('click');
-              setPreviewCondition(null);
-            }}
-            className={`px-2.5 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border cursor-pointer ${
-              previewCondition === null
-                ? 'bg-emerald-400 text-slate-950 border-emerald-300 shadow-md'
-                : 'bg-slate-950/75 hover:bg-slate-900 text-white/80 border-white/15'
-            }`}
-          >
-            <Icon name="Compass" size={13} />
-            <span>自動連動 ({autoDetectedCondition})</span>
-          </button>
-          {[
-            { id: 'Sunny' as const, label: '快晴・3D太陽', icon: 'Sun', color: 'text-amber-400' },
-            { id: 'Rainy' as const, label: '豪雨・3D雨滴', icon: 'CloudRain', color: 'text-cyan-400' },
-            { id: 'Thunderstorm' as const, label: '雷雨・3D稲妻', icon: 'Zap', color: 'text-purple-300' },
-            { id: 'Cloudy' as const, label: '曇天・3D立体雲', icon: 'Cloud', color: 'text-slate-300' },
-            { id: 'Snow' as const, label: '吹雪・3D氷晶', icon: 'Sparkles', color: 'text-sky-200' },
-            { id: 'Aurora' as const, label: 'オーロラ・3D磁気嵐', icon: 'Sparkles', color: 'text-emerald-300' },
-          ].map((sc) => (
-            <button
-              key={sc.id}
-              type="button"
-              onClick={() => {
-                playSound('click');
-                setPreviewCondition(sc.id === previewCondition ? null : sc.id);
-              }}
-              className={`px-2.5 py-1 rounded-xl text-xs font-medium transition flex items-center gap-1.5 border cursor-pointer ${
-                previewCondition === sc.id
-                  ? 'bg-cyan-400 text-slate-950 font-black border-cyan-300 shadow-md scale-105'
-                  : 'bg-slate-950/75 hover:bg-slate-900 text-white/80 border-white/15'
-              }`}
-            >
-              <Icon
-                name={sc.icon}
-                size={13}
-                className={previewCondition === sc.id ? 'text-slate-950' : sc.color}
+              <Icon name="Search" size={14} className="opacity-60 shrink-0" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  if (!e.target.value.trim()) setSearchResults([]);
+                }}
+                placeholder="都市名・地域を検索 (例: 横浜, 京都, 仙台, London)..."
+                className="w-full bg-transparent text-xs outline-none"
               />
-              <span>{sc.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Main Weather Display Hero */}
-      <div className="relative z-10 p-6 max-w-5xl mx-auto w-full space-y-5">
-        {/* MULTI-SOURCE WEATHER CONSENSUS ENSEMBLE DASHBOARD */}
-        <div className="rounded-2xl p-5 bg-slate-950/75 border border-white/15 shadow-2xl space-y-3.5">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-400 to-emerald-400 text-slate-950 flex items-center justify-center font-black shadow">
-                <Icon name="Compass" size={16} />
-              </div>
-              <div>
-                <div className="text-xs font-bold text-white flex items-center gap-2">
-                  <span>多地点・気象機関コンセンサス集計 (Ensemble Consensus)</span>
-                  <span className="px-2 py-0.5 rounded-full bg-cyan-400/20 border border-cyan-300/30 text-[10px] text-cyan-300 font-mono">
-                    {consensusData ? `最多予想: ${consensusData.winningVoteCount}/${consensusData.totalSourcesQueried} 機関一致` : '集計中...'}
-                  </span>
-                </div>
-                <div className="text-[11px] text-white/60">
-                  気象庁(JMA)・欧州中期予報(ECMWF)・米国NOAA・ドイツ気象局・仏Météo・wttr.in を同時照合し、一番予想された数が多い天気を自動選択
-                </div>
-              </div>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSearchResults([]);
+                  }}
+                  className="opacity-50 hover:opacity-100 text-xs cursor-pointer"
+                >
+                  ✕
+                </button>
+              )}
             </div>
+            <button
+              type="submit"
+              disabled={searching}
+              style={{ backgroundColor: resolvedAccentHex }}
+              className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-950 hover:brightness-110 transition cursor-pointer shrink-0"
+            >
+              {searching ? '検索中' : '検索'}
+            </button>
 
-            {consensusData && (
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-mono text-white/70">コンセンサス信頼度</span>
-                <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-bold text-xs">
-                  {consensusData.confidencePercent}% 一致
-                </span>
+            {/* Search Dropdown Results */}
+            {searchResults.length > 0 && (
+              <div
+                className={`absolute left-0 right-0 top-full mt-1.5 z-50 rounded-2xl border shadow-2xl overflow-hidden max-h-60 overflow-y-auto ${
+                  isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/15'
+                }`}
+              >
+                {searchResults.map((loc) => {
+                  const alreadySaved = savedLocations.some((s) => s.id === loc.id);
+                  return (
+                    <div
+                      key={loc.id}
+                      onClick={() => {
+                        setActiveLoc(loc);
+                        setSearchResults([]);
+                        setSearchQuery('');
+                      }}
+                      className={`px-3.5 py-2.5 flex items-center justify-between gap-2 text-xs cursor-pointer border-b last:border-b-0 ${
+                        isLight
+                          ? 'hover:bg-slate-100 border-slate-100'
+                          : 'hover:bg-white/10 border-white/5'
+                      }`}
+                    >
+                      <div>
+                        <div className="font-bold">{loc.name}</div>
+                        {loc.region && <div className="text-[10px] opacity-60">{loc.region}</div>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (!alreadySaved) {
+                            setSavedLocations((prev) => [...prev, loc]);
+                          }
+                          setActiveLoc(loc);
+                          setSearchResults([]);
+                          setSearchQuery('');
+                        }}
+                        style={
+                          alreadySaved
+                            ? undefined
+                            : { backgroundColor: resolvedAccentHex, color: '#0f172a' }
+                        }
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold cursor-pointer ${
+                          alreadySaved ? 'bg-emerald-500/20 text-emerald-400' : ''
+                        }`}
+                      >
+                        {alreadySaved ? '登録済み' : '＋ 地点登録'}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
-          </div>
+          </form>
 
-          {/* Model Breakdown Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
-            {consensusData?.modelPredictions.map((pred) => {
-              const isWinnerMatch = pred.condition === consensusData.consensusCondition;
-              return (
-                <div
-                  key={pred.sourceId}
-                  className={`p-3 rounded-xl border transition-all ${
-                    isWinnerMatch
-                      ? 'bg-cyan-500/20 border-cyan-400/60 shadow-md ring-1 ring-cyan-400/30'
-                      : 'bg-slate-900/75 border-white/10 opacity-80'
-                  }`}
-                >
-                  <div className="text-[10px] font-mono text-white/50 truncate">{pred.country}</div>
-                  <div className="text-xs font-bold text-white truncate mt-0.5">{pred.sourceName}</div>
-                  <div className="flex items-center justify-between mt-2">
-                    <Icon
-                      name={pred.iconName}
-                      size={18}
-                      className={pred.condition === 'Sunny' ? 'text-amber-400' : 'text-cyan-300'}
-                    />
-                    <span className="text-sm font-bold font-mono text-white">{convertTemp(pred.temp)}°</span>
-                  </div>
-                  <div className="text-[10px] text-white/90 truncate mt-1 font-medium">{pred.conditionLabelJa}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Hero Card */}
-        <div className="relative rounded-2xl p-6 sm:p-8 overflow-hidden bg-slate-950/70 border border-white/15 shadow-2xl">
-          <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div>
-              <div className="text-cyan-400 text-xs font-medium tracking-wide mb-1 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-                <span>最頻出コンセンサス観測 · Three.js 3D連動中</span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-white tracking-tight">{city.name}</h2>
-              <div className="text-white/75 text-xs mt-1">
-                {consensusData ? consensusData.consensusLabelJa : city.condition} · 湿度 {city.humidity}% · 気圧 {city.pressure} hPa
-              </div>
-
-              <div className="flex items-baseline gap-4 mt-4">
-                <div className="text-6xl sm:text-7xl font-light tracking-tighter text-white tabular-nums drop-shadow-md">
-                  {convertTemp(consensusData ? consensusData.consensusTemp : city.temp)}°
-                </div>
-                <div className="text-xs text-white/70 space-y-0.5 font-medium">
-                  <div>最高 {convertTemp(city.high)}°</div>
-                  <div>最低 {convertTemp(city.low)}°</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Condition Icon Visual Card */}
-            <div className="flex flex-col items-center justify-center p-5 rounded-2xl bg-slate-900/85 border border-white/15 shadow-lg">
-              <Icon
-                name={
-                  activeCondition === 'Sunny'
-                    ? 'Sun'
-                    : activeCondition === 'Rainy'
-                    ? 'CloudRain'
-                    : activeCondition === 'Thunderstorm'
-                    ? 'Zap'
-                    : activeCondition === 'Snow' || activeCondition === 'Aurora'
-                    ? 'Sparkles'
-                    : 'CloudSun'
+          {/* View Switcher & Server Update Indicator */}
+          <div className="flex items-center gap-2">
+            <div
+              className={`flex p-0.5 rounded-xl border ${
+                isLight ? 'bg-slate-100 border-slate-200' : 'bg-white/5 border-white/10'
+              }`}
+            >
+              <button
+                type="button"
+                onClick={() => setActiveTab('forecast')}
+                style={
+                  activeTab === 'forecast'
+                    ? { backgroundColor: resolvedAccentHex, color: '#0f172a' }
+                    : undefined
                 }
-                size={48}
-                className={
-                  activeCondition === 'Sunny'
-                    ? 'text-amber-400'
-                    : activeCondition === 'Rainy'
-                    ? 'text-cyan-400'
-                    : activeCondition === 'Thunderstorm'
-                    ? 'text-purple-300'
-                    : 'text-sky-200'
-                }
-              />
-              <span className="text-xs font-bold text-white mt-2.5">
-                {previewCondition
-                  ? `3D Preview: ${previewCondition}`
-                  : consensusData
-                  ? consensusData.consensusLabelJa
-                  : activeCondition}
-              </span>
-              <span className="text-[11px] text-white/50 mt-0.5">Air Quality: {city.airQuality.status}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Hourly Forecast Slider */}
-        <div className="rounded-2xl p-4 bg-white/[0.02] border border-white/[0.05] backdrop-blur-xl">
-          <div className="flex items-center justify-between mb-3 px-1">
-            <span className="text-xs font-semibold text-white/80">Hourly Forecast</span>
-            <span className="text-[11px] text-white/40">Next 24 hours</span>
-          </div>
-
-          <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none">
-            {city.hourly.map((h, i) => (
-              <div
-                key={i}
-                className="flex flex-col items-center justify-between min-w-[76px] py-3 px-2 rounded-xl bg-white/5 hover:bg-white/10 transition border border-white/5 shrink-0"
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  activeTab === 'forecast' ? '' : 'opacity-70 hover:opacity-100'
+                }`}
               >
-                <span className="text-xs text-white/60 font-mono">{h.time}</span>
-                <Icon name={h.icon} size={22} className="my-2 text-cyan-300" />
-                <span className="text-sm font-bold text-white tabular-nums">{convertTemp(h.temp)}°</span>
-                {h.pop > 0 && (
-                  <span className="text-[10px] text-sky-400 font-mono mt-1">{h.pop}%</span>
+                天気予報
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('radar')}
+                style={
+                  activeTab === 'radar'
+                    ? { backgroundColor: resolvedAccentHex, color: '#0f172a' }
+                    : undefined
+                }
+                className={`px-3 py-1 rounded-lg text-xs font-bold transition cursor-pointer ${
+                  activeTab === 'radar' ? '' : 'opacity-70 hover:opacity-100'
+                }`}
+              >
+                雨雲レーダー・マップ
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setUnit(unit === 'C' ? 'F' : 'C')}
+              className={`px-2.5 py-1 rounded-xl border text-xs font-bold cursor-pointer ${
+                isLight ? 'bg-slate-100 border-slate-200' : 'bg-white/5 border-white/10'
+              }`}
+            >
+              °{unit}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => fetchWeatherForLocation(activeLoc, true)}
+              disabled={loading}
+              className={`px-2.5 py-1 rounded-xl border text-[11px] font-medium flex items-center gap-1.5 cursor-pointer ${
+                isLight ? 'bg-slate-100 border-slate-200' : 'bg-white/5 border-white/10 hover:bg-white/10'
+              }`}
+              title="5分ごとにサーバーから自動更新されます（クリックで手動更新）"
+            >
+              <Icon name="RefreshCw" size={12} className={loading ? 'animate-spin' : ''} />
+              <span>
+                {lastSyncStr} 更新 (次回 {nextMin}:{nextSec})
+              </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Registered Locations Bar */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+          <span className="text-[11px] opacity-60 shrink-0 mr-1">登録地点:</span>
+          {savedLocations.map((loc) => {
+            const isActive =
+              loc.id === activeLoc.id ||
+              (Math.abs(loc.lat - activeLoc.lat) < 0.02 && Math.abs(loc.lon - activeLoc.lon) < 0.02);
+            return (
+              <div
+                key={loc.id}
+                onClick={() => setActiveLoc(loc)}
+                style={
+                  isActive
+                    ? { backgroundColor: resolvedAccentHex, color: '#0f172a' }
+                    : undefined
+                }
+                className={`group flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold transition cursor-pointer shrink-0 ${
+                  isActive
+                    ? 'shadow-sm'
+                    : isLight
+                    ? 'bg-slate-200/70 hover:bg-slate-300/70 text-slate-700'
+                    : 'bg-white/5 hover:bg-white/10 text-white/80'
+                }`}
+              >
+                <span>{loc.name}</span>
+                {savedLocations.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={(e) => removeSavedLocation(loc.id, e)}
+                    className={`opacity-50 hover:opacity-100 text-[10px] leading-none px-0.5 rounded cursor-pointer ${
+                      isActive ? 'text-slate-900' : ''
+                    }`}
+                    title={`${loc.name} を登録解除`}
+                  >
+                    ✕
+                  </button>
                 )}
               </div>
-            ))}
-          </div>
-        </div>
+            );
+          })}
 
-        {/* Extended 7-Day Forecast & Atmospheric Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* 7-Day Outlook */}
-          <div className="rounded-2xl p-5 bg-slate-900/50 border border-white/10 backdrop-blur-xl flex flex-col justify-between">
-            <div className="text-xs font-semibold text-white/70 uppercase tracking-wider mb-3 flex items-center gap-1.5">
-              <Icon name="Calendar" size={13} className="text-cyan-400" /> 7-Day Forecast
+          {!isLocationSaved && (
+            <button
+              type="button"
+              onClick={toggleSaveActiveLocation}
+              style={{ borderColor: resolvedAccentHex, color: resolvedAccentHex }}
+              className="px-2.5 py-1 rounded-xl border text-xs font-bold shrink-0 cursor-pointer hover:bg-white/5"
+            >
+              ＋ 「{activeLoc.name}」を地点登録
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {errorMsg && (
+          <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs">
+            {errorMsg}
+          </div>
+        )}
+
+        {activeTab === 'forecast' ? (
+          <>
+            {/* Current Weather Summary Card */}
+            <div
+              className={`p-5 rounded-2xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
+                isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.04] border-white/10'
+              }`}
+            >
+              <div className="flex items-center gap-4">
+                <div className="text-5xl select-none">{weather?.icon || '⛅'}</div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold">{activeLoc.name}</h2>
+                    {activeLoc.region && (
+                      <span className="text-xs opacity-60">{activeLoc.region}</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={toggleSaveActiveLocation}
+                      className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border cursor-pointer ${
+                        isLocationSaved
+                          ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                          : 'border-white/20 opacity-75 hover:opacity-100'
+                      }`}
+                    >
+                      {isLocationSaved ? '★ 登録地点' : '☆ 地点登録'}
+                    </button>
+                  </div>
+                  <div className="text-sm opacity-80 mt-0.5">
+                    {weather?.condition || '取得中...'} ・ 最高 {fmtTemp(weather?.high ?? 22)}°{unit} / 最低{' '}
+                    {fmtTemp(weather?.low ?? 14)}°{unit}
+                  </div>
+                  <div className="text-[11px] opacity-55 mt-1 font-mono">
+                    緯度 {activeLoc.lat.toFixed(2)}° / 経度 {activeLoc.lon.toFixed(2)}° ・ 5分自動更新サーバー接続中
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-baseline gap-2">
+                <span className="text-5xl font-black tracking-tight">
+                  {fmtTemp(weather?.temp ?? 20)}°{unit}
+                </span>
+                <span className="text-xs opacity-65">
+                  体感 {fmtTemp(weather?.feelsLike ?? 19)}°{unit}
+                </span>
+              </div>
             </div>
 
-            <div className="space-y-2.5">
-              {city.weekly.map((w, idx) => (
-                <div key={idx} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/5 transition text-xs">
-                  <span className="w-16 font-medium text-white/80">{w.day}</span>
-                  <div className="flex items-center gap-2 flex-1 justify-center">
-                    <Icon name={w.icon} size={16} className="text-cyan-400" />
-                    <span className="text-white/60 truncate max-w-[120px] hidden sm:inline">{w.condition}</span>
-                  </div>
-                  <div className="flex items-center gap-3 font-mono">
-                    <span className="text-white/50">{convertTemp(w.low)}°</span>
-                    <div className="w-16 h-1.5 rounded-full bg-white/10 overflow-hidden relative">
-                      <div className="absolute inset-y-0 left-2 right-2 bg-gradient-to-r from-sky-400 to-amber-400 rounded-full" />
-                    </div>
-                    <span className="text-white font-bold">{convertTemp(w.high)}°</span>
-                  </div>
+            {/* Key Weather Metrics Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+              {[
+                { label: '湿度', value: `${weather?.humidity ?? 55}%`, sub: '相対湿度' },
+                { label: '風速', value: `${weather?.wind ?? 8} km/h`, sub: `風向 ${weather?.windDirection ?? 180}°` },
+                { label: '気圧', value: `${weather?.pressure ?? 1013} hPa`, sub: '海面更正気圧' },
+                { label: '降水量', value: `${weather?.precipitation ?? 0} mm`, sub: '直近1時間' },
+                { label: 'UV指数', value: `${weather?.uvIndex ?? 4}`, sub: (weather?.uvIndex ?? 4) >= 6 ? '強い' : '中程度' },
+                { label: '日の出 / 日の入り', value: `${weather?.sunrise ?? '05:45'}`, sub: `日没 ${weather?.sunset ?? '18:15'}` },
+              ].map((m) => (
+                <div
+                  key={m.label}
+                  className={`p-3 rounded-xl border ${
+                    isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/10'
+                  }`}
+                >
+                  <div className="text-[11px] opacity-60">{m.label}</div>
+                  <div className="text-base font-bold mt-1">{m.value}</div>
+                  <div className="text-[10px] opacity-50 mt-0.5">{m.sub}</div>
                 </div>
               ))}
             </div>
-          </div>
 
-          {/* Atmospheric Telemetry Grid */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* Wind */}
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col justify-between">
-              <div className="flex items-center justify-between text-white/50 text-xs">
-                <span>Wind Speed</span>
-                <Icon name="Wind" size={14} className="text-cyan-400" />
+            {/* Hourly Forecast (24 Hours) */}
+            <div
+              className={`p-4 rounded-2xl border ${
+                isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/10'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xs font-bold">時間ごとの天気予報 (24時間)</h3>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('radar')}
+                  style={{ color: resolvedAccentHex }}
+                  className="text-xs font-bold hover:underline cursor-pointer"
+                >
+                  雨雲レーダーを見る →
+                </button>
               </div>
-              <div className="text-2xl font-bold text-white mt-2 tabular-nums">
-                {city.windSpeed} <span className="text-xs font-normal text-white/60">km/h</span>
+              <div className="flex gap-2.5 overflow-x-auto pb-2">
+                {(weather?.hourly && weather.hourly.length > 0
+                  ? weather.hourly
+                  : Array.from({ length: 12 }, (_, i) => ({
+                      time: `${(new Date().getHours() + i) % 24}:00`,
+                      temp: 20 - Math.sin(i / 3) * 3,
+                      precipProb: 10,
+                      precipMm: 0,
+                      windSpeed: 6,
+                      icon: '⛅',
+                      condition: '晴れ',
+                    }))
+                ).map((h, i) => (
+                  <div
+                    key={`${h.time}-${i}`}
+                    className={`min-w-[74px] p-2.5 rounded-xl border flex flex-col items-center gap-1 shrink-0 ${
+                      isLight ? 'bg-slate-50 border-slate-200' : 'bg-black/25 border-white/10'
+                    }`}
+                  >
+                    <span className="text-[11px] opacity-65 font-mono">{i === 0 ? '現在' : h.time}</span>
+                    <span className="text-xl my-0.5">{h.icon}</span>
+                    <span className="text-xs font-bold">
+                      {fmtTemp(h.temp)}°{unit}
+                    </span>
+                    <span className="text-[10px] text-sky-400 font-mono">💧{h.precipProb}%</span>
+                  </div>
+                ))}
               </div>
-              <div className="text-[11px] text-white/50 mt-1">NW Gentle Breeze</div>
             </div>
 
-            {/* Humidity */}
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col justify-between">
-              <div className="flex items-center justify-between text-white/50 text-xs">
-                <span>Humidity</span>
-                <Icon name="Droplets" size={14} className="text-sky-400" />
+            {/* 7-Day Forecast */}
+            <div
+              className={`p-4 rounded-2xl border ${
+                isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/10'
+              }`}
+            >
+              <h3 className="text-xs font-bold mb-3">週間天気予報 (7日間)</h3>
+              <div className="divide-y divide-white/10">
+                {(weather?.daily || []).map((d) => (
+                  <div key={d.date} className="py-2.5 flex items-center justify-between text-xs gap-3">
+                    <div className="w-24 font-bold">
+                      {d.day}{' '}
+                      <span className="text-[10px] opacity-50 font-mono">{d.date.slice(5)}</span>
+                    </div>
+                    <div className="flex items-center gap-2 w-32">
+                      <span className="text-lg">{d.icon}</span>
+                      <span className="opacity-85 truncate">{d.condition}</span>
+                    </div>
+                    <div className="w-20 text-sky-400 font-mono text-[11px]">
+                      降水 {d.precipProb}%
+                    </div>
+                    <div className="flex items-center gap-2 font-mono">
+                      <span className="opacity-60">{fmtTemp(d.low)}°</span>
+                      <div className="w-20 h-1.5 rounded-full bg-white/10 overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${Math.min(100, Math.max(25, (d.high - d.low) * 6))}%`,
+                            backgroundColor: resolvedAccentHex,
+                          }}
+                        />
+                      </div>
+                      <span className="font-bold">{fmtTemp(d.high)}°</span>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="text-2xl font-bold text-white mt-2 tabular-nums">
-                {city.humidity}%
-              </div>
-              <div className="text-[11px] text-white/50 mt-1">Dew point is 12°</div>
             </div>
-
-            {/* UV Index */}
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col justify-between">
-              <div className="flex items-center justify-between text-white/50 text-xs">
-                <span>UV Index</span>
-                <Icon name="Sun" size={14} className="text-amber-400" />
-              </div>
-              <div className="text-2xl font-bold text-white mt-2 tabular-nums">
-                {city.uvIndex} <span className="text-xs font-normal text-white/60">/ 11</span>
-              </div>
-              <div className="text-[11px] text-white/50 mt-1">Moderate protection</div>
-            </div>
-
-            {/* Barometer */}
-            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex flex-col justify-between">
-              <div className="flex items-center justify-between text-white/50 text-xs">
-                <span>Pressure</span>
-                <Icon name="Thermometer" size={14} className="text-emerald-400" />
-              </div>
-              <div className="text-2xl font-bold text-white mt-2 tabular-nums">
-                {city.pressure} <span className="text-xs font-normal text-white/60">hPa</span>
-              </div>
-              <div className="text-[11px] text-white/50 mt-1">Stable atmosphere</div>
-            </div>
-
-            {/* Sunrise / Sunset */}
-            <div className="col-span-2 p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Icon name="Sun" size={20} className="text-amber-400" />
+          </>
+        ) : (
+          /* Rain Cloud Radar & Weather Map View */
+          <div className="space-y-3">
+            <div
+              className={`p-4 rounded-2xl border space-y-3 ${
+                isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/10'
+              }`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <div className="text-xs text-white/50">Sunrise</div>
-                  <div className="text-sm font-semibold text-white">{city.sunrise}</div>
+                  <h3 className="text-sm font-bold">
+                    {activeLoc.name} 周辺の雨雲レーダー・気象マップ
+                  </h3>
+                  <p className="text-[11px] opacity-60">
+                    OpenStreetMap 地図タイル ＋ RainViewer 降水レーダーオーバーレイ（5分周期自動更新）
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showWindOverlay}
+                      onChange={(e) => setShowWindOverlay(e.target.checked)}
+                    />
+                    <span>風向・気象情報表示</span>
+                  </label>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setMapZoom((z) => Math.max(4, z - 1))}
+                      className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold cursor-pointer"
+                    >
+                      － 縮小
+                    </button>
+                    <span className="text-xs font-mono px-1.5">Zoom {mapZoom}</span>
+                    <button
+                      type="button"
+                      onClick={() => setMapZoom((z) => Math.min(10, z + 1))}
+                      className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold cursor-pointer"
+                    >
+                      ＋ 拡大
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div className="h-6 w-px bg-white/10" />
-              <div className="flex items-center gap-3">
-                <Icon name="Moon" size={20} className="text-indigo-400" />
-                <div>
-                  <div className="text-xs text-white/50">Sunset</div>
-                  <div className="text-sm font-semibold text-white">{city.sunset}</div>
+
+              {/* Map Viewport (3x3 256px Tiles = 768x768 centered on location) */}
+              <div className="relative w-full h-[380px] rounded-2xl overflow-hidden border border-white/15 bg-slate-900">
+                <div
+                  className="absolute"
+                  style={{
+                    width: 768,
+                    height: 768,
+                    left: `calc(50% - ${256 + tileGrid.offsetX}px)`,
+                    top: `calc(50% - ${256 + tileGrid.offsetY}px)`,
+                  }}
+                >
+                  {tileGrid.tiles.map((t) => (
+                    <React.Fragment key={`${t.z}-${t.x}-${t.y}`}>
+                      {/* Base Map Tile */}
+                      <img
+                        src={`https://tile.openstreetmap.org/${t.z}/${t.x}/${t.y}.png`}
+                        alt=""
+                        className="absolute w-[256px] h-[256px] select-none pointer-events-none"
+                        style={{
+                          left: (t.dx + 1) * 256,
+                          top: (t.dy + 1) * 256,
+                          filter: isLight ? 'none' : 'invert(90%) hue-rotate(180deg) brightness(88%) contrast(92%)',
+                        }}
+                      />
+                      {/* RainViewer Precipitation Radar Tile Overlay */}
+                      {activeRadarFrame?.path && (
+                        <img
+                          src={`${radarHost}${activeRadarFrame.path}/256/${t.z}/${t.x}/${t.y}/2/1_1.png`}
+                          alt=""
+                          className="absolute w-[256px] h-[256px] select-none pointer-events-none transition-opacity duration-300"
+                          style={{
+                            left: (t.dx + 1) * 256,
+                            top: (t.dy + 1) * 256,
+                            opacity: radarOpacity,
+                          }}
+                        />
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+
+                {/* Center Location Marker */}
+                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center pointer-events-none">
+                  <div
+                    style={{ backgroundColor: resolvedAccentHex }}
+                    className="px-2.5 py-1 rounded-full text-[11px] font-bold text-slate-950 shadow-lg mb-1 whitespace-nowrap"
+                  >
+                    {activeLoc.name} {fmtTemp(weather?.temp ?? 20)}°{unit} ({weather?.condition || '晴れ'})
+                  </div>
+                  <div
+                    style={{ backgroundColor: resolvedAccentHex }}
+                    className="w-3.5 h-3.5 rounded-full border-2 border-white shadow-md"
+                  />
+                </div>
+
+                {/* Weather Telemetry HUD on Map */}
+                {showWindOverlay && (
+                  <div className="absolute top-3 left-3 z-20 p-3 rounded-xl bg-slate-950/80 backdrop-blur-md border border-white/15 text-white text-xs space-y-1">
+                    <div className="font-bold flex items-center gap-1.5">
+                      <span>🌧️ 降水量: {weather?.precipitation ?? 0} mm/h</span>
+                    </div>
+                    <div className="opacity-80">
+                      💨 風速: {weather?.wind ?? 8} km/h (風向 {weather?.windDirection ?? 180}°)
+                    </div>
+                    <div className="opacity-80">
+                      💧 湿度: {weather?.humidity ?? 55}% / 気圧: {weather?.pressure ?? 1013} hPa
+                    </div>
+                  </div>
+                )}
+
+                {/* Rain Intensity Legend */}
+                <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-xl bg-slate-950/80 backdrop-blur-md border border-white/15 text-white text-[10px] flex items-center gap-2">
+                  <span>雨雲強度:</span>
+                  <span className="px-1.5 py-0.5 rounded bg-sky-400/40">弱</span>
+                  <span className="px-1.5 py-0.5 rounded bg-blue-500/60">中</span>
+                  <span className="px-1.5 py-0.5 rounded bg-amber-500/70">強</span>
+                  <span className="px-1.5 py-0.5 rounded bg-rose-600/80">激しい雨</span>
+                </div>
+              </div>
+
+              {/* Radar Timeline Controls */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRadarPlaying(!radarPlaying)}
+                    style={{ backgroundColor: resolvedAccentHex }}
+                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-950 cursor-pointer"
+                  >
+                    {radarPlaying ? '⏸ 一時停止' : '▶ 雨雲の動きを再生'}
+                  </button>
+                  <span className="text-xs font-mono opacity-80">
+                    {activeRadarFrame?.time
+                      ? new Date(activeRadarFrame.time * 1000).toLocaleTimeString('ja-JP', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })
+                      : '現在時刻'}
+                  </span>
+                </div>
+
+                {radarFrames.length > 1 && (
+                  <input
+                    type="range"
+                    min={0}
+                    max={radarFrames.length - 1}
+                    value={radarFrameIdx}
+                    onChange={(e) => {
+                      setRadarPlaying(false);
+                      setRadarFrameIdx(Number(e.target.value));
+                    }}
+                    className="flex-1 min-w-[140px] cursor-pointer"
+                  />
+                )}
+
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="opacity-65">レーダー透過度</span>
+                  <input
+                    type="range"
+                    min={0.2}
+                    max={1}
+                    step={0.05}
+                    value={radarOpacity}
+                    onChange={(e) => setRadarOpacity(Number(e.target.value))}
+                    className="w-24 cursor-pointer"
+                  />
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

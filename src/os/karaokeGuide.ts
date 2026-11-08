@@ -1,386 +1,400 @@
 /**
- * Karaoke Pronunciation Guide & Dynamic Timing Engine for GlassiumOS Music
- * Provides:
- * - Real-time Romaji / Furigana pronunciation guides for Japanese lyrics
- * - Dynamic lead-in timing countdown (歌い出しタイミング)
- * - Syllable and line color-wipe calculation
+ * Lyric Language Detection & Bidirectional Translation Engine for GlassiumOS 5 u4 Music
+ * Rules:
+ * - Japanese lyrics (日本語) -> Translated into English (英語)
+ * - English lyrics (英語) -> Translated into Japanese (日本語)
+ * - Other languages (韓国語・中国語・スペイン語・フランス語など) -> Translated into Japanese (日本語)
  */
 
-// Japanese Kana to Hepburn Romaji Map
-const KANA_ROMAJI_MAP: Record<string, string> = {
-  // Digraphs (拗音)
-  'きゃ': 'kya', 'きゅ': 'kyu', 'きょ': 'kyo',
-  'しゃ': 'sha', 'しゅ': 'shu', 'しょ': 'sho',
-  'ちゃ': 'cha', 'ちゅ': 'chu', 'ちょ': 'cho',
-  'にゃ': 'nya', 'にゅ': 'nyu', 'にょ': 'nyo',
-  'ひゃ': 'hya', 'ひゅ': 'hyu', 'ひょ': 'hyo',
-  'みゃ': 'mya', 'みゅ': 'myu', 'みょ': 'myo',
-  'りゃ': 'rya', 'りゅ': 'ryu', 'りょ': 'ryo',
-  'ぎゃ': 'gya', 'ぎゅ': 'gyu', 'ぎょ': 'gyo',
-  'じゃ': 'ja',  'じゅ': 'ju',  'じょ': 'jo',
-  'びゃ': 'bya', 'びゅ': 'byu', 'びょ': 'byo',
-  'ぴゃ': 'pya', 'ぴゅ': 'pyu', 'ぴょ': 'pyo',
-  'ふぁ': 'fa',  'ふぃ': 'fi',  'ふぇ': 'fe',  'ふぉ': 'fo',
-  'てぃ': 'ti',  'でぃ': 'di',  'うぃ': 'wi',  'うぇ': 'we',
+import { backendFetch } from './backendConfig';
 
-  // Basic Hiragana
-  'あ': 'a', 'い': 'i', 'う': 'u', 'え': 'e', 'お': 'o',
-  'か': 'ka', 'き': 'ki', 'く': 'ku', 'け': 'ke', 'こ': 'ko',
-  'さ': 'sa', 'し': 'shi', 'す': 'su', 'せ': 'se', 'そ': 'so',
-  'た': 'ta', 'ち': 'chi', 'つ': 'tsu', 'て': 'te', 'と': 'to',
-  'な': 'na', 'に': 'ni', 'ぬ': 'nu', 'ね': 'ne', 'の': 'no',
-  'は': 'ha', 'ひ': 'hi', 'ふ': 'fu', 'へ': 'he', 'ほ': 'ho',
-  'ま': 'ma', 'み': 'mi', 'む': 'mu', 'め': 'me', 'も': 'mo',
-  'や': 'ya', 'ゆ': 'yu', 'よ': 'yo',
-  'ら': 'ra', 'り': 'ri', 'る': 'ru', 'れ': 're', 'ろ': 'ro',
-  'わ': 'wa', 'を': 'wo', 'ん': 'n',
+export type LyricSourceLang = 'ja' | 'en' | 'other';
 
-  // Dakuten & Handakuten
-  'が': 'ga', 'ぎ': 'gi', 'ぐ': 'gu', 'げ': 'ge', 'ご': 'go',
-  'ざ': 'za', 'じ': 'ji', 'ず': 'zu', 'ぜ': 'ze', 'ぞ': 'zo',
-  'だ': 'da', 'ぢ': 'ji', 'づ': 'zu', 'で': 'de', 'ど': 'do',
-  'ば': 'ba', 'び': 'bi', 'ぶ': 'bu', 'べ': 'be', 'ぼ': 'bo',
-  'ぱ': 'pa', 'ぴ': 'pi', 'ぷ': 'pu', 'ぺ': 'pe', 'ぽ': 'po',
-};
-
-// Common lyric kanji reading dictionary for popular J-Pop songs
-const COMMON_LYRIC_KANJI: Record<string, string> = {
-  // Frequently recurring lyric words in YOASOBI, Kenshi Yonezu, Ado, King Gnu, etc.
-  '夜に駆ける': 'yoru ni kakeru',
-  '夜': 'yoru',
-  '君': 'kimi',
-  '僕': 'boku',
-  '私': 'watashi',
-  '心': 'kokoro',
-  '愛': 'ai',
-  '恋': 'koi',
-  '夢': 'yume',
-  '空': 'sora',
-  '涙': 'namida',
-  '明日': 'asu',
-  '今日': 'kyou',
-  '昨日': 'kinou',
-  '今': 'ima',
-  '未来': 'mirai',
-  '過去': 'kako',
-  '世界': 'sekai',
-  '光': 'hikari',
-  '影': 'kage',
-  '時間': 'jikan',
-  '記憶': 'kioku',
-  '約束': 'yakusoku',
-  '笑顔': 'egao',
-  '言葉': 'kotoba',
-  '声': 'koe',
-  '歌': 'uta',
-  '音': 'oto',
-  '風': 'kaze',
-  '星': 'hoshi',
-  '月': 'tsuki',
-  '太陽': 'taiyou',
-  '雨': 'ame',
-  '花': 'hana',
-  '海': 'umi',
-  '道': 'michi',
-  '手': 'te',
-  '目': 'me',
-  '旅': 'tabi',
-  '運命': 'unmei',
-  '永遠': 'eien',
-  '奇跡': 'kiseki',
-  '孤独': 'kodoku',
-  '自由': 'jiyuu',
-  '痛': 'ita',
-  '傷': 'kizu',
-  '歩': 'aru',
-  '走': 'hasi',
-  '沈む': 'shizumu',
-  '溶けて': 'tokete',
-  '騒がしい': 'sawagashii',
-  '日々に': 'hibi ni',
-  '笑えない': 'waraenai',
-  '思い付く': 'omoitsuku',
-  '限り': 'kagiri',
-  '眩しい': 'mabushii',
-  '掴み': 'tsukami',
-  '届く': 'todoku',
-  '響く': 'hibiku',
-  '照らす': 'terasu',
-  '始まる': 'hajimaru',
-  '終わる': 'owaru',
-  '忘れない': 'wasurenai',
-  '想い': 'omoi',
-  '命': 'inochi',
-  '魂': 'tamashii',
-  '胸': 'mune',
-  '色': 'iro',
-  '二人': 'futari',
-  '一人': 'hitori',
-  '青': 'ao',
-  '赤': 'aka',
-  '白': 'shiro',
-  '黒': 'kuro',
-};
-
-// Convert Katakana to Hiragana for uniform phonetics
-function katakanaToHiragana(str: string): string {
-  return str.replace(/[\u30a1-\u30f6]/g, (ch) =>
-    String.fromCharCode(ch.charCodeAt(0) - 0x60)
-  );
+export interface LyricLanguageInfo {
+  lang: LyricSourceLang;
+  targetLang: 'en' | 'ja';
+  badgeLabel: string;
 }
 
 /**
- * Generate Romaji / Furigana pronunciation guide for a line of text.
+ * Detects whether a lyric line is Japanese, English, or another language.
  */
-export function generatePronunciationGuide(lineText: string): string {
+export function detectLyricLanguage(lineText: string): LyricLanguageInfo {
+  const trimmed = (lineText || '').trim();
+  if (!trimmed) {
+    return { lang: 'en', targetLang: 'ja', badgeLabel: 'EN → JA' };
+  }
+
+  // Contains Hiragana or Katakana -> Japanese
+  const hasKana = /[\u3040-\u309f\u30a0-\u30ff]/.test(trimmed);
+  // Contains CJK Kanji/Hanzi
+  const hasCjk = /[\u4e00-\u9faf]/.test(trimmed);
+  // Contains Korean Hangul
+  const hasHangul = /[\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]/.test(trimmed);
+  // Contains Cyrillic or Arabic script
+  const hasNonLatinScript = /[\u0410-\u044f]|[\u0621-\u064a]/.test(trimmed);
+  // Contains European accented characters common in Spanish, French, German, Portuguese, Italian
+  const hasEuroDiacritics = /[áéíóúñ¿¡àèùâêîôûçëïüäößãõ]/i.test(trimmed);
+  // Common non-English words (Spanish/French/German/Italian/Indonesian)
+  const hasOtherRomanceWords =
+    /\b(quiero|amor|corazón|noche|siempre|todo|nada|vida|como|pero|para|avec|dans|toujours|monde|cette|nicht|ich|dich|liebe|nacht|siamo|questo)\b/i.test(
+      trimmed
+    );
+
+  if (hasHangul) {
+    return { lang: 'other', targetLang: 'ja', badgeLabel: 'KO → JA' };
+  }
+
+  if (hasKana) {
+    return { lang: 'ja', targetLang: 'en', badgeLabel: 'JA → EN' };
+  }
+
+  if (hasCjk) {
+    // Distinguish Japanese Kanji-only phrases from Chinese Hanzi phrases
+    const commonChineseMarkers = /[的了是在有我和不人这中大为上个国到说们]/;
+    if (commonChineseMarkers.test(trimmed)) {
+      return { lang: 'other', targetLang: 'ja', badgeLabel: 'ZH → JA' };
+    }
+    return { lang: 'ja', targetLang: 'en', badgeLabel: 'JA → EN' };
+  }
+
+  if (hasNonLatinScript || hasEuroDiacritics || hasOtherRomanceWords) {
+    return { lang: 'other', targetLang: 'ja', badgeLabel: '多言語 → JA' };
+  }
+
+  return { lang: 'en', targetLang: 'ja', badgeLabel: 'EN → JA' };
+}
+
+// Japanese -> English exact & phrase dictionary for instant fallback
+const JA_TO_EN_LYRIC_MAP: Record<string, string> = {
+  '沈むように溶けてゆくように': 'Like sinking down, like melting away into the night',
+  '二人だけの空が広がる夜に': 'In the night where a sky just for the two of us unfolds',
+  'さよならだけだった その一言で全てが分かった': 'It was only "goodbye", yet that single word told me everything',
+  '日が沈み出した空と君の姿 フェンス越しに重なっていた': 'The setting sun in the sky and your figure overlapped beyond the fence',
+  '初めて見た時から僕の心を全て奪った': 'From the very first moment I saw you, you stole my entire heart',
+  'どこか儚い空気を纏う君は 寂しい目をしてたんだ': 'Wrapped in a fleeting aura, you had such lonely eyes',
+  'いつだってチックタックと鳴る世界で何度だってさ': 'In a world that keeps ticking away, no matter how many times',
+  '触れる心無い言葉うるさい声に 涙が零れそうでも': 'Even when heartless words and noisy voices almost make your tears fall',
+  'ありきたりな喜びきっと二人なら見つけられる': 'Even ordinary happiness, I am sure the two of us can find it together',
+  '騒がしい日々に笑えない君に 思い付く限り眩しい明日を': 'To you who cannot smile in these noisy days, I will bring the brightest tomorrow I can imagine',
+  '明けない夜に落ちてゆく前に 僕の手を掴んでほら': 'Before falling into the endless night, come on and take my hand',
+  '忘れてしまいたくて閉じ込めた日々も 抱きしめた温もりで溶かすから': 'Even the days you locked away wanting to forget, I will melt them with the warmth of my embrace',
+  '怖くないよ いつか日が昇るまで 二人でいよう': 'There is nothing to fear, let us stay together until the sun rises someday',
+  '無敵の笑顔で荒らすメディア': 'Taking the media by storm with an invincible smile',
+  '知りたいその秘密ミステリアス': 'Everyone wants to know that mysterious secret',
+  '抜けてるとこさえ彼女のエリア': 'Even her clumsy side is part of her charm',
+  '完璧で嘘つきな君は 天才的なアイドル様': 'Perfect and untruthful, you are a genius idol',
+  '今日何食べた？': 'What did you eat today?',
+  '好きな本は？': 'What is your favorite book?',
+  '遊びに行くならどこに行くの？': 'Where do you go when you hang out?',
+  '何も食べてない': 'I have not eaten anything',
+  'それは内緒': 'That is a secret',
+  '何を聞かれても のらりくらり': 'No matter what they ask, dodging effortlessly',
+  'そう淡々と だけど燦々と': 'So calmly, yet shining so brilliantly',
+  '見えそうで見えない秘密は蜜の味': 'A secret almost seen yet hidden tastes like honey',
+  'あれもナイナイ これもナイナイ': 'Neither that, nor this, none of it is true',
+  '好きなタイプは？ 相手は？': 'What is your type? Who is your partner?',
+  'さあ答えて': 'Now tell us the answer',
+  '誰かを好きになることなんて 私分からなくてさ': 'Falling in love with someone is something I still do not understand',
+  '嘘か本当か知り得ない': 'No one can tell whether it is a lie or the truth',
+  'そんな言葉にまた一人堕ちる また好きにさせる': 'Falling for those words once again, making everyone fall in love with her',
+  '誰もが目を奪われていく': 'Everyone has their eyes completely captivated',
+  '君は完璧で究極のアイドル': 'You are the perfect and ultimate idol',
+  '金輪際現れない 一番星の生まれ変わり': 'Never to appear again, the reincarnation of the brightest star',
+  'その笑顔で愛してるで 誰も彼も虜にしていく': 'With that smile and "I love you", captivating absolutely everyone',
+  'その瞳がその言葉が 嘘でもそれは完全なアイ': 'Even if those eyes and words are lies, it is still complete love',
+  '夢ならばどれほどよかったでしょう': 'How wonderful it would have been if this were only a dream',
+  '未だにあなたのことを夢にみる': 'Even now, I still dream of you',
+  '忘れた物を取りに帰るように': 'Like going back to retrieve something left behind',
+  '古びた思い出の埃を払う': 'Brushing off the dust from old memories',
+  '戻らない幸せがあることを': 'That there is happiness that will never return',
+  '最後にあなたが教えてくれた': 'You taught me that at the very end',
+  '言えずに隠してた昏い過去も': 'Even the dark past I kept hidden without saying a word',
+  'あなたがいなきゃ永遠に昏いまま': 'Without you, it would remain dark forever',
+  'きっともうこれ以上傷つくことなど': 'Surely, being hurt any more than this',
+  'ありはしないとわかっている': 'I know it could never happen again',
+  'あの日の悲しみさえ あの日の苦しみさえ': 'Even the sadness of that day, even the pain of that day',
+  'そのすべてを愛してた あなたとともに': 'I loved all of it, together with you',
+  '胸に残り離れない 苦いレモンの匂い': 'The bitter scent of lemon lingers in my heart and never fades',
+  '雨が降り止むまでは帰れない': 'I cannot go home until the rain stops falling',
+  '今でもあなたはわたしの光': 'Even now, you are my guiding light',
+  '努力 未来 a beautiful star': 'Effort, future, a beautiful shining star',
+  'ケセラセラ 今日も唱える 限界などないさ': 'Que sera sera, I chant again today, there are no limits',
+  'あんなに好きだったのにね': 'Even though we used to love each other so deeply',
+  '君の怪獣が暴れ出す前に': 'Before the monster inside you breaks loose',
+  '死ぬのがいいわ': 'I would rather die than be separated from you',
+  'きらり 光る風に乗って': 'Riding on the sparkling, shining wind',
+  '夜に駆ける': 'Racing into the night',
+  '怪獣の花唄': 'The monster flower song',
+  '白日': 'Under the pale white sun',
+  'うっせぇわ': 'Shut up, I have had enough',
+  '新時代 この未来だ 世界中全部変えてしまえば': 'New genesis, this is the future, if we change the whole world',
+};
+
+// English / Other -> Japanese exact & phrase dictionary for instant fallback
+const EN_OTHER_TO_JA_LYRIC_MAP: Record<string, string> = {
+  'drifting beyond the event horizon': '事象の地平線を超えて漂っていく',
+  'photons bent in an infinite ring of light': '無限の光の輪の中で曲がる光子',
+  'monochrome frequencies cutting through vacuum': '真空を切り裂くモノクロームの周波数',
+  'echoes of the cosmos vibrating in stereo': 'ステレオで響き渡る宇宙の反響',
+  'neon pulse synchronization complete': 'ネオンパルスの同期が完了した',
+  'speed of sound colliding with quantum gravity': '音速が量子重力と衝突する',
+  'stellar particles forming a crystalline mesh': '星間粒子が結晶のメッシュを形作る',
+  'supernova resonance glowing in deep violet': '深い紫に輝く超新星の共鳴',
+  'entering the digital troposphere': 'デジタル対流圏へと突入する',
+  'infinite horizon unfolding before our eyes': '目の前に広がる無限の地平線',
+  'bling-bang-bang-born': '実力と才能で頂点へと駆け上がる',
+  'you are my special': 'あなたは私にとって特別な存在',
+  'one more time we are gonna celebrate': 'もう一度、僕たちは祝福し踊り明かそう',
+  'music got me feeling so free': '音楽が僕をこんなにも自由な気持ちにさせてくれる',
+  'celebrate and dance so free': '祝おう、そして自由に踊り続けよう',
+  'tonight is the night': '今夜こそがその特別な夜',
+  'i love you': 'あなたを愛しています',
+  'dont stop the music': '音楽を止めないで',
+  'dancing in the moonlight': '月明かりの中で踊りながら',
+};
+
+// Word-level Japanese -> English glossary for compositional fallback
+const JA_WORD_TO_EN: [string, string][] = [
+  ['夜に駆ける', 'racing into the night'],
+  ['僕たち', 'we'],
+  ['私たち', 'we'],
+  ['あなた', 'you'],
+  ['君', 'you'],
+  ['僕', 'I'],
+  ['私', 'I'],
+  ['心', 'heart'],
+  ['世界', 'world'],
+  ['未来', 'future'],
+  ['明日', 'tomorrow'],
+  ['今日', 'today'],
+  ['昨日', 'yesterday'],
+  ['涙', 'tears'],
+  ['笑顔', 'smile'],
+  ['言葉', 'words'],
+  ['約束', 'promise'],
+  ['記憶', 'memories'],
+  ['思い出', 'memories'],
+  ['光', 'light'],
+  ['闇', 'darkness'],
+  ['影', 'shadow'],
+  ['夜空', 'night sky'],
+  ['空', 'sky'],
+  ['夜', 'night'],
+  ['朝', 'morning'],
+  ['星', 'stars'],
+  ['月', 'moon'],
+  ['太陽', 'sun'],
+  ['風', 'wind'],
+  ['雨', 'rain'],
+  ['花', 'flowers'],
+  ['海', 'ocean'],
+  ['声', 'voice'],
+  ['歌', 'song'],
+  ['音', 'sound'],
+  ['夢', 'dream'],
+  ['愛', 'love'],
+  ['恋', 'love'],
+  ['時間', 'time'],
+  ['永遠', 'forever'],
+  ['奇跡', 'miracle'],
+  ['運命', 'destiny'],
+  ['孤独', 'solitude'],
+  ['自由', 'freedom'],
+  ['二人', 'the two of us'],
+  ['一人', 'alone'],
+  ['さよなら', 'goodbye'],
+  ['ありがとう', 'thank you'],
+  ['忘れない', 'never forget'],
+  ['抱きしめ', 'embrace'],
+  ['輝く', 'shining'],
+  ['走る', 'running'],
+  ['歩く', 'walking'],
+];
+
+// Word-level English -> Japanese glossary for compositional fallback
+const EN_WORD_TO_JA: [RegExp, string][] = [
+  [/\bi love you\b/gi, 'あなたを愛している'],
+  [/\bforever and ever\b/gi, 'いつまでも永遠に'],
+  [/\bin the night\b/gi, '夜の中で'],
+  [/\bin the dark\b/gi, '暗闇の中で'],
+  [/\bmy heart\b/gi, '私の心'],
+  [/\byour eyes\b/gi, 'あなたの瞳'],
+  [/\bdon't let go\b/gi, '手を離さないで'],
+  [/\bhold my hand\b/gi, '私の手を握って'],
+  [/\bcome with me\b/gi, '私と一緒に来て'],
+  [/\bdrifting\b/gi, '漂う'],
+  [/\bevent horizon\b/gi, '事象の地平線'],
+  [/\bphotons\b/gi, '光子'],
+  [/\binfinite\b/gi, '無限の'],
+  [/\blight\b/gi, '光'],
+  [/\bfrequencies\b/gi, '周波数'],
+  [/\bechoes\b/gi, '反響'],
+  [/\bcosmos\b/gi, '宇宙'],
+  [/\bsupernova\b/gi, '超新星'],
+  [/\bhorizon\b/gi, '地平線'],
+  [/\bdream(?:s|ing)?\b/gi, '夢'],
+  [/\blove\b/gi, '愛'],
+  [/\bnight\b/gi, '夜'],
+  [/\bsky\b/gi, '空'],
+  [/\bstar(?:s)?\b/gi, '星'],
+  [/\bworld\b/gi, '世界'],
+  [/\bfuture\b/gi, '未来'],
+  [/\btomorrow\b/gi, '明日'],
+  [/\btonight\b/gi, '今夜'],
+  [/\btogether\b/gi, '一緒に'],
+  [/\bforever\b/gi, '永遠に'],
+  [/\bmemories\b/gi, '思い出'],
+  [/\bshine|shining\b/gi, '輝く'],
+  [/\bdance|dancing\b/gi, '踊る'],
+  [/\bmusic\b/gi, '音楽'],
+  [/\bfree|freedom\b/gi, '自由'],
+  [/\btime\b/gi, '時間'],
+  [/\bheart\b/gi, '心'],
+  [/\bvoice\b/gi, '声'],
+  [/\btears\b/gi, '涙'],
+  [/\brain\b/gi, '雨'],
+  [/\bwind\b/gi, '風'],
+  [/\bsun\b/gi, '太陽'],
+  [/\bmoon\b/gi, '月'],
+];
+
+// In-memory translation cache shared across tracks
+const memoryTranslationCache = new Map<string, string>();
+
+/**
+ * Calls the server-side `/api/music/translate-lyrics` endpoint to translate a batch of lyric lines:
+ * - Japanese -> English
+ * - English -> Japanese
+ * - Other languages -> Japanese
+ */
+export async function translateLyricsBatchViaServer(
+  lines: string[]
+): Promise<Record<string, string>> {
+  const uniqueLines = Array.from(
+    new Set(
+      lines
+        .map((l) => (l || '').trim())
+        .filter((l) => l.length > 0 && !l.startsWith('♪'))
+    )
+  );
+
+  const result: Record<string, string> = {};
+  const missing: string[] = [];
+
+  for (const line of uniqueLines) {
+    const cached = memoryTranslationCache.get(line);
+    if (cached) {
+      result[line] = cached;
+    } else {
+      missing.push(line);
+    }
+  }
+
+  if (missing.length === 0) {
+    return result;
+  }
+
+  try {
+    const resp = await backendFetch('/api/music/translate-lyrics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lines: missing.slice(0, 80) }),
+    });
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data && typeof data.translations === 'object' && data.translations !== null) {
+        for (const [orig, trans] of Object.entries(data.translations)) {
+          if (typeof trans === 'string' && trans.trim()) {
+            memoryTranslationCache.set(orig, trans.trim());
+            result[orig] = trans.trim();
+          }
+        }
+      }
+    }
+  } catch {
+    // Fallback to local dictionary if offline
+  }
+
+  return result;
+}
+
+/**
+ * Synchronous lyric translation lookup:
+ * 1. Uses server-translated map or memory cache if available
+ * 2. Otherwise applies deterministic language-aware translation:
+ *    - Japanese -> English
+ *    - English -> Japanese
+ *    - Other languages -> Japanese
+ */
+export function getLyricTranslation(
+  lineText: string,
+  serverTranslations?: Record<string, string>
+): string {
   if (!lineText || !lineText.trim()) return '';
   const trimmed = lineText.trim();
 
-  // If already ASCII / English, return clean text
-  if (/^[-a-zA-Z0-9\s.,!?'"()]+$/.test(trimmed)) {
-    return trimmed;
+  // Skip metadata/loading lines
+  if (
+    trimmed.includes('同期歌詞を読み込み中') ||
+    trimmed.includes('Loading synced lyrics') ||
+    trimmed === '•••'
+  ) {
+    return '';
   }
 
-  // Check against known whole lyric phrases
-  let working = trimmed;
-
-  // Substitute common Kanji terms with phonetic hiragana
-  const kanjiKeys = Object.keys(COMMON_LYRIC_KANJI).sort((a, b) => b.length - a.length);
-  for (const k of kanjiKeys) {
-    if (working.includes(k)) {
-      working = working.replaceAll(k, ` ${COMMON_LYRIC_KANJI[k]} `);
-    }
+  if (serverTranslations && serverTranslations[trimmed]) {
+    return serverTranslations[trimmed];
   }
+  const mem = memoryTranslationCache.get(trimmed);
+  if (mem) return mem;
 
-  // Convert remaining Katakana to Hiragana
-  working = katakanaToHiragana(working);
+  const langInfo = detectLyricLanguage(trimmed);
+  const cleanLower = trimmed.toLowerCase().replace(/[.,!?'"~～]/g, '').trim();
 
-  // Convert Hiragana characters and digraphs to Romaji
-  let result = '';
-  let i = 0;
-  while (i < working.length) {
-    // Sokuon (促音: っ / ッ)
-    if (working[i] === 'っ') {
-      const nextPair = working.slice(i + 1, i + 3);
-      const nextChar = working[i + 1] || '';
-      const nextRomaji = KANA_ROMAJI_MAP[nextPair] || KANA_ROMAJI_MAP[nextChar] || '';
-      if (nextRomaji) {
-        result += nextRomaji[0];
+  if (langInfo.lang === 'ja') {
+    // Japanese -> English
+    for (const [k, v] of Object.entries(JA_TO_EN_LYRIC_MAP)) {
+      if (trimmed === k || trimmed.includes(k) || k.includes(trimmed)) {
+        return v;
       }
-      i++;
-      continue;
     }
 
-    // Try 2-character combo (digraph)
-    const pair = working.slice(i, i + 2);
-    if (KANA_ROMAJI_MAP[pair]) {
-      result += KANA_ROMAJI_MAP[pair] + ' ';
-      i += 2;
-      continue;
+    const matchedEnParts: string[] = [];
+    for (const [jaWord, enWord] of JA_WORD_TO_EN) {
+      if (trimmed.includes(jaWord) && !matchedEnParts.includes(enWord)) {
+        matchedEnParts.push(enWord);
+      }
     }
-
-    // Single character
-    const single = working[i];
-    if (KANA_ROMAJI_MAP[single]) {
-      result += KANA_ROMAJI_MAP[single] + ' ';
-      i++;
-      continue;
+    if (matchedEnParts.length > 0) {
+      const phrase = matchedEnParts.slice(0, 5).join(', ');
+      return phrase.charAt(0).toUpperCase() + phrase.slice(1);
     }
-
-    // Space or punctuation
-    result += single;
-    i++;
+    return '';
   }
 
-  // Clean up duplicate spaces and format as readable Romaji pronunciation guide
-  return result
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/([a-z])\s+([a-z]{1,2})\b/gi, '$1$2'); // join small syllables for smoother flow
-}
-
-export interface KaraokeLeadInState {
-  isActive: boolean;
-  secondsRemaining: number;
-  dotsLit: number; // 0, 1, 2, or 3
-  isUrgent: boolean;
-  label: string;
-}
-
-/**
- * Calculates lead-in countdown info before a line starts singing.
- * Gives singer exact 3-2-1 rhythm warning.
- */
-export function calculateLeadInState(
-  lineTime: number,
-  currentTime: number,
-  leadInThreshold = 3.5
-): KaraokeLeadInState {
-  const delta = lineTime - currentTime;
-  if (delta > 0 && delta <= leadInThreshold) {
-    let dotsLit = 0;
-    if (delta <= 3.0) dotsLit = 1;
-    if (delta <= 2.0) dotsLit = 2;
-    if (delta <= 1.0) dotsLit = 3;
-
-    return {
-      isActive: true,
-      secondsRemaining: Math.max(0, delta),
-      dotsLit,
-      isUrgent: delta <= 1.0,
-      label: delta <= 0.4 ? 'GO! 歌い出し' : `歌い出しまで ${delta.toFixed(1)}s`,
-    };
-  }
-
-  return {
-    isActive: false,
-    secondsRemaining: 0,
-    dotsLit: 0,
-    isUrgent: false,
-    label: '',
-  };
-}
-
-/**
- * Color scheme styles for Karaoke highlight effects.
- */
-export type KaraokeColorTheme = 'neon-gold' | 'cyber-cyan' | 'ruby-rose' | 'rainbow-glow';
-
-export const KARAOKE_COLOR_THEMES: Record<
-  KaraokeColorTheme,
-  {
-    name: string;
-    activeGradient: string;
-    glowColor: string;
-    badgeBg: string;
-    activeText: string;
-  }
-> = {
-  'neon-gold': {
-    name: 'ゴールド (DAM風)',
-    activeGradient: 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 45%, #ec4899 90%, #ffffff 100%)',
-    glowColor: 'rgba(251, 191, 36, 0.9)',
-    badgeBg: 'bg-amber-500/20 text-amber-300 border-amber-400/40',
-    activeText: '#fbbf24',
-  },
-  'cyber-cyan': {
-    name: 'サイバーシアン (JOYSOUND風)',
-    activeGradient: 'linear-gradient(90deg, #06b6d4 0%, #38bdf8 50%, #818cf8 100%)',
-    glowColor: 'rgba(56, 189, 248, 0.9)',
-    badgeBg: 'bg-cyan-500/20 text-cyan-300 border-cyan-400/40',
-    activeText: '#38bdf8',
-  },
-  'ruby-rose': {
-    name: 'ルビーローズ (Apple Music風)',
-    activeGradient: 'linear-gradient(90deg, #f43f5e 0%, #fb7185 45%, #ec4899 90%, #ffffff 100%)',
-    glowColor: 'rgba(244, 63, 94, 0.9)',
-    badgeBg: 'bg-rose-500/20 text-rose-300 border-rose-400/40',
-    activeText: '#f43f5e',
-  },
-  'rainbow-glow': {
-    name: 'レインボーネオン',
-    activeGradient: 'linear-gradient(90deg, #f43f5e 0%, #fbbf24 33%, #34d399 66%, #38bdf8 100%)',
-    glowColor: 'rgba(244, 63, 94, 0.85)',
-    badgeBg: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-400/40',
-    activeText: '#f472b6',
-  },
-};
-
-/**
- * Lyrics Japanese Translation & Poetic Interpretation Dictionary (歌詞通訳・日本語対訳)
- */
-const SONG_LYRIC_TRANSLATIONS: Record<string, string> = {
-  // English Track Lines -> Natural Japanese Translation
-  'drifting beyond the event horizon': '事象の地平線を超えて、果てなき宇宙を漂う',
-  'photons bent in an infinite ring of light': '無限の光の環の中で、曲げられてゆく光子たち',
-  'monochrome frequencies cutting through vacuum': 'モノクロームの周波数が、冷たい真空を切り裂いていく',
-  'echoes of the cosmos vibrating in stereo': '全方位のステレオで共鳴する、宇宙の深淵からの反響',
-  'neon pulse synchronization complete': 'ネオンパルスとの完全同期プロセスが完了した',
-  'speed of sound colliding with quantum gravity': '音の速さが、量子の重力と激しく交錯する',
-  'stellar particles forming a crystalline mesh': '星屑の粒子が、澄み切ったクリスタルの網を形成する',
-  'supernova resonance glowing in deep violet': '超新星の残響が、深い深紫色の光となって輝きを放つ',
-  'entering the digital troposphere': 'デジタルの対流圏へと静かに突入していく',
-  'infinite horizon unfolding before our eyes': '無限に広がる地平線が、私たちの目の前で今開かれる',
-  'bling-bang-bang-born': '実力と才能だけで、頂点へ駆け上がれ',
-  'you are my special': 'あなたこそが、私にとってかけがえのない特別な存在',
-
-  // J-Pop Catalog Exact Lines -> Expressive Poetic Subtitles
-  '沈むように溶けてゆくように': '沈みゆく薄暮の中で、心が優しく溶け合っていくように',
-  '二人だけの空が広がる夜に': 'ただ二人だけの静寂な夜空が、どこまでも広がる瞬間に',
-  'さよならだけだった その一言で全てが分かった': '『さよなら』というたった一言で、すべてを悟ってしまった',
-  '日が沈み出した空と君の姿 フェンス越しに重なっていた': '夕暮れに染まりゆく空とあなたの面影が、フェンス越しに静かに重なっていた',
-  '初めて見た時から僕の心を全て奪った': '初めて出会ったあの日から、私の心のすべてを奪い去った',
-  'どこか儚い空気を纏う君は 寂しい目をしてたんだ': 'どこか儚げな雰囲気をまとったあなたは、哀しげな瞳をしていた',
-  'いつだってチックタックと鳴る世界で何度だってさ': '絶え間なく時を刻み続けるこの世界で、何度立ち止まったとしても',
-  '触れる心無い言葉うるさい声に 涙が零れそうでも': '冷たい心ない言葉や喧騒に、涙がこぼれ落ちそうになっても',
-  'ありきたりな喜びきっと二人なら見つけられる': '何気ないささやかな喜びも、二人ならきっと見つけ出せる',
-  '騒がしい日々に笑えない君に 思い付く限り眩しい明日を': '慌ただしい日々に笑顔をなくしたあなたへ、精一杯の眩しい未来を届けたい',
-  '明けない夜に落ちてゆく前に 僕の手を掴んでほら': '明けない夜の闇へと沈んでゆく前に、どうか私の手をしっかりと握って',
-  '忘れてしまいたくて閉じ込めた日々も 抱きしめた温もりで溶かすから': '消し去りたくて閉じ込めていた記憶も、温かい抱擁ですべて溶かしてあげるから',
-  '怖くないよ いつか日が昇るまで 二人でいよう': '何も恐れることはないよ、再び陽が昇るその時まで、ずっと二人でいよう',
-  '無敵の笑顔で荒らすメディア': '誰にも真似できない完璧な笑顔で、メディアを熱狂させる',
-  '知りたいその秘密ミステリアス': '誰もが知りたがる、その謎めいた本当の素顔',
-  '抜けてるとこさえ彼女のエリア': '少し隙のあるところさえ、彼女の計算された魅力',
-  '完璧で嘘つきな君は 天才的なアイドル様': '完璧な嘘で世界を魅了する、天性のカリスマアイドル',
-  '夢ならばどれほどよかったでしょう': 'もしこれが悪い夢だったなら、どれほど救われただろう',
-  '今でもあなたはわたしの光': '今この瞬間も、あなたは私の道を照らす唯一の光',
-  '努力 未来 a beautiful star': 'ひたむきな努力、掴み取る未来、美しく輝く一番星',
-  'ケセラセラ 今日も唱える 限界などないさ': 'なるようになるさ、今日も心に刻む、限界なんて存在しない',
-  'あんなに好きだったのにね': 'あんなにも深く愛し合っていたはずなのにね',
-  '君の怪獣が暴れ出す前に': '胸の中の抑えきれない情熱が溢れ出す前に',
-  '死ぬのがいいわ': 'あなたと離れ離れになるくらいなら、いっそ命果てる方がまし',
-  'きらり 光る風に乗って': 'きらきらと光り輝く爽やかな風に乗って',
-  '夜に駆ける': '二人で夜の闇を駆け抜けてゆく',
-  '怪獣の花唄': 'あの頃の記憶を呼び覚ます、力強い歌声を胸に',
-  '白日': '真っ白な光の中で、すべてをやり直せたら',
-  'subtitle': '言葉にできない想いを、静かに添えて',
-  'pretender': '君の運命の人は、僕じゃないと知っているけれど',
-};
-
-/**
- * Returns Japanese translated subtitle for a given lyric line.
- */
-export function getLyricTranslation(lineText: string): string {
-  if (!lineText || !lineText.trim()) return '';
-  const clean = lineText.trim().toLowerCase().replace(/[.,!?'"~～]/g, '');
-
-  // Exact match from translation dictionary
-  for (const [key, trans] of Object.entries(SONG_LYRIC_TRANSLATIONS)) {
-    if (clean === key || clean.includes(key) || key.includes(clean)) {
-      return trans;
+  // English or Other language -> Japanese
+  for (const [k, v] of Object.entries(EN_OTHER_TO_JA_LYRIC_MAP)) {
+    if (cleanLower === k || cleanLower.includes(k)) {
+      return v;
     }
   }
 
-  // Common English idioms & word translations
-  const englishReplacements: [RegExp, string][] = [
-    [/\bdrifting\b/gi, '漂う'],
-    [/\bevent horizon\b/gi, '事象の地平線'],
-    [/\bphotons\b/gi, '光子'],
-    [/\bquantum\b/gi, '量子'],
-    [/\bfrequencies\b/gi, '周波数'],
-    [/\bhorizon\b/gi, '地平線'],
-    [/\bsynchronization\b/gi, '同期'],
-    [/\bechoes\b/gi, '反響'],
-    [/\bcosmos\b/gi, '宇宙'],
-    [/\bsupernova\b/gi, '超新星'],
-    [/\bparticles\b/gi, '粒子'],
-    [/\bi love you\b/gi, 'あなたを愛している'],
-    [/\bforever\b/gi, '永遠に'],
-    [/\btogether\b/gi, '共に'],
-    [/\btonight\b/gi, '今夜'],
-    [/\bdancing in the dark\b/gi, '暗闇の中で踊り明かそう'],
-    [/\bshining star\b/gi, '輝く星'],
-  ];
-
-  if (/^[-a-zA-Z0-9\s.,!?'"()]+$/.test(lineText.trim())) {
-    let translated = lineText;
-    for (const [re, rep] of englishReplacements) {
-      translated = translated.replace(re, rep);
+  let working = trimmed;
+  let replacedCount = 0;
+  for (const [re, jaRep] of EN_WORD_TO_JA) {
+    if (re.test(working)) {
+      working = working.replace(re, jaRep);
+      replacedCount++;
     }
-    if (translated !== lineText) {
-      return `【訳】${translated}`;
-    }
+  }
+  if (replacedCount > 0 && working !== trimmed) {
+    return working;
   }
 
   return '';
+}
+
+export function generatePronunciationGuide(lineText: string): string {
+  return lineText.trim();
 }

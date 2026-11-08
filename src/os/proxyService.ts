@@ -2457,69 +2457,7 @@ export async function resolveFullLengthAudioStream(
       }
     }
   } catch {
-    // fall through to direct client resolution
-  }
-
-  // 2. Direct client-side resolution via GDStudio NetEase API
-  const fetchDirectGdUrl = async (idToFetch: string): Promise<string | null> => {
-    if (!idToFetch || !/^\d+$/.test(idToFetch)) return null;
-    try {
-      const r = await fetch(
-        `https://music-api.gdstudio.xyz/api.php?types=url&source=netease&id=${encodeURIComponent(idToFetch)}&br=${brVal}`,
-        { signal: AbortSignal.timeout(5500) }
-      );
-      if (r.ok) {
-        const d = (await r.json()) as { url?: string };
-        if (d?.url && d.url.startsWith('http')) {
-          return d.url.replace(/^http:\/\//i, 'https://');
-        }
-      }
-    } catch {
-      // ignore
-    }
-    return null;
-  };
-
-  if (cleanId) {
-    const directUrl = await fetchDirectGdUrl(cleanId);
-    if (directUrl) {
-      return {
-        audioUrl: directUrl,
-        format: 'api.monochrome.tf Full-Length Stream',
-        bitrate: `${brVal === 999 ? 'Lossless' : brVal} kbps Hi-Fi`,
-      };
-    }
-  }
-
-  // 3. Search by title + artist on GDStudio NetEase and pick strictly matching track
-  const query = `${title} ${artist}`.trim();
-  if (query) {
-    try {
-      const sRes = await fetch(
-        `https://music-api.gdstudio.xyz/api.php?types=search&source=netease&name=${encodeURIComponent(query)}&count=6&pages=1`,
-        { signal: AbortSignal.timeout(5500) }
-      );
-      if (sRes.ok) {
-        const list = (await sRes.json()) as GdStudioClientTrackItem[];
-        if (Array.isArray(list)) {
-          for (const item of list.slice(0, 4)) {
-            const itemArtist = Array.isArray(item.artist) ? item.artist.join(' ') : String(item.artist || '');
-            if (!isStrictTrackMatchForLyrics(title, artist, item.name, itemArtist)) continue;
-            const candidateId = String(item.url_id || item.id || '');
-            const candidateUrl = await fetchDirectGdUrl(candidateId);
-            if (candidateUrl) {
-              return {
-                audioUrl: candidateUrl,
-                format: 'api.monochrome.tf Full-Length Stream',
-                bitrate: `${brVal === 999 ? 'Lossless' : brVal} kbps Hi-Fi`,
-              };
-            }
-          }
-        }
-      }
-    } catch {
-      // ignore
-    }
+    // ignore
   }
 
   return null;

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   ProxyEngine,
   ProxyRelayNodeId,
@@ -28,16 +28,16 @@ import { backendFetch } from '../backendConfig';
 import { DrumPadTunerView } from './ExtraAppsSuite';
 import { MusicEqualizerPanel } from './MusicEqualizerPanel';
 import {
-  generatePronunciationGuide,
-  calculateLeadInState,
-  KARAOKE_COLOR_THEMES,
-  KaraokeColorTheme,
+  detectLyricLanguage,
+  translateLyricsBatchViaServer,
   getLyricTranslation,
 } from '../karaokeGuide';
 
-type AppleMusicNavId =
-  | 'listen-now'
+type MusicNavId =
+  | 'home'
   | 'browse'
+  | 'collection-detail'
+  | 'playlists'
   | 'mv'
   | 'artist'
   | 'favorites'
@@ -50,6 +50,21 @@ type AppleMusicNavId =
   | 'synth'
   | 'drumpad'
   | 'proxy';
+
+export type CollectionKind = 'PLAYLIST' | 'ALBUM' | 'EP' | 'SINGLE';
+
+export interface MusicCollectionViewData {
+  id: string;
+  kind: CollectionKind;
+  title: string;
+  subtitle: string;
+  creator: string;
+  year: number;
+  artworkUrl: string;
+  coverGradient: string;
+  sourceService?: string;
+  tracks: MonochromeTrack[];
+}
 
 export interface MusicVideoItem {
   id: string;
@@ -181,36 +196,6 @@ const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
     year: 2023,
   },
   {
-    id: 'mv-yoasobi-monster',
-    youtubeId: 'dy90tA3TT1c',
-    title: '怪物 (Monster)',
-    artist: 'YOASOBI',
-    album: 'THE BOOK 2',
-    durationLabel: '3:26',
-    viewsLabel: '3.6億回視聴',
-    year: 2021,
-  },
-  {
-    id: 'mv-yoasobi-gunjou',
-    youtubeId: 'Y4nEEZwckuU',
-    title: '群青 (Gunjou)',
-    artist: 'YOASOBI',
-    album: 'THE BOOK',
-    durationLabel: '4:08',
-    viewsLabel: '2.1億回視聴',
-    year: 2020,
-  },
-  {
-    id: 'mv-yoasobi-shukufuku',
-    youtubeId: '3eytpBOkOFA',
-    title: '祝福 (The Blessing)',
-    artist: 'YOASOBI',
-    album: 'THE BOOK 3',
-    durationLabel: '3:17',
-    viewsLabel: '1.4億回視聴',
-    year: 2022,
-  },
-  {
     id: 'mv-kenshi-kickback',
     youtubeId: 'M2cckDmNLMI',
     title: 'KICK BACK',
@@ -231,36 +216,6 @@ const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
     year: 2018,
   },
   {
-    id: 'mv-kenshi-kanden',
-    youtubeId: 'KFStSc5cTSo',
-    title: '感電 (Kanden)',
-    artist: '米津玄師',
-    album: 'STRAY SHEEP',
-    durationLabel: '4:24',
-    viewsLabel: '2.5億回視聴',
-    year: 2020,
-  },
-  {
-    id: 'mv-kenshi-chikyugi',
-    youtubeId: 'VUsXA__081c',
-    title: '地球儀 (Spinning Globe)',
-    artist: '米津玄師',
-    album: 'LOST CORNER',
-    durationLabel: '4:33',
-    viewsLabel: '5,800万回視聴',
-    year: 2023,
-  },
-  {
-    id: 'mv-kenshi-sayonara',
-    youtubeId: '-ubEP_bB05E',
-    title: 'さよーならまたいつか！',
-    artist: '米津玄師',
-    album: 'LOST CORNER',
-    durationLabel: '3:22',
-    viewsLabel: '6,200万回視聴',
-    year: 2024,
-  },
-  {
     id: 'mv-ado-show',
     youtubeId: 'pgXpM4l_MwI',
     title: '唱 (Show)',
@@ -269,26 +224,6 @@ const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
     durationLabel: '3:12',
     viewsLabel: '2.3億回視聴',
     year: 2023,
-  },
-  {
-    id: 'mv-ado-usseewa',
-    youtubeId: 'Qp3b-RXtz4w',
-    title: 'うっせぇわ (Usseewa)',
-    artist: 'Ado',
-    album: '狂言',
-    durationLabel: '3:26',
-    viewsLabel: '3.4億回視聴',
-    year: 2020,
-  },
-  {
-    id: 'mv-ado-newgenesis',
-    youtubeId: '1FliVTcX8bQ',
-    title: '新時代 (New Genesis)',
-    artist: 'Ado',
-    album: 'ウタの歌 ONE PIECE FILM RED',
-    durationLabel: '3:49',
-    viewsLabel: '2.2億回視聴',
-    year: 2022,
   },
   {
     id: 'mv-higedan-pretender',
@@ -301,26 +236,6 @@ const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
     year: 2019,
   },
   {
-    id: 'mv-higedan-subtitle',
-    youtubeId: 'hN5MBlGv2Ac',
-    title: 'Subtitle',
-    artist: 'Official髭男dism',
-    album: 'Rejoice',
-    durationLabel: '5:14',
-    viewsLabel: '1.9億回視聴',
-    year: 2022,
-  },
-  {
-    id: 'mv-higedan-mixednuts',
-    youtubeId: 'CbH2F0kXgTY',
-    title: 'ミックスナッツ (Mixed Nuts)',
-    artist: 'Official髭男dism',
-    album: 'Rejoice',
-    durationLabel: '3:33',
-    viewsLabel: '1.6億回視聴',
-    year: 2022,
-  },
-  {
     id: 'mv-mga-lilac',
     youtubeId: 'QjrkrVmC-8M',
     title: 'ライラック (Lilac)',
@@ -329,36 +244,6 @@ const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
     durationLabel: '4:05',
     viewsLabel: '1.1億回視聴',
     year: 2024,
-  },
-  {
-    id: 'mv-mga-que-sera',
-    youtubeId: 'Jy-QS27q7lA',
-    title: 'ケセラセラ (Que Sera Sera)',
-    artist: 'Mrs. GREEN APPLE',
-    album: 'ANTENNA',
-    durationLabel: '4:32',
-    viewsLabel: '1.4億回視聴',
-    year: 2023,
-  },
-  {
-    id: 'mv-mga-dancehall',
-    youtubeId: 'x2rvSf0STBM',
-    title: 'ダンスホール (Dancehall)',
-    artist: 'Mrs. GREEN APPLE',
-    album: 'Unity',
-    durationLabel: '3:24',
-    viewsLabel: '1.8億回視聴',
-    year: 2022,
-  },
-  {
-    id: 'mv-mga-aotonatsu',
-    youtubeId: 'm34VTZqqncg',
-    title: '青と夏 (Ao to Natsu)',
-    artist: 'Mrs. GREEN APPLE',
-    album: 'Attitude',
-    durationLabel: '4:30',
-    viewsLabel: '2.1億回視聴',
-    year: 2018,
   },
   {
     id: 'mv-vaundy-kaiju',
@@ -371,26 +256,6 @@ const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
     year: 2020,
   },
   {
-    id: 'mv-vaundy-odoriko',
-    youtubeId: '7HgJIAUtICU',
-    title: '踊り子 (Odoriko)',
-    artist: 'Vaundy',
-    album: 'replica',
-    durationLabel: '3:45',
-    viewsLabel: '1.3億回視聴',
-    year: 2021,
-  },
-  {
-    id: 'mv-vaundy-timeparadox',
-    youtubeId: 'EDnP4h_n0Z0',
-    title: 'タイムパラドックス (Time Paradox)',
-    artist: 'Vaundy',
-    album: 'Time Paradox Single',
-    durationLabel: '3:47',
-    viewsLabel: '7,800万回視聴',
-    year: 2024,
-  },
-  {
     id: 'mv-creepynuts-bling',
     youtubeId: 'mLW35YMzELE',
     title: 'Bling-Bang-Bang-Born',
@@ -401,64 +266,14 @@ const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
     year: 2024,
   },
   {
-    id: 'mv-creepynuts-otonoke',
-    youtubeId: 'ba4bV_3A-Xg',
-    title: 'オトノケ (Otonoke) — ダンダダン OP',
-    artist: 'Creepy Nuts',
-    album: 'Otonoke Single',
-    durationLabel: '3:04',
-    viewsLabel: '6,400万回視聴',
-    year: 2024,
-  },
-  {
-    id: 'mv-creepynuts-nobishiro',
-    youtubeId: 'n_sUo0D4E4I',
-    title: 'のびしろ (Nobishiro)',
-    artist: 'Creepy Nuts',
-    album: 'Case',
-    durationLabel: '3:57',
-    viewsLabel: '8,500万回視聴',
-    year: 2021,
-  },
-  {
-    id: 'mv-fujiikaze-michiteyuku',
-    youtubeId: 'cDS0vU2Fq5s',
-    title: '満ちてゆく (Overflowing)',
-    artist: '藤井 風',
-    album: 'Michiteyuku Single',
-    durationLabel: '5:13',
-    viewsLabel: '6,800万回視聴',
-    year: 2024,
-  },
-  {
-    id: 'mv-fujiikaze-shinunogaiiwa',
-    youtubeId: 'dusrG7hZk78',
-    title: '死ぬのがいいわ (Shinunoga E-Wa)',
-    artist: '藤井 風',
-    album: 'HELP EVER HURT NEVER',
-    durationLabel: '3:08',
-    viewsLabel: '1.2億回視聴',
-    year: 2020,
-  },
-  {
     id: 'mv-kinggnu-specialz',
     youtubeId: 'fhzKLBZJC3w',
-    title: 'SPECIALZ — 呪術廻戦 渋谷事変 OP',
+    title: 'SPECIALZ',
     artist: 'King Gnu',
     album: 'THE GREATEST UNKNOWN',
     durationLabel: '3:58',
     viewsLabel: '1.4億回視聴',
     year: 2023,
-  },
-  {
-    id: 'mv-kinggnu-hakujitsu',
-    youtubeId: 'ony539T074U',
-    title: '白日 (Hakujitsu)',
-    artist: 'King Gnu',
-    album: 'CEREMONY',
-    durationLabel: '4:35',
-    viewsLabel: '4.8億回視聴',
-    year: 2019,
   },
   {
     id: 'mv-daftpunk-onemoretime',
@@ -472,75 +287,145 @@ const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
   },
 ];
 
-const ARTIST_METADATA_MAP: Record<
-  string,
-  Omit<ArtistProfileData, 'name' | 'mvs'>
-> = {
+const ARTIST_METADATA_MAP: Record<string, Omit<ArtistProfileData, 'name' | 'mvs'>> = {
   YOASOBI: {
     englishName: 'Ayase & ikura',
-    genre: 'J-Pop / ボカロ小説音楽ユニット',
+    genre: 'J-Pop',
     monthlyListeners: '1,180万人 / 月',
-    bio: 'コンポーザーのAyaseとボーカルのikuraからなる、「小説を音楽にするユニット」。2019年公開の『夜に駆ける』でストリーミング10億回再生を突破し、『アイドル』『勇者』など世界的ヒットを連発。',
+    bio: 'コンポーザーのAyaseとボーカルのikuraによる音楽ユニット。『夜に駆ける』『アイドル』『勇者』などを発表。',
     bannerGradient: 'from-rose-600 via-fuchsia-600 to-indigo-900',
     avatarUrl: 'https://img.youtube.com/vi/ZRtdQ81jPUQ/hqdefault.jpg',
   },
   米津玄師: {
     englishName: 'Kenshi Yonezu',
-    genre: 'J-Pop / オルタナティブ・ロック',
+    genre: 'J-Pop / Rock',
     monthlyListeners: '960万人 / 月',
-    bio: '作詞・作曲・アレンジ・アートワークまで全てを一人で手掛けるシンガーソングライター。『Lemon』『KICK BACK』『地球儀』『さよーならまたいつか！』など時代を象徴する名曲を多数発表。',
+    bio: 'シンガーソングライター。『Lemon』『KICK BACK』『地球儀』『さよーならまたいつか！』などを発表。',
     bannerGradient: 'from-amber-600 via-orange-700 to-zinc-900',
     avatarUrl: 'https://img.youtube.com/vi/M2cckDmNLMI/hqdefault.jpg',
   },
   Ado: {
-    englishName: 'Ado Official',
-    genre: 'J-Pop / ロック / ボーカロイド・カルチャー',
+    englishName: 'Ado',
+    genre: 'J-Pop / Vocal',
     monthlyListeners: '890万人 / 月',
-    bio: '圧倒的な歌唱力と表現力を持つ歌い手・シンガー。『うっせぇわ』『新時代』『唱』などチャートを席巻し、ワールドツアー「Wish」も成功させた次世代アイコン。',
+    bio: 'シンガー。『うっせぇわ』『新時代』『唱』などを発表。',
     bannerGradient: 'from-blue-700 via-indigo-800 to-slate-950',
     avatarUrl: 'https://img.youtube.com/vi/pgXpM4l_MwI/hqdefault.jpg',
   },
   Official髭男dism: {
     englishName: 'Official HIGE DANdism',
-    genre: 'J-Pop / ピアノ・ポップロック',
+    genre: 'J-Pop / Band',
     monthlyListeners: '780万人 / 月',
-    bio: '藤原聡・小笹大輔・楢﨑誠・松浦匡希の4人組ピアノポップバンド。緻密なメロディと心に刺さる歌詞で『Pretender』『Subtitle』『Mixed Nuts』など数々の国民的ヒットを生む。',
+    bio: '4人組ピアノポップバンド。『Pretender』『Subtitle』『ミックスナッツ』などを発表。',
     bannerGradient: 'from-cyan-600 via-teal-700 to-slate-900',
     avatarUrl: 'https://img.youtube.com/vi/TQ8WlA2GXbk/hqdefault.jpg',
   },
   'Mrs. GREEN APPLE': {
     englishName: 'Mrs. GREEN APPLE',
-    genre: 'J-Pop / シンフォニック・ロック',
+    genre: 'J-Pop / Rock',
     monthlyListeners: '1,020万人 / 月',
-    bio: '大森元貴・若井滉斗・藤澤涼架による3人組ロックバンド。『ケセラセラ』『ダンスホール』『ライラック』『Soranji』など圧倒的なポップセンスでストリーミングチャートを席巻中。',
+    bio: '3人組ロックバンド。『ケセラセラ』『ダンスホール』『ライラック』などを発表。',
     bannerGradient: 'from-emerald-600 via-green-700 to-teal-950',
     avatarUrl: 'https://img.youtube.com/vi/QjrkrVmC-8M/hqdefault.jpg',
   },
   Vaundy: {
     englishName: 'Vaundy',
-    genre: 'J-Pop / R&B / インディーロック',
+    genre: 'J-Pop / R&B / Rock',
     monthlyListeners: '710万人 / 月',
-    bio: '作詞・作曲・編曲のみならず映像監督やデザインも手掛けるマルチアーティスト。『怪獣の花唄』『踊り子』『タイムパラドックス』などジャンルを超越したサウンドを展開。',
+    bio: 'マルチアーティスト。『怪獣の花唄』『踊り子』『タイムパラドックス』などを発表。',
     bannerGradient: 'from-purple-600 via-violet-800 to-zinc-950',
     avatarUrl: 'https://img.youtube.com/vi/UM9XNpgrqVk/hqdefault.jpg',
   },
   'Creepy Nuts': {
     englishName: 'R-指定 & DJ松永',
-    genre: 'Hip-Hop / J-Rap',
+    genre: 'Hip-Hop',
     monthlyListeners: '940万人 / 月',
-    bio: '日本三連覇のラッパー「R-指定」と世界一のターンテーブリスト「DJ松永」によるヒップホップユニット。『Bling-Bang-Bang-Born』『オトノケ』『のびしろ』で世界的なバイラルヒットを記録。',
+    bio: 'ラッパー「R-指定」とDJ「DJ松永」によるヒップホップユニット。『Bling-Bang-Bang-Born』『オトノケ』などを発表。',
     bannerGradient: 'from-yellow-500 via-amber-700 to-zinc-950',
     avatarUrl: 'https://img.youtube.com/vi/mLW35YMzELE/hqdefault.jpg',
   },
   'Daft Punk': {
     englishName: 'Daft Punk',
-    genre: 'French House / Electronic',
+    genre: 'Electronic / House',
     monthlyListeners: '2,150万人 / 月',
-    bio: 'フレンチ・ハウスおよびエレクトロニック・ミュージックの歴史を塗り替えた伝説的デュオ。『Discovery』『Random Access Memories』など不朽の名盤を残す。',
+    bio: 'エレクトロニック・ミュージック・デュオ。『Discovery』『Random Access Memories』などを発表。',
     bannerGradient: 'from-cyan-500 via-blue-700 to-indigo-950',
     avatarUrl: 'https://img.youtube.com/vi/FGBhQbmPwH8/hqdefault.jpg',
   },
 };
+
+const SPOTIFY_SEARCH_CATEGORIES = [
+  {
+    id: 'jpop',
+    title: 'J-Pop',
+    query: 'YOASOBI 米津玄師 Mrs. GREEN APPLE',
+    gradient: 'from-rose-600 to-pink-800',
+    coverUrl: 'https://img.youtube.com/vi/ZRtdQ81jPUQ/hqdefault.jpg',
+  },
+  {
+    id: 'anime',
+    title: 'アニメ & ゲーム',
+    query: 'アニメ 主題歌 LiSA YOASOBI',
+    gradient: 'from-violet-600 to-indigo-900',
+    coverUrl: 'https://img.youtube.com/vi/OIBODIPC_8Y/hqdefault.jpg',
+  },
+  {
+    id: 'vocaloid',
+    title: 'ボカロ / Vocaloid',
+    query: '初音ミク DECO*27 ピノキオピー',
+    gradient: 'from-cyan-500 to-teal-800',
+    coverUrl: 'https://img.youtube.com/vi/pgXpM4l_MwI/hqdefault.jpg',
+  },
+  {
+    id: 'rock',
+    title: 'ロック & バンド',
+    query: 'King Gnu Official髭男dism Vaundy',
+    gradient: 'from-amber-600 to-red-800',
+    coverUrl: 'https://img.youtube.com/vi/TQ8WlA2GXbk/hqdefault.jpg',
+  },
+  {
+    id: 'electronic',
+    title: 'ダンス & EDM',
+    query: 'Daft Punk Avicii Alan Walker',
+    gradient: 'from-blue-600 to-indigo-950',
+    coverUrl: 'https://img.youtube.com/vi/FGBhQbmPwH8/hqdefault.jpg',
+  },
+  {
+    id: 'hiphop',
+    title: 'ヒップホップ',
+    query: 'Creepy Nuts Bling-Bang-Bang-Born',
+    gradient: 'from-orange-500 to-amber-900',
+    coverUrl: 'https://img.youtube.com/vi/mLW35YMzELE/hqdefault.jpg',
+  },
+  {
+    id: 'chill',
+    title: 'Lo-Fi & チル',
+    query: 'Nujabes Lo-Fi Chillhop',
+    gradient: 'from-emerald-600 to-teal-900',
+    coverUrl: 'https://img.youtube.com/vi/UM9XNpgrqVk/hqdefault.jpg',
+  },
+  {
+    id: 'kpop',
+    title: 'K-Pop',
+    query: 'NewJeans ILLIT LE SSERAFIM',
+    gradient: 'from-fuchsia-600 to-purple-900',
+    coverUrl: 'https://img.youtube.com/vi/QjrkrVmC-8M/hqdefault.jpg',
+  },
+  {
+    id: 'citypop',
+    title: 'シティポップ',
+    query: '藤井 風 竹内まりや シティポップ',
+    gradient: 'from-sky-600 to-slate-900',
+    coverUrl: 'https://img.youtube.com/vi/SX_ViT4Ra7k/hqdefault.jpg',
+  },
+  {
+    id: 'classical',
+    title: 'ピアノ & 室内楽',
+    query: '久石譲 坂本龍一 Piano',
+    gradient: 'from-stone-600 to-zinc-900',
+    coverUrl: 'https://img.youtube.com/vi/by4SYYWlhEs/hqdefault.jpg',
+  },
+];
 
 function resolveMvForTrack(track: MonochromeTrack): MusicVideoItem {
   const cleanArtist = cleanPrimaryArtistName(track.artist);
@@ -555,17 +440,17 @@ function resolveMvForTrack(track: MonochromeTrack): MusicVideoItem {
   if (exact) return exact;
   return {
     id: `mv-track-${track.id}`,
-    title: `${track.title} — Official Music Video`,
+    title: `${track.title} — Music Video`,
     artist: cleanArtist,
     album: track.album,
     durationLabel: '3:45',
-    viewsLabel: 'Monochrome Official MV',
+    viewsLabel: 'Music Video',
     year: 2024,
     thumbnailUrl: track.artworkUrl,
   };
 }
 
-function resolveInitialNav(tab?: string): AppleMusicNavId {
+function resolveInitialNav(tab?: string): MusicNavId {
   if (tab === 'drumpad' || tab === 'tuner') return 'drumpad';
   if (tab === 'eq' || tab === 'equalizer' || tab === 'aieq') return 'eq';
   if (tab === 'mv') return 'mv';
@@ -575,7 +460,8 @@ function resolveInitialNav(tab?: string): AppleMusicNavId {
   if (tab === 'monochrome-web') return 'monochrome-web';
   if (tab === 'synth') return 'synth';
   if (tab === 'proxy') return 'proxy';
-  return 'browse';
+  if (tab === 'browse' || tab === 'search') return 'browse';
+  return 'home';
 }
 
 const INITIAL_ENRICHED_CATALOG: MonochromeTrack[] = MONOCHROME_CATALOG.map((t) => ({
@@ -583,7 +469,6 @@ const INITIAL_ENRICHED_CATALOG: MonochromeTrack[] = MONOCHROME_CATALOG.map((t) =
   lyrics: enrichLyricsWithWordTiming(t.lyrics, t.duration),
 }));
 
-// Upgrade any legacy cached tracks in localStorage so every track plays its own exact full-length stream
 function sanitizeStoredTracks(list: MonochromeTrack[]): MonochromeTrack[] {
   return list
     .filter((item) => item && item.title && !item.id.startsWith('track-'))
@@ -613,13 +498,13 @@ function sanitizeStoredTracks(list: MonochromeTrack[]): MonochromeTrack[] {
     });
 }
 
-// Apple Music cubic-bezier(0.22, 1, 0.36, 1) spring approximation
 function easeAppleMusicSpring(t: number): number {
   return 1 - Math.pow(1 - t, 3.6);
 }
 
 const FAVORITES_STORAGE_KEY = 'glassium_apple_music_favorites_v3';
 const RECENT_STORAGE_KEY = 'glassium_apple_music_recent_v3';
+const CUSTOM_PLAYLISTS_STORAGE_KEY = 'glassium_music_playlists_u4';
 
 const POPULAR_ARTIST_SHORTCUTS = [
   'YOASOBI',
@@ -632,10 +517,83 @@ const POPULAR_ARTIST_SHORTCUTS = [
   'Daft Punk',
 ];
 
-export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {}) {
-  const { openApp } = useOS();
+const BUILTIN_COLLECTIONS: MusicCollectionViewData[] = [
+  {
+    id: 'pl-jpop-hits',
+    kind: 'PLAYLIST',
+    title: 'Tokyo Top Hits',
+    subtitle: '日本のストリーミングチャート上位曲を集めたプレイリスト',
+    creator: 'Glassium Music',
+    year: 2025,
+    artworkUrl: INITIAL_ENRICHED_CATALOG[0]?.artworkUrl || 'https://img.youtube.com/vi/ZRtdQ81jPUQ/hqdefault.jpg',
+    coverGradient: 'from-rose-600 via-fuchsia-800 to-slate-950',
+    sourceService: 'GlassiumOS',
+    tracks: INITIAL_ENRICHED_CATALOG.slice(0, 6),
+  },
+  {
+    id: 'pl-night-drive',
+    kind: 'PLAYLIST',
+    title: 'Midnight Liquid Drive',
+    subtitle: '夜のドライブや作業に合うエレクトロ・J-Popミックス',
+    creator: 'Glassium Music',
+    year: 2025,
+    artworkUrl: INITIAL_ENRICHED_CATALOG[1]?.artworkUrl || 'https://img.youtube.com/vi/by4SYYWlhEs/hqdefault.jpg',
+    coverGradient: 'from-cyan-600 via-indigo-900 to-slate-950',
+    sourceService: 'GlassiumOS',
+    tracks: INITIAL_ENRICHED_CATALOG.slice(1, 7),
+  },
+  {
+    id: 'alb-the-book-3',
+    kind: 'ALBUM',
+    title: 'THE BOOK 3',
+    subtitle: 'YOASOBI · アルバム',
+    creator: 'YOASOBI',
+    year: 2023,
+    artworkUrl: INITIAL_ENRICHED_CATALOG[0]?.artworkUrl || 'https://img.youtube.com/vi/ZRtdQ81jPUQ/hqdefault.jpg',
+    coverGradient: 'from-pink-600 via-rose-900 to-zinc-950',
+    tracks: INITIAL_ENRICHED_CATALOG.filter((t) => t.artist.includes('YOASOBI')),
+  },
+  {
+    id: 'ep-lost-corner',
+    kind: 'EP',
+    title: 'LOST CORNER Sessions',
+    subtitle: '米津玄師 · EP',
+    creator: '米津玄師',
+    year: 2024,
+    artworkUrl: 'https://img.youtube.com/vi/M2cckDmNLMI/hqdefault.jpg',
+    coverGradient: 'from-amber-600 via-orange-900 to-zinc-950',
+    tracks: INITIAL_ENRICHED_CATALOG.filter((t) => t.artist.includes('米津玄師') || t.title.includes('Lemon')),
+  },
+  {
+    id: 'single-bling',
+    kind: 'SINGLE',
+    title: 'Bling-Bang-Bang-Born',
+    subtitle: 'Creepy Nuts · シングル',
+    creator: 'Creepy Nuts',
+    year: 2024,
+    artworkUrl: 'https://img.youtube.com/vi/mLW35YMzELE/hqdefault.jpg',
+    coverGradient: 'from-yellow-500 via-amber-800 to-zinc-950',
+    tracks: INITIAL_ENRICHED_CATALOG.filter((t) => t.artist.includes('Creepy') || t.title.includes('Bling')),
+  },
+  {
+    id: 'alb-discovery',
+    kind: 'ALBUM',
+    title: 'Discovery',
+    subtitle: 'Daft Punk · アルバム',
+    creator: 'Daft Punk',
+    year: 2001,
+    artworkUrl: 'https://img.youtube.com/vi/FGBhQbmPwH8/hqdefault.jpg',
+    coverGradient: 'from-blue-600 via-indigo-900 to-black',
+    tracks: INITIAL_ENRICHED_CATALOG.slice(-4),
+  },
+];
 
-  const [activeNav, setActiveNav] = useState<AppleMusicNavId>(() => resolveInitialNav(initialTab));
+export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {}) {
+  const { resolvedAccentHex } = useOS();
+
+  const [activeNav, setActiveNav] = useState<MusicNavId>(() => resolveInitialNav(initialTab));
+  const [previousNav, setPreviousNav] = useState<MusicNavId>('home');
+  const [homeFilterChip, setHomeFilterChip] = useState<'all' | 'music' | 'playlists' | 'albums'>('all');
   const [showLyricsDrawer, setShowLyricsDrawer] = useState<boolean>(false);
   const [isArtworkMaximized, setIsArtworkMaximized] = useState<boolean>(false);
   const [selectedArtistName, setSelectedArtistName] = useState<string>('YOASOBI');
@@ -646,20 +604,54 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const [isFetchingMv, setIsFetchingMv] = useState<boolean>(false);
   const [customMvYoutubeInput, setCustomMvYoutubeInput] = useState<string>('');
 
+  // Collection Detail State (2nd Image Layout for Playlists / Albums / EPs / Singles)
+  const [selectedCollection, setSelectedCollection] = useState<MusicCollectionViewData>(
+    BUILTIN_COLLECTIONS[0]
+  );
+
+  // User Imported / Custom Playlists State
+  const [userPlaylists, setUserPlaylists] = useState<MusicCollectionViewData[]>(() => {
+    try {
+      const saved = localStorage.getItem(CUSTOM_PLAYLISTS_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(CUSTOM_PLAYLISTS_STORAGE_KEY, JSON.stringify(userPlaylists));
+    } catch {
+      // ignore
+    }
+  }, [userPlaylists]);
+
+  // External Playlist Import Modal State
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importService, setImportService] = useState<'Spotify' | 'Apple Music' | 'YouTube Music' | 'URL / テキスト'>('Spotify');
+  const [importPlaylistName, setImportPlaylistName] = useState('');
+  const [importSourceUrlOrText, setImportSourceUrlOrText] = useState('');
+  const [isImportingPlaylist, setIsImportingPlaylist] = useState(false);
+
   useEffect(() => {
     if (initialTab) setActiveNav(resolveInitialNav(initialTab));
   }, [initialTab]);
 
   // Proxy Engine, Wisp v1 & Relay Server State
-  const [proxyEngine, setProxyEngine] = useState<ProxyEngine>('scramjet');
+  const [proxyEngine] = useState<ProxyEngine>('scramjet');
   const [relayNode, setRelayNode] = useState<ProxyRelayNodeId>('auto');
   const [wispServer, setWispServer] = useState<string>(WISP_SERVER_PRESETS[0].wispUrl);
   const [customWispUrlInput, setCustomWispUrlInput] = useState<string>('');
-  const [activeRelayLabel, setActiveRelayLabel] = useState<string>('Wisp v1 + SW (api.monochrome.tf)');
-  const [proxyLatency, setProxyLatency] = useState(8);
+  const [, setActiveRelayLabel] = useState<string>('api.monochrome.tf');
+  const [, setProxyLatency] = useState(11);
   const [isBuffering, setIsBuffering] = useState(false);
 
-  // Track Catalog State & Exact Active Track Selection (Never mismatched by index shifts)
+  // Track Catalog State
   const [tracks, setTracks] = useState<MonochromeTrack[]>(INITIAL_ENRICHED_CATALOG);
   const [currentTrackId, setCurrentTrackId] = useState<string>(INITIAL_ENRICHED_CATALOG[0].id);
   const [activeTrackOverride, setActiveTrackOverride] = useState<MonochromeTrack | null>(null);
@@ -673,7 +665,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     return tracks[0] ?? INITIAL_ENRICHED_CATALOG[0];
   }, [tracks, currentTrackId, activeTrackOverride]);
 
-  // Favorites State (Persisted in localStorage)
+  // Favorites State
   const [favoriteTracks, setFavoriteTracks] = useState<MonochromeTrack[]>(() => {
     try {
       const raw = localStorage.getItem(FAVORITES_STORAGE_KEY);
@@ -685,12 +677,12 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         }
       }
     } catch {
-      // ignore storage read error
+      // ignore
     }
     return [INITIAL_ENRICHED_CATALOG[0]];
   });
 
-  // Recently Played State (Persisted in localStorage)
+  // Recently Played State
   const [recentTracks, setRecentTracks] = useState<MonochromeTrack[]>(() => {
     try {
       const raw = localStorage.getItem(RECENT_STORAGE_KEY);
@@ -704,14 +696,14 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     } catch {
       // ignore
     }
-    return INITIAL_ENRICHED_CATALOG.slice(0, 4);
+    return INITIAL_ENRICHED_CATALOG.slice(0, 6);
   });
 
   useEffect(() => {
     try {
       localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteTracks));
     } catch {
-      // ignore storage write error
+      // ignore
     }
   }, [favoriteTracks]);
 
@@ -739,7 +731,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     });
   }, []);
 
-  // High-Precision Playback State (60fps resolution)
+  // Playback State
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [lyricOffsetSec, setLyricOffsetSec] = useState(0);
@@ -756,11 +748,40 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const [lastSearchedQuery, setLastSearchedQuery] = useState('');
   const [isSearchingOnline, setIsSearchingOnline] = useState(false);
   const [isFetchingLyrics, setIsFetchingLyrics] = useState(false);
-  const [statusBanner, setStatusBanner] = useState<string>(
-    'Apple Music JP 公式カタログ (歌ってみた・カバー除外) + 320kbps フル尺ストリーム & LRCLIB 同期歌詞'
-  );
+  const [statusBanner, setStatusBanner] = useState<string>('ストリーミング準備完了');
 
-  // api.monochrome.tf / monochrome.tf Web Proxy State (Wisp + UV/Scramjet SW)
+  // Lyric Translation State (JA -> EN, EN -> JA, Other -> JA)
+  const [showLyricsTranslation, setShowLyricsTranslation] = useState<boolean>(true);
+  const [serverLyricTranslations, setServerLyricTranslations] = useState<Record<string, string>>({});
+  const [isTranslatingLyrics, setIsTranslatingLyrics] = useState<boolean>(false);
+
+  // Translate lyrics whenever currentTrack.lyrics changes
+  useEffect(() => {
+    let cancelled = false;
+    const rawLines = (currentTrack.lyrics || [])
+      .filter((l) => !l.isInterlude && l.text && l.text.trim())
+      .map((l) => l.text.trim());
+    if (rawLines.length === 0) return;
+
+    setIsTranslatingLyrics(true);
+    translateLyricsBatchViaServer(rawLines)
+      .then((map) => {
+        if (!cancelled) {
+          setServerLyricTranslations((prev) => ({ ...prev, ...map }));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsTranslatingLyrics(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentTrack.id, currentTrack.lyrics]);
+
+  // Web Proxy State
   const [monoWebUrl, setMonoWebUrl] = useState<string>('https://monochrome.tf');
   const [monoWebSwSrc, setMonoWebSwSrc] = useState<string>('');
   const [monoWebSrcDoc, setMonoWebSrcDoc] = useState<string>('');
@@ -772,14 +793,12 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const [harmonics, setHarmonics] = useState(3);
   const [filterCutoff, setFilterCutoff] = useState(1400);
 
-  // Audio Context & Nodes Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const filterNodeRef = useRef<BiquadFilterNode | null>(null);
   const analyserNodeRef = useRef<AnalyserNode | null>(null);
 
-  // Procedural Synth Music Engine & 60fps Sync Refs
   const oscNodesRef = useRef<OscillatorNode[]>([]);
   const musicIntervalRef = useRef<number | null>(null);
   const rafSyncIdRef = useRef<number | null>(null);
@@ -790,27 +809,22 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
   const searchDebounceRef = useRef<number | null>(null);
 
-  // Interactive Custom Lyric Editor State (LRC / TTML / JSON)
   const [showCustomLyricEditor, setShowCustomLyricEditor] = useState(false);
   const [customLyricInput, setCustomLyricInput] = useState('');
 
-  // Music Settings State (Streaming Quality, Source Site, Download Quality, MV Quality, Dolby Atmos)
   const [musicSettings, setMusicSettings] = useState<MusicSettingsConfig>(() => getMusicSettings());
 
-  const updateMusicSettings = useCallback(
-    (patch: Partial<MusicSettingsConfig>) => {
-      const updated = saveMusicSettings(patch);
-      setMusicSettings(updated);
-      if (
-        typeof patch.dolbyAtmosEnabled === 'boolean' ||
-        patch.dolbyAtmosPreset !== undefined
-      ) {
-        globalAudio.setDolbyAtmos(updated.dolbyAtmosEnabled, updated.dolbyAtmosPreset);
-      }
-      return updated;
-    },
-    []
-  );
+  const updateMusicSettings = useCallback((patch: Partial<MusicSettingsConfig>) => {
+    const updated = saveMusicSettings(patch);
+    setMusicSettings(updated);
+    if (
+      typeof patch.dolbyAtmosEnabled === 'boolean' ||
+      patch.dolbyAtmosPreset !== undefined
+    ) {
+      globalAudio.setDolbyAtmos(updated.dolbyAtmosEnabled, updated.dolbyAtmosPreset);
+    }
+    return updated;
+  }, []);
 
   const triggerTrackDownload = useCallback(
     (track: MonochromeTrack, e?: React.MouseEvent) => {
@@ -825,7 +839,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       a.click();
       document.body.removeChild(a);
       setStatusBanner(
-        `ダウンロード開始 (${musicSettings.downloadQuality.toUpperCase()}): ${track.title} — ${track.artist}`
+        `ダウンロード開始 (${musicSettings.downloadQuality.toUpperCase()}): ${track.title}`
       );
     },
     [musicSettings]
@@ -842,12 +856,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     originY: number;
   } | null>(null);
   const lyricFetchSeqRef = useRef<number>(0);
-
-  // Karaoke Engine States
-  const [isKaraokeMode, setIsKaraokeMode] = useState<boolean>(true);
-  const [showPronunciationGuide, setShowPronunciationGuide] = useState<boolean>(true);
-  const [showLyricsTranslation, setShowLyricsTranslation] = useState<boolean>(true);
-  const [karaokeTheme, setKaraokeTheme] = useState<KaraokeColorTheme>('neon-gold');
 
   const handlePillPointerDown = useCallback(
     (e: React.PointerEvent<HTMLElement>) => {
@@ -876,7 +884,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     const dx = e.clientX - pillDragStartRef.current.pointerX;
     const dy = e.clientY - pillDragStartRef.current.pointerY;
 
-    // Dynamic viewport-responsive dragging across entire screen without getting stuck
     const winW = typeof window !== 'undefined' ? window.innerWidth : 1200;
     const winH = typeof window !== 'undefined' ? window.innerHeight : 800;
     const maxHalfW = Math.max(300, Math.round(winW / 2 - 30));
@@ -917,7 +924,10 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           ...aState.track!,
           duration: realDur,
           lyrics:
-            prev && prev.id === aState.track!.id && prev.lyrics && prev.lyrics.length > aState.track!.lyrics.length
+            prev &&
+            prev.id === aState.track!.id &&
+            prev.lyrics &&
+            prev.lyrics.length > aState.track!.lyrics.length
               ? prev.lyrics
               : aState.track!.lyrics,
         }));
@@ -933,11 +943,9 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     return () => clearInterval(timer);
   }, []);
 
-  // Show all online search results when a search was executed, or filter locally for quick 1-char filter
   const filteredTracks = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return tracks;
-    // If tracks already contain live search results for the active query, return them all without hiding script variants
     if (
       lastSearchedQuery &&
       (lastSearchedQuery.toLowerCase() === q ||
@@ -956,13 +964,11 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     return localMatches.length > 0 ? localMatches : tracks;
   }, [searchQuery, lastSearchedQuery, tracks]);
 
-  // Effective lyric synchronization time
   const effectiveLyricTime = useMemo(
     () => Math.max(0, currentTime + lyricOffsetSec),
     [currentTime, lyricOffsetSec]
   );
 
-  // Find currently active lyric line based on effectiveLyricTime
   const currentLyricIndex = useMemo(() => {
     if (!currentTrack.lyrics || currentTrack.lyrics.length === 0) return -1;
     let idx = 0;
@@ -976,7 +982,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     return idx;
   }, [effectiveLyricTime, currentTrack.lyrics]);
 
-  // Spring-like cubic-bezier(0.22, 1, 0.36, 1) Smooth Auto-Scroll to center active line
   const scrollToActiveLyric = useCallback(
     (force = false) => {
       if (userScrolledLyrics && !force) return;
@@ -1041,9 +1046,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     }, 3500);
   };
 
-  // -----------------------------------------------------------------------
-  // Procedural Hi-Fi Music Synthesis Engine + HTML5 Audio Stream Engine
-  // -----------------------------------------------------------------------
   const stopAllAudio = useCallback(() => {
     if (musicIntervalRef.current) {
       clearInterval(musicIntervalRef.current);
@@ -1054,13 +1056,12 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         node.stop();
         node.disconnect();
       } catch {
-        // Ignore stop error
+        // ignore
       }
     });
     oscNodesRef.current = [];
   }, []);
 
-  // Fetch Strictly Verified Synchronized Lyrics from /api/music/lyrics & LRCLIB
   const loadLyricsForTrack = useCallback(async (track: MonochromeTrack) => {
     const reqSeq = ++lyricFetchSeqRef.current;
     setIsFetchingLyrics(true);
@@ -1085,12 +1086,9 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         setActiveTrackOverride((prev) =>
           prev && prev.id === track.id ? { ...prev, lyrics: synced } : prev
         );
-        setStatusBanner(
-          `厳密一致の同期歌詞を取得完了: ${track.title} — ${track.artist} (${synced.length}行)`
-        );
       }
     } catch {
-      // keep existing lyrics
+      // keep existing
     } finally {
       if (reqSeq === lyricFetchSeqRef.current) {
         setIsFetchingLyrics(false);
@@ -1098,7 +1096,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     }
   }, []);
 
-  // Load full synchronized LRC lyrics for the initial track on mount
   useEffect(() => {
     const initial = INITIAL_ENRICHED_CATALOG[0];
     if (initial) {
@@ -1106,10 +1103,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     }
   }, [loadLyricsForTrack]);
 
-  // Note: Proxy Service Worker is only registered on demand when opening the Monochrome Web Proxy tab
-  // so it never intercepts or slows down native Music or Entertainment streaming.
-
-  // Load Monochrome Web Proxy Tab via Wisp v1 + Service Worker (/scramjet/* or /uv/service/*)
   const loadMonochromeWebProxy = useCallback(
     async (
       targetUrl = monoWebUrl,
@@ -1126,24 +1119,17 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         setMonoWebSwSrc(swRoute);
         const prefix = engineOverride === 'ultraviolet' ? '/uv/service/' : '/scramjet/';
         setActiveRelayLabel(`Wisp + ${engineOverride.toUpperCase()} SW (${prefix})`);
-        setStatusBanner(
-          `${targetUrl} を Wisp (${wispServer}) + ${engineOverride.toUpperCase()} Service Worker 経由で接続しました`
-        );
         setTimeout(() => setMonoWebLoading(false), 450);
         return;
       }
 
-      setStatusBanner(`Service Worker プロキシで ${targetUrl} を取得中...`);
       try {
         const res = await fetchHtmlViaProxyCascade(targetUrl, node);
         setMonoWebSwSrc('');
         setMonoWebSrcDoc(res.html);
         setActiveRelayLabel(res.usedNode);
-        setStatusBanner(`${targetUrl} をプロキシ中継サーバー [${res.usedNode}] 経由で接続しました`);
       } catch {
-        setStatusBanner(
-          `${targetUrl} の中継に失敗しました。プロキシノードを切り替えて再試行してください`
-        );
+        // ignore
       } finally {
         setMonoWebLoading(false);
       }
@@ -1157,9 +1143,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     }
   }, [activeNav, loadMonochromeWebProxy, monoWebLoading, monoWebSrcDoc, monoWebSwSrc, monoWebUrl, proxyEngine, relayNode]);
 
-  // -----------------------------------------------------------------------
-  // Playback Toggle & Track Changing (Exact Song Full-Length Stream via Global Audio)
-  // -----------------------------------------------------------------------
   const startTrackPlayback = useCallback(
     (track: MonochromeTrack, startAtSec = 0) => {
       stopAllAudio();
@@ -1174,7 +1157,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const playTrack = useCallback(
     (trackToPlay: MonochromeTrack) => {
       const rawIdStr = String(trackToPlay.monoTrackId || trackToPlay.id || '').trim();
-      const isNonNetease = /^(?:mono-itunes-|itunes-|album-|single-|artist-)/i.test(rawIdStr);
+      const isNonNetease = /^(?:mono-itunes-|itunes-|album-|single-|artist-|imp-)/i.test(rawIdStr);
       const cleanNumericId = isNonNetease
         ? ''
         : rawIdStr
@@ -1213,20 +1196,17 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       setUserScrolledLyrics(false);
       fullPlayheadRef.current = 0;
 
-      // Always fetch verified full-length synchronized LRC lyrics for the playing track
       loadLyricsForTrack(normalizedTrack);
-
       startTrackPlayback(normalizedTrack, 0);
     },
     [loadLyricsForTrack, startTrackPlayback]
   );
 
-  // Search Live Tracks (Fast <400ms via /api/music/search + GDStudio/iTunes JP)
   const handleOnlineMusicSearch = useCallback(
     async (qOverride?: string) => {
       const q = (qOverride ?? searchQuery).trim() || 'YOASOBI';
       setIsSearchingOnline(true);
-      setStatusBanner(`"${q}" のフル尺ストリームと同期歌詞を検索中...`);
+      setStatusBanner(`"${q}" を検索中...`);
       try {
         const liveResults = await searchMonochromeLiveTracks(q);
         if (liveResults.length > 0) {
@@ -1237,7 +1217,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           setLastSearchedQuery(q);
           setTracks(enrichedLive);
 
-          // Only switch selected track if not currently playing another song
           if (!isPlaying) {
             setCurrentTrackId(enrichedLive[0].id);
             setActiveTrackOverride(enrichedLive[0]);
@@ -1249,29 +1228,23 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           if (
             activeNav !== 'songs' &&
             activeNav !== 'browse' &&
-            activeNav !== 'listen-now' &&
+            activeNav !== 'home' &&
             activeNav !== 'artist'
           ) {
             setActiveNav('browse');
           }
-          setStatusBanner(
-            `"${q}" の検索結果: ${enrichedLive.length} 曲 — クリックするとその曲がフル尺再生されます`
-          );
+          setStatusBanner(`"${q}" の検索結果: ${enrichedLive.length} 曲`);
         } else {
-          setStatusBanner(
-            `"${q}" の楽曲が見つかりませんでした。別のアーティスト名や曲名をお試しください`
-          );
+          setStatusBanner(`"${q}" の楽曲が見つかりませんでした`);
         }
       } catch {
-        setStatusBanner('検索中にエラーが発生しました。もう一度お試しください');
+        setStatusBanner('検索中にエラーが発生しました');
       } finally {
         setIsSearchingOnline(false);
       }
     },
     [activeNav, isPlaying, loadLyricsForTrack, searchQuery]
   );
-
-  const [showBrowseEqPanel, setShowBrowseEqPanel] = useState<boolean>(true);
 
   // Auto-search with 420ms debounce when typing in the search box
   useEffect(() => {
@@ -1313,14 +1286,11 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     }
   }, [currentTrack, currentTime, isPlaying, startTrackPlayback]);
 
-  const seekToSeconds = useCallback(
-    (targetSec: number) => {
-      globalAudio.seek(targetSec);
-      setCurrentTime(targetSec);
-      setUserScrolledLyrics(false);
-    },
-    []
-  );
+  const seekToSeconds = useCallback((targetSec: number) => {
+    globalAudio.seek(targetSec);
+    setCurrentTime(targetSec);
+    setUserScrolledLyrics(false);
+  }, []);
 
   const nextTrack = useCallback(() => {
     const currentIdx = tracks.findIndex((t) => t.id === currentTrack.id);
@@ -1346,18 +1316,171 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     if (prevItem) playTrack(prevItem);
   }, [currentTime, currentTrack.id, playTrack, seekToSeconds, tracks]);
 
-  // -----------------------------------------------------------------------
-  // Real-Time Artwork Pattern & 4-Quadrant Color Extraction Engine
-  // Extracts dominant colors from the 4 quadrants of currentTrack.artworkUrl
-  // (with deterministic fallback from coverGradient) to drive moving gradients.
-  // -----------------------------------------------------------------------
+  // Open a Playlist / Album / EP / Single in the 2nd-Image Spotify Detail View
+  const openCollectionDetail = useCallback(
+    async (collection: MusicCollectionViewData, fetchCollectionId?: string) => {
+      if (activeNav !== 'collection-detail') {
+        setPreviousNav(activeNav);
+      }
+      setSelectedCollection(collection);
+      setActiveNav('collection-detail');
+
+      if (fetchCollectionId || collection.tracks.length === 0) {
+        try {
+          const resp = await backendFetch(
+            `/api/music/album?collectionId=${encodeURIComponent(
+              fetchCollectionId || ''
+            )}&album=${encodeURIComponent(collection.title)}&artist=${encodeURIComponent(
+              collection.creator
+            )}`
+          );
+          if (resp.ok) {
+            const data = await resp.json();
+            if (Array.isArray(data.tracks) && data.tracks.length > 0) {
+              const mapped: MonochromeTrack[] = data.tracks.map(
+                (item: Record<string, unknown>, idx: number) => ({
+                  id: String(item.id || `col-t-${idx}`),
+                  monoTrackId: String(item.monoTrackId || ''),
+                  title: String(item.title || 'Track'),
+                  artist: String(item.artist || collection.creator),
+                  album: String(item.album || collection.title),
+                  coverGradient: collection.coverGradient,
+                  coverAccent: resolvedAccentHex,
+                  artworkUrl: item.artworkUrl
+                    ? String(item.artworkUrl)
+                    : collection.artworkUrl,
+                  audioUrl: String(
+                    item.audioUrl ||
+                      `/api/music/play?title=${encodeURIComponent(
+                        String(item.title || '')
+                      )}&artist=${encodeURIComponent(collection.creator)}`
+                  ),
+                  isFullLengthStream: true,
+                  duration: Number(item.duration) || 215,
+                  format: 'Full-Length Stream',
+                  bitrate: '320 kbps',
+                  genre: String(item.genre || collection.kind),
+                  year: Number(item.year) || collection.year,
+                  lyrics: enrichLyricsWithWordTiming(
+                    [
+                      {
+                        time: 0,
+                        text: `${String(item.title || '')} — ${collection.creator}`,
+                      },
+                    ],
+                    Number(item.duration) || 215
+                  ),
+                })
+              );
+              setSelectedCollection((prev) => ({
+                ...prev,
+                tracks: mapped,
+              }));
+            }
+          }
+        } catch {
+          // keep existing tracks
+        }
+      }
+    },
+    [activeNav, resolvedAccentHex]
+  );
+
+  // Import Playlist from External Service (Spotify / Apple Music / YouTube Music / Text)
+  const handleImportExternalPlaylist = useCallback(
+    async (e?: React.FormEvent, presetQuery?: { service: 'Spotify' | 'Apple Music' | 'YouTube Music'; name: string; rawText: string }) => {
+      if (e) e.preventDefault();
+      const targetService = presetQuery?.service || importService;
+      const targetName = (presetQuery?.name || importPlaylistName).trim() || `${targetService} インポート`;
+      const targetRaw = (presetQuery?.rawText || importSourceUrlOrText).trim();
+      if (!targetRaw) return;
+
+      setIsImportingPlaylist(true);
+      try {
+        const resp = await backendFetch('/api/music/import-playlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            service: targetService,
+            name: targetName,
+            urlOrText: targetRaw,
+          }),
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data && data.playlist && Array.isArray(data.playlist.tracks)) {
+            const importedTracks: MonochromeTrack[] = data.playlist.tracks.map(
+              (t: Record<string, unknown>, idx: number) => ({
+                id: String(t.id || `imp-${Date.now()}-${idx}`),
+                monoTrackId: String(t.monoTrackId || ''),
+                title: String(t.title || 'Track'),
+                artist: String(t.artist || 'Artist'),
+                album: String(t.album || targetName),
+                coverGradient: 'from-emerald-600 via-teal-900 to-slate-950',
+                coverAccent: resolvedAccentHex,
+                artworkUrl: t.artworkUrl ? String(t.artworkUrl) : INITIAL_ENRICHED_CATALOG[0]?.artworkUrl,
+                audioUrl: String(
+                  t.audioUrl ||
+                    `/api/music/play?title=${encodeURIComponent(
+                      String(t.title || '')
+                    )}&artist=${encodeURIComponent(String(t.artist || ''))}`
+                ),
+                isFullLengthStream: true,
+                duration: Number(t.duration) || 210,
+                format: 'Imported Track',
+                bitrate: '320 kbps',
+                genre: 'Playlist',
+                year: Number(t.year) || 2025,
+                lyrics: enrichLyricsWithWordTiming(
+                  [{ time: 0, text: `${String(t.title || '')} — ${String(t.artist || '')}` }],
+                  Number(t.duration) || 210
+                ),
+              })
+            );
+
+            const newCollection: MusicCollectionViewData = {
+              id: `pl-imported-${Date.now()}`,
+              kind: 'PLAYLIST',
+              title: String(data.playlist.name || targetName),
+              subtitle: `${targetService} からインポートしたプレイリスト`,
+              creator: `${targetService} Import`,
+              year: new Date().getFullYear(),
+              artworkUrl:
+                importedTracks[0]?.artworkUrl ||
+                INITIAL_ENRICHED_CATALOG[0]?.artworkUrl ||
+                '',
+              coverGradient: 'from-emerald-600 via-cyan-800 to-slate-950',
+              sourceService: targetService,
+              tracks: importedTracks.length > 0 ? importedTracks : INITIAL_ENRICHED_CATALOG.slice(0, 5),
+            };
+
+            setUserPlaylists((prev) => [newCollection, ...prev]);
+            setShowImportModal(false);
+            setImportPlaylistName('');
+            setImportSourceUrlOrText('');
+            openCollectionDetail(newCollection);
+            setStatusBanner(
+              `${targetService} から「${newCollection.title}」(${newCollection.tracks.length}曲) をインポートしました`
+            );
+          }
+        }
+      } catch {
+        setStatusBanner('プレイリストのインポートに失敗しました');
+      } finally {
+        setIsImportingPlaylist(false);
+      }
+    },
+    [importPlaylistName, importService, importSourceUrlOrText, openCollectionDetail, resolvedAccentHex]
+  );
+
+  // Artwork Palette Extraction
   const [artworkPalette, setArtworkPalette] = useState<{
     c1: string;
     c2: string;
     c3: string;
     c4: string;
   }>({
-    c1: '#fa243c',
+    c1: resolvedAccentHex,
     c2: '#8b5cf6',
     c3: '#06b6d4',
     c4: '#f59e0b',
@@ -1365,46 +1488,18 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
   useEffect(() => {
     let cancelled = false;
-
-    const getFallbackPalette = (grad: string, seedStr: string) => {
+    const getFallbackPalette = (grad: string) => {
       const g = (grad || '').toLowerCase();
-      if (g.includes('rose') || g.includes('pink') || g.includes('red')) {
-        return { c1: '#ff2d55', c2: '#a855f7', c3: '#ec4899', c4: '#fb7185' };
+      if (g.includes('rose') || g.includes('pink')) {
+        return { c1: resolvedAccentHex, c2: '#a855f7', c3: '#ec4899', c4: '#fb7185' };
       }
-      if (g.includes('cyan') || g.includes('blue') || g.includes('sky')) {
+      if (g.includes('cyan') || g.includes('blue')) {
         return { c1: '#06b6d4', c2: '#3b82f6', c3: '#6366f1', c4: '#2dd4bf' };
       }
-      if (g.includes('emerald') || g.includes('teal') || g.includes('green')) {
-        return { c1: '#10b981', c2: '#06b6d4', c3: '#3b82f6', c4: '#34d399' };
-      }
-      if (g.includes('amber') || g.includes('orange') || g.includes('yellow')) {
-        return { c1: '#f59e0b', c2: '#ef4444', c3: '#ec4899', c4: '#fbbf24' };
-      }
-      if (g.includes('violet') || g.includes('purple') || g.includes('indigo') || g.includes('fuchsia')) {
-        return { c1: '#8b5cf6', c2: '#ec4899', c3: '#06b6d4', c4: '#d946ef' };
-      }
-      let hash = 0;
-      for (let i = 0; i < seedStr.length; i++) {
-        hash = (hash * 31 + seedStr.charCodeAt(i)) >>> 0;
-      }
-      const h1 = hash % 360;
-      const h2 = (h1 + 65) % 360;
-      const h3 = (h1 + 145) % 360;
-      const h4 = (h1 + 225) % 360;
-      return {
-        c1: `hsl(${h1}, 85%, 56%)`,
-        c2: `hsl(${h2}, 82%, 54%)`,
-        c3: `hsl(${h3}, 80%, 50%)`,
-        c4: `hsl(${h4}, 85%, 58%)`,
-      };
+      return { c1: resolvedAccentHex, c2: '#06b6d4', c3: '#8b5cf6', c4: '#10b981' };
     };
 
-    const fallback = getFallbackPalette(
-      currentTrack.coverGradient,
-      `${currentTrack.title}-${currentTrack.artist}`
-    );
-    setArtworkPalette(fallback);
-
+    setArtworkPalette(getFallbackPalette(currentTrack.coverGradient));
     if (!currentTrack.artworkUrl) return;
 
     const img = new Image();
@@ -1437,7 +1532,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               const min = Math.min(r, g, b);
               const sat = max === 0 ? 0 : (max - min) / max;
               const lum = (r + g + b) / 3;
-              // Prefer vibrant mid-tone pixels from the artwork pattern
               const w = 1 + sat * 4 + (lum > 25 && lum < 235 ? 1.5 : 0.2);
               rSum += r * w;
               gSum += g * w;
@@ -1445,42 +1539,32 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               weightSum += w;
             }
           }
-          if (weightSum === 0) return '#fa243c';
-          let r = Math.round(rSum / weightSum);
-          let g = Math.round(gSum / weightSum);
-          let b = Math.round(bSum / weightSum);
-          // Boost overly dark colors so the moving gradient remains luminous
-          const avg = (r + g + b) / 3;
-          if (avg < 65) {
-            const boost = 65 / Math.max(1, avg);
-            r = Math.min(255, Math.round(r * boost + 24));
-            g = Math.min(255, Math.round(g * boost + 18));
-            b = Math.min(255, Math.round(b * boost + 30));
-          }
+          if (weightSum === 0) return resolvedAccentHex;
+          const r = Math.min(255, Math.round(rSum / weightSum + 15));
+          const g = Math.min(255, Math.round(gSum / weightSum + 15));
+          const b = Math.min(255, Math.round(bSum / weightSum + 15));
           return `rgb(${r}, ${g}, ${b})`;
         };
 
-        const extracted = {
-          c1: sampleQuadrant(0, 0),
-          c2: sampleQuadrant(1, 0),
-          c3: sampleQuadrant(0, 1),
-          c4: sampleQuadrant(1, 1),
-        };
         if (!cancelled) {
-          setArtworkPalette(extracted);
+          setArtworkPalette({
+            c1: sampleQuadrant(0, 0),
+            c2: sampleQuadrant(1, 0),
+            c3: sampleQuadrant(0, 1),
+            c4: sampleQuadrant(1, 1),
+          });
         }
       } catch {
-        // Keep deterministic fallback palette if canvas is tainted by CORS
+        // ignore CORS canvas taint
       }
     };
     img.src = currentTrack.artworkUrl;
-
     return () => {
       cancelled = true;
     };
-  }, [currentTrack.artworkUrl, currentTrack.coverGradient, currentTrack.title, currentTrack.artist]);
+  }, [currentTrack.artworkUrl, currentTrack.coverGradient, resolvedAccentHex]);
 
-  // Broadcast Now Playing Dock state to OS Desktop & listen for remote dock commands
+  // Broadcast Now Playing Dock state to OS Desktop
   useEffect(() => {
     const activeLyricText =
       currentTrack.lyrics && currentLyricIndex >= 0
@@ -1505,45 +1589,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     );
   }, [isPlaying, currentTrack, currentTime, currentLyricIndex, artworkPalette, volume, isMuted]);
 
-  useEffect(() => {
-    return () => {
-      window.dispatchEvent(
-        new CustomEvent('glassium-music-state', {
-          detail: { isPlaying: false },
-        })
-      );
-    };
-  }, []);
-
-  useEffect(() => {
-    const onMusicCommand = (e: Event) => {
-      const detail = (e as CustomEvent<{ action?: string; artist?: string; volume?: number }>).detail;
-      const cmd = detail?.action;
-      if (cmd === 'toggle-play') {
-        togglePlay();
-      } else if (cmd === 'next') {
-        nextTrack();
-      } else if (cmd === 'prev') {
-        prevTrack();
-      } else if (cmd === 'set-volume' && typeof detail?.volume === 'number') {
-        const v = Math.max(0, Math.min(1, detail.volume));
-        setVolume(v);
-        setIsMuted(v === 0);
-        globalAudio.setVolume(v);
-      } else if (cmd === 'open-artist' && detail?.artist) {
-        const clean = cleanPrimaryArtistName(detail.artist);
-        setSelectedArtistName(clean);
-        setActiveNav('artist');
-      }
-    };
-    window.addEventListener('glassium-music-command', onMusicCommand);
-    return () => window.removeEventListener('glassium-music-command', onMusicCommand);
-  }, [togglePlay, nextTrack, prevTrack]);
-
-  // -----------------------------------------------------------------------
-  // 60fps High-Precision requestAnimationFrame Lyric & Audio Sync Engine
-  // Reads directly from globalAudio.getAudioElement() so currentTime advances smoothly
-  // -----------------------------------------------------------------------
+  // 60fps Audio Sync Loop
   useEffect(() => {
     if (!isPlaying) {
       if (rafSyncIdRef.current !== null) {
@@ -1563,7 +1609,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       const targetFullDuration = Math.max(60, currentTrack.duration || 210);
       let activeSec = fullPlayheadRef.current;
 
-      // Read directly from GlobalAudioManager's HTML5 <audio> element at 60fps
       if (currentTrack.audioUrl && audio) {
         if (!audio.paused && Number.isFinite(audio.currentTime)) {
           activeSec = audio.currentTime;
@@ -1578,45 +1623,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           return;
         }
         fullPlayheadRef.current = activeSec;
-      }
-
-      // Direct 60fps DOM CSS Variable update for active line's word-by-word karaoke gradient wipe
-      const syncTimeWithOffset = Math.max(0, activeSec + lyricOffsetSec);
-      const lyrics = currentTrack.lyrics;
-      if (lyrics && lyrics.length > 0) {
-        let activeIdx = 0;
-        for (let i = 0; i < lyrics.length; i++) {
-          if (syncTimeWithOffset >= lyrics[i].time) {
-            activeIdx = i;
-          } else {
-            break;
-          }
-        }
-        const activeLine = lyrics[activeIdx];
-        if (activeLine && activeLine.words && activeLine.words.length > 0) {
-          for (let wIdx = 0; wIdx < activeLine.words.length; wIdx++) {
-            const w = activeLine.words[wIdx];
-            const wordEl = document.getElementById(`apple-lyric-word-${activeIdx}-${wIdx}`);
-            if (wordEl) {
-              const span = Math.max(0.06, w.end - w.start);
-              const prog = Math.max(0, Math.min(1, (syncTimeWithOffset - w.start) / span));
-              const pct = (prog * 100).toFixed(1) + '%';
-              const isCurrentWord = prog > 0 && prog < 1;
-              const isSungWord = prog >= 1;
-              const lift = isCurrentWord
-                ? `${(-2.4 * Math.sin(prog * Math.PI)).toFixed(2)}px`
-                : isSungWord
-                ? '-0.8px'
-                : '0px';
-              const glow = isCurrentWord ? '12px' : isSungWord ? '4px' : '0px';
-              const scale = isCurrentWord ? '1.03' : '1';
-              wordEl.style.setProperty('--word-progress', pct);
-              wordEl.style.setProperty('--word-lift', lift);
-              wordEl.style.setProperty('--word-glow', glow);
-              wordEl.style.setProperty('--word-scale', scale);
-            }
-          }
-        }
       }
 
       if (audio && audio.ended) {
@@ -1644,9 +1650,8 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         rafSyncIdRef.current = null;
       }
     };
-  }, [isPlaying, currentTrack, isRepeat, lyricOffsetSec, nextTrack, playbackRate]);
+  }, [isPlaying, currentTrack, isRepeat, nextTrack, playbackRate]);
 
-  // Volume, Mute & PlaybackRate adjustments on GlobalAudioManager
   useEffect(() => {
     const targetGain = isMuted ? 0 : volume;
     if (masterGainRef.current && audioCtxRef.current) {
@@ -1656,7 +1661,6 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     globalAudio.setPlaybackRate(playbackRate);
   }, [volume, isMuted, playbackRate]);
 
-  // Synth parameter live updates
   useEffect(() => {
     if (filterNodeRef.current && audioCtxRef.current) {
       const targetFreq = vocalBoost ? Math.min(4800, filterCutoff + 1100) : filterCutoff;
@@ -1664,9 +1668,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     }
   }, [filterCutoff, vocalBoost]);
 
-  // -----------------------------------------------------------------------
   // Visualizer Canvas Loop (for Synth tab)
-  // -----------------------------------------------------------------------
   useEffect(() => {
     if (activeNav !== 'synth') return;
     let raf = 0;
@@ -1710,8 +1712,8 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         const y = h - barHeight;
 
         const barGrad = ctx.createLinearGradient(0, y, 0, h);
-        barGrad.addColorStop(0, '#fa243c');
-        barGrad.addColorStop(1, 'rgba(250, 36, 60, 0.08)');
+        barGrad.addColorStop(0, resolvedAccentHex);
+        barGrad.addColorStop(1, 'rgba(255, 255, 255, 0.06)');
         ctx.fillStyle = barGrad;
         ctx.fillRect(x + 2, y, Math.max(2, barWidth - 4), barHeight);
       }
@@ -1721,7 +1723,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
     render();
     return () => cancelAnimationFrame(raf);
-  }, [isPlaying, currentTrack.audioUrl, activeNav]);
+  }, [isPlaying, currentTrack.audioUrl, activeNav, resolvedAccentHex]);
 
   useEffect(() => {
     return () => {
@@ -1740,502 +1742,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
-  // -----------------------------------------------------------------------
-  // Apple Music Time-Synced Lyrics Panel (60fps + Liquid Glass UI)
-  // -----------------------------------------------------------------------
-  const renderAppleMusicLyricsPanel = (fullScreenMode = false) => {
-    const currentFav = isFavorite(currentTrack.id);
-    return (
-      <div
-        className={`${
-          fullScreenMode
-            ? 'flex-1'
-            : 'w-full lg:w-[420px] xl:w-[460px] border-l border-white/[0.12]'
-        } flex flex-col min-h-0 relative overflow-hidden apple-liquid-glass shrink-0`}
-      >
-        {/* Lyrics Control Header (Liquid Glass Bar) */}
-        <div className="px-5 py-3 border-b border-white/[0.1] bg-white/[0.03] backdrop-blur-2xl flex flex-wrap items-center justify-between gap-2 shrink-0 z-10">
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs font-semibold tracking-tight text-white flex items-center gap-1">
-              <span className="material-symbols-rounded text-sm text-amber-400">mic</span>
-              カラオケ & 同期歌詞
-            </span>
-            <span className="text-[10px] text-white/50 font-mono tabular-nums">
-              · 60fps rAF · {currentTrack.lyrics.length} 行
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5">
-            {/* Karaoke Mode Toggle */}
-            <button
-              type="button"
-              onClick={() => setIsKaraokeMode((v) => !v)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition border flex items-center gap-1 ${
-                isKaraokeMode
-                  ? 'bg-amber-400 text-black border-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
-                  : 'apple-liquid-glass-pill text-white/80 hover:text-white'
-              }`}
-              title="カラオケハイライト表示切替 (色変化エフェクト)"
-            >
-              <span className="material-symbols-rounded text-xs">mic</span>
-              カラオケ
-            </button>
-
-            {/* Pronunciation Guide (Furigana / Romaji) Toggle */}
-            <button
-              type="button"
-              onClick={() => setShowPronunciationGuide((v) => !v)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition border flex items-center gap-1 ${
-                showPronunciationGuide
-                  ? 'bg-cyan-500 text-black border-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.5)]'
-                  : 'apple-liquid-glass-pill text-white/80 hover:text-white'
-              }`}
-              title="ローマ字・発音ガイド表示切替"
-            >
-              <span className="text-[10px] font-mono">あ/A</span>
-              発音ガイド
-            </button>
-
-            {/* Lyrics Translation (歌詞通訳・日本語対訳) Toggle */}
-            <button
-              type="button"
-              onClick={() => setShowLyricsTranslation((v) => !v)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition border flex items-center gap-1 ${
-                showLyricsTranslation
-                  ? 'bg-emerald-400 text-black border-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.5)]'
-                  : 'apple-liquid-glass-pill text-white/80 hover:text-white'
-              }`}
-              title="歌詞通訳・日本語対訳の表示切替"
-            >
-              <span className="material-symbols-rounded text-xs">translate</span>
-              歌詞通訳
-            </button>
-
-            {/* Karaoke Color Theme Selector */}
-            {isKaraokeMode && (
-              <button
-                type="button"
-                onClick={() => {
-                  const themes: KaraokeColorTheme[] = ['neon-gold', 'cyber-cyan', 'ruby-rose', 'rainbow-glow'];
-                  const nextIdx = (themes.indexOf(karaokeTheme) + 1) % themes.length;
-                  setKaraokeTheme(themes[nextIdx]);
-                }}
-                className="px-2 py-1 rounded-md apple-liquid-glass-pill text-[10px] font-mono text-white/90 hover:text-white transition flex items-center gap-1.5"
-                title="カラオケ演出カラーを変更"
-              >
-                <span
-                  className="w-2.5 h-2.5 rounded-full inline-block border border-white/40 shadow-sm"
-                  style={{ background: KARAOKE_COLOR_THEMES[karaokeTheme].activeGradient }}
-                />
-                {KARAOKE_COLOR_THEMES[karaokeTheme].name.split(' ')[0]}
-              </button>
-            )}
-
-            {/* Sync Offset Calibration Controls (-0.2s / 0.0s / +0.2s) */}
-            <div className="flex items-center apple-liquid-glass-pill px-1.5 py-0.5 text-[10px] font-mono tabular-nums rounded-md">
-              <button
-                onClick={() => setLyricOffsetSec((o) => Math.round((o - 0.2) * 10) / 10)}
-                className="px-1.5 py-0.5 hover:bg-white/15 text-white/75 hover:text-white transition"
-                title="歌詞を0.2秒遅らせる"
-              >
-                -0.2s
-              </button>
-              <button
-                onClick={() => setLyricOffsetSec(0)}
-                className={`px-1.5 py-0.5 font-semibold transition ${
-                  lyricOffsetSec === 0 ? 'text-white/90' : 'text-[#fa243c]'
-                }`}
-                title="0.0sにリセット"
-              >
-                {lyricOffsetSec >= 0 ? `+${lyricOffsetSec.toFixed(1)}s` : `${lyricOffsetSec.toFixed(1)}s`}
-              </button>
-              <button
-                onClick={() => setLyricOffsetSec((o) => Math.round((o + 0.2) * 10) / 10)}
-                className="px-1.5 py-0.5 hover:bg-white/15 text-white/75 hover:text-white transition"
-                title="歌詞を0.2秒早める"
-              >
-                +0.2s
-              </button>
-            </div>
-
-            <button
-              onClick={() => {
-                setShowCustomLyricEditor((v) => !v);
-                if (!customLyricInput) {
-                  setCustomLyricInput(JSON.stringify(currentTrack.lyrics.slice(0, 6), null, 2));
-                }
-              }}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition border ${
-                showCustomLyricEditor
-                  ? 'bg-white text-black border-white'
-                  : 'apple-liquid-glass-pill text-white/80 hover:text-white'
-              }`}
-            >
-              データ編集
-            </button>
-
-            <button
-              onClick={() => toggleFavorite(currentTrack)}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition border ${
-                currentFav
-                  ? 'bg-[#fa243c] text-white border-[#fa243c]'
-                  : 'apple-liquid-glass-pill text-white/80 hover:text-white'
-              }`}
-            >
-              {currentFav ? 'お気に入り済' : 'お気に入り'}
-            </button>
-
-            <button
-              onClick={() => loadLyricsForTrack(currentTrack)}
-              disabled={isFetchingLyrics}
-              className="px-2.5 py-1 rounded-md apple-liquid-glass-pill text-[11px] text-white/80 hover:text-white transition"
-            >
-              {isFetchingLyrics ? '同期中...' : '再同期'}
-            </button>
-          </div>
-        </div>
-
-        {/* Custom LRC / TTML / JSON Live Parser & Data Structure Drawer */}
-        {showCustomLyricEditor && (
-          <div className="p-4 border-b border-white/[0.12] bg-black/65 backdrop-blur-3xl space-y-2.5 z-20">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold text-white/90">
-                歌詞データ入力 (LRC / Enhanced LRC / TTML / JSON 単語タイムスタンプ対応)
-              </span>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() =>
-                    setCustomLyricInput(
-                      `[00:00.20]<00:00.20>Drifting <00:01.40>beyond <00:02.60>the <00:03.20>event <00:04.30>horizon\n[00:06.10]<00:06.10>Photons <00:07.20>bent <00:08.00>in an <00:08.80>infinite <00:10.10>ring of light\n[00:12.10]<00:12.10>Monochrome <00:13.80>frequencies <00:15.40>cutting <00:16.50>through vacuum`
-                    )
-                  }
-                  className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-white/80"
-                >
-                  サンプル LRC
-                </button>
-                <button
-                  onClick={() =>
-                    setCustomLyricInput(
-                      `<tt><body><div>\n  <p begin="00:00.20" end="00:05.80"><span begin="00:00.20" end="00:01.40">Drifting</span> <span begin="00:01.40" end="00:02.60">beyond</span> <span begin="00:02.60" end="00:04.30">the event</span> <span begin="00:04.30" end="00:05.80">horizon</span></p>\n  <p begin="00:06.10" end="00:11.80"><span begin="00:06.10" end="00:08.00">Photons bent</span> <span begin="00:08.00" end="00:11.80">in an infinite ring of light</span></p>\n</div></body></tt>`
-                    )
-                  }
-                  className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-white/80"
-                >
-                  サンプル TTML
-                </button>
-                <button
-                  onClick={() =>
-                    setCustomLyricInput(JSON.stringify(currentTrack.lyrics.slice(0, 5), null, 2))
-                  }
-                  className="px-2 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[10px] text-white/80"
-                >
-                  現在JSON
-                </button>
-              </div>
-            </div>
-            <textarea
-              value={customLyricInput}
-              onChange={(e) => setCustomLyricInput(e.target.value)}
-              rows={5}
-              className="w-full rounded-md bg-black/60 border border-white/15 p-2.5 text-[11px] font-mono text-white/90 outline-none focus:border-[#fa243c]"
-              placeholder="LRC, TTML, または JSON 形式の歌詞データを入力..."
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowCustomLyricEditor(false)}
-                className="px-3 py-1 rounded text-xs text-white/60 hover:text-white"
-              >
-                閉じる
-              </button>
-              <button
-                onClick={() => {
-                  const parsed = parseSyncedLyricsUniversal(customLyricInput, currentTrack.duration);
-                  if (parsed.length > 0) {
-                    setTracks((prev) =>
-                      prev.map((t) => (t.id === currentTrack.id ? { ...t, lyrics: parsed } : t))
-                    );
-                    setShowCustomLyricEditor(false);
-                    setStatusBanner(`カスタム同期歌詞 (${parsed.length}行) を適用しました`);
-                  }
-                }}
-                className="px-3.5 py-1 rounded bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-semibold"
-              >
-                歌詞を適用
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Floating Liquid Glass "Return to Auto-Sync" Pill when user scrolls manually */}
-        {userScrolledLyrics && (
-          <div className="absolute top-16 right-5 z-20">
-            <button
-              onClick={() => {
-                setUserScrolledLyrics(false);
-                scrollToActiveLyric(true);
-              }}
-              className="px-4 py-1.5 rounded-full apple-liquid-glass-pill text-white font-semibold text-xs hover:bg-[#fa243c] transition"
-            >
-              現在位置へ戻る
-            </button>
-          </div>
-        )}
-
-        {/* Scrolling Apple Music Time-Synced Lyrics Viewport */}
-        <div
-          ref={lyricsContainerRef}
-          onWheel={handleManualLyricsWheel}
-          onTouchMove={handleManualLyricsWheel}
-          className={`flex-1 overflow-y-auto ${
-            fullScreenMode ? 'px-10 sm:px-16 py-16' : 'px-7 py-12'
-          } space-y-7 select-none`}
-        >
-          <div className="h-12" />
-          {currentTrack.lyrics.map((line: LyricLine, idx: number) => {
-            const isActive = idx === currentLyricIndex;
-            const distance = Math.abs(idx - currentLyricIndex);
-            const isPassed = idx < currentLyricIndex;
-
-            const lineStart = line.time;
-            const lineEnd =
-              line.endTime ??
-              (idx + 1 < currentTrack.lyrics.length
-                ? currentTrack.lyrics[idx + 1].time
-                : currentTrack.duration);
-            const lineDuration = Math.max(0.4, lineEnd - lineStart);
-            const lineProgress = isActive
-              ? Math.max(0, Math.min(1, (effectiveLyricTime - lineStart) / lineDuration))
-              : isPassed
-              ? 1
-              : 0;
-
-            const depthStateClass = isActive
-              ? 'is-active'
-              : distance === 1
-              ? 'is-neighbor'
-              : 'is-inactive';
-
-            // Apple Music Instrumental Interlude (• • •)
-            if (line.isInterlude) {
-              if (!isActive && distance > 1) return null;
-              return (
-                <div
-                  key={`interlude-${idx}`}
-                  id={`apple-lyric-line-${idx}`}
-                  onClick={() => {
-                    seekToSeconds(line.time);
-                    if (!isPlaying) togglePlay();
-                  }}
-                  className={`apple-lyric-line ${depthStateClass} cursor-pointer py-3 px-4 rounded-xl`}
-                >
-                  <div className="flex items-center gap-3">
-                    {[0, 1, 2].map((dotIdx) => {
-                      const dotThreshold = (dotIdx + 1) / 3.4;
-                      const lit = isActive && lineProgress >= dotThreshold - 0.22;
-                      return (
-                        <span
-                          key={dotIdx}
-                          className={`inline-block w-3 h-3 rounded-full transition-all duration-300 ${
-                            lit
-                              ? 'bg-white scale-125 shadow-[0_0_14px_rgba(255,255,255,0.95)]'
-                              : 'bg-white/25 scale-95'
-                          }`}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            }
-
-            const fallbackWords =
-              line.words && line.words.length > 0
-                ? line.words
-                : line.text
-                    .trim()
-                    .split(/(\s+)/)
-                    .filter(Boolean)
-                    .reduce<{ text: string; start: number; end: number }[]>((acc, part, pIdx, arr) => {
-                      const step = lineDuration / Math.max(1, arr.length);
-                      acc.push({
-                        text: part,
-                        start: lineStart + pIdx * step,
-                        end: lineStart + (pIdx + 1) * step,
-                      });
-                      return acc;
-                    }, []);
-
-            const leadIn = calculateLeadInState(line.time, effectiveLyricTime);
-            const pronunciation = showPronunciationGuide ? generatePronunciationGuide(line.text) : '';
-            const translation = showLyricsTranslation ? getLyricTranslation(line.text) : '';
-
-            return (
-              <div
-                key={idx}
-                id={`apple-lyric-line-${idx}`}
-                onClick={() => {
-                  seekToSeconds(line.time);
-                  if (!isPlaying) togglePlay();
-                }}
-                className={`apple-lyric-line ${depthStateClass} group cursor-pointer py-3 px-4 rounded-2xl ${
-                  isActive ? 'bg-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]' : 'hover:bg-white/[0.05]'
-                }`}
-              >
-                {/* Lead-in Timing Indicator (歌い出しタイミング検知・カウントダウン) */}
-                {leadIn.isActive && (
-                  <div className="flex items-center gap-2 mb-2 animate-pulse select-none">
-                    <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border flex items-center gap-1.5 transition-all ${
-                        leadIn.isUrgent
-                          ? 'bg-rose-500/30 text-rose-200 border-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.7)]'
-                          : 'bg-amber-500/25 text-amber-200 border-amber-400/50 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
-                      }`}
-                    >
-                      <span className="material-symbols-rounded text-xs">mic</span>
-                      {leadIn.label}
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      {[1, 2, 3].map((dot) => (
-                        <span
-                          key={dot}
-                          className={`w-2 h-2 rounded-full transition-all duration-200 ${
-                            leadIn.dotsLit >= dot
-                              ? 'bg-amber-400 scale-125 shadow-[0_0_10px_rgba(251,191,36,0.95)]'
-                              : 'bg-white/20 scale-90'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Pronunciation Guide (発音ガイド: ふりがな / ローマ字) */}
-                {showPronunciationGuide && pronunciation && (
-                  <div className="text-[11px] sm:text-xs font-mono font-medium tracking-wider text-amber-300/85 mb-1 select-none flex items-center gap-1.5 opacity-90">
-                    <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-400/30 font-sans leading-none">
-                      発音
-                    </span>
-                    <span className="truncate">{pronunciation}</span>
-                  </div>
-                )}
-
-                <div className="flex items-baseline justify-between gap-4">
-                  <div
-                    className={`font-bold tracking-tight leading-snug ${
-                      fullScreenMode
-                        ? 'text-2xl sm:text-3xl md:text-4xl'
-                        : 'text-xl sm:text-2xl'
-                    }`}
-                  >
-                    {isActive && fallbackWords.length > 0 ? (
-                      <span className="inline">
-                        {fallbackWords.map((w, wIdx) => {
-                          const wSpan = Math.max(0.06, w.end - w.start);
-                          const wProg = Math.max(
-                            0,
-                            Math.min(1, (effectiveLyricTime - w.start) / wSpan)
-                          );
-                          const pct = `${(wProg * 100).toFixed(1)}%`;
-                          const isWordCurrent = wProg > 0 && wProg < 1;
-                          const isWordSung = wProg >= 1;
-                          const lift = isWordCurrent
-                            ? `${(-2.8 * Math.sin(wProg * Math.PI)).toFixed(2)}px`
-                            : isWordSung
-                            ? '-0.8px'
-                            : '0px';
-
-                          return (
-                            <span
-                              key={wIdx}
-                              id={`apple-lyric-word-${idx}-${wIdx}`}
-                              className={`apple-karaoke-word ${
-                                isKaraokeMode ? `karaoke-theme-${karaokeTheme}` : ''
-                              }`}
-                              style={
-                                {
-                                  '--word-progress': pct,
-                                  '--word-lift': lift,
-                                  '--word-glow': isWordCurrent
-                                    ? '14px'
-                                    : isWordSung
-                                    ? '6px'
-                                    : '0px',
-                                  '--word-scale': isWordCurrent ? '1.04' : '1',
-                                } as React.CSSProperties
-                              }
-                            >
-                              {w.text}
-                            </span>
-                          );
-                        })}
-                      </span>
-                    ) : isActive && isKaraokeMode ? (
-                      /* Smooth line-level color sweep when word-level timing is pending */
-                      <span
-                        className="inline-block transition-all duration-75"
-                        style={{
-                          backgroundImage: KARAOKE_COLOR_THEMES[karaokeTheme].activeGradient,
-                          backgroundSize: '100% 100%',
-                          WebkitBackgroundClip: 'text',
-                          backgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          filter: `drop-shadow(0 0 10px ${KARAOKE_COLOR_THEMES[karaokeTheme].glowColor})`,
-                        }}
-                      >
-                        {line.text}
-                      </span>
-                    ) : (
-                      <span className={isActive ? 'text-white' : 'text-white/85'}>
-                        {line.text}
-                      </span>
-                    )}
-                  </div>
-
-                  <span
-                    className={`text-[11px] font-mono tabular-nums shrink-0 transition-opacity ${
-                      isActive
-                        ? 'opacity-75 text-white/75'
-                        : 'opacity-0 group-hover:opacity-70 text-white/50'
-                    }`}
-                  >
-                    {formatSecs(line.time)}
-                  </span>
-                </div>
-
-                {/* Lyrics Translation Subtitle (歌詞の通訳・日本語対訳) */}
-                {showLyricsTranslation && translation && !line.isInterlude && (
-                  <div className="text-xs sm:text-sm text-emerald-300/95 font-medium tracking-normal mt-1.5 mb-0.5 select-none leading-relaxed flex items-center gap-1.5">
-                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 font-sans leading-none shrink-0 shadow-xs">
-                      通訳
-                    </span>
-                    <span className="truncate">{translation}</span>
-                  </div>
-                )}
-
-                {/* Real-time Karaoke Pitch & Rhythm Bar for Active Line */}
-                {isActive && isKaraokeMode && (
-                  <div className="karaoke-pitch-progress-track mt-3 w-full max-w-md">
-                    <div
-                      className="karaoke-pitch-progress-fill"
-                      style={{
-                        width: `${(lineProgress * 100).toFixed(1)}%`,
-                        background: KARAOKE_COLOR_THEMES[karaokeTheme].activeGradient,
-                      }}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-          <div className="h-44" />
-        </div>
-      </div>
-    );
-  };
-
-  // -----------------------------------------------------------------------
-  // Open Official MV or Artist Page Helpers (Fetches real Monochrome / Deezer / iTunes data)
-  // -----------------------------------------------------------------------
+  // Fetch MV & Artist Helpers
   const fetchLiveMvsForQuery = useCallback(
     async (title: string, artist: string, switchActive = true) => {
       const cleanArtist = cleanPrimaryArtistName(artist);
@@ -2243,23 +1750,29 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       setIsFetchingMv(true);
       try {
         const resp = await backendFetch(
-          `/api/music/mv?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(cleanArtist)}&q=${encodeURIComponent(`${cleanArtist} ${title}`.trim())}&quality=${encodeURIComponent(currentSettings.mvQuality)}`
+          `/api/music/mv?title=${encodeURIComponent(title)}&artist=${encodeURIComponent(
+            cleanArtist
+          )}&q=${encodeURIComponent(`${cleanArtist} ${title}`.trim())}&quality=${encodeURIComponent(
+            currentSettings.mvQuality
+          )}`
         );
         if (resp.ok) {
           const data = await resp.json();
           if (Array.isArray(data.mvs) && data.mvs.length > 0) {
-            const mapped: MusicVideoItem[] = data.mvs.map((m: Record<string, unknown>, idx: number) => ({
-              id: String(m.id || `mv-live-${idx}`),
-              videoUrl: m.videoUrl ? String(m.videoUrl) : undefined,
-              youtubeId: m.youtubeId ? String(m.youtubeId) : undefined,
-              title: String(m.title || title || 'Music Video'),
-              artist: String(m.artist || cleanArtist),
-              album: String(m.album || ''),
-              durationLabel: String(m.durationLabel || '3:45'),
-              viewsLabel: String(m.viewsLabel || `Monochrome Official MV (${currentSettings.mvQuality.toUpperCase()})`),
-              year: Number(m.year || 2024),
-              thumbnailUrl: m.thumbnailUrl ? String(m.thumbnailUrl) : undefined,
-            }));
+            const mapped: MusicVideoItem[] = data.mvs.map(
+              (m: Record<string, unknown>, idx: number) => ({
+                id: String(m.id || `mv-live-${idx}`),
+                videoUrl: m.videoUrl ? String(m.videoUrl) : undefined,
+                youtubeId: m.youtubeId ? String(m.youtubeId) : undefined,
+                title: String(m.title || title || 'Music Video'),
+                artist: String(m.artist || cleanArtist),
+                album: String(m.album || ''),
+                durationLabel: String(m.durationLabel || '3:45'),
+                viewsLabel: String(m.viewsLabel || 'Music Video'),
+                year: Number(m.year || 2024),
+                thumbnailUrl: m.thumbnailUrl ? String(m.thumbnailUrl) : undefined,
+              })
+            );
             setLiveMvCatalog((prev) => {
               const existingIds = new Set(mapped.map((x) => x.id));
               return [...mapped, ...prev.filter((p) => !existingIds.has(p.id))].slice(0, 28);
@@ -2271,7 +1784,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           }
         }
       } catch {
-        // ignore network error
+        // ignore
       } finally {
         setIsFetchingMv(false);
       }
@@ -2294,203 +1807,142 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     [fetchLiveMvsForQuery, isPlaying]
   );
 
-  const [selectedArtistAlbum, setSelectedArtistAlbum] = useState<ArtistAlbumItem | null>(null);
-  const [selectedAlbumTracks, setSelectedAlbumTracks] = useState<MonochromeTrack[]>([]);
-  const [isLoadingAlbumTracks, setIsLoadingAlbumTracks] = useState(false);
+  const fetchArtistProfileFromApi = useCallback(
+    async (artistName: string) => {
+      const cleanArtist = cleanPrimaryArtistName(artistName);
+      setIsFetchingArtist(true);
+      try {
+        const resp = await backendFetch(`/api/music/artist?name=${encodeURIComponent(cleanArtist)}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          const apiMvs: MusicVideoItem[] = Array.isArray(data.mvs)
+            ? data.mvs.map((m: Record<string, unknown>, idx: number) => ({
+                id: String(m.id || `artist-mv-${idx}`),
+                videoUrl: m.videoUrl ? String(m.videoUrl) : undefined,
+                youtubeId: m.youtubeId ? String(m.youtubeId) : undefined,
+                title: String(m.title || `${cleanArtist} MV`),
+                artist: String(m.artist || cleanArtist),
+                album: String(m.album || ''),
+                durationLabel: String(m.durationLabel || '3:30'),
+                viewsLabel: String(m.viewsLabel || 'Official MV'),
+                year: Number(m.year || 2024),
+                thumbnailUrl: m.thumbnailUrl ? String(m.thumbnailUrl) : undefined,
+              }))
+            : [];
 
-  const openAlbumTracks = useCallback(async (album: ArtistAlbumItem) => {
-    setSelectedArtistAlbum(album);
-    setIsLoadingAlbumTracks(true);
-    try {
-      const resp = await backendFetch(
-        `/api/music/album?collectionId=${encodeURIComponent(album.collectionId)}&album=${encodeURIComponent(album.title)}&artist=${encodeURIComponent(album.artist)}`
-      );
-      if (resp.ok) {
-        const data = await resp.json();
-        if (Array.isArray(data.tracks) && data.tracks.length > 0) {
-          const mapped: MonochromeTrack[] = data.tracks.map(
-            (item: Record<string, unknown>, idx: number) => ({
-              id: String(item.id || `album-t-${idx}`),
-              monoTrackId: String(item.monoTrackId || ''),
-              title: String(item.title || 'Track'),
-              artist: String(item.artist || album.artist),
-              album: String(item.album || album.title),
-              coverGradient: 'from-rose-950 via-zinc-900 to-black',
-              coverAccent: '#fa243c',
-              artworkUrl: item.artworkUrl ? String(item.artworkUrl) : album.artworkUrl,
-              audioUrl: String(
-                item.audioUrl ||
-                  `/api/music/play?title=${encodeURIComponent(String(item.title || ''))}&artist=${encodeURIComponent(album.artist)}`
-              ),
-              isFullLengthStream: true,
-              duration: Number(item.duration) || 215,
-              format: 'api.monochrome.tf Full-Length Hi-Res Stream',
-              bitrate: '320 kbps Full Track',
-              genre: String(item.genre || album.genre || 'Album'),
-              year: Number(item.year) || album.year,
-              lyrics: enrichLyricsWithWordTiming(
-                [
-                  { time: 0, text: `${String(item.title || '')} — ${album.artist}` },
-                  { time: 3, text: '同期歌詞を読み込み中...' },
-                ],
-                Number(item.duration) || 215
-              ),
-            })
-          );
-          setSelectedAlbumTracks(mapped);
-          return;
-        }
-      }
-      setSelectedAlbumTracks([]);
-    } catch {
-      setSelectedAlbumTracks([]);
-    } finally {
-      setIsLoadingAlbumTracks(false);
-    }
-  }, []);
+          const apiTopTracks: MonochromeTrack[] = Array.isArray(data.topTracks)
+            ? data.topTracks
+                .filter((t: Record<string, unknown>) =>
+                  isSameArtistClient(String(t.artist || cleanArtist), cleanArtist)
+                )
+                .map((t: Record<string, unknown>, idx: number) => {
+                  const dur = Number(t.duration) || 215;
+                  return {
+                    id: String(t.id || `artist-top-${idx}`),
+                    monoTrackId: String(t.monoTrackId || ''),
+                    title: String(t.title || 'Track'),
+                    artist: cleanArtist,
+                    album: String(t.album || 'Single'),
+                    coverGradient: 'from-rose-950 via-zinc-900 to-black',
+                    coverAccent: resolvedAccentHex,
+                    artworkUrl: t.artworkUrl ? String(t.artworkUrl) : undefined,
+                    audioUrl: String(
+                      t.audioUrl ||
+                        `/api/music/play?title=${encodeURIComponent(
+                          String(t.title || '')
+                        )}&artist=${encodeURIComponent(cleanArtist)}`
+                    ),
+                    isFullLengthStream: true,
+                    duration: dur,
+                    format: 'Full-Length Stream',
+                    bitrate: '320 kbps',
+                    genre: String(t.genre || 'J-Pop'),
+                    year: Number(t.year) || 2025,
+                    lyrics: enrichLyricsWithWordTiming(
+                      [{ time: 0, text: `${String(t.title || '')} — ${cleanArtist}` }],
+                      dur
+                    ),
+                  };
+                })
+            : [];
 
-  const fetchArtistProfileFromApi = useCallback(async (artistName: string) => {
-    const cleanArtist = cleanPrimaryArtistName(artistName);
-    setIsFetchingArtist(true);
-    try {
-      const resp = await backendFetch(`/api/music/artist?name=${encodeURIComponent(cleanArtist)}`);
-      if (resp.ok) {
-        const data = await resp.json();
-        const apiMvs: MusicVideoItem[] = Array.isArray(data.mvs)
-          ? data.mvs.map((m: Record<string, unknown>, idx: number) => ({
-              id: String(m.id || `artist-mv-${idx}`),
-              videoUrl: m.videoUrl ? String(m.videoUrl) : undefined,
-              youtubeId: m.youtubeId ? String(m.youtubeId) : undefined,
-              title: String(m.title || `${cleanArtist} MV`),
-              artist: String(m.artist || cleanArtist),
-              album: String(m.album || ''),
-              durationLabel: String(m.durationLabel || '3:30'),
-              viewsLabel: String(m.viewsLabel || 'Monochrome Official MV'),
-              year: Number(m.year || 2024),
-              thumbnailUrl: m.thumbnailUrl ? String(m.thumbnailUrl) : undefined,
-            }))
-          : [];
+          const apiAlbums: ArtistAlbumItem[] = Array.isArray(data.albums)
+            ? data.albums.map((a: Record<string, unknown>, idx: number) => ({
+                id: String(a.id || `album-${idx}`),
+                collectionId: String(a.collectionId || ''),
+                title: String(a.title || 'Album'),
+                artist: cleanArtist,
+                artworkUrl: String(a.artworkUrl || ''),
+                year: Number(a.year) || 2024,
+                trackCount: Number(a.trackCount) || 10,
+                genre: String(a.genre || 'Album'),
+              }))
+            : [];
 
-        const apiTopTracks: MonochromeTrack[] = Array.isArray(data.topTracks)
-          ? data.topTracks
-              .filter((t: Record<string, unknown>) =>
-                isSameArtistClient(String(t.artist || cleanArtist), cleanArtist)
-              )
-              .map((t: Record<string, unknown>, idx: number) => {
-                const dur = Number(t.duration) || 215;
-                return {
-                  id: String(t.id || `artist-top-${idx}`),
-                  monoTrackId: String(t.monoTrackId || ''),
-                  title: String(t.title || 'Track'),
-                  artist: cleanArtist,
-                  album: String(t.album || 'Single'),
-                  coverGradient: 'from-rose-950 via-zinc-900 to-black',
-                  coverAccent: '#fa243c',
-                  artworkUrl: t.artworkUrl ? String(t.artworkUrl) : undefined,
-                  audioUrl: String(
-                    t.audioUrl ||
-                      `/api/music/play?title=${encodeURIComponent(String(t.title || ''))}&artist=${encodeURIComponent(cleanArtist)}`
-                  ),
-                  isFullLengthStream: true,
-                  duration: dur,
-                  format: String(t.format || 'api.monochrome.tf Full-Length Stream'),
-                  bitrate: String(t.bitrate || '320 kbps Full Track'),
-                  genre: String(t.genre || 'J-Pop / Lossless'),
-                  year: Number(t.year) || 2025,
-                  lyrics: enrichLyricsWithWordTiming(
-                    [
-                      { time: 0, text: `${String(t.title || '')} — ${cleanArtist}` },
-                      { time: 3, text: '同期歌詞を読み込み中...' },
-                    ],
-                    dur
-                  ),
-                };
-              })
-          : [];
+          const apiSingles: ArtistSingleItem[] = Array.isArray(data.singles)
+            ? data.singles.map((s: Record<string, unknown>, idx: number) => ({
+                id: String(s.id || `single-${idx}`),
+                collectionId: String(s.collectionId || ''),
+                title: String(s.title || 'Single'),
+                cleanTitle: String(s.cleanTitle || s.title || 'Single'),
+                artist: cleanArtist,
+                artworkUrl: String(s.artworkUrl || ''),
+                year: Number(s.year) || 2024,
+                trackCount: Number(s.trackCount) || 1,
+                audioUrl: String(
+                  s.audioUrl ||
+                    `/api/music/play?title=${encodeURIComponent(
+                      String(s.cleanTitle || s.title || '')
+                    )}&artist=${encodeURIComponent(cleanArtist)}`
+                ),
+              }))
+            : [];
 
-        const apiAlbums: ArtistAlbumItem[] = Array.isArray(data.albums)
-          ? data.albums.map((a: Record<string, unknown>, idx: number) => ({
-              id: String(a.id || `album-${idx}`),
-              collectionId: String(a.collectionId || ''),
-              title: String(a.title || 'Album'),
-              artist: cleanArtist,
-              artworkUrl: String(a.artworkUrl || ''),
-              year: Number(a.year) || 2024,
-              trackCount: Number(a.trackCount) || 10,
-              genre: String(a.genre || 'Album'),
-            }))
-          : [];
-
-        const apiSingles: ArtistSingleItem[] = Array.isArray(data.singles)
-          ? data.singles.map((s: Record<string, unknown>, idx: number) => ({
-              id: String(s.id || `single-${idx}`),
-              collectionId: String(s.collectionId || ''),
-              title: String(s.title || 'Single'),
-              cleanTitle: String(s.cleanTitle || s.title || 'Single'),
-              artist: cleanArtist,
-              artworkUrl: String(s.artworkUrl || ''),
-              year: Number(s.year) || 2024,
-              trackCount: Number(s.trackCount) || 1,
-              audioUrl: String(
-                s.audioUrl ||
-                  `/api/music/play?title=${encodeURIComponent(String(s.cleanTitle || s.title || ''))}&artist=${encodeURIComponent(cleanArtist)}`
-              ),
-            }))
-          : [];
-
-        if (apiMvs.length > 0) {
-          setLiveMvCatalog((prev) => {
-            const ids = new Set(apiMvs.map((x) => x.id));
-            return [...apiMvs, ...prev.filter((p) => !ids.has(p.id))].slice(0, 28);
+          const presetMeta = ARTIST_METADATA_MAP[cleanArtist];
+          setLiveArtistProfile({
+            name: String(data.name || cleanArtist),
+            englishName: presetMeta?.englishName || cleanArtist,
+            genre: String(data.genre || presetMeta?.genre || 'Artist'),
+            monthlyListeners: String(
+              data.monthlyListeners || presetMeta?.monthlyListeners || '840万人 / 月'
+            ),
+            bio: presetMeta?.bio || String(data.bio || `${cleanArtist} のプロフィール。`),
+            bannerGradient:
+              presetMeta?.bannerGradient || 'from-cyan-700 via-indigo-800 to-slate-950',
+            avatarUrl: String(data.avatarUrl || presetMeta?.avatarUrl || ''),
+            bannerUrl: String(data.bannerUrl || data.avatarUrl || ''),
+            topTracks: apiTopTracks,
+            albums: apiAlbums,
+            singles: apiSingles,
+            mvs: apiMvs,
           });
         }
-        const presetMeta = ARTIST_METADATA_MAP[cleanArtist];
-        setLiveArtistProfile({
-          name: String(data.name || cleanArtist),
-          englishName: presetMeta?.englishName || `${cleanArtist} Official`,
-          genre: String(data.genre || presetMeta?.genre || 'Official Recording Artist'),
-          monthlyListeners: String(
-            data.monthlyListeners || presetMeta?.monthlyListeners || '840万人 / 月'
-          ),
-          bio: presetMeta?.bio || String(data.bio || `${cleanArtist} の公式アーティストプロフィール。`),
-          bannerGradient:
-            presetMeta?.bannerGradient || 'from-rose-600 via-purple-700 to-slate-950',
-          avatarUrl: String(data.avatarUrl || presetMeta?.avatarUrl || ''),
-          bannerUrl: String(data.bannerUrl || data.avatarUrl || ''),
-          topTracks: apiTopTracks,
-          albums: apiAlbums,
-          singles: apiSingles,
-          mvs: apiMvs,
-        });
+      } catch {
+        // ignore
+      } finally {
+        setIsFetchingArtist(false);
       }
-    } catch {
-      // ignore error
-    } finally {
-      setIsFetchingArtist(false);
-    }
-  }, []);
+    },
+    [resolvedAccentHex]
+  );
 
   const openArtistPage = useCallback(
     (artistName: string, e?: React.MouseEvent) => {
       if (e) e.stopPropagation();
       const cleanArtist = cleanPrimaryArtistName(artistName);
       setSelectedArtistName(cleanArtist);
-      setSelectedArtistAlbum(null);
-      setSelectedAlbumTracks([]);
       setActiveNav('artist');
       fetchArtistProfileFromApi(cleanArtist);
     },
     [fetchArtistProfileFromApi]
   );
 
-  // Fetch initial artist profile when artist tab is opened
   useEffect(() => {
     if (activeNav === 'artist') {
       fetchArtistProfileFromApi(selectedArtistName);
     }
   }, [activeNav, selectedArtistName, fetchArtistProfileFromApi]);
 
-  // Strictly filtered tracks for the currently selected artist (NEVER includes other artists)
   const artistStrictTopTracks = useMemo(() => {
     const cleanSelected = cleanPrimaryArtistName(selectedArtistName);
     if (
@@ -2501,9 +1953,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     ) {
       return liveArtistProfile.topTracks;
     }
-    return INITIAL_ENRICHED_CATALOG.filter((t) =>
-      isSameArtistClient(t.artist, cleanSelected)
-    );
+    return INITIAL_ENRICHED_CATALOG.filter((t) => isSameArtistClient(t.artist, cleanSelected));
   }, [selectedArtistName, liveArtistProfile]);
 
   const activeArtistProfile: ArtistProfileData = useMemo(() => {
@@ -2515,10 +1965,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       const matchedTrackArt = artistStrictTopTracks[0]?.artworkUrl;
       return {
         ...liveArtistProfile,
-        avatarUrl:
-          liveArtistProfile.avatarUrl ||
-          matchedTrackArt ||
-          '',
+        avatarUrl: liveArtistProfile.avatarUrl || matchedTrackArt || '',
         mvs:
           liveArtistProfile.mvs.length > 0
             ? liveArtistProfile.mvs
@@ -2528,20 +1975,17 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
     const meta = ARTIST_METADATA_MAP[cleanSelected];
     const matchedTrackArt = artistStrictTopTracks[0]?.artworkUrl || '';
-
     const artistMvs = OFFICIAL_MV_CATALOG.filter((m) =>
       isSameArtistClient(m.artist, cleanSelected)
     );
 
     return {
       name: cleanSelected,
-      englishName: meta?.englishName || `${cleanSelected} Official`,
-      genre: meta?.genre || 'Monochrome Music Official Artist',
+      englishName: meta?.englishName || cleanSelected,
+      genre: meta?.genre || 'Artist',
       monthlyListeners: meta?.monthlyListeners || '680万人 / 月',
-      bio:
-        meta?.bio ||
-        `${cleanSelected} の公式アーティストページ。Monochrome Music から取得したアーティスト画像、人気楽曲、アルバム、シングル、および公式ミュージックビデオ (MV) を一覧で楽しめます。`,
-      bannerGradient: meta?.bannerGradient || 'from-rose-600 via-purple-700 to-slate-950',
+      bio: meta?.bio || `${cleanSelected} のアーティストページ。`,
+      bannerGradient: meta?.bannerGradient || 'from-cyan-700 via-indigo-800 to-slate-950',
       avatarUrl: meta?.avatarUrl || matchedTrackArt || '',
       topTracks: artistStrictTopTracks,
       albums: [],
@@ -2550,27 +1994,325 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     };
   }, [selectedArtistName, liveArtistProfile, artistStrictTopTracks]);
 
+  // All Collections (Built-in + User Imported + Favorites Playlist)
+  const allPlaylistsAndCollections = useMemo(() => {
+    const favCollection: MusicCollectionViewData = {
+      id: 'pl-favorites',
+      kind: 'PLAYLIST',
+      title: 'お気に入りソング',
+      subtitle: 'お気に入り登録した曲',
+      creator: 'あなた',
+      year: 2025,
+      artworkUrl:
+        favoriteTracks[0]?.artworkUrl ||
+        INITIAL_ENRICHED_CATALOG[0]?.artworkUrl ||
+        '',
+      coverGradient: 'from-indigo-600 via-violet-800 to-slate-950',
+      sourceService: 'Library',
+      tracks: favoriteTracks,
+    };
+    return [favCollection, ...userPlaylists, ...BUILTIN_COLLECTIONS];
+  }, [favoriteTracks, userPlaylists]);
+
   // -----------------------------------------------------------------------
-  // Apple Music Track Table Renderer (Used in Songs, Favorites, Recent, Browse, Artist)
+  // Synchronized Lyrics & Bidirectional Translation Panel (NO KARAOKE)
   // -----------------------------------------------------------------------
-  const renderAppleMusicSongTable = (list: MonochromeTrack[], emptyMessage: string) => {
-    if (list.length === 0) {
-      return (
-        <div className="py-16 text-center text-sm text-white/45">
-          {emptyMessage}
+  const renderSyncedLyricsPanel = (fullScreenMode = false) => {
+    const currentFav = isFavorite(currentTrack.id);
+    return (
+      <div
+        className={`${
+          fullScreenMode
+            ? 'flex-1'
+            : 'w-full lg:w-[420px] xl:w-[460px] border-l border-white/[0.12]'
+        } flex flex-col min-h-0 relative overflow-hidden apple-liquid-glass shrink-0`}
+      >
+        {/* Lyrics Control Header */}
+        <div className="px-5 py-3 border-b border-white/[0.1] bg-white/[0.03] backdrop-blur-2xl flex flex-wrap items-center justify-between gap-2 shrink-0 z-10">
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className="material-symbols-rounded text-sm"
+              style={{ color: resolvedAccentHex }}
+            >
+              lyrics
+            </span>
+            <span className="text-xs font-semibold tracking-tight text-white">
+              同期歌詞 &amp; 多言語翻訳
+            </span>
+            <span className="text-[10px] text-white/50 font-mono">
+              ({currentTrack.lyrics.length}行{isTranslatingLyrics ? ' · 翻訳中...' : ''})
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-1.5">
+            {/* Lyric Translation Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowLyricsTranslation((v) => !v)}
+              style={
+                showLyricsTranslation
+                  ? {
+                      backgroundColor: resolvedAccentHex,
+                      borderColor: resolvedAccentHex,
+                      color: '#ffffff',
+                    }
+                  : undefined
+              }
+              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition border flex items-center gap-1 ${
+                showLyricsTranslation
+                  ? 'shadow-sm'
+                  : 'apple-liquid-glass-pill text-white/80 hover:text-white'
+              }`}
+              title="日本語→英語 / 英語→日本語 / その他→日本語 自動翻訳"
+            >
+              <span className="material-symbols-rounded text-xs">translate</span>
+              翻訳 {showLyricsTranslation ? 'ON' : 'OFF'}
+            </button>
+
+            {/* Sync Offset Controls */}
+            <div className="flex items-center apple-liquid-glass-pill px-1.5 py-0.5 text-[10px] font-mono tabular-nums rounded-md">
+              <button
+                onClick={() => setLyricOffsetSec((o) => Math.round((o - 0.2) * 10) / 10)}
+                className="px-1.5 py-0.5 hover:bg-white/15 text-white/75 hover:text-white transition"
+              >
+                -0.2s
+              </button>
+              <button
+                onClick={() => setLyricOffsetSec(0)}
+                className="px-1.5 py-0.5 font-semibold text-white/90"
+              >
+                {lyricOffsetSec >= 0 ? `+${lyricOffsetSec.toFixed(1)}s` : `${lyricOffsetSec.toFixed(1)}s`}
+              </button>
+              <button
+                onClick={() => setLyricOffsetSec((o) => Math.round((o + 0.2) * 10) / 10)}
+                className="px-1.5 py-0.5 hover:bg-white/15 text-white/75 hover:text-white transition"
+              >
+                +0.2s
+              </button>
+            </div>
+
+            <button
+              onClick={() => {
+                setShowCustomLyricEditor((v) => !v);
+                if (!customLyricInput) {
+                  setCustomLyricInput(JSON.stringify(currentTrack.lyrics.slice(0, 6), null, 2));
+                }
+              }}
+              className="px-2.5 py-1 rounded-md text-[11px] font-medium apple-liquid-glass-pill text-white/80 hover:text-white transition"
+            >
+              編集
+            </button>
+
+            <button
+              onClick={() => toggleFavorite(currentTrack)}
+              style={
+                currentFav
+                  ? { backgroundColor: resolvedAccentHex, borderColor: resolvedAccentHex }
+                  : undefined
+              }
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition border ${
+                currentFav ? 'text-white' : 'apple-liquid-glass-pill text-white/80 hover:text-white'
+              }`}
+            >
+              {currentFav ? '保存済' : '保存'}
+            </button>
+
+            <button
+              onClick={() => loadLyricsForTrack(currentTrack)}
+              disabled={isFetchingLyrics}
+              className="px-2.5 py-1 rounded-md apple-liquid-glass-pill text-[11px] text-white/80 hover:text-white transition"
+            >
+              {isFetchingLyrics ? '取得中...' : '再取得'}
+            </button>
+          </div>
         </div>
-      );
+
+        {/* Translation Rule Info Bar */}
+        {showLyricsTranslation && (
+          <div className="px-5 py-1.5 bg-white/[0.02] border-b border-white/[0.06] flex items-center justify-between text-[11px] text-white/60">
+            <span>自動翻訳ルール: 日本語 → 英語 / 英語 → 日本語 / その他の言語 → 日本語</span>
+            <span className="font-mono text-[10px] text-white/45">LRCLIB Sync</span>
+          </div>
+        )}
+
+        {showCustomLyricEditor && (
+          <div className="p-4 border-b border-white/[0.12] bg-black/65 backdrop-blur-3xl space-y-2.5 z-20">
+            <div className="text-[11px] font-semibold text-white/90">
+              歌詞データ編集 (LRC / TTML / JSON)
+            </div>
+            <textarea
+              value={customLyricInput}
+              onChange={(e) => setCustomLyricInput(e.target.value)}
+              rows={4}
+              className="w-full rounded-md bg-black/60 border border-white/15 p-2.5 text-[11px] font-mono text-white/90 outline-none"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowCustomLyricEditor(false)}
+                className="px-3 py-1 rounded text-xs text-white/60 hover:text-white"
+              >
+                閉じる
+              </button>
+              <button
+                onClick={() => {
+                  const parsed = parseSyncedLyricsUniversal(customLyricInput, currentTrack.duration);
+                  if (parsed.length > 0) {
+                    setTracks((prev) =>
+                      prev.map((t) => (t.id === currentTrack.id ? { ...t, lyrics: parsed } : t))
+                    );
+                    setShowCustomLyricEditor(false);
+                  }
+                }}
+                style={{ backgroundColor: resolvedAccentHex }}
+                className="px-3.5 py-1 rounded text-white text-xs font-semibold"
+              >
+                適用
+              </button>
+            </div>
+          </div>
+        )}
+
+        {userScrolledLyrics && (
+          <div className="absolute top-20 right-5 z-20">
+            <button
+              onClick={() => {
+                setUserScrolledLyrics(false);
+                scrollToActiveLyric(true);
+              }}
+              style={{ backgroundColor: resolvedAccentHex }}
+              className="px-4 py-1.5 rounded-full text-white font-semibold text-xs shadow-lg transition"
+            >
+              現在位置へ戻る
+            </button>
+          </div>
+        )}
+
+        {/* Scrolling Time-Synced Lyrics List */}
+        <div
+          ref={lyricsContainerRef}
+          onWheel={handleManualLyricsWheel}
+          onTouchMove={handleManualLyricsWheel}
+          className={`flex-1 overflow-y-auto ${
+            fullScreenMode ? 'px-10 sm:px-16 py-12' : 'px-6 py-10'
+          } space-y-5 select-none`}
+        >
+          <div className="h-8" />
+          {currentTrack.lyrics.map((line: LyricLine, idx: number) => {
+            const isActive = idx === currentLyricIndex;
+            const distance = Math.abs(idx - currentLyricIndex);
+
+            const depthStateClass = isActive
+              ? 'is-active'
+              : distance === 1
+              ? 'is-neighbor'
+              : 'is-inactive';
+
+            if (line.isInterlude) {
+              if (!isActive && distance > 1) return null;
+              return (
+                <div
+                  key={`interlude-${idx}`}
+                  id={`apple-lyric-line-${idx}`}
+                  onClick={() => {
+                    seekToSeconds(line.time);
+                    if (!isPlaying) togglePlay();
+                  }}
+                  className={`apple-lyric-line ${depthStateClass} cursor-pointer py-3 px-4 rounded-xl`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    {[0, 1, 2].map((dotIdx) => (
+                      <span
+                        key={dotIdx}
+                        className={`inline-block w-2.5 h-2.5 rounded-full ${
+                          isActive ? 'bg-white' : 'bg-white/25'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            }
+
+            const langInfo = detectLyricLanguage(line.text);
+            const translation = showLyricsTranslation
+              ? getLyricTranslation(line.text, serverLyricTranslations)
+              : '';
+
+            return (
+              <div
+                key={idx}
+                id={`apple-lyric-line-${idx}`}
+                onClick={() => {
+                  seekToSeconds(line.time);
+                  if (!isPlaying) togglePlay();
+                }}
+                className={`apple-lyric-line ${depthStateClass} group cursor-pointer py-3 px-4 rounded-2xl transition ${
+                  isActive
+                    ? 'bg-white/[0.08] border border-white/15 shadow-sm'
+                    : 'hover:bg-white/[0.04]'
+                }`}
+              >
+                <div className="flex items-baseline justify-between gap-4">
+                  <div
+                    className={`font-bold tracking-tight leading-snug ${
+                      fullScreenMode ? 'text-2xl sm:text-3xl' : 'text-lg sm:text-xl'
+                    } ${isActive ? 'text-white' : 'text-white/75'}`}
+                  >
+                    {line.text}
+                  </div>
+                  <span
+                    className={`text-[11px] font-mono tabular-nums shrink-0 ${
+                      isActive
+                        ? 'opacity-80 text-white/80'
+                        : 'opacity-0 group-hover:opacity-70 text-white/50'
+                    }`}
+                  >
+                    {formatSecs(line.time)}
+                  </span>
+                </div>
+
+                {/* Translated Lyric Line (JA->EN, EN->JA, Other->JA) */}
+                {showLyricsTranslation && translation && (
+                  <div className="mt-1.5 flex items-start gap-2 text-xs sm:text-sm font-medium leading-relaxed">
+                    <span
+                      style={{
+                        borderColor: `${resolvedAccentHex}66`,
+                        color: resolvedAccentHex,
+                      }}
+                      className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/[0.06] border shrink-0 mt-0.5"
+                    >
+                      {langInfo.badgeLabel}
+                    </span>
+                    <span className={isActive ? 'text-white/95' : 'text-white/65'}>
+                      {translation}
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          <div className="h-36" />
+        </div>
+      </div>
+    );
+  };
+
+  // -----------------------------------------------------------------------
+  // Track Table Renderer (Spotify-style Clean Numbered Table with OS Accent)
+  // -----------------------------------------------------------------------
+  const renderSpotifyTrackTable = (list: MonochromeTrack[], emptyMessage: string) => {
+    if (list.length === 0) {
+      return <div className="py-16 text-center text-sm text-white/45">{emptyMessage}</div>;
     }
 
     return (
       <div className="w-full">
-        {/* Table Header */}
-        <div className="grid grid-cols-[36px_minmax(160px,2fr)_minmax(105px,1.2fr)_minmax(100px,1fr)_168px_52px] items-center px-4 py-2 border-b border-white/[0.08] text-[11px] font-medium text-white/45">
+        <div className="grid grid-cols-[36px_minmax(160px,2fr)_minmax(110px,1.2fr)_minmax(100px,1fr)_140px_52px] items-center px-4 py-2 border-b border-white/[0.08] text-[11px] font-medium text-white/45 uppercase tracking-wider">
           <span>#</span>
-          <span>曲名</span>
-          <span className="hidden sm:block">アーティスト (クリックで詳細)</span>
+          <span>タイトル</span>
+          <span className="hidden sm:block">アーティスト</span>
           <span className="hidden md:block">アルバム</span>
-          <span className="text-center">MV / DL / お気に入り</span>
+          <span className="text-center">操作</span>
           <span className="text-right">時間</span>
         </div>
 
@@ -2582,22 +2324,32 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               <div
                 key={`${track.id}-${idx}`}
                 onClick={() => playTrack(track)}
-                className={`grid grid-cols-[36px_minmax(160px,2fr)_minmax(105px,1.2fr)_minmax(100px,1fr)_168px_52px] items-center px-4 py-2.5 cursor-pointer transition rounded-lg ${
-                  isCurrent ? 'bg-[#fa243c]/18 text-white' : 'hover:bg-white/[0.05]'
+                style={
+                  isCurrent
+                    ? { backgroundColor: `${resolvedAccentHex}24` }
+                    : undefined
+                }
+                className={`grid grid-cols-[36px_minmax(160px,2fr)_minmax(110px,1.2fr)_minmax(100px,1fr)_140px_52px] items-center px-4 py-2.5 cursor-pointer transition rounded-xl ${
+                  isCurrent ? 'text-white' : 'hover:bg-white/[0.06]'
                 }`}
               >
-                {/* Track Number / Play Status */}
                 <div className="text-xs font-mono tabular-nums text-white/45 flex items-center">
                   {isCurrent && isPlaying ? (
-                    <span className="material-symbols-rounded text-[18px] text-[#fa243c]">
-                      pause
+                    <span
+                      className="material-symbols-rounded text-[18px]"
+                      style={{ color: resolvedAccentHex }}
+                    >
+                      equalizer
                     </span>
                   ) : isCurrent ? (
-                    <span className="material-symbols-rounded text-[18px] text-white/80">
+                    <span
+                      className="material-symbols-rounded text-[18px]"
+                      style={{ color: resolvedAccentHex }}
+                    >
                       play_arrow
                     </span>
                   ) : (
-                    <span className="w-5 text-center text-white/40 text-[11px]">{idx + 1}</span>
+                    <span className="w-5 text-center text-white/45 text-[11px]">{idx + 1}</span>
                   )}
                 </div>
 
@@ -2611,36 +2363,32 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div
-                        className={`w-full h-full bg-gradient-to-br ${track.coverGradient}`}
-                      />
+                      <div className={`w-full h-full bg-gradient-to-br ${track.coverGradient}`} />
                     )}
                   </div>
                   <div className="min-w-0">
                     <div
-                      className={`text-xs font-semibold truncate ${
-                        isCurrent ? 'text-[#fa243c]' : 'text-white'
-                      }`}
+                      style={isCurrent ? { color: resolvedAccentHex } : undefined}
+                      className="text-xs font-bold truncate text-white"
                     >
                       {track.title}
                     </div>
                     <button
                       type="button"
                       onClick={(e) => openArtistPage(track.artist, e)}
-                      className="text-[11px] text-white/55 hover:text-[#fa243c] hover:underline truncate sm:hidden block text-left"
+                      className="text-[11px] text-white/55 hover:text-white hover:underline truncate sm:hidden block text-left"
                     >
                       {cleanPrimaryArtistName(track.artist)}
                     </button>
                   </div>
                 </div>
 
-                {/* Clickable Artist Name -> Opens Artist Page */}
+                {/* Artist */}
                 <div className="hidden sm:block truncate pr-3">
                   <button
                     type="button"
                     onClick={(e) => openArtistPage(track.artist, e)}
-                    className="text-xs text-white/75 hover:text-[#fa243c] hover:underline truncate transition text-left"
-                    title={`${cleanPrimaryArtistName(track.artist)} のアーティストページを開く`}
+                    className="text-xs text-white/75 hover:text-white hover:underline truncate transition text-left"
                   >
                     {cleanPrimaryArtistName(track.artist)}
                   </button>
@@ -2651,38 +2399,45 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   {track.album}
                 </div>
 
-                {/* MV Button + Download Button + Favorite Registration Button */}
+                {/* Actions */}
                 <div className="flex items-center justify-center gap-1">
                   <button
                     type="button"
                     onClick={(e) => openTrackMv(track, e)}
-                    className="px-2 py-0.5 rounded bg-white/[0.08] hover:bg-[#fa243c] text-white/85 hover:text-white text-[10px] font-semibold transition border border-white/15"
-                    title={`${track.title} の公式MVを再生`}
+                    className="px-2 py-0.5 rounded bg-white/[0.08] hover:bg-white/20 text-white/85 text-[10px] font-semibold transition border border-white/15"
                   >
                     MV
                   </button>
                   <button
                     type="button"
                     onClick={(e) => triggerTrackDownload(track, e)}
-                    className="px-2 py-0.5 rounded bg-white/[0.08] hover:bg-cyan-500 text-cyan-200 hover:text-black text-[10px] font-semibold transition border border-cyan-400/25"
-                    title={`${track.title} を ${musicSettings.downloadQuality.toUpperCase()} 品質でダウンロード`}
+                    className="px-2 py-0.5 rounded bg-white/[0.08] hover:bg-white/20 text-white/85 text-[10px] font-semibold transition border border-white/15"
                   >
                     DL
                   </button>
                   <button
                     type="button"
                     onClick={(e) => toggleFavorite(track, e)}
+                    style={
+                      fav
+                        ? {
+                            backgroundColor: resolvedAccentHex,
+                            borderColor: resolvedAccentHex,
+                            color: '#ffffff',
+                          }
+                        : undefined
+                    }
                     className={`px-2 py-0.5 rounded text-[10px] font-medium transition border ${
                       fav
-                        ? 'bg-[#fa243c] text-white border-[#fa243c]'
+                        ? ''
                         : 'bg-transparent text-white/45 border-white/15 hover:text-white hover:border-white/40'
                     }`}
                   >
-                    {fav ? '登録済' : '追加'}
+                    {fav ? '保存済' : '保存'}
                   </button>
                 </div>
 
-                {/* Full Duration */}
+                {/* Duration */}
                 <div className="text-right text-xs font-mono tabular-nums text-white/50">
                   {formatSecs(track.duration)}
                 </div>
@@ -2697,13 +2452,163 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const showMaximizedArtworkBg = activeNav === 'lyrics' || isArtworkMaximized;
 
   return (
-    <div className="flex h-full w-full flex-col bg-[#121316] text-white select-none overflow-hidden font-sans relative">
+    <div className="flex h-full w-full flex-col bg-[#0f1116] text-white select-none overflow-hidden font-sans relative">
       {/* ===================================================================
-          ARTWORK-ADAPTIVE MOVING GRADIENT ENGINE (アートワーク最大化時のみ背景色が変化)
+          EXTERNAL PLAYLIST IMPORT MODAL (Spotify / Apple Music / YouTube Music)
+         =================================================================== */}
+      {showImportModal && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-xl animate-fadeIn"
+          onClick={() => setShowImportModal(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg rounded-2xl apple-liquid-glass border border-white/20 p-6 shadow-2xl space-y-5"
+          >
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <div>
+                <h2 className="text-lg font-bold text-white">
+                  別サービスからプレイリストをインポート
+                </h2>
+                <p className="text-xs text-white/55 mt-0.5">
+                  Spotify、Apple Music、YouTube Music の共有URLまたは曲リストを取り込みます
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowImportModal(false)}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center text-white/75"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Service Selector */}
+            <div className="grid grid-cols-4 gap-2">
+              {(['Spotify', 'Apple Music', 'YouTube Music', 'URL / テキスト'] as const).map(
+                (srv) => {
+                  const active = importService === srv;
+                  return (
+                    <button
+                      key={srv}
+                      type="button"
+                      onClick={() => setImportService(srv)}
+                      style={
+                        active
+                          ? {
+                              backgroundColor: `${resolvedAccentHex}30`,
+                              borderColor: resolvedAccentHex,
+                            }
+                          : undefined
+                      }
+                      className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition ${
+                        active
+                          ? 'text-white'
+                          : 'bg-white/[0.04] border-white/10 text-white/65 hover:text-white'
+                      }`}
+                    >
+                      {srv}
+                    </button>
+                  );
+                }
+              )}
+            </div>
+
+            {/* Quick One-Click Sample Playlists from External Services */}
+            <div className="space-y-2">
+              <div className="text-[11px] font-semibold text-white/60">
+                ワンクリックで人気プレイリストを取り込む:
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {[
+                  {
+                    service: 'Spotify' as const,
+                    name: 'Spotify Top Hits Japan',
+                    rawText: 'YOASOBI - アイドル\n米津玄師 - KICK BACK\nCreepy Nuts - Bling-Bang-Bang-Born\nMrs. GREEN APPLE - ライラック',
+                  },
+                  {
+                    service: 'Apple Music' as const,
+                    name: 'Apple Music J-Pop Now',
+                    rawText: 'Vaundy - 怪獣の花唄\nOfficial髭男dism - Subtitle\nAdo - 唱\n藤井 風 - 満ちてゆく',
+                  },
+                  {
+                    service: 'YouTube Music' as const,
+                    name: 'YouTube Anime & Viral',
+                    rawText: 'YOASOBI - 勇者\nKing Gnu - SPECIALZ\nCreepy Nuts - オトノケ\nDaft Punk - One More Time',
+                  },
+                ].map((preset) => (
+                  <button
+                    key={preset.name}
+                    type="button"
+                    disabled={isImportingPlaylist}
+                    onClick={() => handleImportExternalPlaylist(undefined, preset)}
+                    className="p-2.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.12] border border-white/10 text-left transition"
+                  >
+                    <div
+                      className="text-[10px] font-bold"
+                      style={{ color: resolvedAccentHex }}
+                    >
+                      {preset.service}
+                    </div>
+                    <div className="text-xs font-semibold text-white truncate mt-0.5">
+                      {preset.name}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={handleImportExternalPlaylist} className="space-y-3">
+              <div>
+                <label className="text-xs text-white/70 block mb-1">
+                  プレイリスト名 (任意)
+                </label>
+                <input
+                  value={importPlaylistName}
+                  onChange={(e) => setImportPlaylistName(e.target.value)}
+                  placeholder={`${importService} マイプレイリスト`}
+                  className="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/15 text-xs text-white outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-white/70 block mb-1">
+                  プレイリストURL または 曲リスト (1行に1曲「アーティスト - 曲名」)
+                </label>
+                <textarea
+                  value={importSourceUrlOrText}
+                  onChange={(e) => setImportSourceUrlOrText(e.target.value)}
+                  rows={4}
+                  placeholder={`https://open.spotify.com/playlist/...\nまたは:\nYOASOBI - 夜に駆ける\n米津玄師 - Lemon\nOfficial髭男dism - Pretender`}
+                  className="w-full px-3 py-2 rounded-xl bg-black/50 border border-white/15 text-xs text-white font-mono outline-none"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowImportModal(false)}
+                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-xs font-semibold text-white/80"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="submit"
+                  disabled={isImportingPlaylist || !importSourceUrlOrText.trim()}
+                  style={{ backgroundColor: resolvedAccentHex }}
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-white shadow-lg disabled:opacity-40 transition"
+                >
+                  {isImportingPlaylist ? 'インポート中...' : 'インポート実行'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================================
+          ARTWORK-ADAPTIVE MOVING GRADIENT ENGINE
          =================================================================== */}
       {showMaximizedArtworkBg && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 transition-opacity duration-700">
-          {/* Layer 1: 4-Quadrant Extracted Color Mesh Gradient Orbs */}
           <div
             className="absolute -top-[18%] -left-[12%] w-[68%] h-[68%] rounded-full blur-[95px] opacity-65 artwork-fluid-orb-1 transition-colors duration-1000"
             style={{
@@ -2718,47 +2623,16 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               animationPlayState: isPlaying ? 'running' : 'paused',
             }}
           />
-          <div
-            className="absolute top-[15%] left-[20%] w-[60%] h-[60%] rounded-full blur-[110px] opacity-50 artwork-fluid-orb-3 mix-blend-screen transition-colors duration-1000"
-            style={{
-              background: `radial-gradient(circle at center, ${artworkPalette.c2} 0%, ${artworkPalette.c4} 50%, transparent 75%)`,
-              animationPlayState: isPlaying ? 'running' : 'paused',
-            }}
-          />
-
-          {/* Layer 2: Multi-Layered Counter-Rotating Artwork Pattern Orbs */}
-          {currentTrack.artworkUrl ? (
-            <>
-              <img
-                src={currentTrack.artworkUrl}
-                alt=""
-                className="absolute -top-[15%] -left-[15%] w-[85%] h-[85%] object-cover rounded-full blur-[80px] saturate-[2.2] contrast-125 opacity-45 artwork-fluid-orb-1 transition-all duration-1000"
-                style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
-              />
-              <img
-                src={currentTrack.artworkUrl}
-                alt=""
-                className="absolute -bottom-[15%] -right-[15%] w-[85%] h-[85%] object-cover rounded-full blur-[85px] saturate-[2.4] contrast-125 opacity-40 artwork-fluid-orb-2 mix-blend-screen transition-all duration-1000"
-                style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
-              />
-            </>
-          ) : (
-            <div
-              className={`w-full h-full bg-gradient-to-br ${currentTrack.coverGradient} opacity-45 blur-3xl artwork-fluid-orb-1 transition-all duration-1000`}
-            />
-          )}
-
-          {/* Layer 3: GlassiumOS Deep Frosted Diffusion Veil */}
-          <div className="absolute inset-0 bg-[#0b0c12]/55 backdrop-blur-[36px]" />
+          <div className="absolute inset-0 bg-[#0b0c12]/60 backdrop-blur-[36px]" />
         </div>
       )}
 
       {/* ===================================================================
-          MAXIMIZED ARTWORK OVERLAY MODAL (アートワーク最大化モード)
+          MAXIMIZED ARTWORK OVERLAY MODAL
          =================================================================== */}
       {isArtworkMaximized && (
         <div
-          className="absolute inset-0 z-40 flex flex-col items-center justify-center p-6 pb-36 bg-black/35 backdrop-blur-xl animate-fadeIn"
+          className="absolute inset-0 z-40 flex flex-col items-center justify-center p-6 pb-36 bg-black/40 backdrop-blur-xl animate-fadeIn"
           onClick={() => setIsArtworkMaximized(false)}
         >
           <div
@@ -2771,9 +2645,9 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               className="self-end px-3 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition flex items-center gap-1"
             >
               <span className="material-symbols-rounded text-sm">close_fullscreen</span>
-              <span>元の画面に戻る</span>
+              <span>閉じる</span>
             </button>
-            <div className="w-64 h-64 sm:w-80 sm:h-80 rounded-3xl overflow-hidden border border-white/30 shadow-[0_32px_80px_rgba(0,0,0,0.75)] bg-zinc-900">
+            <div className="w-64 h-64 sm:w-80 sm:h-80 rounded-3xl overflow-hidden border border-white/30 shadow-2xl bg-zinc-900">
               {currentTrack.artworkUrl ? (
                 <img
                   src={currentTrack.artworkUrl}
@@ -2792,7 +2666,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   setIsArtworkMaximized(false);
                   openArtistPage(currentTrack.artist);
                 }}
-                className="text-sm font-semibold text-white/85 hover:text-[#fa243c] hover:underline transition"
+                className="text-sm font-semibold text-white/85 hover:underline transition"
               >
                 {cleanPrimaryArtistName(currentTrack.artist)}
               </button>
@@ -2803,196 +2677,950 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       )}
 
       {/* ===================================================================
-          MAIN APPLE MUSIC WORKSPACE (Left Sidebar + Center Stage + Lyrics)
-          Full height with floating bottom Dock so page content scrolls underneath Dock
+          MAIN SPOTIFY-INSPIRED LIQUID GLASS WORKSPACE
          =================================================================== */}
-      <div className="relative z-10 flex-1 min-h-0 flex overflow-hidden">
+      <div className="relative z-10 flex-1 min-h-0 flex overflow-hidden p-2 gap-2">
         {/* -----------------------------------------------------------------
-            LEFT APPLE MUSIC LIQUID GLASS SIDEBAR
+            LEFT SIDEBAR (Spotify + GlassiumOS Liquid Glass Panel)
            ----------------------------------------------------------------- */}
-        <aside className="w-56 apple-liquid-glass border-r border-white/[0.12] flex flex-col justify-between p-3 pb-36 shrink-0 overflow-y-auto">
-          <div className="space-y-5">
-            {/* Search Box (Queries official releases) */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleOnlineMusicSearch();
-              }}
-              className="space-y-1.5"
-            >
-              <div className="flex items-center bg-white/[0.07] border border-white/15 focus-within:border-[#fa243c] rounded-lg px-2.5 py-1.5">
-                <input
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="楽曲・アーティスト検索..."
-                  className="bg-transparent text-white placeholder-white/40 outline-none w-full text-xs"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="text-[10px] text-white/45 hover:text-white ml-1"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-              <button
-                type="submit"
-                disabled={isSearchingOnline}
-                className="w-full py-1.5 rounded-lg bg-[#fa243c] hover:bg-[#e01e35] text-white font-semibold text-xs transition"
-              >
-                {isSearchingOnline ? '検索中...' : '楽曲検索'}
-              </button>
-            </form>
-
-            {/* Section 1: Music & MV / Artist (Without top 'いま聴く') */}
-            <div className="space-y-1">
-              <div className="px-2.5 text-[10px] font-semibold uppercase tracking-wider text-white/40">
-                Monochrome Music
-              </div>
-              {(
-                [
-                  { id: 'browse', label: '見つける', icon: 'explore' },
-                  { id: 'mv', label: 'MV (ミュージックビデオ)', icon: 'smart_display' },
-                  { id: 'artist', label: 'アーティストページ', icon: 'person' },
-                  { id: 'lyrics', label: 'アートワーク最大化 & 歌詞', icon: 'lyrics' },
-                ] as { id: AppleMusicNavId; label: string; icon: string }[]
-              ).map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveNav(item.id)}
-                  className={`w-full flex items-center gap-2 text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
-                    activeNav === item.id
-                      ? 'bg-[#fa243c] text-white font-semibold shadow-sm'
-                      : 'text-white/75 hover:bg-white/[0.06] hover:text-white'
-                  }`}
+        <aside className="w-60 rounded-2xl apple-liquid-glass border border-white/[0.12] flex flex-col justify-between p-3 pb-36 shrink-0 overflow-y-auto">
+          <div className="space-y-4">
+            {/* Brand Header */}
+            <div className="flex items-center justify-between px-2 pt-1">
+              <div className="flex items-center gap-2">
+                <div
+                  style={{ backgroundColor: resolvedAccentHex }}
+                  className="w-7 h-7 rounded-xl flex items-center justify-center text-white shadow-md"
                 >
-                  <span className="material-symbols-rounded text-[16px] shrink-0">{item.icon}</span>
-                  <span className="truncate">{item.label}</span>
-                </button>
-              ))}
+                  <span className="material-symbols-rounded text-[18px]">graphic_eq</span>
+                </div>
+                <div>
+                  <div className="text-xs font-extrabold tracking-tight text-white">
+                    Glassium Groove
+                  </div>
+                  <div className="text-[10px] text-white/45 font-mono">GlassiumOS 5 u4</div>
+                </div>
+              </div>
             </div>
 
-            {/* Section 2: Library (Includes Favorites!) */}
+            {/* Primary Navigation (Home / Search / Library / Lyrics / Settings) */}
             <div className="space-y-1">
-              <div className="px-2.5 text-[10px] font-semibold uppercase tracking-wider text-white/40">
-                ライブラリ
-              </div>
               {(
                 [
-                  { id: 'favorites', label: 'お気に入り', count: favoriteTracks.length, icon: 'favorite' },
-                  { id: 'songs', label: 'すべての曲', count: tracks.length, icon: 'library_music' },
-                  { id: 'recent', label: '最近再生した項目', count: recentTracks.length, icon: 'history' },
-                ] as { id: AppleMusicNavId; label: string; count: number; icon: string }[]
-              ).map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveNav(item.id)}
-                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
-                    activeNav === item.id
-                      ? 'bg-[#fa243c] text-white font-semibold shadow-sm'
-                      : 'text-white/75 hover:bg-white/[0.06] hover:text-white'
-                  }`}
-                >
-                  <span className="flex items-center gap-2 min-w-0">
-                    <span className="material-symbols-rounded text-[16px] shrink-0">{item.icon}</span>
-                    <span className="truncate">{item.label}</span>
-                  </span>
-                  <span
-                    className={`text-[10px] font-mono tabular-nums ${
-                      activeNav === item.id ? 'text-white/90' : 'text-white/40'
+                  { id: 'home', label: 'ホーム', icon: 'home' },
+                  { id: 'browse', label: '検索', icon: 'search' },
+                  { id: 'lyrics', label: '歌詞 & 翻訳', icon: 'translate' },
+                  { id: 'mv', label: 'ミュージックビデオ', icon: 'smart_display' },
+                  { id: 'artist', label: 'アーティスト', icon: 'person' },
+                  { id: 'eq', label: 'イコライザー (EQ)', icon: 'equalizer' },
+                  { id: 'settings', label: '設定', icon: 'settings' },
+                ] as { id: MusicNavId; label: string; icon: string }[]
+              ).map((item) => {
+                const active = activeNav === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveNav(item.id)}
+                    style={
+                      active
+                        ? {
+                            backgroundColor: resolvedAccentHex,
+                            color: '#ffffff',
+                          }
+                        : undefined
+                    }
+                    className={`w-full flex items-center gap-2.5 text-left px-3 py-2 rounded-xl text-xs font-semibold transition ${
+                      active
+                        ? 'shadow-md'
+                        : 'text-white/75 hover:bg-white/[0.07] hover:text-white'
                     }`}
                   >
-                    {item.count}
-                  </span>
-                </button>
-              ))}
+                    <span className="material-symbols-rounded text-[18px] shrink-0">
+                      {item.icon}
+                    </span>
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
-            {/* Section 3: Audio & Quality Settings + Studio */}
-            <div className="space-y-1">
-              <div className="px-2.5 text-[10px] font-semibold uppercase tracking-wider text-white/40">
-                設定 &amp; スタジオ
-              </div>
-              {(
-                [
-                  { id: 'eq', label: 'EQ & AIスピーカー補正', icon: 'graphic_eq' },
-                  { id: 'settings', label: '設定 (音質・DL・MV・Atmos)', icon: 'tune' },
-                  { id: 'monochrome-web', label: 'api.monochrome.tf Web', icon: 'language' },
-                  { id: 'synth', label: 'シンセサイザー', icon: 'piano' },
-                  { id: 'drumpad', label: 'ドラム & 周波数', icon: 'equalizer' },
-                  { id: 'proxy', label: 'プロキシ設定', icon: 'hub' },
-                ] as { id: AppleMusicNavId; label: string; icon: string }[]
-              ).map((item) => (
+            {/* Your Library & Playlists Section (with External Service Import Button) */}
+            <div className="pt-2 border-t border-white/[0.08] space-y-2">
+              <div className="flex items-center justify-between px-2">
+                <span className="text-[11px] font-bold text-white/60 uppercase tracking-wider">
+                  マイライブラリ
+                </span>
                 <button
-                  key={item.id}
-                  onClick={() => setActiveNav(item.id)}
-                  className={`w-full flex items-center gap-2 text-left px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
-                    activeNav === item.id
-                      ? 'bg-[#fa243c] text-white font-semibold shadow-sm'
-                      : 'text-white/75 hover:bg-white/[0.06] hover:text-white'
-                  }`}
+                  type="button"
+                  onClick={() => setShowImportModal(true)}
+                  style={{ color: resolvedAccentHex }}
+                  className="text-[11px] font-bold hover:underline flex items-center gap-0.5"
+                  title="Spotify / Apple Music / YouTube Music からプレイリストを取り込む"
                 >
-                  <span className="material-symbols-rounded text-[16px] shrink-0">{item.icon}</span>
-                  <span className="truncate">{item.label}</span>
+                  <span className="material-symbols-rounded text-[15px]">add</span>
+                  <span>取込</span>
                 </button>
-              ))}
-            </div>
-          </div>
+              </div>
 
-          {/* Bottom Endpoint Status & Browser Shortcuts */}
-          <div className="pt-3 border-t border-white/[0.08] space-y-2 text-[11px] text-white/45">
-            <div className="truncate font-mono text-[10px] text-white/55">
-              API: {activeRelayLabel} ({proxyLatency}ms)
-            </div>
-            <div className="flex items-center gap-1.5">
               <button
-                onClick={() =>
-                  openApp('browser', {
-                    payload: { url: 'about:gcs' },
-                  })
-                }
-                className="flex-1 py-1 rounded bg-white/[0.06] hover:bg-white/15 text-white/75 hover:text-white text-[10px] font-medium transition text-center"
+                type="button"
+                onClick={() => setShowImportModal(true)}
+                className="w-full py-2 px-3 rounded-xl bg-white/[0.05] hover:bg-white/[0.12] border border-white/10 text-left flex items-center gap-2.5 transition"
               >
-                GCS 起動
+                <div
+                  style={{ backgroundColor: `${resolvedAccentHex}28`, color: resolvedAccentHex }}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
+                >
+                  <span className="material-symbols-rounded text-[18px]">cloud_download</span>
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-white truncate">
+                    プレイリスト取込
+                  </div>
+                  <div className="text-[10px] text-white/50 truncate">
+                    Spotify / Apple / YouTube
+                  </div>
+                </div>
               </button>
-              <button
-                onClick={() =>
-                  openApp('browser', {
-                    payload: { url: 'https://monochrome.tf' },
-                  })
-                }
-                className="flex-1 py-1 rounded bg-white/[0.06] hover:bg-white/15 text-white/75 hover:text-white text-[10px] font-medium transition text-center"
-              >
-                ブラウザ
-              </button>
+
+              {/* Playlists, Albums, EPs, Singles quick list */}
+              <div className="space-y-1 max-h-56 overflow-y-auto pr-0.5">
+                {allPlaylistsAndCollections.map((col) => {
+                  const isSelected =
+                    activeNav === 'collection-detail' && selectedCollection.id === col.id;
+                  return (
+                    <button
+                      key={col.id}
+                      type="button"
+                      onClick={() => openCollectionDetail(col)}
+                      className={`w-full flex items-center gap-2.5 p-1.5 rounded-xl text-left transition ${
+                        isSelected ? 'bg-white/[0.14]' : 'hover:bg-white/[0.06]'
+                      }`}
+                    >
+                      <div className="w-9 h-9 rounded-lg overflow-hidden bg-zinc-900 shrink-0 border border-white/10">
+                        {col.artworkUrl ? (
+                          <img
+                            src={col.artworkUrl}
+                            alt={col.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className={`w-full h-full bg-gradient-to-br ${col.coverGradient}`} />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-semibold text-white truncate">
+                          {col.title}
+                        </div>
+                        <div className="text-[10px] text-white/45 truncate">
+                          {col.kind} · {col.creator}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Songs & Recent Library Shortcuts */}
+              <div className="pt-1 space-y-1">
+                {(
+                  [
+                    { id: 'songs', label: 'すべての曲', count: tracks.length, icon: 'library_music' },
+                    { id: 'recent', label: '再生履歴', count: recentTracks.length, icon: 'history' },
+                    { id: 'synth', label: 'シンセサイザー', count: 0, icon: 'piano' },
+                  ] as { id: MusicNavId; label: string; count: number; icon: string }[]
+                ).map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => setActiveNav(item.id)}
+                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-xl text-xs font-medium transition ${
+                      activeNav === item.id
+                        ? 'bg-white/15 text-white font-semibold'
+                        : 'text-white/65 hover:bg-white/[0.06] hover:text-white'
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 truncate">
+                      <span className="material-symbols-rounded text-[16px]">{item.icon}</span>
+                      <span className="truncate">{item.label}</span>
+                    </span>
+                    {item.count > 0 && (
+                      <span className="text-[10px] font-mono text-white/40">{item.count}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </aside>
 
         {/* -----------------------------------------------------------------
-            CENTER APPLE MUSIC CONTENT STAGE
+            MAIN STAGE (Rounded Liquid Glass Viewport)
            ----------------------------------------------------------------- */}
-        <main className="flex-1 min-w-0 flex overflow-hidden">
-          {/* VIEW 2: MV (OFFICIAL MUSIC VIDEO STAGE - Monochrome / iTunes MV + YouTube MV) */}
+        <main className="flex-1 min-w-0 rounded-2xl apple-liquid-glass border border-white/[0.12] flex overflow-hidden relative">
+          {/* ===============================================================
+              VIEW 1: MAIN HOME VIEW (3枚目: Spotify風 2列クイックカード + 横シェルフ + Liquid Glass)
+             =============================================================== */}
+          {activeNav === 'home' && (
+            <div className="flex-1 overflow-y-auto p-6 sm:p-8 pb-36 space-y-8">
+              {/* Top Filter Chips & Import Button */}
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  {(
+                    [
+                      { id: 'all', label: 'すべて' },
+                      { id: 'music', label: '音楽' },
+                      { id: 'playlists', label: 'プレイリスト' },
+                      { id: 'albums', label: 'アルバム・EP・シングル' },
+                    ] as const
+                  ).map((chip) => {
+                    const active = homeFilterChip === chip.id;
+                    return (
+                      <button
+                        key={chip.id}
+                        type="button"
+                        onClick={() => setHomeFilterChip(chip.id)}
+                        style={
+                          active
+                            ? { backgroundColor: resolvedAccentHex, color: '#ffffff' }
+                            : undefined
+                        }
+                        className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition ${
+                          active
+                            ? 'shadow-md'
+                            : 'bg-white/[0.08] text-white/80 hover:bg-white/[0.14]'
+                        }`}
+                      >
+                        {chip.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowImportModal(true)}
+                    className="px-3.5 py-1.5 rounded-full bg-white/[0.08] hover:bg-white/[0.15] border border-white/15 text-xs font-semibold text-white flex items-center gap-1.5 transition"
+                  >
+                    <span className="material-symbols-rounded text-[16px]">cloud_download</span>
+                    <span>他サービスからプレイリスト取込</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveNav('browse')}
+                    className="px-3.5 py-1.5 rounded-full bg-white/[0.08] hover:bg-white/[0.15] border border-white/15 text-xs font-semibold text-white flex items-center gap-1.5 transition"
+                  >
+                    <span className="material-symbols-rounded text-[16px]">search</span>
+                    <span>検索</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Spotify-Style 2/3-Column Top Quick-Access Grid (6 Horizontal Liquid Glass Cards) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {allPlaylistsAndCollections.slice(0, 6).map((col) => (
+                  <div
+                    key={col.id}
+                    onClick={() => openCollectionDetail(col)}
+                    className="group relative flex items-center justify-between rounded-xl overflow-hidden bg-white/[0.06] hover:bg-white/[0.13] border border-white/[0.08] transition cursor-pointer pr-3 shadow-sm"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-14 h-14 bg-zinc-900 shrink-0 overflow-hidden">
+                        {col.artworkUrl ? (
+                          <img
+                            src={col.artworkUrl}
+                            alt={col.title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className={`w-full h-full bg-gradient-to-br ${col.coverGradient}`} />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs sm:text-sm font-bold text-white truncate">
+                          {col.title}
+                        </div>
+                        <div className="text-[10px] text-white/50 truncate mt-0.5">
+                          {col.kind} · {col.creator}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (col.tracks.length > 0) {
+                          playTrack(col.tracks[0]);
+                        } else {
+                          openCollectionDetail(col);
+                        }
+                      }}
+                      style={{ backgroundColor: resolvedAccentHex }}
+                      className="w-10 h-10 rounded-full text-white flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition duration-200 shrink-0"
+                    >
+                      <span className="material-symbols-rounded text-xl">play_arrow</span>
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Shelf 1: Playlists & Imported Collections (Clicking opens 2nd-image Detail Layout) */}
+              {(homeFilterChip === 'all' || homeFilterChip === 'playlists') && (
+                <section className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-white">
+                      おすすめプレイリスト
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => setShowImportModal(true)}
+                      style={{ color: resolvedAccentHex }}
+                      className="text-xs font-bold hover:underline"
+                    >
+                      + 別サービスからインポート
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {allPlaylistsAndCollections
+                      .filter((c) => c.kind === 'PLAYLIST')
+                      .map((pl) => (
+                        <div
+                          key={pl.id}
+                          onClick={() => openCollectionDetail(pl)}
+                          className="group p-3.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.1] border border-white/[0.08] transition cursor-pointer flex flex-col gap-3"
+                        >
+                          <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-zinc-900 shadow-lg">
+                            {pl.artworkUrl ? (
+                              <img
+                                src={pl.artworkUrl}
+                                alt={pl.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                              />
+                            ) : (
+                              <div className={`w-full h-full bg-gradient-to-br ${pl.coverGradient}`} />
+                            )}
+                            <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-[9px] font-mono font-bold text-white border border-white/15">
+                              {pl.sourceService || 'PLAYLIST'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (pl.tracks.length > 0) playTrack(pl.tracks[0]);
+                              }}
+                              style={{ backgroundColor: resolvedAccentHex }}
+                              className="absolute bottom-2.5 right-2.5 w-11 h-11 rounded-full text-white flex items-center justify-center shadow-xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition duration-200"
+                            >
+                              <span className="material-symbols-rounded text-2xl">play_arrow</span>
+                            </button>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs sm:text-sm font-bold text-white truncate">
+                              {pl.title}
+                            </div>
+                            <div className="text-[11px] text-white/50 line-clamp-2 mt-0.5">
+                              {pl.subtitle}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Shelf 2: Popular Albums, EPs & Singles (Clicking opens 2nd-image Detail Layout) */}
+              {(homeFilterChip === 'all' || homeFilterChip === 'albums') && (
+                <section className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-white">
+                      人気のアルバム・EP・シングル
+                    </h2>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                    {allPlaylistsAndCollections
+                      .filter((c) => c.kind !== 'PLAYLIST')
+                      .map((alb) => (
+                        <div
+                          key={alb.id}
+                          onClick={() => openCollectionDetail(alb)}
+                          className="group p-3.5 rounded-2xl bg-white/[0.04] hover:bg-white/[0.1] border border-white/[0.08] transition cursor-pointer flex flex-col gap-3"
+                        >
+                          <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-zinc-900 shadow-lg">
+                            {alb.artworkUrl ? (
+                              <img
+                                src={alb.artworkUrl}
+                                alt={alb.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                              />
+                            ) : (
+                              <div className={`w-full h-full bg-gradient-to-br ${alb.coverGradient}`} />
+                            )}
+                            <span className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-md text-[9px] font-mono font-bold text-white border border-white/15">
+                              {alb.kind}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (alb.tracks.length > 0) playTrack(alb.tracks[0]);
+                              }}
+                              style={{ backgroundColor: resolvedAccentHex }}
+                              className="absolute bottom-2.5 right-2.5 w-11 h-11 rounded-full text-white flex items-center justify-center shadow-xl opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0 transition duration-200"
+                            >
+                              <span className="material-symbols-rounded text-2xl">play_arrow</span>
+                            </button>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="text-xs sm:text-sm font-bold text-white truncate">
+                              {alb.title}
+                            </div>
+                            <div className="text-[11px] text-white/50 truncate mt-0.5">
+                              {alb.year}年 · {alb.creator}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Shelf 3: Quick Play Tracks */}
+              {(homeFilterChip === 'all' || homeFilterChip === 'music') && (
+                <section className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg sm:text-xl font-extrabold tracking-tight text-white">
+                      人気の楽曲
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={() => setActiveNav('songs')}
+                      className="text-xs text-white/60 hover:text-white"
+                    >
+                      すべて表示
+                    </button>
+                  </div>
+                  {renderSpotifyTrackTable(tracks.slice(0, 8), '楽曲がありません')}
+                </section>
+              )}
+            </div>
+          )}
+
+          {/* ===============================================================
+              VIEW 2: COLLECTION DETAIL VIEW (2枚目: プレイリスト・アルバム・EP・シングル詳細画面)
+             =============================================================== */}
+          {activeNav === 'collection-detail' && (
+            <div className="flex-1 overflow-y-auto pb-36">
+              {/* Top Gradient & Liquid Glass Header */}
+              <div
+                className={`relative p-6 sm:p-8 bg-gradient-to-b ${selectedCollection.coverGradient} border-b border-white/10`}
+              >
+                <div className="mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setActiveNav(previousNav === 'collection-detail' ? 'home' : previousNav)}
+                    className="px-3 py-1.5 rounded-full bg-black/40 hover:bg-black/60 border border-white/15 text-xs font-semibold text-white flex items-center gap-1 transition"
+                  >
+                    <span className="material-symbols-rounded text-sm">arrow_back</span>
+                    <span>戻る</span>
+                  </button>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center sm:items-end gap-6">
+                  {/* Large Cover Artwork */}
+                  <div className="w-44 h-44 sm:w-52 sm:h-52 rounded-2xl overflow-hidden bg-zinc-900 shadow-[0_24px_60px_rgba(0,0,0,0.75)] border border-white/20 shrink-0">
+                    {selectedCollection.artworkUrl ? (
+                      <img
+                        src={selectedCollection.artworkUrl}
+                        alt={selectedCollection.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className={`w-full h-full bg-gradient-to-br ${selectedCollection.coverGradient}`}
+                      />
+                    )}
+                  </div>
+
+                  {/* Metadata Column */}
+                  <div className="flex-1 min-w-0 text-center sm:text-left space-y-2">
+                    <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-md bg-black/40 border border-white/15 text-[11px] font-mono font-bold uppercase tracking-wider text-white/90">
+                      <span>{selectedCollection.kind}</span>
+                      {selectedCollection.sourceService && (
+                        <span>· {selectedCollection.sourceService}</span>
+                      )}
+                    </div>
+                    <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
+                      {selectedCollection.title}
+                    </h1>
+                    <p className="text-xs sm:text-sm text-white/75 max-w-2xl">
+                      {selectedCollection.subtitle}
+                    </p>
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 text-xs text-white/80 pt-1">
+                      <span className="font-bold text-white">{selectedCollection.creator}</span>
+                      <span>•</span>
+                      <span>{selectedCollection.year}年</span>
+                      <span>•</span>
+                      <span>{selectedCollection.tracks.length}曲</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Controls Bar (Large Circular OS-Accent Play Button, Shuffle, Import) */}
+              <div className="px-6 sm:px-8 py-5 flex items-center gap-4 border-b border-white/[0.06] bg-black/20">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (selectedCollection.tracks.length > 0) {
+                      playTrack(selectedCollection.tracks[0]);
+                    }
+                  }}
+                  style={{ backgroundColor: resolvedAccentHex }}
+                  className="w-14 h-14 rounded-full text-white flex items-center justify-center shadow-xl hover:scale-105 active:scale-95 transition"
+                  title="再生"
+                >
+                  <span
+                    className="material-symbols-rounded text-3xl"
+                    style={{ fontVariationSettings: "'FILL' 1" }}
+                  >
+                    play_arrow
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsShuffle((s) => !s)}
+                  style={isShuffle ? { color: resolvedAccentHex } : undefined}
+                  className="w-10 h-10 rounded-full bg-white/[0.06] hover:bg-white/[0.14] border border-white/10 flex items-center justify-center text-white/75 transition"
+                  title="シャッフル再生"
+                >
+                  <span className="material-symbols-rounded text-xl">shuffle</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowImportModal(true)}
+                  className="px-4 py-2 rounded-full bg-white/[0.06] hover:bg-white/[0.14] border border-white/15 text-xs font-semibold text-white flex items-center gap-1.5 transition"
+                >
+                  <span className="material-symbols-rounded text-sm">cloud_download</span>
+                  <span>別サービスから追加</span>
+                </button>
+              </div>
+
+              {/* Numbered Tracklist Table */}
+              <div className="p-6 sm:p-8 pt-4">
+                {renderSpotifyTrackTable(
+                  selectedCollection.tracks,
+                  'このコレクションにはまだ曲がありません'
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ===============================================================
+              VIEW 3: SEARCH VIEW (1枚目: Spotify風 検索バー + カラフルなブラウズタイル + Liquid Glass)
+             =============================================================== */}
+          {activeNav === 'browse' && (
+            <div className="flex-1 overflow-y-auto p-6 sm:p-8 pb-36 space-y-7">
+              {/* Top Search Header Bar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleOnlineMusicSearch();
+                  }}
+                  className="flex-1 max-w-xl flex items-center gap-2 bg-white/[0.08] hover:bg-white/[0.12] focus-within:bg-white/[0.14] border border-white/15 rounded-full px-4 py-2.5 shadow-inner transition"
+                >
+                  <span className="material-symbols-rounded text-white/60 text-xl">search</span>
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="何を聴きたいですか？ (曲名・アーティスト・アルバム)"
+                    className="bg-transparent text-white placeholder-white/45 outline-none w-full text-xs sm:text-sm"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchQuery('');
+                        setLastSearchedQuery('');
+                        setTracks(INITIAL_ENRICHED_CATALOG);
+                      }}
+                      className="text-xs text-white/50 hover:text-white"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </form>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleOnlineMusicSearch()}
+                    disabled={isSearchingOnline}
+                    style={{ backgroundColor: resolvedAccentHex }}
+                    className="px-5 py-2.5 rounded-full text-white text-xs font-bold shadow-md transition"
+                  >
+                    {isSearchingOnline ? '検索中...' : '検索'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowImportModal(true)}
+                    className="px-4 py-2.5 rounded-full bg-white/[0.08] hover:bg-white/[0.14] border border-white/15 text-xs font-semibold text-white transition"
+                  >
+                    プレイリスト取込
+                  </button>
+                </div>
+              </div>
+
+              {/* Search Results Top Card + Songs when searching */}
+              {searchQuery.trim() && filteredTracks.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                  {/* Left: Top Result Card */}
+                  <div className="lg:col-span-5 space-y-3">
+                    <h2 className="text-base font-extrabold text-white">上位の検索結果</h2>
+                    <div
+                      onClick={() => playTrack(filteredTracks[0])}
+                      className="group p-5 rounded-2xl apple-liquid-glass border border-white/15 hover:bg-white/[0.08] transition cursor-pointer relative space-y-4"
+                    >
+                      <div className="w-24 h-24 rounded-2xl overflow-hidden bg-zinc-900 shadow-xl">
+                        {filteredTracks[0].artworkUrl ? (
+                          <img
+                            src={filteredTracks[0].artworkUrl}
+                            alt={filteredTracks[0].title}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div
+                            className={`w-full h-full bg-gradient-to-br ${filteredTracks[0].coverGradient}`}
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-xl font-black text-white truncate">
+                          {filteredTracks[0].title}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-white/65 mt-1">
+                          <span>曲</span>
+                          <span>•</span>
+                          <span className="font-bold text-white">{filteredTracks[0].artist}</span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        style={{ backgroundColor: resolvedAccentHex }}
+                        className="absolute bottom-5 right-5 w-12 h-12 rounded-full text-white flex items-center justify-center shadow-xl"
+                      >
+                        <span className="material-symbols-rounded text-2xl">play_arrow</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Right: Top 4 Songs */}
+                  <div className="lg:col-span-7 space-y-3">
+                    <h2 className="text-base font-extrabold text-white">曲</h2>
+                    <div className="space-y-1">
+                      {filteredTracks.slice(0, 4).map((t) => (
+                        <div
+                          key={t.id}
+                          onClick={() => playTrack(t)}
+                          className="flex items-center justify-between p-2.5 rounded-xl hover:bg-white/[0.07] cursor-pointer transition"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-zinc-900 shrink-0">
+                              {t.artworkUrl && (
+                                <img
+                                  src={t.artworkUrl}
+                                  alt={t.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-xs font-bold text-white truncate">{t.title}</div>
+                              <div className="text-[11px] text-white/55 truncate">{t.artist}</div>
+                            </div>
+                          </div>
+                          <div className="text-xs font-mono text-white/50">
+                            {formatSecs(t.duration)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Spotify-Style "すべて閲覧" (Browse All Category Cards with Liquid Glass) */}
+              <div className="space-y-3">
+                <h2 className="text-lg font-extrabold tracking-tight text-white">
+                  すべて閲覧
+                </h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                  {SPOTIFY_SEARCH_CATEGORIES.map((cat) => (
+                    <div
+                      key={cat.id}
+                      onClick={() => {
+                        setSearchQuery(cat.query);
+                        handleOnlineMusicSearch(cat.query);
+                      }}
+                      className={`group relative h-28 sm:h-32 rounded-2xl overflow-hidden p-4 bg-gradient-to-br ${cat.gradient} border border-white/20 shadow-lg cursor-pointer hover:scale-[1.02] transition`}
+                    >
+                      <div className="text-sm sm:text-base font-extrabold text-white tracking-tight relative z-10">
+                        {cat.title}
+                      </div>
+                      {cat.coverUrl && (
+                        <img
+                          src={cat.coverUrl}
+                          alt={cat.title}
+                          className="w-16 h-16 sm:w-20 sm:h-20 object-cover rounded-xl shadow-2xl absolute -bottom-2 -right-2 rotate-[22deg] group-hover:rotate-[14deg] group-hover:scale-105 transition duration-300 border border-white/20"
+                        />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Full Search Results Table */}
+              <div className="space-y-3">
+                <h2 className="text-base font-bold text-white">
+                  楽曲一覧 ({filteredTracks.length}曲)
+                </h2>
+                {renderSpotifyTrackTable(filteredTracks, '検索結果がありません')}
+              </div>
+            </div>
+          )}
+
+          {/* ===============================================================
+              VIEW 4: SETTINGS TAB (4枚目: Spotify風 クリーン設定UI + 音質 + EQ + バージョン仕様)
+             =============================================================== */}
+          {activeNav === 'settings' && (
+            <div className="flex-1 overflow-y-auto p-6 sm:p-10 pb-36">
+              <div className="max-w-3xl mx-auto space-y-8">
+                <div className="border-b border-white/10 pb-4">
+                  <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                    設定
+                  </h1>
+                  <p className="text-xs text-white/55 mt-1">
+                    音質、イコライザー (EQ)、プレイリスト連携、およびバージョン情報
+                  </p>
+                </div>
+
+                {/* Section 1: 音質 (Audio Quality) */}
+                <section className="rounded-2xl apple-liquid-glass border border-white/15 p-5 space-y-4">
+                  <h2 className="text-base font-bold text-white">音質</h2>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-2 border-b border-white/[0.06]">
+                    <div>
+                      <div className="text-xs sm:text-sm font-semibold text-white">
+                        ストリーミング音質
+                      </div>
+                      <div className="text-[11px] text-white/55">
+                        オンライン再生時のビットレートを選択します
+                      </div>
+                    </div>
+                    <select
+                      value={musicSettings.streamingQuality}
+                      onChange={(e) => {
+                        const val = e.target.value as MusicSettingsConfig['streamingQuality'];
+                        updateMusicSettings({ streamingQuality: val });
+                      }}
+                      className="bg-black/60 border border-white/20 rounded-xl px-3.5 py-2 text-xs font-semibold text-white outline-none"
+                    >
+                      <option value="128">標準 (128 kbps)</option>
+                      <option value="192">高音質 (192 kbps)</option>
+                      <option value="320">最高音質 (320 kbps)</option>
+                      <option value="lossless">ロスレス (FLAC)</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-2 border-b border-white/[0.06]">
+                    <div>
+                      <div className="text-xs sm:text-sm font-semibold text-white">
+                        ダウンロード音質
+                      </div>
+                      <div className="text-[11px] text-white/55">
+                        楽曲をローカルに保存する際のフォーマット
+                      </div>
+                    </div>
+                    <select
+                      value={musicSettings.downloadQuality}
+                      onChange={(e) => {
+                        const val = e.target.value as MusicSettingsConfig['downloadQuality'];
+                        updateMusicSettings({ downloadQuality: val });
+                      }}
+                      className="bg-black/60 border border-white/20 rounded-xl px-3.5 py-2 text-xs font-semibold text-white outline-none"
+                    >
+                      <option value="128">128 kbps MP3</option>
+                      <option value="192">192 kbps MP3</option>
+                      <option value="320">320 kbps MP3/M4A</option>
+                      <option value="flac">FLAC ロスレス</option>
+                    </select>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-2">
+                    <div>
+                      <div className="text-xs sm:text-sm font-semibold text-white">
+                        音源ストリーム取得先
+                      </div>
+                      <div className="text-[11px] text-white/55">
+                        優先して使用する音源サーバー
+                      </div>
+                    </div>
+                    <select
+                      value={musicSettings.sourceSite}
+                      onChange={(e) => {
+                        const val = e.target.value as MusicSettingsConfig['sourceSite'];
+                        updateMusicSettings({ sourceSite: val });
+                      }}
+                      className="bg-black/60 border border-white/20 rounded-xl px-3.5 py-2 text-xs font-semibold text-white outline-none"
+                    >
+                      <option value="auto">自動選択 (推奨)</option>
+                      <option value="monochrome">api.monochrome.tf</option>
+                      <option value="saavn">JioSaavn (320kbps)</option>
+                      <option value="netease">NetEase Cloud</option>
+                      <option value="kuwo">Kuwo</option>
+                    </select>
+                  </div>
+                </section>
+
+                {/* Section 2: イコライザー (EQ) & 立体音響 */}
+                <section className="rounded-2xl apple-liquid-glass border border-white/15 p-5 space-y-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-base font-bold text-white">
+                        イコライザー (EQ) &amp; 立体音響
+                      </h2>
+                      <p className="text-[11px] text-white/55">
+                        10バンド周波数調整および空間オーディオ設定
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        updateMusicSettings({
+                          dolbyAtmosEnabled: !musicSettings.dolbyAtmosEnabled,
+                        })
+                      }
+                      style={
+                        musicSettings.dolbyAtmosEnabled
+                          ? { backgroundColor: resolvedAccentHex }
+                          : undefined
+                      }
+                      className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${
+                        musicSettings.dolbyAtmosEnabled
+                          ? 'text-white'
+                          : 'bg-white/10 text-white/70 hover:bg-white/20'
+                      }`}
+                    >
+                      立体音響: {musicSettings.dolbyAtmosEnabled ? 'ON' : 'OFF'}
+                    </button>
+                  </div>
+
+                  <MusicEqualizerPanel
+                    currentTrackGenre={currentTrack.genre}
+                    onStatusMessage={(msg) => setStatusBanner(msg)}
+                  />
+                </section>
+
+                {/* Section 3: 歌詞翻訳 & 外部プレイリスト連携 */}
+                <section className="rounded-2xl apple-liquid-glass border border-white/15 p-5 space-y-4">
+                  <h2 className="text-base font-bold text-white">
+                    歌詞翻訳 &amp; プレイリスト連携
+                  </h2>
+
+                  <div className="flex items-center justify-between py-2 border-b border-white/[0.06]">
+                    <div>
+                      <div className="text-xs sm:text-sm font-semibold text-white">
+                        歌詞の自動翻訳を表示
+                      </div>
+                      <div className="text-[11px] text-white/55">
+                        日本語は英語に、英語は日本語に、その他の言語は日本語に翻訳します
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowLyricsTranslation((v) => !v)}
+                      style={
+                        showLyricsTranslation
+                          ? { backgroundColor: resolvedAccentHex }
+                          : undefined
+                      }
+                      className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${
+                        showLyricsTranslation ? 'text-white' : 'bg-white/10 text-white/70'
+                      }`}
+                    >
+                      {showLyricsTranslation ? '有効' : '無効'}
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between py-2">
+                    <div>
+                      <div className="text-xs sm:text-sm font-semibold text-white">
+                        外部サービスからプレイリストをインポート
+                      </div>
+                      <div className="text-[11px] text-white/55">
+                        Spotify、Apple Music、YouTube Music のプレイリストを取り込みます
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowImportModal(true)}
+                      style={{ backgroundColor: resolvedAccentHex }}
+                      className="px-4 py-2 rounded-xl text-xs font-bold text-white transition"
+                    >
+                      インポート画面を開く
+                    </button>
+                  </div>
+                </section>
+
+                {/* Section 4: バージョン・仕様情報 (GlassiumOS 5 u4) */}
+                <section className="rounded-2xl apple-liquid-glass border border-white/15 p-5 space-y-3">
+                  <h2 className="text-base font-bold text-white">バージョン・仕様</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">
+                      <div className="text-white/50 text-[11px]">システムバージョン</div>
+                      <div className="font-bold text-white mt-0.5">GlassiumOS 5 u4</div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">
+                      <div className="text-white/50 text-[11px]">アプリケーション</div>
+                      <div className="font-bold text-white mt-0.5">
+                        Glassium Groove 5.0 u4
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">
+                      <div className="text-white/50 text-[11px]">オーディオ処理</div>
+                      <div className="font-bold text-white mt-0.5">
+                        Web Audio 10バンド BiquadFilter EQ
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">
+                      <div className="text-white/50 text-[11px]">歌詞・翻訳仕様</div>
+                      <div className="font-bold text-white mt-0.5">
+                        LRCLIB 同期歌詞 / 日↔英・多言語→日翻訳
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </div>
+          )}
+
+          {/* VIEW: MV */}
           {activeNav === 'mv' && (
             <div className="flex-1 overflow-y-auto p-6 sm:p-8 pb-36 space-y-6">
               <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-4">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-[#fa243c]">
-                    Monochrome Official Music Video Stage
-                  </div>
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
                     ミュージックビデオ (MV)
                   </h1>
                   <p className="text-xs text-white/55 mt-1">
-                    {activeMvItem.title} — {activeMvItem.artist} ({activeMvItem.viewsLabel})
-                    {isFetchingMv ? ' · Monochrome MVを取得中...' : ''}
+                    {activeMvItem.title} — {activeMvItem.artist}
+                    {isFetchingMv ? ' · 読み込み中...' : ''}
                   </p>
                 </div>
 
-                {/* Search Monochrome MVs or Load YouTube ID */}
                 <form
                   onSubmit={async (e) => {
                     e.preventDefault();
@@ -3004,7 +3632,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                       setActiveMvItem({
                         id: `mv-custom-${ytId}`,
                         youtubeId: ytId,
-                        title: `${currentTrack.title} (Custom MV)`,
+                        title: `${currentTrack.title} (MV)`,
                         artist: cleanPrimaryArtistName(currentTrack.artist),
                         durationLabel: 'HD',
                         viewsLabel: 'YouTube MV',
@@ -3021,19 +3649,19 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   <input
                     value={customMvYoutubeInput}
                     onChange={(e) => setCustomMvYoutubeInput(e.target.value)}
-                    placeholder="曲名・歌手名でMV検索 または YouTube URL..."
-                    className="w-64 px-3 py-1.5 rounded-lg bg-white/[0.07] border border-white/15 text-xs text-white placeholder-white/40 outline-none focus:border-[#fa243c]"
+                    placeholder="曲名・歌手名でMV検索..."
+                    className="w-60 px-3 py-1.5 rounded-lg bg-white/[0.07] border border-white/15 text-xs text-white outline-none"
                   />
                   <button
                     type="submit"
-                    className="px-3.5 py-1.5 rounded-lg bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-semibold transition"
+                    style={{ backgroundColor: resolvedAccentHex }}
+                    className="px-3.5 py-1.5 rounded-lg text-white text-xs font-semibold"
                   >
                     MV検索
                   </button>
                 </form>
               </div>
 
-              {/* Active MV Cinema Player (16:9 Liquid Glass Frame - Native Monochrome Video or YouTube) */}
               <div className="rounded-2xl overflow-hidden apple-liquid-glass border border-white/20 shadow-2xl">
                 <div className="aspect-video w-full bg-black relative">
                   {activeMvItem.videoUrl ? (
@@ -3055,176 +3683,99 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                       allowFullScreen
                     />
                   ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-white/60">
-                      <span className="material-symbols-rounded text-4xl text-[#fa243c]">
-                        smart_display
-                      </span>
-                      <span className="text-xs">MVストリームを読み込み中...</span>
+                    <div className="w-full h-full flex items-center justify-center text-xs text-white/60">
+                      MVを読み込み中...
                     </div>
                   )}
                 </div>
-                <div className="p-4 flex flex-wrap items-center justify-between gap-4 bg-black/40">
-                  <div>
-                    <h2 className="text-base sm:text-lg font-bold text-white">
-                      {activeMvItem.title}
-                    </h2>
-                    <div className="flex items-center gap-2 text-xs text-white/65 mt-0.5">
-                      <button
-                        type="button"
-                        onClick={() => openArtistPage(activeMvItem.artist)}
-                        className="text-[#fa243c] hover:underline font-semibold"
-                      >
-                        {cleanPrimaryArtistName(activeMvItem.artist)}
-                      </button>
-                      <span>· {activeMvItem.year}年</span>
-                      <span>· {activeMvItem.viewsLabel}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openArtistPage(activeMvItem.artist)}
-                      className="px-3.5 py-1.5 rounded-lg apple-liquid-glass-pill hover:bg-white/20 text-xs font-semibold text-white transition"
-                    >
-                      {cleanPrimaryArtistName(activeMvItem.artist)} のアーティストページへ
-                    </button>
-                  </div>
-                </div>
               </div>
 
-              {/* All Official MVs Grid */}
-              <div className="space-y-3">
-                <h3 className="text-base font-bold text-white">
-                  ミュージックビデオ一覧 ({liveMvCatalog.length}本)
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {liveMvCatalog.map((mv) => {
-                    const isCurrentMv = mv.id === activeMvItem.id;
-                    const thumb =
-                      mv.thumbnailUrl ||
-                      (mv.youtubeId
-                        ? `https://img.youtube.com/vi/${mv.youtubeId}/hqdefault.jpg`
-                        : currentTrack.artworkUrl);
-                    return (
-                      <div
-                        key={mv.id}
-                        onClick={() => {
-                          setActiveMvItem(mv);
-                          if (isPlaying) globalAudio.pause();
-                        }}
-                        className={`group cursor-pointer rounded-xl overflow-hidden border transition flex flex-col ${
-                          isCurrentMv
-                            ? 'bg-[#fa243c]/20 border-[#fa243c] shadow-lg'
-                            : 'apple-liquid-glass hover:border-white/30'
-                        }`}
-                      >
-                        <div className="aspect-video w-full relative overflow-hidden bg-zinc-900">
-                          {thumb && (
-                            <img
-                              src={thumb}
-                              alt={mv.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                            />
-                          )}
-                          <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition flex items-center justify-center">
-                            <div className="w-10 h-10 rounded-full bg-[#fa243c] text-white flex items-center justify-center shadow-lg">
-                              <span className="material-symbols-rounded text-xl">play_arrow</span>
-                            </div>
-                          </div>
-                          <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-mono text-white">
-                            {mv.durationLabel}
-                          </span>
-                        </div>
-                        <div className="p-3 flex-1 flex flex-col justify-between">
-                          <div>
-                            <div className="text-xs font-bold text-white truncate">{mv.title}</div>
-                            <button
-                              type="button"
-                              onClick={(e) => openArtistPage(mv.artist, e)}
-                              className="text-[11px] text-white/60 hover:text-[#fa243c] hover:underline truncate mt-0.5 block text-left"
-                            >
-                              {cleanPrimaryArtistName(mv.artist)}
-                            </button>
-                          </div>
-                          <div className="text-[10px] text-white/40 mt-1">
-                            {mv.year}年 · {mv.viewsLabel}
-                          </div>
-                        </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {liveMvCatalog.map((mv) => {
+                  const thumb =
+                    mv.thumbnailUrl ||
+                    (mv.youtubeId
+                      ? `https://img.youtube.com/vi/${mv.youtubeId}/hqdefault.jpg`
+                      : currentTrack.artworkUrl);
+                  return (
+                    <div
+                      key={mv.id}
+                      onClick={() => {
+                        setActiveMvItem(mv);
+                        if (isPlaying) globalAudio.pause();
+                      }}
+                      className="group cursor-pointer rounded-xl overflow-hidden apple-liquid-glass border border-white/10 hover:border-white/30 transition flex flex-col"
+                    >
+                      <div className="aspect-video w-full relative overflow-hidden bg-zinc-900">
+                        {thumb && (
+                          <img
+                            src={thumb}
+                            alt={mv.title}
+                            className="w-full h-full object-cover"
+                          />
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
+                      <div className="p-3">
+                        <div className="text-xs font-bold text-white truncate">{mv.title}</div>
+                        <div className="text-[11px] text-white/60 truncate mt-0.5">{mv.artist}</div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* VIEW 3: ARTIST PAGE (専用アーティストページ - 人気曲・アルバム・シングル & EP・公式MV) */}
+          {/* VIEW: ARTIST PAGE (Clicking any Album/Single opens the 2nd-Image Detail Layout) */}
           {activeNav === 'artist' && (
             <div className="flex-1 overflow-y-auto p-6 sm:p-8 pb-36 space-y-8">
-              {/* Artist Selector Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-xs text-white/50 mr-1">人気アーティスト:</span>
-                  {POPULAR_ARTIST_SHORTCUTS.map((artist) => (
-                    <button
-                      key={artist}
-                      type="button"
-                      onClick={() => openArtistPage(artist)}
-                      className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
-                        selectedArtistName === artist
-                          ? 'bg-[#fa243c] text-white shadow'
-                          : 'bg-white/[0.06] text-white/75 hover:bg-white/[0.14] hover:text-white'
-                      }`}
-                    >
-                      {artist}
-                    </button>
-                  ))}
-                </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {POPULAR_ARTIST_SHORTCUTS.map((artist) => (
+                  <button
+                    key={artist}
+                    type="button"
+                    onClick={() => openArtistPage(artist)}
+                    style={
+                      selectedArtistName === artist
+                        ? { backgroundColor: resolvedAccentHex }
+                        : undefined
+                    }
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+                      selectedArtistName === artist
+                        ? 'text-white'
+                        : 'bg-white/[0.06] text-white/75 hover:bg-white/[0.14]'
+                    }`}
+                  >
+                    {artist}
+                  </button>
+                ))}
               </div>
 
-              {/* Artist Hero Banner (Liquid Glass + Real Artist Photo) */}
               <div
                 className={`relative rounded-2xl overflow-hidden border border-white/20 bg-gradient-to-br ${activeArtistProfile.bannerGradient} p-6 sm:p-8 shadow-2xl`}
               >
-                {activeArtistProfile.bannerUrl && (
-                  <img
-                    src={activeArtistProfile.bannerUrl}
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-cover opacity-25 blur-xl scale-110 pointer-events-none"
-                  />
-                )}
                 <div className="relative z-10 flex flex-col sm:flex-row items-center sm:items-end gap-6">
-                  <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden border-2 border-white/30 shadow-2xl shrink-0 bg-zinc-900 flex items-center justify-center">
-                    {activeArtistProfile.avatarUrl ? (
+                  <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden border-2 border-white/30 shadow-2xl shrink-0 bg-zinc-900">
+                    {activeArtistProfile.avatarUrl && (
                       <img
                         src={activeArtistProfile.avatarUrl}
                         alt={activeArtistProfile.name}
                         className="w-full h-full object-cover"
                       />
-                    ) : (
-                      <span className="material-symbols-rounded text-5xl text-white/40">
-                        person
-                      </span>
                     )}
                   </div>
                   <div className="flex-1 min-w-0 space-y-2 text-center sm:text-left">
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-black/40 backdrop-blur-md text-[11px] font-semibold text-emerald-300 border border-white/15">
-                      <span className="material-symbols-rounded text-xs">verified</span>
-                      <span>
-                        Monochrome 公式アーティスト · {activeArtistProfile.monthlyListeners}
-                        {isFetchingArtist ? ' · ディスコグラフィ同期中...' : ''}
-                      </span>
+                    <div className="text-xs text-white/80 font-mono">
+                      {activeArtistProfile.monthlyListeners}
+                      {isFetchingArtist ? ' · 読み込み中...' : ''}
                     </div>
                     <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
                       {activeArtistProfile.name}
                     </h1>
-                    <p className="text-xs text-white/75 font-mono">
-                      {activeArtistProfile.englishName} · {activeArtistProfile.genre}
-                    </p>
-                    <p className="text-xs sm:text-sm text-white/85 max-w-2xl leading-relaxed">
+                    <p className="text-xs sm:text-sm text-white/85 max-w-2xl">
                       {activeArtistProfile.bio}
                     </p>
-                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 pt-2">
+                    <div className="pt-2">
                       <button
                         type="button"
                         onClick={() => {
@@ -3232,645 +3783,218 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                             playTrack(artistStrictTopTracks[0]);
                           }
                         }}
-                        className="px-5 py-2 rounded-lg bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-bold transition shadow-lg flex items-center gap-1.5"
+                        style={{ backgroundColor: resolvedAccentHex }}
+                        className="px-5 py-2 rounded-full text-white text-xs font-bold shadow-lg"
                       >
-                        <span className="material-symbols-rounded text-[18px]">play_arrow</span>
-                        <span>人気曲をフル尺再生 ({artistStrictTopTracks.length}曲)</span>
+                        人気曲を再生
                       </button>
-                      {activeArtistProfile.mvs.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActiveMvItem(activeArtistProfile.mvs[0]);
-                            if (isPlaying) globalAudio.pause();
-                            setActiveNav('mv');
-                          }}
-                          className="px-4 py-2 rounded-lg bg-black/50 hover:bg-black/75 border border-white/25 text-white text-xs font-semibold transition flex items-center gap-1.5"
-                        >
-                          <span className="material-symbols-rounded text-[18px]">smart_display</span>
-                          <span>公式MVを再生 ({activeArtistProfile.mvs.length}本)</span>
-                        </button>
-                      )}
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* SECTION 1: 人気曲 (Top Songs - Strictly Only This Artist) */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                      <span className="material-symbols-rounded text-[#fa243c] text-xl">
-                        local_fire_department
-                      </span>
-                      <span>
-                        {activeArtistProfile.name} の人気曲 ({artistStrictTopTracks.length}曲)
-                      </span>
-                    </h2>
-                    <p className="text-[11px] text-white/45 mt-0.5">
-                      {activeArtistProfile.name} 本人の公式楽曲のみを厳密フィルタリングして表示しています
-                    </p>
-                  </div>
-                  {isFetchingArtist && (
-                    <span className="text-xs text-[#fa243c] font-mono">
-                      ディスコグラフィを取得中...
-                    </span>
-                  )}
-                </div>
-                {renderAppleMusicSongTable(
-                  artistStrictTopTracks,
-                  isFetchingArtist
-                    ? `${activeArtistProfile.name} の人気楽曲を読み込み中です...`
-                    : `${activeArtistProfile.name} の楽曲データが見つかりませんでした`
-                )}
+                <h2 className="text-lg font-bold text-white">人気曲</h2>
+                {renderSpotifyTrackTable(artistStrictTopTracks, '楽曲が見つかりませんでした')}
               </div>
 
-              {/* SECTION 2: アルバム (Official Albums + Expandable Album Tracklist) */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                    <span className="material-symbols-rounded text-cyan-400 text-xl">album</span>
-                    <span>
-                      アルバム ({activeArtistProfile.albums?.length || 0}作品)
-                    </span>
-                  </h2>
-                  {selectedArtistAlbum && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedArtistAlbum(null);
-                        setSelectedAlbumTracks([]);
-                      }}
-                      className="text-xs text-white/60 hover:text-white px-2.5 py-1 rounded-lg bg-white/10"
-                    >
-                      収録曲パネルを閉じる
-                    </button>
-                  )}
+              {activeArtistProfile.albums && activeArtistProfile.albums.length > 0 && (
+                <div className="space-y-3">
+                  <h2 className="text-lg font-bold text-white">アルバム</h2>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    {activeArtistProfile.albums.map((alb) => (
+                      <div
+                        key={alb.id}
+                        onClick={() =>
+                          openCollectionDetail(
+                            {
+                              id: alb.id,
+                              kind: 'ALBUM',
+                              title: alb.title,
+                              subtitle: `${alb.artist} · アルバム`,
+                              creator: alb.artist,
+                              year: alb.year,
+                              artworkUrl: alb.artworkUrl,
+                              coverGradient: activeArtistProfile.bannerGradient,
+                              tracks: [],
+                            },
+                            alb.collectionId
+                          )
+                        }
+                        className="group cursor-pointer rounded-2xl p-3 bg-white/[0.04] hover:bg-white/[0.1] border border-white/10 transition flex flex-col gap-2"
+                      >
+                        <div className="aspect-square w-full rounded-xl overflow-hidden bg-zinc-900">
+                          {alb.artworkUrl && (
+                            <img
+                              src={alb.artworkUrl}
+                              alt={alb.title}
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                        </div>
+                        <div className="text-xs font-bold text-white truncate">{alb.title}</div>
+                        <div className="text-[11px] text-white/50">
+                          {alb.year}年 · アルバム
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+              )}
 
-                {activeArtistProfile.albums && activeArtistProfile.albums.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                    {activeArtistProfile.albums.map((alb) => {
-                      const isSelected = selectedArtistAlbum?.id === alb.id;
-                      return (
-                        <div
-                          key={alb.id}
-                          onClick={() => openAlbumTracks(alb)}
-                          className={`group cursor-pointer rounded-xl p-3 border transition flex flex-col gap-2.5 ${
-                            isSelected
-                              ? 'bg-[#fa243c]/15 border-[#fa243c]'
-                              : 'bg-white/[0.03] hover:bg-white/[0.08] border-white/10'
-                          }`}
-                        >
-                          <div className="aspect-square w-full rounded-lg overflow-hidden bg-zinc-900 relative shadow-lg">
-                            {alb.artworkUrl ? (
-                              <img
-                                src={alb.artworkUrl}
-                                alt={alb.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <span className="material-symbols-rounded text-4xl text-white/30">
-                                  album
-                                </span>
-                              </div>
-                            )}
-                            <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                              <div className="px-3 py-1.5 rounded-lg bg-[#fa243c] text-white text-[11px] font-bold shadow-lg flex items-center gap-1">
-                                <span className="material-symbols-rounded text-sm">queue_music</span>
-                                <span>収録曲を表示</span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-xs font-bold text-white truncate" title={alb.title}>
-                              {alb.title}
-                            </div>
-                            <div className="text-[11px] text-white/50 mt-0.5">
-                              {alb.year}年 · 全{alb.trackCount}曲 · {alb.genre}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="p-6 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs text-white/45 text-center">
-                    {isFetchingArtist
-                      ? `${activeArtistProfile.name} のアルバム一覧を取得中...`
-                      : '登録されているフルアルバムはありません'}
-                  </div>
-                )}
-
-                {/* Expanded Album Tracklist Panel */}
-                {selectedArtistAlbum && (
-                  <div className="rounded-2xl p-5 bg-white/[0.04] border border-white/15 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-3">
-                      <div className="flex items-center gap-3.5">
-                        {selectedArtistAlbum.artworkUrl && (
-                          <img
-                            src={selectedArtistAlbum.artworkUrl}
-                            alt={selectedArtistAlbum.title}
-                            className="w-14 h-14 rounded-xl object-cover border border-white/20"
-                          />
-                        )}
-                        <div>
-                          <div className="text-[10px] font-mono uppercase tracking-wider text-cyan-300">
-                            ALBUM TRACKLIST · {selectedArtistAlbum.year}年
-                          </div>
-                          <h3 className="text-base font-bold text-white">
-                            {selectedArtistAlbum.title}
-                          </h3>
-                          <p className="text-xs text-white/55">
-                            {selectedArtistAlbum.artist} · 全{selectedAlbumTracks.length || selectedArtistAlbum.trackCount}曲
-                          </p>
-                        </div>
-                      </div>
-                      {selectedAlbumTracks.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => playTrack(selectedAlbumTracks[0])}
-                          className="px-4 py-2 rounded-lg bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-bold transition flex items-center gap-1.5"
-                        >
-                          <span className="material-symbols-rounded text-base">play_arrow</span>
-                          <span>アルバムを最初から再生</span>
-                        </button>
-                      )}
-                    </div>
-                    {isLoadingAlbumTracks ? (
-                      <div className="py-8 text-center text-xs text-white/55 font-mono">
-                        『{selectedArtistAlbum.title}』の収録曲を取得中...
-                      </div>
-                    ) : (
-                      renderAppleMusicSongTable(
-                        selectedAlbumTracks,
-                        '収録曲データが見つかりませんでした'
-                      )
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* SECTION 3: シングル & EP (Official Singles & EPs) */}
-              <div className="space-y-3">
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <span className="material-symbols-rounded text-amber-400 text-xl">music_note</span>
-                  <span>
-                    シングル &amp; EP ({activeArtistProfile.singles?.length || 0}作品)
-                  </span>
-                </h2>
-                {activeArtistProfile.singles && activeArtistProfile.singles.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {activeArtistProfile.singles && activeArtistProfile.singles.length > 0 && (
+                <div className="space-y-3">
+                  <h2 className="text-lg font-bold text-white">シングル &amp; EP</h2>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {activeArtistProfile.singles.map((sg) => (
                       <div
                         key={sg.id}
-                        onClick={() => {
-                          playTrack({
+                        onClick={() =>
+                          openCollectionDetail({
                             id: sg.id,
-                            monoTrackId: '',
+                            kind: sg.trackCount > 1 ? 'EP' : 'SINGLE',
                             title: sg.cleanTitle,
-                            artist: sg.artist,
-                            album: sg.title,
-                            coverGradient: 'from-rose-950 via-zinc-900 to-black',
-                            coverAccent: '#fa243c',
-                            artworkUrl: sg.artworkUrl,
-                            audioUrl: sg.audioUrl,
-                            isFullLengthStream: true,
-                            duration: 215,
-                            format: 'api.monochrome.tf Full-Length Stream',
-                            bitrate: '320 kbps Full Track',
-                            genre: 'Single',
+                            subtitle: `${sg.artist} · ${sg.trackCount > 1 ? 'EP' : 'シングル'}`,
+                            creator: sg.artist,
                             year: sg.year,
-                            lyrics: [
-                              { time: 0, text: `${sg.cleanTitle} — ${sg.artist}` },
-                              { time: 3, text: '同期歌詞を読み込み中...' },
+                            artworkUrl: sg.artworkUrl,
+                            coverGradient: activeArtistProfile.bannerGradient,
+                            tracks: [
+                              {
+                                id: sg.id,
+                                monoTrackId: '',
+                                title: sg.cleanTitle,
+                                artist: sg.artist,
+                                album: sg.title,
+                                coverGradient: activeArtistProfile.bannerGradient,
+                                coverAccent: resolvedAccentHex,
+                                artworkUrl: sg.artworkUrl,
+                                audioUrl: sg.audioUrl,
+                                isFullLengthStream: true,
+                                duration: 215,
+                                format: 'Stream',
+                                bitrate: '320 kbps',
+                                genre: 'Single',
+                                year: sg.year,
+                                lyrics: [{ time: 0, text: `${sg.cleanTitle} — ${sg.artist}` }],
+                              },
                             ],
-                          });
-                        }}
-                        className="group cursor-pointer rounded-xl p-3 bg-white/[0.03] hover:bg-white/[0.08] border border-white/10 hover:border-[#fa243c]/50 transition flex items-center gap-3"
+                          })
+                        }
+                        className="group cursor-pointer rounded-2xl p-3 bg-white/[0.04] hover:bg-white/[0.1] border border-white/10 transition flex items-center gap-3"
                       >
-                        <div className="w-14 h-14 rounded-lg overflow-hidden bg-zinc-900 shrink-0 relative">
-                          {sg.artworkUrl ? (
+                        <div className="w-14 h-14 rounded-xl overflow-hidden bg-zinc-900 shrink-0">
+                          {sg.artworkUrl && (
                             <img
                               src={sg.artworkUrl}
                               alt={sg.title}
                               className="w-full h-full object-cover"
                             />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <span className="material-symbols-rounded text-xl text-white/30">
-                                music_note
-                              </span>
-                            </div>
                           )}
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                            <span className="material-symbols-rounded text-white text-xl">
-                              play_arrow
-                            </span>
-                          </div>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs font-bold text-white truncate" title={sg.title}>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-white truncate">
                             {sg.cleanTitle}
                           </div>
-                          <div className="text-[10px] text-white/50 truncate mt-0.5">
-                            {sg.year}年 · シングル
+                          <div className="text-[10px] text-white/50">
+                            {sg.year}年 · {sg.trackCount > 1 ? 'EP' : 'シングル'}
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
-                ) : (
-                  <div className="p-6 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs text-white/45 text-center">
-                    {isFetchingArtist
-                      ? `${activeArtistProfile.name} のシングル一覧を取得中...`
-                      : '登録されているシングルはありません'}
-                  </div>
-                )}
-              </div>
-
-              {/* SECTION 4: ミュージックビデオ (Official MVs) */}
-              {activeArtistProfile.mvs.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                      <span className="material-symbols-rounded text-purple-400 text-xl">
-                        smart_display
-                      </span>
-                      <span>
-                        {activeArtistProfile.name} のミュージックビデオ ({activeArtistProfile.mvs.length}本)
-                      </span>
-                    </h2>
-                    <button
-                      type="button"
-                      onClick={() => setActiveNav('mv')}
-                      className="text-xs text-[#fa243c] hover:underline"
-                    >
-                      MVステージへ
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {activeArtistProfile.mvs.map((mv) => {
-                      const thumb =
-                        mv.thumbnailUrl ||
-                        (mv.youtubeId
-                          ? `https://img.youtube.com/vi/${mv.youtubeId}/hqdefault.jpg`
-                          : activeArtistProfile.avatarUrl);
-                      return (
-                        <div
-                          key={mv.id}
-                          onClick={() => {
-                            setActiveMvItem(mv);
-                            if (isPlaying) globalAudio.pause();
-                            setActiveNav('mv');
-                          }}
-                          className="group cursor-pointer rounded-xl overflow-hidden apple-liquid-glass hover:border-[#fa243c]/60 transition flex flex-col"
-                        >
-                          <div className="aspect-video w-full relative overflow-hidden bg-zinc-900">
-                            {thumb && (
-                              <img
-                                src={thumb}
-                                alt={mv.title}
-                                className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                              />
-                            )}
-                            <div className="absolute inset-0 bg-black/35 group-hover:bg-black/15 transition flex items-center justify-center">
-                              <div className="w-11 h-11 rounded-full bg-[#fa243c] text-white flex items-center justify-center shadow-lg">
-                                <span className="material-symbols-rounded text-2xl">play_arrow</span>
-                              </div>
-                            </div>
-                            <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[10px] font-mono text-white">
-                              {mv.durationLabel}
-                            </span>
-                          </div>
-                          <div className="p-3">
-                            <div className="text-xs font-bold text-white truncate">{mv.title}</div>
-                            <div className="text-[11px] text-white/55 mt-0.5">
-                              {mv.year}年 · {mv.viewsLabel}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* VIEW 4: BROWSE (見つける) */}
-          {(activeNav === 'browse' || activeNav === 'listen-now') && (
-            <div className="flex-1 overflow-y-auto p-6 sm:p-8 pb-36 space-y-6">
-              <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-4">
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                    見つける (楽曲・アーティスト・MV)
-                  </h1>
-                  <p className="text-xs text-white/50 mt-1">{statusBanner}</p>
-                </div>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleOnlineMusicSearch();
-                  }}
-                  className="flex items-center gap-2 w-full sm:w-auto"
-                >
-                  <input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="曲名・アーティスト名を入力..."
-                    className="w-full sm:w-64 px-3 py-1.5 rounded-lg bg-white/[0.07] border border-white/15 focus:border-[#fa243c] text-xs text-white placeholder-white/40 outline-none"
-                  />
-                  <button
-                    type="submit"
-                    disabled={isSearchingOnline}
-                    className="px-4 py-1.5 rounded-lg bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-semibold shrink-0 transition"
-                  >
-                    {isSearchingOnline ? '検索中...' : '検索'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowBrowseEqPanel((v) => !v)}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold shrink-0 transition flex items-center gap-1.5 border cursor-pointer ${
-                      showBrowseEqPanel
-                        ? 'bg-cyan-500 text-slate-950 border-cyan-300 shadow-[0_0_16px_rgba(34,211,238,0.4)]'
-                        : 'bg-cyan-500/15 text-cyan-200 border-cyan-400/35 hover:bg-cyan-500/25'
-                    }`}
-                  >
-                    <span className="material-symbols-rounded text-[15px]">equalizer</span>
-                    <span>{showBrowseEqPanel ? 'EQパネルを隠す' : 'EQ / AIEQパネルを表示'}</span>
-                  </button>
-                </form>
-              </div>
-
-              {/* Inline Equalizer (Rock, Pop, Jazz, Classical + Draggable Faders + JBL Charge 5 / Echo Studio / Quantum / ZEALOT AIEQ) */}
-              {showBrowseEqPanel && (
-                <MusicEqualizerPanel
-                  currentTrackGenre={currentTrack.genre}
-                  onStatusMessage={(msg) => setStatusBanner(msg)}
-                />
-              )}
-
-              {/* 12-Genre Full-Length Server Music Category Bar */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-white/80">
-                    🎵 ジャンル別フル尺ストリーミング (Server 320kbps Master)
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchQuery('');
-                      setLastSearchedQuery('');
-                      setTracks(INITIAL_ENRICHED_CATALOG);
-                      setStatusBanner(
-                        `全ジャンル統合フル尺カタログ (${INITIAL_ENRICHED_CATALOG.length}曲) — 30秒制限なし・サーバー直結フル再生`
-                      );
-                    }}
-                    className="text-[11px] text-[#fa243c] hover:underline font-semibold"
-                  >
-                    全ジャンル表示に戻す
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    { label: '🌟 すべて (All Genres)', query: '' },
-                    { label: '🎤 J-POP トップヒット', query: 'YOASOBI 米津玄師 Mrs. GREEN APPLE' },
-                    { label: '🎹 ボカロ / Vocaloid', query: '初音ミク DECO*27 ピノキオピー Kanaria' },
-                    { label: '⚔️ アニソン / Anime OST', query: 'アニメ 主題歌 LiSA 結束バンド' },
-                    { label: '🔥 Phonk / Drift', query: 'KORDHELL INTERWORLD DVRST Phonk' },
-                    { label: '💎 K-POP', query: 'NewJeans ILLIT LE SSERAFIM aespa' },
-                    { label: '🎧 EDM / Future Bass', query: 'Alan Walker Avicii Marshmello EDM' },
-                    { label: '🎸 J-Rock / バンド', query: 'King Gnu Official髭男dism RADWIMPS' },
-                    { label: '🎙️ Hip-Hop / J-Rap', query: 'Creepy Nuts Travis Scott Hip Hop' },
-                    { label: '🌃 シティポップ / 80s', query: '松原みき 竹内まりや シティポップ' },
-                    { label: '☕ Lo-Fi Chill / Jazz', query: 'Nujabes Lo-Fi Chillhop Jazz' },
-                    { label: '🎮 ゲームOST / Boss', query: 'Undertale Toby Fox HOYO-MiX 原神' },
-                    { label: '🎻 クラシック / ピアノ', query: '久石譲 坂本龍一 Piano Classical' },
-                  ].map((g) => (
-                    <button
-                      key={g.label}
-                      type="button"
-                      onClick={() => {
-                        if (!g.query) {
-                          setSearchQuery('');
-                          setLastSearchedQuery('');
-                          setTracks(INITIAL_ENRICHED_CATALOG);
-                        } else {
-                          setSearchQuery(g.query);
-                          handleOnlineMusicSearch(g.query);
-                        }
-                      }}
-                      className="px-3 py-1.5 rounded-full bg-white/[0.06] hover:bg-[#fa243c] border border-white/10 hover:border-[#fa243c] text-xs font-semibold text-white transition"
-                    >
-                      {g.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {POPULAR_ARTIST_SHORTCUTS.map((artist) => (
-                  <div
-                    key={artist}
-                    onClick={() => openArtistPage(artist)}
-                    className="p-4 rounded-xl border bg-white/[0.04] hover:bg-[#fa243c]/20 border-white/[0.08] hover:border-[#fa243c] text-left transition cursor-pointer flex flex-col justify-between gap-2"
-                  >
-                    <div className="text-sm font-bold text-white">{artist}</div>
-                    <div className="text-[11px] text-white/55">
-                      アーティストページ &amp; MVを開く →
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {renderAppleMusicSongTable(filteredTracks, '検索結果がありません')}
-            </div>
-          )}
-
-          {/* VIEW 5: FAVORITES (お気に入り) */}
+          {/* VIEW: FAVORITES */}
           {activeNav === 'favorites' && (
             <div className="flex-1 overflow-y-auto p-6 sm:p-8 pb-36 space-y-6">
-              <div className="flex items-end justify-between border-b border-white/[0.08] pb-4">
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                    お気に入り
-                  </h1>
-                  <p className="text-xs text-white/50 mt-1">
-                    登録した楽曲 ({favoriteTracks.length}曲) — ブラウザに自動保存されます
-                  </p>
-                </div>
-                {favoriteTracks.length > 0 && (
-                  <button
-                    onClick={() => playTrack(favoriteTracks[0])}
-                    className="px-4 py-1.5 rounded-lg bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-semibold transition"
-                  >
-                    お気に入りを再生
-                  </button>
-                )}
-              </div>
-
-              {renderAppleMusicSongTable(
-                favoriteTracks,
-                'お気に入りに登録された曲がまだありません。各曲の「追加」ボタンから登録できます。'
-              )}
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">
+                お気に入り ({favoriteTracks.length}曲)
+              </h1>
+              {renderSpotifyTrackTable(favoriteTracks, 'お気に入りに登録された曲がまだありません')}
             </div>
           )}
 
-          {/* VIEW 6: ALL SONGS (すべての曲) */}
+          {/* VIEW: ALL SONGS */}
           {activeNav === 'songs' && (
             <div className="flex-1 overflow-y-auto p-6 sm:p-8 pb-36 space-y-6">
-              <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-4">
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                    すべての曲 ({filteredTracks.length}曲)
-                  </h1>
-                  <p className="text-xs text-white/50 mt-1">{statusBanner}</p>
-                </div>
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    handleOnlineMusicSearch();
-                  }}
-                  className="flex items-center gap-2 w-full sm:w-auto"
-                >
-                  <input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="曲名・アーティスト名で検索..."
-                    className="w-full sm:w-64 px-3 py-1.5 rounded-lg bg-white/[0.07] border border-white/15 focus:border-[#fa243c] text-xs text-white placeholder-white/40 outline-none"
-                  />
-                  <button
-                    type="submit"
-                    disabled={isSearchingOnline}
-                    className="px-4 py-1.5 rounded-lg bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-semibold shrink-0 transition"
-                  >
-                    {isSearchingOnline ? '検索中...' : '検索'}
-                  </button>
-                </form>
-              </div>
-              {renderAppleMusicSongTable(filteredTracks, '楽曲がありません')}
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">
+                すべての曲 ({filteredTracks.length}曲)
+              </h1>
+              {renderSpotifyTrackTable(filteredTracks, '楽曲がありません')}
             </div>
           )}
 
-          {/* VIEW 7: RECENTLY PLAYED (最近再生した項目) */}
+          {/* VIEW: RECENT */}
           {activeNav === 'recent' && (
             <div className="flex-1 overflow-y-auto p-6 sm:p-8 pb-36 space-y-6">
-              <div className="border-b border-white/[0.08] pb-4">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                  最近再生した項目
-                </h1>
-                <p className="text-xs text-white/50 mt-1">再生履歴 ({recentTracks.length}曲)</p>
-              </div>
-              {renderAppleMusicSongTable(recentTracks, '再生履歴がまだありません')}
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">
+                再生履歴 ({recentTracks.length}曲)
+              </h1>
+              {renderSpotifyTrackTable(recentTracks, '再生履歴がありません')}
             </div>
           )}
 
-          {/* VIEW 8: FULL-SCREEN LYRICS (Apple Music Immersive 2-Column Liquid Glass Stage) */}
+          {/* VIEW: FULL-SCREEN LYRICS & TRANSLATION */}
           {activeNav === 'lyrics' && (
             <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden relative">
-              {/* Extra Immersive Artwork-Synced Moving Gradient Stage Layer */}
-              <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-                <div
-                  className="absolute -top-[10%] left-[5%] w-[65%] h-[65%] rounded-full blur-[90px] opacity-55 artwork-fluid-orb-1"
-                  style={{
-                    background: `radial-gradient(circle, ${artworkPalette.c1}, ${artworkPalette.c3}, transparent 72%)`,
-                  }}
-                />
-                <div
-                  className="absolute -bottom-[10%] right-[5%] w-[65%] h-[65%] rounded-full blur-[95px] opacity-50 artwork-fluid-orb-2"
-                  style={{
-                    background: `radial-gradient(circle, ${artworkPalette.c2}, ${artworkPalette.c4}, transparent 72%)`,
-                  }}
-                />
-              </div>
-
-              {/* Left Column: Floating Liquid Glass Artwork, Scrubber & Transport */}
-              <div className="relative z-10 w-full lg:w-[380px] xl:w-[430px] p-6 sm:p-8 flex flex-col justify-center items-center apple-liquid-glass border-b lg:border-b-0 lg:border-r border-white/[0.12] shrink-0">
-                <div className="w-full max-w-[300px] space-y-6">
-                  {/* Dynamic Spring-Scaled Artwork with Moving Aura */}
-                  <div className="relative group">
-                    <div
-                      className="absolute -inset-3 rounded-3xl blur-2xl opacity-75 transition-all duration-700 artwork-dock-underglow"
-                      style={{
-                        background: `linear-gradient(135deg, ${artworkPalette.c1}, ${artworkPalette.c2}, ${artworkPalette.c3}, ${artworkPalette.c4})`,
-                      }}
-                    />
-                    <div
-                      className={`relative aspect-square w-full rounded-2xl overflow-hidden bg-zinc-900 border border-white/25 transition-all duration-700 ${
-                        isPlaying
-                          ? 'scale-100 shadow-[0_28px_60px_rgba(0,0,0,0.68)]'
-                          : 'scale-[0.92] opacity-80 shadow-[0_12px_30px_rgba(0,0,0,0.45)]'
-                      }`}
-                    >
-                      {currentTrack.artworkUrl ? (
-                        <img
-                          src={currentTrack.artworkUrl}
-                          alt={currentTrack.title}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div
-                          className={`w-full h-full bg-gradient-to-br ${currentTrack.coverGradient}`}
-                        />
-                      )}
-                    </div>
+              <div className="relative z-10 w-full lg:w-[360px] p-6 sm:p-8 flex flex-col justify-center items-center apple-liquid-glass border-b lg:border-b-0 lg:border-r border-white/[0.12] shrink-0">
+                <div className="w-full max-w-[260px] space-y-5">
+                  <div className="aspect-square w-full rounded-2xl overflow-hidden bg-zinc-900 border border-white/25 shadow-2xl">
+                    {currentTrack.artworkUrl ? (
+                      <img
+                        src={currentTrack.artworkUrl}
+                        alt={currentTrack.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div
+                        className={`w-full h-full bg-gradient-to-br ${currentTrack.coverGradient}`}
+                      />
+                    )}
                   </div>
-
-                  {/* Title, Artist & Favorite Button */}
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <h2 className="text-lg sm:text-xl font-bold text-white truncate">
-                        {currentTrack.title}
-                      </h2>
-                      <button
-                        type="button"
-                        onClick={() => openArtistPage(currentTrack.artist)}
-                        className="text-sm text-white/70 hover:text-[#fa243c] hover:underline truncate mt-0.5 block text-left"
-                      >
-                        {cleanPrimaryArtistName(currentTrack.artist)}
-                      </button>
-                      <p className="text-[11px] text-white/40 font-mono truncate mt-0.5">
-                        {currentTrack.album} · {currentTrack.bitrate}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => openTrackMv(currentTrack)}
-                        className="px-2.5 py-1 rounded-lg apple-liquid-glass-pill text-xs font-semibold text-white hover:bg-[#fa243c] transition"
-                      >
-                        MV
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => toggleFavorite(currentTrack, e)}
-                        className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
-                          isFavorite(currentTrack.id)
-                            ? 'bg-[#fa243c] text-white'
-                            : 'apple-liquid-glass-pill text-white/80 hover:text-white'
-                        }`}
-                      >
-                        {isFavorite(currentTrack.id) ? '登録済' : 'お気に入り'}
-                      </button>
-                    </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white truncate">{currentTrack.title}</h2>
+                    <button
+                      type="button"
+                      onClick={() => openArtistPage(currentTrack.artist)}
+                      className="text-sm text-white/70 hover:text-white hover:underline truncate mt-0.5 block"
+                    >
+                      {cleanPrimaryArtistName(currentTrack.artist)}
+                    </button>
                   </div>
                 </div>
               </div>
-
-              {/* Right Column: Full-Screen 60fps Time-Synced Lyrics Stage */}
-              {renderAppleMusicLyricsPanel(true)}
+              {renderSyncedLyricsPanel(true)}
             </div>
           )}
 
-          {/* VIEW 9: API.MONOCHROME.TF WEB PROXY (Wisp v1 + UV/Scramjet Service Worker) */}
+          {/* VIEW: EQUALIZER */}
+          {activeNav === 'eq' && (
+            <div className="flex-1 p-6 sm:p-8 pb-36 overflow-y-auto space-y-6">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+                  10バンド イコライザー (EQ)
+                </h1>
+                <p className="text-xs text-white/55 mt-1">
+                  周波数スライダーまたはプリセットで音質を調整できます
+                </p>
+              </div>
+              <MusicEqualizerPanel
+                currentTrackGenre={currentTrack.genre}
+                onStatusMessage={(msg) => setStatusBanner(msg)}
+              />
+            </div>
+          )}
+
+          {/* VIEW: MONOCHROME WEB PROXY */}
           {activeNav === 'monochrome-web' && (
             <div className="flex-1 flex flex-col min-h-0 bg-zinc-950">
               <div className="px-4 py-2 bg-zinc-900 border-b border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="text-white/60 font-mono text-[11px]">Instance:</span>
                   {MONOCHROME_INSTANCES.map((inst) => (
                     <button
                       key={inst.name}
@@ -3878,47 +4002,20 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                         setMonoWebUrl(inst.url);
                         loadMonochromeWebProxy(inst.url, relayNode, proxyEngine);
                       }}
-                      className={`px-2.5 py-1 rounded text-[11px] font-semibold transition ${
+                      style={
                         monoWebUrl === inst.url
-                          ? 'bg-[#fa243c] text-white'
-                          : 'bg-white/5 text-white/70 hover:bg-white/15'
+                          ? { backgroundColor: resolvedAccentHex }
+                          : undefined
+                      }
+                      className={`px-2.5 py-1 rounded text-[11px] font-semibold transition ${
+                        monoWebUrl === inst.url ? 'text-white' : 'bg-white/5 text-white/70'
                       }`}
                     >
                       {inst.name}
                     </button>
                   ))}
                 </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                  <select
-                    value={wispServer}
-                    onChange={(e) => {
-                      const nextWisp = e.target.value;
-                      setWispServer(nextWisp);
-                      configureServiceWorkerWisp(nextWisp, proxyEngine, relayNode);
-                      loadMonochromeWebProxy(monoWebUrl, relayNode, proxyEngine);
-                    }}
-                    className="bg-black border border-white/15 text-emerald-300 text-[11px] px-2 py-1 rounded outline-none font-mono"
-                  >
-                    {WISP_SERVER_PRESETS.map((w) => (
-                      <option key={w.id} value={w.wispUrl} className="bg-zinc-900 text-white">
-                        Wisp: {w.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  <button
-                    onClick={() => {
-                      const nextEngine: ProxyEngine =
-                        proxyEngine === 'scramjet' ? 'ultraviolet' : 'scramjet';
-                      setProxyEngine(nextEngine);
-                      loadMonochromeWebProxy(monoWebUrl, relayNode, nextEngine);
-                    }}
-                    className="px-2.5 py-1 rounded bg-white/10 hover:bg-white/20 text-white text-[11px] font-mono"
-                  >
-                    SW: {proxyEngine === 'scramjet' ? 'Scramjet (/scramjet/)' : 'Ultraviolet (/uv/service/)'}
-                  </button>
-
+                <div className="flex items-center gap-2">
                   <select
                     value={relayNode}
                     onChange={(e) => {
@@ -3926,650 +4023,172 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                       setRelayNode(nextNode);
                       loadMonochromeWebProxy(monoWebUrl, nextNode, proxyEngine);
                     }}
-                    className="bg-black border border-white/15 text-white text-[11px] px-2 py-1 rounded outline-none"
+                    className="bg-black border border-white/15 text-white text-[11px] px-2 py-1 rounded"
                   >
                     {PROXY_RELAY_SERVERS.map((srv) => (
-                      <option key={srv.id} value={srv.id} className="bg-zinc-900 text-white">
-                        Relay: {srv.name}
+                      <option key={srv.id} value={srv.id}>
+                        {srv.name}
                       </option>
                     ))}
                   </select>
-                  <button
-                    onClick={() => loadMonochromeWebProxy(monoWebUrl, relayNode, proxyEngine)}
-                    className="px-3 py-1 rounded bg-white/10 hover:bg-white/20 text-white text-[11px]"
-                  >
-                    再読込
-                  </button>
                 </div>
               </div>
-
               <div className="flex-1 relative bg-white">
-                {monoWebLoading && (
-                  <div className="absolute inset-0 z-20 bg-zinc-950/85 backdrop-blur-sm flex items-center justify-center text-xs text-white font-mono">
-                    Wisp ({wispServer}) + {proxyEngine.toUpperCase()} Service Worker 経由で {monoWebUrl} を接続中...
-                  </div>
-                )}
                 {monoWebSwSrc ? (
                   <iframe
                     src={monoWebSwSrc}
-                    onLoad={() => setMonoWebLoading(false)}
                     className="w-full h-full border-0 bg-white"
                     title="monochrome-wisp-sw-proxy"
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
                   />
                 ) : (
                   <iframe
                     srcDoc={monoWebSrcDoc}
-                    onLoad={() => setMonoWebLoading(false)}
                     className="w-full h-full border-0 bg-white"
                     title="monochrome-sw-proxy"
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
                   />
                 )}
               </div>
             </div>
           )}
 
-          {/* VIEW 10: SYNTHESIZER */}
+          {/* VIEW: SYNTH */}
           {activeNav === 'synth' && (
             <div className="flex-1 flex flex-col md:flex-row min-h-0">
-              <div className="flex-1 flex flex-col items-center justify-center p-6 relative">
-                <div className="h-64 w-full max-w-lg bg-black/40 p-4 rounded-lg overflow-hidden relative border border-white/10">
+              <div className="flex-1 flex flex-col items-center justify-center p-6">
+                <div className="h-64 w-full max-w-lg bg-black/40 p-4 rounded-xl border border-white/10">
                   <canvas ref={canvasRef} className="h-full w-full" />
                 </div>
-
                 <div className="mt-6">
                   <button
                     onClick={togglePlay}
-                    className="px-6 py-2.5 rounded-lg bg-[#fa243c] hover:bg-[#e01e35] font-semibold text-xs text-white transition"
+                    style={{ backgroundColor: resolvedAccentHex }}
+                    className="px-6 py-2.5 rounded-xl font-semibold text-xs text-white"
                   >
-                    {isPlaying ? 'Pause Synthesis' : 'Start Synthesis'}
+                    {isPlaying ? '一時停止' : '再生'}
                   </button>
                 </div>
               </div>
-
-              <div className="w-72 border-l border-white/10 p-5 flex flex-col justify-between bg-black/30 overflow-y-auto">
-                <div className="space-y-4">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-white/60">
-                    Oscillator Configuration
-                  </h3>
-
-                  <div>
-                    <label className="text-[11px] text-white/60 mb-1.5 block">Waveform</label>
-                    <div className="grid grid-cols-2 gap-1.5 bg-black/40 p-1 border border-white/10 rounded">
-                      {(['sawtooth', 'sine', 'triangle', 'square'] as OscillatorType[]).map(
-                        (wf) => (
-                          <button
-                            key={wf}
-                            onClick={() => setWaveform(wf)}
-                            className={`py-1 rounded text-xs capitalize font-medium transition ${
-                              waveform === wf
-                                ? 'bg-[#fa243c] text-white'
-                                : 'text-white/60 hover:text-white'
-                            }`}
-                          >
-                            {wf}
-                          </button>
-                        )
-                      )}
-                    </div>
+              <div className="w-72 border-l border-white/10 p-5 space-y-4 bg-black/30">
+                <div>
+                  <label className="text-[11px] text-white/60 mb-1.5 block">波形</label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {(['sawtooth', 'sine', 'triangle', 'square'] as OscillatorType[]).map((wf) => (
+                      <button
+                        key={wf}
+                        onClick={() => setWaveform(wf)}
+                        style={
+                          waveform === wf ? { backgroundColor: resolvedAccentHex } : undefined
+                        }
+                        className={`py-1.5 rounded text-xs capitalize font-medium ${
+                          waveform === wf ? 'text-white' : 'bg-white/5 text-white/60'
+                        }`}
+                      >
+                        {wf}
+                      </button>
+                    ))}
                   </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-white/60">Frequency</span>
-                      <span className="font-mono text-white">{baseFreq} Hz</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={55}
-                      max={660}
-                      value={baseFreq}
-                      onChange={(e) => setBaseFreq(Number(e.target.value))}
-                      className="w-full accent-[#fa243c] cursor-pointer"
-                    />
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-white/60">基本周波数</span>
+                    <span className="font-mono text-white">{baseFreq} Hz</span>
                   </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-white/60">Harmonics</span>
-                      <span className="font-mono text-white">{harmonics}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={1}
-                      max={8}
-                      value={harmonics}
-                      onChange={(e) => setHarmonics(Number(e.target.value))}
-                      className="w-full accent-[#fa243c] cursor-pointer"
-                    />
+                  <input
+                    type="range"
+                    min={55}
+                    max={660}
+                    value={baseFreq}
+                    onChange={(e) => setBaseFreq(Number(e.target.value))}
+                    className="w-full cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-white/60">倍音</span>
+                    <span className="font-mono text-white">{harmonics}</span>
                   </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span className="text-white/60">Filter Cutoff</span>
-                      <span className="font-mono text-white">{filterCutoff} Hz</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={200}
-                      max={4000}
-                      value={filterCutoff}
-                      onChange={(e) => setFilterCutoff(Number(e.target.value))}
-                      className="w-full accent-[#fa243c] cursor-pointer"
-                    />
+                  <input
+                    type="range"
+                    min={1}
+                    max={8}
+                    value={harmonics}
+                    onChange={(e) => setHarmonics(Number(e.target.value))}
+                    className="w-full cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-white/60">フィルター</span>
+                    <span className="font-mono text-white">{filterCutoff} Hz</span>
                   </div>
+                  <input
+                    type="range"
+                    min={200}
+                    max={4000}
+                    value={filterCutoff}
+                    onChange={(e) => setFilterCutoff(Number(e.target.value))}
+                    className="w-full cursor-pointer"
+                  />
                 </div>
               </div>
             </div>
           )}
 
-          {/* VIEW 11: DRUMPAD & FREQUENCY */}
+          {/* VIEW: DRUMPAD */}
           {activeNav === 'drumpad' && (
             <div className="flex-1 min-h-0 overflow-hidden">
               <DrumPadTunerView />
             </div>
           )}
 
-          {/* VIEW 12: WISP v1 + ULTRAVIOLET / SCRAMJET SERVICE WORKER PROXY SETTINGS */}
+          {/* VIEW: PROXY */}
           {activeNav === 'proxy' && (
             <div className="flex-1 p-6 overflow-y-auto space-y-6 max-w-3xl">
-              <div>
-                <h2 className="text-lg font-bold text-white">
-                  Wisp v1 Server &amp; Ultraviolet / Scramjet Service Worker Settings
-                </h2>
-                <p className="text-xs text-white/55 mt-1">
-                  Wisp v1 WebSocket マルチプレクサーと Service Worker (/uv/service/* および /scramjet/*) を使用して api.monochrome.tf のフル尺ストリーム・同期歌詞・Webプレイヤーを中継します。
-                </p>
-              </div>
-
-              <div className="space-y-3 p-4 rounded-xl apple-liquid-glass">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-white">
-                    Wisp v1 Multiplexer Server (wss://)
-                  </span>
-                  <span className="text-[11px] font-mono text-emerald-400">
-                    Active: {wispServer} ({proxyLatency}ms)
-                  </span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                  {WISP_SERVER_PRESETS.map((w) => {
-                    const active = wispServer === w.wispUrl;
-                    return (
-                      <button
-                        key={w.id}
-                        onClick={async () => {
-                          setWispServer(w.wispUrl);
-                          configureServiceWorkerWisp(w.wispUrl, proxyEngine, relayNode);
-                          const res = await testWispServerConnection(w.wispUrl);
-                          setProxyLatency(res.latencyMs);
-                          setActiveRelayLabel(`${w.name} (${res.mode})`);
-                          setStatusBanner(`Wisp サーバーを ${w.wispUrl} に切り替えました (${res.latencyMs}ms)`);
-                        }}
-                        className={`p-3 rounded-lg border text-left transition flex flex-col justify-between gap-1 ${
-                          active
-                            ? 'bg-[#fa243c]/20 border-[#fa243c] text-white'
-                            : 'bg-white/[0.03] border-white/10 text-white/70 hover:text-white'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold">{w.name}</span>
-                          <span className="text-[10px] font-mono text-white/50">{w.region}</span>
-                        </div>
-                        <div className="text-[11px] font-mono text-emerald-300 truncate">{w.wispUrl}</div>
-                        <div className="text-[11px] text-white/50">{w.description}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div className="flex gap-2 pt-1">
-                  <input
-                    type="text"
-                    value={customWispUrlInput}
-                    onChange={(e) => setCustomWispUrlInput(e.target.value)}
-                    placeholder="カスタム Wisp サーバー URL (例: wss://wisp.mercurywork.shop/)"
-                    className="flex-1 bg-black/50 border border-white/15 rounded-lg px-3 py-1.5 text-xs text-white font-mono outline-none focus:border-[#fa243c]"
-                  />
+              <h2 className="text-lg font-bold text-white">プロキシ設定</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {WISP_SERVER_PRESETS.map((w) => (
                   <button
+                    key={w.id}
                     onClick={async () => {
-                      const clean = customWispUrlInput.trim();
-                      if (!clean) return;
-                      setWispServer(clean);
-                      setCustomWispUrlInput('');
-                      configureServiceWorkerWisp(clean, proxyEngine, relayNode);
-                      const res = await testWispServerConnection(clean);
+                      setWispServer(w.wispUrl);
+                      configureServiceWorkerWisp(w.wispUrl, proxyEngine, relayNode);
+                      const res = await testWispServerConnection(w.wispUrl);
                       setProxyLatency(res.latencyMs);
-                      setActiveRelayLabel(`Custom Wisp (${clean})`);
-                      setStatusBanner(`カスタム Wisp サーバー ${clean} を適用しました (${res.latencyMs}ms)`);
                     }}
-                    className="px-4 py-1.5 rounded-lg bg-[#fa243c] hover:bg-[#e01e35] text-white text-xs font-semibold transition"
+                    className="p-3 rounded-xl border border-white/10 bg-white/[0.04] text-left"
                   >
-                    Wisp 適用
+                    <div className="text-xs font-bold text-white">{w.name}</div>
+                    <div className="text-[11px] font-mono text-white/60 truncate">{w.wispUrl}</div>
                   </button>
-                </div>
+                ))}
               </div>
-
-              <div className="p-4 rounded-xl apple-liquid-glass space-y-3">
-                <span className="text-xs font-semibold text-white block">
-                  Service Worker Proxy Engine (Ultraviolet / Scramjet):
-                </span>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <button
-                    onClick={() => {
-                      setProxyEngine('scramjet');
-                      configureServiceWorkerWisp(wispServer, 'scramjet', relayNode);
-                      setStatusBanner('Scramjet v3 Service Worker (/scramjet/*) に切り替えました');
-                    }}
-                    className={`p-3.5 rounded-lg border text-left transition ${
-                      proxyEngine === 'scramjet'
-                        ? 'bg-[#fa243c]/20 border-[#fa243c] text-white'
-                        : 'bg-white/5 border-white/10 text-white/70 hover:text-white'
-                    }`}
-                  >
-                    <div className="text-xs font-bold text-white">
-                      Scramjet v3 Service Worker (/scramjet/*)
-                    </div>
-                    <div className="text-[11px] text-white/55 mt-1">
-                      Service Worker 内で DOM・fetch・XHR・History API をフックし、Wisp トンネル経由で SPA や音声ストリームを直接ルーティングします。
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      setProxyEngine('ultraviolet');
-                      configureServiceWorkerWisp(wispServer, 'ultraviolet', relayNode);
-                      setStatusBanner('Ultraviolet v3.2 Service Worker (/uv/service/*) に切り替えました');
-                    }}
-                    className={`p-3.5 rounded-lg border text-left transition ${
-                      proxyEngine === 'ultraviolet'
-                        ? 'bg-[#fa243c]/20 border-[#fa243c] text-white'
-                        : 'bg-white/5 border-white/10 text-white/70 hover:text-white'
-                    }`}
-                  >
-                    <div className="text-xs font-bold text-white">
-                      Ultraviolet v3.2 Service Worker (/uv/service/*)
-                    </div>
-                    <div className="text-[11px] text-white/55 mt-1">
-                      XOR エンコード URL ルーティング (/uv/service/) と $uv クライアントランタイム注入により CORS 制限を回避します。
-                    </div>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* VIEW 12.5: 10-BAND PARAMETRIC EQUALIZER & AI SPEAKER AUTO-EQ STUDIO */}
-          {activeNav === 'eq' && (
-            <div className="flex-1 p-6 sm:p-8 pb-36 overflow-y-auto space-y-6">
-              <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-4">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-cyan-300">
-                    10-Band Web Audio BiquadFilter &amp; Gemini Speaker Calibration
-                  </div>
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                    イコライザー &amp; AI スピーカー自動補正 (AIEQ)
-                  </h1>
-                  <p className="text-xs text-white/55 mt-1">
-                    お使いのスピーカーやヘッドホンの機種名を入力してAIで自動補正するか、10バンドの周波数スライダーを手動で調整できます。
-                  </p>
-                </div>
-              </div>
-
-              <MusicEqualizerPanel
-                currentTrackGenre={currentTrack.genre}
-                onStatusMessage={(msg) => setStatusBanner(msg)}
-              />
-            </div>
-          )}
-
-          {/* VIEW 13: COMPREHENSIVE MUSIC & DOLBY ATMOS SETTINGS (音質・取得サイト・DL品質・MV画質・Dolby Atmos) */}
-          {activeNav === 'settings' && (
-            <div className="flex-1 p-6 sm:p-8 pb-36 overflow-y-auto space-y-6">
-              <div className="flex flex-wrap items-end justify-between gap-4 border-b border-white/[0.08] pb-4">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-wider text-[#fa243c]">
-                    Monochrome Hi-Fi &amp; Spatial Audio Engine
-                  </div>
-                  <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-                    音楽・Dolby Atmos・品質設定
-                  </h1>
-                  <p className="text-xs text-white/55 mt-1">
-                    ストリーミング音質、取得元サイト、楽曲ダウンロード品質、MV画質、および 3D Dolby Atmos 空間オーディオをリアルタイムに変更できます。
-                  </p>
-                </div>
-
+              <div className="flex gap-2">
+                <input
+                  value={customWispUrlInput}
+                  onChange={(e) => setCustomWispUrlInput(e.target.value)}
+                  placeholder="wss://..."
+                  className="flex-1 bg-black/50 border border-white/15 rounded-lg px-3 py-1.5 text-xs text-white"
+                />
                 <button
-                  type="button"
-                  onClick={() => triggerTrackDownload(currentTrack)}
-                  className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition flex items-center gap-1.5 shadow-lg"
+                  onClick={() => {
+                    if (customWispUrlInput.trim()) setWispServer(customWispUrlInput.trim());
+                  }}
+                  style={{ backgroundColor: resolvedAccentHex }}
+                  className="px-4 py-1.5 rounded-lg text-white text-xs font-semibold"
                 >
-                  <span className="material-symbols-rounded text-[18px]">download</span>
-                  <span>
-                    再生中の曲をダウンロード ({musicSettings.downloadQuality.toUpperCase()})
-                  </span>
+                  適用
                 </button>
               </div>
-
-              {/* 0. 10-Band Equalizer & AI Speaker Auto-EQ Studio */}
-              <MusicEqualizerPanel
-                currentTrackGenre={currentTrack.genre}
-                onStatusMessage={(msg) => setStatusBanner(msg)}
-              />
-
-              {/* 1. Dolby Atmos 3D Spatial Audio Engine Card */}
-              <div className="p-5 rounded-2xl apple-liquid-glass border border-white/15 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="material-symbols-rounded text-cyan-300 text-xl">
-                        spatial_audio_off
-                      </span>
-                      <h2 className="text-base font-bold text-white">
-                        Dolby Atmos 3D 空間オーディオ (Web Audio 3D DSP)
-                      </h2>
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
-                          musicSettings.dolbyAtmosEnabled
-                            ? 'bg-cyan-500/25 text-cyan-200 border border-cyan-400/40'
-                            : 'bg-white/10 text-white/50'
-                        }`}
-                      >
-                        {musicSettings.dolbyAtmosEnabled
-                          ? `ACTIVE · ${musicSettings.dolbyAtmosPreset.toUpperCase()}`
-                          : 'OFF (STEREO BYPASS)'}
-                      </span>
-                    </div>
-                    <p className="text-xs text-white/60">
-                      3D Haas ステレオワイドナー + 立体音響コンボルバーリバーブ + サブベース/プレゼンスダイナミックEQ + マスターコンプレッサーによる空間オーディオ処理。
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = !musicSettings.dolbyAtmosEnabled;
-                      updateMusicSettings({ dolbyAtmosEnabled: next });
-                      setStatusBanner(
-                        next
-                          ? `Dolby Atmos (${musicSettings.dolbyAtmosPreset.toUpperCase()}) を有効化しました`
-                          : 'Dolby Atmos をオフにしました (ステレオ原音出力)'
-                      );
-                    }}
-                    className={`px-5 py-2 rounded-xl text-xs font-bold transition border ${
-                      musicSettings.dolbyAtmosEnabled
-                        ? 'bg-cyan-500 text-slate-950 border-cyan-300 shadow-[0_0_24px_rgba(6,182,212,0.5)]'
-                        : 'bg-white/10 text-white/80 border-white/20 hover:bg-white/20'
-                    }`}
-                  >
-                    {musicSettings.dolbyAtmosEnabled ? 'Dolby Atmos: ON' : 'Dolby Atmos: OFF'}
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                  {(
-                    [
-                      {
-                        id: 'theater',
-                        title: 'Theater 3D Hall (映画館サラウンド)',
-                        desc: '広大な3Dホール残響と82Hz重低音ブーストでライブ会場・映画館の臨場感を再現',
-                      },
-                      {
-                        id: 'binaural',
-                        title: 'Binaural 360° (ヘッドホン立体定位)',
-                        desc: 'イヤフォン・ヘッドホン向けに最適化された360度空間定位とボーカル明瞭化',
-                      },
-                      {
-                        id: 'studio',
-                        title: 'Studio Reference (マスタリング原音空間)',
-                        desc: 'タイトな初期反射と高精度ダイナミックEQによるスタジオモニター空間',
-                      },
-                    ] as const
-                  ).map((preset) => {
-                    const active = musicSettings.dolbyAtmosPreset === preset.id;
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => {
-                          updateMusicSettings({
-                            dolbyAtmosEnabled: true,
-                            dolbyAtmosPreset: preset.id,
-                          });
-                          setStatusBanner(`Dolby Atmos モードを「${preset.title}」に変更しました`);
-                        }}
-                        className={`p-3.5 rounded-xl border text-left transition ${
-                          active && musicSettings.dolbyAtmosEnabled
-                            ? 'bg-cyan-500/20 border-cyan-400 text-white shadow-md'
-                            : 'bg-white/[0.04] border-white/10 text-white/70 hover:text-white hover:bg-white/[0.08]'
-                        }`}
-                      >
-                        <div className="text-xs font-bold text-white flex items-center justify-between">
-                          <span>{preset.title}</span>
-                          {active && musicSettings.dolbyAtmosEnabled && (
-                            <span className="text-[10px] font-mono text-cyan-300">選択中</span>
-                          )}
-                        </div>
-                        <div className="text-[11px] text-white/55 mt-1 leading-relaxed">
-                          {preset.desc}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 2. Streaming Audio Quality & Source Site Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {/* Streaming Audio Quality */}
-                <div className="p-5 rounded-2xl apple-liquid-glass border border-white/15 space-y-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-white">
-                      ストリーミング再生音質 (Streaming Bitrate)
-                    </h3>
-                    <p className="text-[11px] text-white/55 mt-0.5">
-                      フル尺再生時の音声ビットレートを選択します（変更すると即座に次回ストリームから反映されます）。
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {(
-                      [
-                        { id: 'lossless', label: 'Lossless FLAC (999kbps)', sub: '最高音質・ハイレゾ相当' },
-                        { id: '320', label: '320 kbps Hi-Fi (推奨)', sub: '高音質・高速フル尺再生' },
-                        { id: '192', label: '192 kbps High', sub: 'バランス重視・安定通信' },
-                        { id: '128', label: '128 kbps Standard', sub: '通信量節約モード' },
-                      ] as const
-                    ).map((q) => {
-                      const active = musicSettings.streamingQuality === q.id;
-                      return (
-                        <button
-                          key={q.id}
-                          type="button"
-                          onClick={() => {
-                            updateMusicSettings({ streamingQuality: q.id });
-                            setStatusBanner(`ストリーミング再生音質を ${q.label} に変更しました`);
-                            if (isPlaying) {
-                              startTrackPlayback(currentTrack, currentTime);
-                            }
-                          }}
-                          className={`p-3 rounded-xl border text-left transition ${
-                            active
-                              ? 'bg-[#fa243c]/25 border-[#fa243c] text-white'
-                              : 'bg-white/[0.04] border-white/10 text-white/75 hover:bg-white/[0.08]'
-                          }`}
-                        >
-                          <div className="text-xs font-bold">{q.label}</div>
-                          <div className="text-[10px] text-white/50 mt-0.5">{q.sub}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Audio Source Site Selection */}
-                <div className="p-5 rounded-2xl apple-liquid-glass border border-white/15 space-y-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-white">
-                      楽曲・音源を取得するサイト (Source Engine)
-                    </h3>
-                    <p className="text-[11px] text-white/55 mt-0.5">
-                      30秒試聴制限を回避してフル尺音源を取得する優先プロバイダーを指定します。
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {(
-                      [
-                        {
-                          id: 'auto',
-                          label: '自動マルチソース (推奨)',
-                          sub: 'GDStudio + JioSaavn 320k + Kuwo を並列検索しフル尺を優先',
-                        },
-                        {
-                          id: 'monochrome',
-                          label: 'api.monochrome.tf',
-                          sub: 'Monochrome Music 公式ストリームノード',
-                        },
-                        {
-                          id: 'saavn',
-                          label: 'JioSaavn 320kbps Full',
-                          sub: '全曲100%フル尺 (3〜5分) AAC/MP4 ストリーム',
-                        },
-                        {
-                          id: 'netease',
-                          label: 'NetEase Cloud Hi-Res',
-                          sub: 'J-Pop / ボカロ / アニソン + 同期歌詞に最適',
-                        },
-                        {
-                          id: 'kuwo',
-                          label: 'Kuwo Lossless Engine',
-                          sub: '制限楽曲のフル尺代替ストリームに最適',
-                        },
-                      ] as const
-                    ).map((s) => {
-                      const active = musicSettings.sourceSite === s.id;
-                      return (
-                        <button
-                          key={s.id}
-                          type="button"
-                          onClick={() => {
-                            updateMusicSettings({ sourceSite: s.id });
-                            setStatusBanner(`音源取得サイトを「${s.label}」に設定しました`);
-                            if (isPlaying) {
-                              startTrackPlayback(currentTrack, currentTime);
-                            }
-                          }}
-                          className={`p-3 rounded-xl border text-left transition ${
-                            active
-                              ? 'bg-[#fa243c]/25 border-[#fa243c] text-white'
-                              : 'bg-white/[0.04] border-white/10 text-white/75 hover:bg-white/[0.08]'
-                          }`}
-                        >
-                          <div className="text-xs font-bold">{s.label}</div>
-                          <div className="text-[10px] text-white/50 mt-0.5">{s.sub}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. Download Quality & MV Video Quality Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                {/* Track Download Quality */}
-                <div className="p-5 rounded-2xl apple-liquid-glass border border-white/15 space-y-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-white">
-                      曲のダウンロード品質 (Download Format &amp; Bitrate)
-                    </h3>
-                    <p className="text-[11px] text-white/55 mt-0.5">
-                      曲一覧やプレイヤーバーの「DL」ボタンを押した際の保存フォーマットと音質を設定します。
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {(
-                      [
-                        { id: 'flac', label: 'FLAC Lossless', sub: '無劣化スタジオ品質 (.flac / .m4a)' },
-                        { id: '320', label: '320 kbps Hi-Fi', sub: '最高品質 MP3 / M4A' },
-                        { id: '192', label: '192 kbps High', sub: '標準高音質' },
-                        { id: '128', label: '128 kbps Compact', sub: '軽量ファイルサイズ' },
-                      ] as const
-                    ).map((dq) => {
-                      const active = musicSettings.downloadQuality === dq.id;
-                      return (
-                        <button
-                          key={dq.id}
-                          type="button"
-                          onClick={() => {
-                            updateMusicSettings({ downloadQuality: dq.id });
-                            setStatusBanner(`ダウンロード品質を ${dq.label} に設定しました`);
-                          }}
-                          className={`p-3 rounded-xl border text-left transition ${
-                            active
-                              ? 'bg-cyan-500/25 border-cyan-400 text-white'
-                              : 'bg-white/[0.04] border-white/10 text-white/75 hover:bg-white/[0.08]'
-                          }`}
-                        >
-                          <div className="text-xs font-bold">{dq.label}</div>
-                          <div className="text-[10px] text-white/50 mt-0.5">{dq.sub}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* MV Video Quality */}
-                <div className="p-5 rounded-2xl apple-liquid-glass border border-white/15 space-y-3">
-                  <div>
-                    <h3 className="text-sm font-bold text-white">
-                      MV (ミュージックビデオ) 画質設定
-                    </h3>
-                    <p className="text-[11px] text-white/55 mt-0.5">
-                      Monochrome / Apple Music Video / YouTube MV ステージの再生解像度を選択します。
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {(
-                      [
-                        { id: '2160p', label: '4K UHD (2160p)', sub: '超高精細マスター映像' },
-                        { id: '1080p', label: '1080p Full HD (推奨)', sub: '高画質・なめらか再生' },
-                        { id: '720p', label: '720p HD', sub: '高速読み込み・省メモリ' },
-                        { id: '480p', label: '480p SD', sub: '軽量・低負荷モード' },
-                      ] as const
-                    ).map((mq) => {
-                      const active = musicSettings.mvQuality === mq.id;
-                      return (
-                        <button
-                          key={mq.id}
-                          type="button"
-                          onClick={() => {
-                            updateMusicSettings({ mvQuality: mq.id });
-                            setStatusBanner(`MV画質を ${mq.label} に設定しました`);
-                          }}
-                          className={`p-3 rounded-xl border text-left transition ${
-                            active
-                              ? 'bg-[#fa243c]/25 border-[#fa243c] text-white'
-                              : 'bg-white/[0.04] border-white/10 text-white/75 hover:bg-white/[0.08]'
-                          }`}
-                        >
-                          <div className="text-xs font-bold">{mq.label}</div>
-                          <div className="text-[10px] text-white/50 mt-0.5">{mq.sub}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
-          {/* RIGHT-HAND COLLAPSIBLE APPLE MUSIC LIVE LYRICS DRAWER */}
-          {showLyricsDrawer && activeNav !== 'lyrics' && renderAppleMusicLyricsPanel(false)}
+          {/* RIGHT-HAND COLLAPSIBLE LYRICS & TRANSLATION DRAWER */}
+          {showLyricsDrawer && activeNav !== 'lyrics' && renderSyncedLyricsPanel(false)}
         </main>
       </div>
 
       {/* ===================================================================
-          DRAGGABLE & MINIMIZABLE LIQUID GLASS PLAYER PILL / DOCK
-          (画面内の自由なドラッグ移動＋最小化でコンパクトなミニピルに変形)
+          DRAGGABLE & MINIMIZABLE LIQUID GLASS PLAYER BAR (Synced with OS Accent)
          =================================================================== */}
       <div
         className="absolute bottom-2.5 left-3 right-3 z-30 pointer-events-none flex justify-center"
@@ -4579,69 +4198,39 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         }}
       >
         {isPillMinimized ? (
-          /* COMPACT FLOATING MINI-PILL MODE (最小化時のコンパクトミニピル) */
           <div
             onPointerDown={handlePillPointerDown}
             onPointerMove={handlePillPointerMove}
             onPointerUp={handlePillPointerUp}
             onPointerCancel={handlePillPointerUp}
             style={{ touchAction: 'none' }}
-            className="pointer-events-auto relative rounded-2xl liquid-glass-music-dock liquid-glass-window overflow-hidden px-3.5 py-2 flex items-center gap-3 shadow-[0_20px_50px_rgba(0,0,0,0.7)] border border-white/25 cursor-grab active:cursor-grabbing max-w-md select-none"
-            title="ドラッグして移動 / ボタンで操作・展開"
+            className="pointer-events-auto relative rounded-2xl liquid-glass-music-dock liquid-glass-window overflow-hidden px-3.5 py-2 flex items-center gap-3 shadow-2xl border border-white/25 cursor-grab active:cursor-grabbing max-w-md select-none"
           >
-            {/* Moving Artwork Underglow */}
-            <div
-              className="absolute inset-0 pointer-events-none opacity-55 blur-xl"
-              style={{
-                background: `linear-gradient(125deg, ${artworkPalette.c1}, ${artworkPalette.c2}, ${artworkPalette.c3})`,
-              }}
-            />
-
-            <span className="material-symbols-rounded text-sm text-white/50 relative z-10 select-none">
-              drag_indicator
-            </span>
-
             <div
               onClick={() => setIsArtworkMaximized((m) => !m)}
               data-no-pill-drag="true"
               className="relative z-10 w-9 h-9 rounded-xl overflow-hidden bg-zinc-900 border border-white/25 shrink-0 cursor-pointer"
-              title="アートワークを最大化"
             >
-              {currentTrack.artworkUrl ? (
+              {currentTrack.artworkUrl && (
                 <img
                   src={currentTrack.artworkUrl}
                   alt={currentTrack.title}
                   className="w-full h-full object-cover"
                 />
-              ) : (
-                <div className={`w-full h-full bg-gradient-to-br ${currentTrack.coverGradient}`} />
               )}
             </div>
-
             <div className="relative z-10 min-w-0 max-w-[165px]">
               <div className="text-xs font-bold text-white truncate">{currentTrack.title}</div>
-              <button
-                type="button"
-                data-no-pill-drag="true"
-                onClick={() => openArtistPage(currentTrack.artist)}
-                className="text-[10px] text-white/75 hover:text-[#fa243c] hover:underline truncate block text-left"
-              >
+              <div className="text-[10px] text-white/70 truncate">
                 {cleanPrimaryArtistName(currentTrack.artist)}
-              </button>
+              </div>
             </div>
-
-            {musicSettings.dolbyAtmosEnabled && (
-              <span className="relative z-10 px-1.5 py-0.5 rounded bg-cyan-500/25 border border-cyan-300/40 text-[9px] font-mono text-cyan-200 shrink-0">
-                Atmos
-              </span>
-            )}
-
             <div className="relative z-10 flex items-center gap-1" data-no-pill-drag="true">
               <button
                 type="button"
                 onClick={togglePlay}
-                className="w-8 h-8 rounded-xl bg-white text-zinc-950 flex items-center justify-center hover:scale-105 transition shadow"
-                title={isPlaying ? '一時停止' : '再生'}
+                style={{ backgroundColor: resolvedAccentHex }}
+                className="w-8 h-8 rounded-xl text-white flex items-center justify-center shadow"
               >
                 <span className="material-symbols-rounded text-[20px]">
                   {isPlaying ? 'pause' : 'play_arrow'}
@@ -4649,75 +4238,30 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               </button>
               <button
                 type="button"
-                onClick={nextTrack}
-                className="w-7 h-7 rounded-lg text-white/85 hover:text-white hover:bg-white/15 flex items-center justify-center transition"
-                title="次の曲"
-              >
-                <span className="material-symbols-rounded text-[18px]">skip_next</span>
-              </button>
-              <button
-                type="button"
                 onClick={() => setIsPillMinimized(false)}
-                className="w-7 h-7 rounded-lg bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition ml-0.5"
-                title="フルプレイヤーバーに展開"
+                className="w-7 h-7 rounded-lg bg-white/15 hover:bg-white/25 text-white flex items-center justify-center"
               >
                 <span className="material-symbols-rounded text-[16px]">open_in_full</span>
               </button>
             </div>
           </div>
         ) : (
-          /* FULL LIQUID GLASS DOCK MODE (ドラッグ移動＆最小化対応フルピル) */
           <div
             onPointerDown={handlePillPointerDown}
             onPointerMove={handlePillPointerMove}
             onPointerUp={handlePillPointerUp}
             onPointerCancel={handlePillPointerUp}
             style={{ touchAction: 'none' }}
-            className="pointer-events-auto relative w-full max-w-6xl rounded-2xl liquid-glass-music-dock liquid-glass-window overflow-hidden px-3.5 sm:px-5 py-2.5 flex flex-col gap-2 cursor-grab active:cursor-grabbing select-none"
+            className="pointer-events-auto relative w-full max-w-6xl rounded-2xl liquid-glass-music-dock liquid-glass-window overflow-hidden px-4 sm:px-5 py-2.5 flex flex-col gap-2 cursor-grab active:cursor-grabbing select-none"
           >
-            {/* Moving Artwork-Pattern Gradient Underglow Inside the Liquid Glass Dock */}
-            <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-65">
-              <div
-                className="absolute -inset-8 blur-2xl opacity-55 artwork-dock-underglow transition-all duration-1000"
-                style={{
-                  background: `linear-gradient(125deg, ${artworkPalette.c1} 0%, ${artworkPalette.c2} 33%, ${artworkPalette.c3} 66%, ${artworkPalette.c4} 100%)`,
-                  animationPlayState: isPlaying ? 'running' : 'paused',
-                }}
-              />
-              {currentTrack.artworkUrl && (
-                <>
-                  <img
-                    src={currentTrack.artworkUrl}
-                    alt=""
-                    className="absolute -top-1/2 -left-1/4 w-[90%] h-[220%] object-cover blur-[42px] saturate-[2.4] opacity-40 artwork-fluid-orb-1"
-                    style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
-                  />
-                  <img
-                    src={currentTrack.artworkUrl}
-                    alt=""
-                    className="absolute -bottom-1/2 -right-1/4 w-[90%] h-[220%] object-cover blur-[46px] saturate-[2.4] opacity-35 artwork-fluid-orb-2 mix-blend-screen"
-                    style={{ animationPlayState: isPlaying ? 'running' : 'paused' }}
-                  />
-                </>
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/20 to-white/[0.06]" />
-            </div>
-
-            {/* Top Drag Handle & Interactive Scrubber Row */}
+            {/* Scrubber Row */}
             <div className="relative z-10 flex items-center gap-2">
-              <div
-                className="flex items-center gap-1 text-white/45 hover:text-white/80 text-[10px] font-mono pr-1 select-none"
-                title="ここをドラッグして再生ピルを自由な位置へ移動"
-              >
-                <span className="material-symbols-rounded text-[15px]">drag_indicator</span>
-              </div>
-
               <span className="text-[10px] font-mono tabular-nums text-white/75 w-9 text-right">
                 {hoverScrubTime !== null ? formatSecs(hoverScrubTime) : formatSecs(currentTime)}
               </span>
               <div
                 data-no-pill-drag="true"
-                className="flex-1 h-1.5 rounded-full bg-white/15 hover:h-2 cursor-pointer relative overflow-hidden group transition-all"
+                className="flex-1 h-1.5 rounded-full bg-white/15 hover:h-2 cursor-pointer relative overflow-hidden transition-all"
                 onMouseMove={(e) => {
                   const rect = e.currentTarget.getBoundingClientRect();
                   const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -4731,149 +4275,92 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 }}
               >
                 <div
-                  className="h-full rounded-full transition-all duration-75 shadow-[0_0_12px_rgba(255,255,255,0.5)]"
+                  className="h-full rounded-full transition-all duration-75"
                   style={{
-                    width: `${Math.min(100, (currentTime / Math.max(1, currentTrack.duration)) * 100)}%`,
-                    background: `linear-gradient(90deg, ${artworkPalette.c1}, ${artworkPalette.c2}, ${artworkPalette.c3})`,
+                    width: `${Math.min(
+                      100,
+                      (currentTime / Math.max(1, currentTrack.duration)) * 100
+                    )}%`,
+                    backgroundColor: resolvedAccentHex,
                   }}
                 />
               </div>
               <span className="text-[10px] font-mono tabular-nums text-white/75 w-9">
                 {formatSecs(currentTrack.duration)}
               </span>
-
-              {/* Pill Position Reset & Minimize Controls */}
-              <div className="flex items-center gap-1 pl-1" data-no-pill-drag="true">
-                {(pillOffset.x !== 0 || pillOffset.y !== 0) && (
-                  <button
-                    type="button"
-                    onClick={() => setPillOffset({ x: 0, y: 0 })}
-                    className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-[9px] font-mono text-white/75 hover:text-white flex items-center gap-0.5 transition"
-                    title="ピルの位置を中央下部にリセット"
-                  >
-                    <span className="material-symbols-rounded text-[12px]">restart_alt</span>
-                    <span>位置戻す</span>
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setIsPillMinimized(true)}
-                  className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/25 text-white/80 hover:text-white flex items-center justify-center transition"
-                  title="コンパクトなミニピルに最小化"
-                >
-                  <span className="material-symbols-rounded text-[15px]">close_fullscreen</span>
-                </button>
-              </div>
+              <button
+                type="button"
+                data-no-pill-drag="true"
+                onClick={() => setIsPillMinimized(true)}
+                className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/25 text-white/80 flex items-center justify-center"
+                title="最小化"
+              >
+                <span className="material-symbols-rounded text-[14px]">close_fullscreen</span>
+              </button>
             </div>
 
-            {/* Main Dock Controls Row */}
+            {/* Transport & Actions Row */}
             <div className="relative z-10 flex items-center justify-between gap-3">
-              {/* Left: Now Playing Artwork + Title + Clickable Artist */}
+              {/* Left: Track Info */}
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <div
                   data-no-pill-drag="true"
                   onClick={() => setIsArtworkMaximized((m) => !m)}
-                  className="relative w-12 h-12 rounded-xl overflow-hidden bg-zinc-900 border border-white/25 shrink-0 cursor-pointer shadow-[0_8px_20px_rgba(0,0,0,0.5)] hover:scale-105 transition group"
-                  title="クリックしてアートワークを最大化 (背景グラデーション連動)"
+                  className="w-11 h-11 rounded-xl overflow-hidden bg-zinc-900 border border-white/25 shrink-0 cursor-pointer"
                 >
                   {currentTrack.artworkUrl ? (
                     <img
                       src={currentTrack.artworkUrl}
                       alt={currentTrack.title}
-                      className={`w-full h-full object-cover transition-transform duration-700 ${
-                        isPlaying ? 'scale-105' : 'scale-100'
-                      }`}
+                      className="w-full h-full object-cover"
                     />
                   ) : (
                     <div className={`w-full h-full bg-gradient-to-br ${currentTrack.coverGradient}`} />
                   )}
-                  {isPlaying && (
-                    <div className="absolute bottom-1 right-1 px-1 py-0.5 rounded bg-black/65 backdrop-blur-md border border-white/20 flex items-end gap-[2px]">
-                      <span className="w-[2px] h-2 bg-rose-400 animate-pulse" />
-                      <span className="w-[2px] h-3 bg-cyan-300 animate-pulse" />
-                      <span className="w-[2px] h-1.5 bg-amber-300 animate-pulse" />
-                    </div>
-                  )}
                 </div>
-
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span
-                      data-no-pill-drag="true"
-                      onClick={() => setIsArtworkMaximized((m) => !m)}
-                      className="text-xs sm:text-sm font-bold text-white truncate cursor-pointer hover:underline"
-                      title="クリックしてアートワークを最大化"
-                    >
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs sm:text-sm font-bold text-white truncate">
                       {currentTrack.title}
                     </span>
-                    <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-white/10 border border-white/15 text-[9px] font-mono text-white/80 shrink-0">
-                      {musicSettings.streamingQuality === 'lossless'
-                        ? 'Lossless FLAC'
-                        : `${musicSettings.streamingQuality}kbps Full`}
-                    </span>
-                    {musicSettings.dolbyAtmosEnabled && (
-                      <span className="hidden md:inline-block px-1.5 py-0.5 rounded bg-cyan-500/25 border border-cyan-300/40 text-[9px] font-mono text-cyan-200 shrink-0">
-                        Dolby Atmos
-                      </span>
-                    )}
                     {isBuffering && (
-                      <span className="text-[10px] font-mono text-rose-300 animate-pulse shrink-0">
-                        Loading...
+                      <span className="text-[10px] font-mono text-white/60 animate-pulse">
+                        読込中...
                       </span>
                     )}
                   </div>
-
-                  <div className="flex items-center gap-1.5 text-[11px] text-white/75 truncate mt-0.5">
-                    <button
-                      type="button"
-                      data-no-pill-drag="true"
-                      onClick={() => openArtistPage(currentTrack.artist)}
-                      className="hover:text-[#fa243c] hover:underline font-bold truncate transition text-white shrink-0"
-                      title={`${cleanPrimaryArtistName(currentTrack.artist)} のアーティストページを開く`}
-                    >
-                      {cleanPrimaryArtistName(currentTrack.artist)}
-                    </button>
-                    <span className="text-white/40">·</span>
-                    <span className="text-white/65 truncate font-medium">
-                      {currentTrack.lyrics[currentLyricIndex]?.text
-                        ? `♪ ${currentTrack.lyrics[currentLyricIndex]?.text}`
-                        : currentTrack.album}
-                    </span>
+                  <div className="text-[11px] text-white/70 truncate">
+                    {cleanPrimaryArtistName(currentTrack.artist)} · {statusBanner}
                   </div>
                 </div>
               </div>
 
-              {/* Center: Liquid Glass Transport Controls */}
-              <div className="flex items-center gap-1 sm:gap-1.5 shrink-0" data-no-pill-drag="true">
+              {/* Center: Play/Pause/Prev/Next */}
+              <div className="flex items-center gap-1.5 shrink-0" data-no-pill-drag="true">
                 <button
                   type="button"
                   onClick={() => setIsShuffle(!isShuffle)}
-                  title="シャッフル"
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center transition ${
-                    isShuffle
-                      ? 'text-white bg-white/20 border border-white/30 shadow-inner'
-                      : 'text-white/65 hover:text-white hover:bg-white/[0.1]'
-                  }`}
+                  style={isShuffle ? { color: resolvedAccentHex } : undefined}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-white/65 hover:text-white"
                 >
                   <span className="material-symbols-rounded text-[18px]">shuffle</span>
                 </button>
                 <button
                   type="button"
                   onClick={prevTrack}
-                  title="前の曲"
-                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white/90 hover:text-white hover:bg-white/[0.12] active:scale-95 transition"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white/90 hover:bg-white/10"
                 >
                   <span className="material-symbols-rounded text-[22px]">skip_previous</span>
                 </button>
                 <button
                   type="button"
                   onClick={togglePlay}
-                  title={isPlaying ? '一時停止' : '再生'}
-                  className="w-10 h-10 rounded-xl bg-white text-zinc-950 hover:scale-105 active:scale-95 flex items-center justify-center transition shadow-[0_8px_24px_rgba(255,255,255,0.35)]"
+                  style={{ backgroundColor: resolvedAccentHex }}
+                  className="w-10 h-10 rounded-full text-white hover:scale-105 active:scale-95 flex items-center justify-center transition shadow-lg"
                 >
                   <span
                     className="material-symbols-rounded text-[24px]"
-                    style={{ fontVariationSettings: "'FILL' 1, 'wght' 600" }}
+                    style={{ fontVariationSettings: "'FILL' 1" }}
                   >
                     {isPlaying ? 'pause' : 'play_arrow'}
                   </span>
@@ -4881,127 +4368,74 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 <button
                   type="button"
                   onClick={nextTrack}
-                  title="次の曲"
-                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white/90 hover:text-white hover:bg-white/[0.12] active:scale-95 transition"
+                  className="w-9 h-9 rounded-xl flex items-center justify-center text-white/90 hover:bg-white/10"
                 >
                   <span className="material-symbols-rounded text-[22px]">skip_next</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsRepeat(!isRepeat)}
-                  title="リピート"
-                  className={`w-8 h-8 rounded-xl flex items-center justify-center transition ${
-                    isRepeat
-                      ? 'text-white bg-white/20 border border-white/30 shadow-inner'
-                      : 'text-white/65 hover:text-white hover:bg-white/[0.1]'
-                  }`}
+                  style={isRepeat ? { color: resolvedAccentHex } : undefined}
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-white/65 hover:text-white"
                 >
                   <span className="material-symbols-rounded text-[18px]">repeat</span>
                 </button>
               </div>
 
-              {/* Right: Dock Action Buttons (Dolby Atmos, DL, MV, Artist, Lyrics, Settings, Volume) */}
+              {/* Right: Lyrics, EQ, Settings, Volume */}
               <div
                 className="flex items-center justify-end gap-1.5 flex-1"
                 data-no-pill-drag="true"
               >
                 <button
                   type="button"
-                  onClick={() => {
-                    const next = !musicSettings.dolbyAtmosEnabled;
-                    updateMusicSettings({ dolbyAtmosEnabled: next });
-                    setStatusBanner(
-                      next
-                        ? `Dolby Atmos (${musicSettings.dolbyAtmosPreset.toUpperCase()}) ON`
-                        : 'Dolby Atmos OFF'
-                    );
-                  }}
-                  className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition hidden md:flex items-center gap-1 whitespace-nowrap border ${
-                    musicSettings.dolbyAtmosEnabled
-                      ? 'bg-cyan-500/30 border-cyan-300 text-cyan-100 shadow-sm'
-                      : 'bg-white/[0.08] border-white/15 text-white/65 hover:text-white'
-                  }`}
-                  title="Dolby Atmos 3D 空間オーディオ ON/OFF"
-                >
-                  <span className="material-symbols-rounded text-[14px]">surround_sound</span>
-                  <span>Atmos</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => triggerTrackDownload(currentTrack)}
-                  className="px-2 py-1 rounded-lg bg-white/[0.1] border border-white/15 text-cyan-200 hover:bg-cyan-500 hover:text-slate-950 text-[11px] font-semibold transition hidden sm:flex items-center gap-1 whitespace-nowrap"
-                  title={`この曲をダウンロード (${musicSettings.downloadQuality.toUpperCase()})`}
-                >
-                  <span className="material-symbols-rounded text-[14px]">download</span>
-                  <span>DL</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => openTrackMv(currentTrack)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 whitespace-nowrap border ${
-                    activeNav === 'mv'
-                      ? 'bg-[#fa243c] border-[#fa243c] text-white shadow-md'
-                      : 'bg-white/[0.1] border-white/15 text-white/85 hover:text-white hover:bg-white/20'
-                  }`}
-                  title="公式ミュージックビデオ (MV) を開く"
-                >
-                  <span className="material-symbols-rounded text-[15px]">smart_display</span>
-                  <span>MV</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => openArtistPage(currentTrack.artist)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition hidden sm:flex items-center gap-1 whitespace-nowrap border ${
-                    activeNav === 'artist'
-                      ? 'bg-[#fa243c] border-[#fa243c] text-white shadow-md'
-                      : 'bg-white/[0.1] border-white/15 text-white/85 hover:text-white hover:bg-white/20'
-                  }`}
-                  title="アーティストページを開く"
-                >
-                  <span className="material-symbols-rounded text-[15px]">person</span>
-                  <span>歌手</span>
-                </button>
-
-                <button
-                  type="button"
                   onClick={() => setShowLyricsDrawer((s) => !s)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 whitespace-nowrap border ${
+                  style={
                     showLyricsDrawer || activeNav === 'lyrics'
-                      ? 'bg-[#fa243c] border-[#fa243c] text-white shadow-md'
-                      : 'bg-white/[0.1] border-white/15 text-white/85 hover:text-white hover:bg-white/20'
+                      ? { backgroundColor: resolvedAccentHex, borderColor: resolvedAccentHex }
+                      : undefined
+                  }
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 border ${
+                    showLyricsDrawer || activeNav === 'lyrics'
+                      ? 'text-white'
+                      : 'bg-white/[0.08] border-white/15 text-white/85 hover:bg-white/15'
                   }`}
-                  title="同期歌詞ドロワーを表示/非表示"
                 >
-                  <span className="material-symbols-rounded text-[15px]">lyrics</span>
-                  <span>歌詞</span>
+                  <span className="material-symbols-rounded text-[15px]">translate</span>
+                  <span>歌詞・翻訳</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setActiveNav(activeNav === 'eq' ? 'browse' : 'eq')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 whitespace-nowrap border ${
+                  onClick={() => setActiveNav(activeNav === 'eq' ? 'home' : 'eq')}
+                  style={
                     activeNav === 'eq'
-                      ? 'bg-cyan-500 border-cyan-300 text-slate-950 font-black shadow-md'
-                      : 'bg-cyan-500/15 border-cyan-400/35 text-cyan-200 hover:bg-cyan-500/30'
+                      ? { backgroundColor: resolvedAccentHex, borderColor: resolvedAccentHex }
+                      : undefined
+                  }
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 border ${
+                    activeNav === 'eq'
+                      ? 'text-white'
+                      : 'bg-white/[0.08] border-white/15 text-white/85 hover:bg-white/15'
                   }`}
-                  title="10バンド イコライザー & AIスピーカー自動補正 (AIEQ)"
                 >
-                  <span className="material-symbols-rounded text-[15px]">graphic_eq</span>
-                  <span>EQ / AIEQ</span>
+                  <span className="material-symbols-rounded text-[15px]">equalizer</span>
+                  <span>EQ</span>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setActiveNav(activeNav === 'settings' ? 'browse' : 'settings')}
-                  className={`px-2 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 whitespace-nowrap border ${
+                  onClick={() => setActiveNav(activeNav === 'settings' ? 'home' : 'settings')}
+                  style={
                     activeNav === 'settings'
-                      ? 'bg-[#fa243c] border-[#fa243c] text-white shadow-md'
-                      : 'bg-white/[0.1] border-white/15 text-white/85 hover:text-white hover:bg-white/20'
+                      ? { backgroundColor: resolvedAccentHex, borderColor: resolvedAccentHex }
+                      : undefined
+                  }
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 border ${
+                    activeNav === 'settings'
+                      ? 'text-white'
+                      : 'bg-white/[0.08] border-white/15 text-white/85 hover:bg-white/15'
                   }`}
-                  title="音質・取得サイト・DL品質・MV画質・Dolby Atmos 設定"
                 >
                   <span className="material-symbols-rounded text-[15px]">tune</span>
                   <span>設定</span>
@@ -5011,8 +4445,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   <button
                     type="button"
                     onClick={() => setIsMuted(!isMuted)}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-white/75 hover:text-white hover:bg-white/[0.12] transition"
-                    title={isMuted ? 'ミュート解除' : 'ミュート'}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-white/75 hover:text-white"
                   >
                     <span className="material-symbols-rounded text-[18px]">
                       {isMuted || volume === 0 ? 'volume_off' : 'volume_up'}
@@ -5028,7 +4461,8 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                       setVolume(Number(e.target.value));
                       if (isMuted) setIsMuted(false);
                     }}
-                    className="w-16 accent-[#fa243c] cursor-pointer h-1 bg-white/25"
+                    style={{ accentColor: resolvedAccentHex }}
+                    className="w-16 cursor-pointer h-1 bg-white/25"
                   />
                 </div>
               </div>

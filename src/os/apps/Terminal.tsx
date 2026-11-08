@@ -63,7 +63,7 @@ const FONT_PRESETS: { id: TerminalFontId; label: string; style: string }[] = [
   { id: 'pixel', label: 'Cyber Pixel', style: '"MS Gothic", "Courier New", monospace' },
 ];
 
-const BANNER = `GlassiumOS 5 u1 Terminal [GlasispectUI Shell v5.1]
+const BANNER = `GlassiumOS 5 u4 Terminal [GlasispectUI Shell v5.4]
 (c) GlassiumOS Project. Zero-Border Liquid Glass Runtime.
 Type 'help' for commands, or use the top bar to switch Background Color & Font.`;
 
@@ -179,14 +179,14 @@ export function TerminalApp() {
     const [name, ...args] = cmd.split(/\s+/);
     switch (name.toLowerCase()) {
       case 'help':
-        print('GlassiumOS 5 u1 (GlasispectUI) Commands:');
+        print('GlassiumOS 5 u4 (GlasispectUI) Commands:');
         print('  help                 Show all available commands');
-        print('  glasispect           Show GlasispectUI & GlassiumOS 5 u1 architecture info');
+        print('  glasispect           Show GlasispectUI & GlassiumOS 5 u4 architecture info');
         print('  color <preset>       Change terminal background (obsidian, glasispect, matrix, cyber-violet, deep-navy, amber-retro)');
         print('  font <preset>        Change terminal font (jetbrains, fira, courier, monospace, pixel)');
         print('  live2d <color>       Switch default Live2D wallpaper color (amethyst-cyan-silk, abyssal-deep-ocean, polar-emerald-aurora, neon-cyber-dusk, crimson-rose-nebula)');
         print('  matrix               Print cyber digital matrix stream');
-        print('  ascii                Display GlassiumOS 5 u1 prism ASCII emblem');
+        print('  ascii                Display GlassiumOS 5 u4 prism ASCII emblem');
         print('  fortune              Print random OS tip or 3DMaze hint');
         print('  ping <host>          Simulate network latency ping');
         print('  calc <expr>          Evaluate mathematical expression');
@@ -202,11 +202,10 @@ export function TerminalApp() {
         return;
       case 'glasispect':
         print('========================================================');
-        print('  GlassiumOS 5 u1 — GlasispectUI Compositor Engine');
-        print('  - Live2D Default Silk: 5 Restored Signature Palettes');
-        print('  - Calculator: Liquid Glass Edge Widget + SpectClip + AI');
-        print('  - Files: Spatial Spect Preview + Smart Drop Zone + AI');
-        print('  - 3DMaze: 50-Floor Roguelike (Depth Fog + 5 Areas)');
+        print('  GlassiumOS 5 u4 — GlasispectUI Compositor Engine');
+        print('  - Music: Liquid Glass UI, Playlist Import, Lyric Translation & 10-Band EQ');
+        print('  - Weather: Global Search, Saved Cities, Rain Radar Map & 5-Min Sync');
+        print('  - Store & Suite: Sonic 3D, Write, Sheet, Stage, Note & TSX Runner');
         print('========================================================');
         break;
       case 'color':
@@ -257,9 +256,9 @@ export function TerminalApp() {
         break;
       case 'ascii':
         print('        /\\        ');
-        print('       /  \\       GlassiumOS 5 u1');
+        print('       /  \\       GlassiumOS 5 u4');
         print('      / /\\ \\      UI: GlasispectUI');
-        print('     / /  \\ \\     Kernel: WebOS 5.1');
+        print('     / /  \\ \\     Kernel: WebOS 5.4');
         print('    /_/____\\_\\    Zero-Border Liquid Glass');
         break;
       case 'fortune':
@@ -274,13 +273,13 @@ export function TerminalApp() {
         break;
       }
       case 'uname':
-        print('GlassiumOS 5 u1 WebOS x86_64 (GlasispectUI Compositor)');
+        print('GlassiumOS 5 u4 WebOS x86_64 (GlasispectUI Compositor)');
         break;
       case 'ps':
       case 'top': {
         print('PID    PROCESS NAME             STATE       MEMORY');
         print('--------------------------------------------------');
-        print('1      glassium-core-u1         Running     32 MB');
+        print('1      glassium-core-u4         Running     32 MB');
         print('2      glasispect-compositor    Running     64 MB');
         windows.forEach((w, idx) => {
           print(`${100 + idx}    ${w.title.padEnd(24, ' ')} ${w.minimized ? 'Suspended' : 'Running'}   48 MB`);
@@ -413,16 +412,16 @@ export function TerminalApp() {
         break;
       }
       case 'neofetch':
-        print('    .-------.       user@glassium-os-u1');
+        print('    .-------.       user@glassium-os-u4');
         print('   /   ___   \\      -------------------');
-        print('  |   /   \\   |     OS: GlassiumOS 5 u1');
-        print('  |  | G5u1|  |     UI: GlasispectUI (Liquid Glass)');
+        print('  |   /   \\   |     OS: GlassiumOS 5 u4');
+        print('  |  | G5u4|  |     UI: GlasispectUI (Liquid Glass)');
         print('  |   \\___/   |     Font: ' + activeFont.label + ' | Bg: ' + activeBg.label);
         print('   \\         /      Uptime: ' + Math.floor(performance.now() / 1000) + 's');
         print("    `-------'       Display: " + window.innerWidth + 'x' + window.innerHeight);
         break;
       case 'sysinfo': {
-        print('=== GlassiumOS 5 u1 (GlasispectUI) System Summary ===');
+        print('=== GlassiumOS 5 u4 (GlasispectUI) System Summary ===');
         print(`Architecture: WebOS Container (TypeScript + Vite + Three.js)`);
         print(`CPU Threads:  ${navigator.hardwareConcurrency ?? '8'} logical cores`);
         print(`Viewport:     ${window.innerWidth}x${window.innerHeight}`);
@@ -484,7 +483,7 @@ export function TerminalApp() {
     }
   };
 
-  const prompt = () => 'glassium@u1:' + (cwd.length ? '/' + cwd.join('/') : '~') + '$';
+  const prompt = () => 'glassium@u4:' + (cwd.length ? '/' + cwd.join('/') : '~') + '$';
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {

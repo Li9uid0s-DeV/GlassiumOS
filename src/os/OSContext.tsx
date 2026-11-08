@@ -226,7 +226,7 @@ export interface OSContextValue {
 
   // App Store & Installed Apps
   installedApps: InstalledApp[];
-  installApp: (app: Partial<StoreApp> & { name: string; icon: string; description: string; author: string; category: 'utilities' | 'games' }) => void;
+  installApp: (app: Partial<StoreApp> & { name: string; icon: string; description: string; author: string; category: 'utilities' | 'games' | 'office' | 'audio' }) => void;
   uninstallApp: (appId: string) => void;
   launchInstalledApp: (appId: string) => void;
   isInstalled: (appId: string) => boolean;
@@ -364,14 +364,20 @@ const APP_DEFAULTS: Record<AppId, { title: string; icon: string; width: number; 
   memory: { title: 'Memory Match (神経衰弱)', icon: 'Sparkles', width: 480, height: 480 },
   typing: { title: 'Typing Trainer (タイピング練習)', icon: 'SquareTerminal', width: 680, height: 440 },
   sudoku: { title: 'Mini Sudoku (ナンプレパズル)', icon: 'Grid3x3', width: 480, height: 460 },
-  periodic: { title: 'Periodic Table (元素周期表)', icon: 'Sparkles', width: 720, height: 500 },
-  dictionary: { title: 'Tech Lexicon (IT・用語辞典)', icon: 'BookOpen', width: 640, height: 480 },
-  sysinfo: { title: 'System Diagnostics (システム診断)', icon: 'Cpu', width: 620, height: 480 },
+  periodic: { title: 'Glassium Elements (元素周期表)', icon: 'Sparkles', width: 720, height: 500 },
+  dictionary: { title: 'Glassium Lexicon (IT・用語辞典)', icon: 'BookOpen', width: 640, height: 480 },
+  sysinfo: { title: 'Glassium Diagnostics (システム診断)', icon: 'Cpu', width: 620, height: 480 },
+  sonicstudio: { title: 'Glassium Sonic 3D (立体音響 & システムEQ)', icon: 'Volume2', width: 860, height: 580 },
+  glassword: { title: 'Glassium Write (Word 文書作成)', icon: 'FileText', width: 880, height: 600 },
+  glassexcel: { title: 'Glassium Sheet (Excel 表計算)', icon: 'Grid3x3', width: 920, height: 600 },
+  glassppt: { title: 'Glassium Stage (PowerPoint スライド)', icon: 'Monitor', width: 940, height: 620 },
+  glassnote: { title: 'Glassium Note (OneNote デジタルノート)', icon: 'BookOpen', width: 900, height: 600 },
+  tsxrunner: { title: 'Glassium TSX App', icon: 'Code2', width: 840, height: 560 },
 };
 
 const INITIAL_TASKS: CalendarTask[] = [
-  { id: 'task-1', title: 'Review GlassiumOS 5 UI Guidelines', date: '2026-08-27', time: '14:00', category: 'system', completed: true, priority: 'high' },
-  { id: 'task-2', title: 'Update 2.5D Glass Refraction Presets', date: '2026-08-27', time: '16:30', category: 'work', completed: false, priority: 'medium' },
+  { id: 'task-1', title: 'Review GlassiumOS 5 u4 UI Guidelines', date: '2026-08-27', time: '14:00', category: 'system', completed: true, priority: 'high' },
+  { id: 'task-2', title: 'Update Liquid Glass Refraction Presets', date: '2026-08-27', time: '16:30', category: 'work', completed: false, priority: 'medium' },
   { id: 'task-3', title: 'Prepare Release Documentation', date: '2026-08-28', time: '11:00', category: 'personal', completed: false, priority: 'low' },
 ];
 
@@ -771,8 +777,8 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => [
     {
       id: 'notif-welcome',
-      title: 'GlassiumOS 5 u1',
-      message: 'GlassiumOS 5 u1 (GlasispectUI) desktop environment is ready.',
+      title: 'GlassiumOS 5 u4',
+      message: 'GlassiumOS 5 u4 (GlasispectUI) desktop environment is ready.',
       time: 'Just now',
       app: 'System',
       icon: 'Shield',
@@ -782,7 +788,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     {
       id: 'notif-driver',
       title: 'GlasispectUI Compositor',
-      message: 'Translucent liquid glass layers and Live2D silk aurora are active.',
+      message: 'Translucent liquid glass layers and dynamic accent sync are active.',
       time: '1 min ago',
       app: 'Settings',
       icon: 'Monitor',
@@ -985,13 +991,19 @@ export function OSProvider({ children }: { children: ReactNode }) {
       const m = new Date().getMonth() + 1;
       let season = m >= 3 && m <= 5 ? 'spring' : m >= 6 && m <= 8 ? 'summer' : m >= 9 && m <= 11 ? 'autumn' : 'winter';
       let eventMode = 'none';
+      let weatherMode = 'auto';
+      let timeMode = 'auto';
       let hour = new Date().getHours();
       try {
-        const raw = localStorage.getItem('glasis_dynamic_world_wallpaper_v1');
+        const raw =
+          localStorage.getItem('glasis_dynamic_world_wallpaper_v1') ||
+          localStorage.getItem('glasis_dynamic_env_v1');
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed.season && parsed.season !== 'auto') season = parsed.season;
           if (parsed.event && parsed.event !== 'auto') eventMode = parsed.event;
+          if (parsed.weather && parsed.weather !== 'auto') weatherMode = parsed.weather;
+          if (parsed.timeOfDay && parsed.timeOfDay !== 'auto') timeMode = parsed.timeOfDay;
           if (parsed.timeOfDay === 'dawn') hour = 6;
           else if (parsed.timeOfDay === 'day') hour = 12;
           else if (parsed.timeOfDay === 'dusk') hour = 17.5;
@@ -1004,10 +1016,15 @@ export function OSProvider({ children }: { children: ReactNode }) {
       else if (eventMode === 'christmas') baseRgb = [16, 185, 129];
       else if (eventMode === 'newyear') baseRgb = [245, 158, 11];
       else if (eventMode === 'tanabata') baseRgb = [56, 189, 248];
-      else if (hour >= 16.5 && hour < 19) baseRgb = [244, 114, 62]; // Sunset warm amber-coral
-      else if (hour >= 5 && hour < 7) baseRgb = [236, 72, 153]; // Dawn rose-gold
+      else if (weatherMode === 'Aurora') baseRgb = [16, 185, 129];
+      else if (weatherMode === 'Thunderstorm') baseRgb = [168, 85, 247];
+      else if (weatherMode === 'Rainy') baseRgb = [14, 165, 233];
+      else if (weatherMode === 'Snow') baseRgb = [96, 165, 250];
+      else if (timeMode === 'dusk' || (timeMode === 'auto' && hour >= 16.5 && hour < 19)) baseRgb = [249, 115, 22]; // Sunset warm amber-coral
+      else if (timeMode === 'dawn' || (timeMode === 'auto' && hour >= 5 && hour < 7.5)) baseRgb = [236, 72, 153]; // Dawn rose-gold
+      else if (timeMode === 'night') baseRgb = [139, 92, 246]; // Night violet-indigo
       else if (season === 'spring') baseRgb = [244, 114, 182]; // Sakura pink
-      else if (season === 'summer') baseRgb = [14, 165, 233]; // Ocean cyan-blue
+      else if (season === 'summer') baseRgb = [6, 182, 212]; // Ocean cyan-blue
       else if (season === 'autumn') baseRgb = [245, 158, 11]; // Autumn maple amber
       else baseRgb = [56, 189, 248]; // Winter crystal sky
     } else if (wallpaper === 'live2d') {
@@ -1017,13 +1034,20 @@ export function OSProvider({ children }: { children: ReactNode }) {
       else if (auroraColor === 'amethyst-cyan-silk' || auroraColor === 'neon-cyber-dusk' || auroraColor === 'classic-galaxy-vortex' || auroraColor === 'classic-plasma-nebula') baseRgb = [139, 92, 246];
       else if (auroraColor === 'abyssal-deep-ocean' || auroraColor === 'ocean-blue' || auroraColor === 'classic-deep-ocean') baseRgb = [59, 130, 246];
       else baseRgb = [6, 182, 212];
+    } else if (wallpaper === 'space') {
+      if (nebulaPreset === 'gargantua') baseRgb = [245, 158, 11];
+      else if (nebulaPreset === 'ultraviolet') baseRgb = [168, 85, 247];
+      else if (nebulaPreset === 'indigo') baseRgb = [99, 102, 241];
+      else if (nebulaPreset === 'cyan-quasar') baseRgb = [6, 182, 212];
+      else if (nebulaPreset === 'solar-flare') baseRgb = [244, 63, 94];
+      else baseRgb = [139, 92, 246];
     } else if (wallpaper === 'golden-sparkle') {
       baseRgb = [245, 158, 11];
     } else if (wallpaper === 'sunset') {
       baseRgb = [244, 63, 94];
     } else if (wallpaper === 'forest' || wallpaper === 'aurora') {
       baseRgb = [16, 185, 129];
-    } else if (wallpaper === 'space' || wallpaper === 'cosmic' || wallpaper === 'shader') {
+    } else if (wallpaper === 'cosmic' || wallpaper === 'shader') {
       baseRgb = [139, 92, 246];
     } else if (wallpaper === 'ocean' || wallpaper === 'bloom') {
       baseRgb = [59, 130, 246];
@@ -1031,22 +1055,19 @@ export function OSProvider({ children }: { children: ReactNode }) {
 
     // 2. Adapt luminance & saturation based on whether Dark or Light mode is active
     let [r, g, b] = baseRgb;
-    // Boost chroma slightly so even muted custom images yield an expressive accent
     const avg = (r + g + b) / 3;
     r = Math.round(avg + (r - avg) * 1.35);
     g = Math.round(avg + (g - avg) * 1.35);
     b = Math.round(avg + (b - avg) * 1.35);
 
     if (theme === 'dark') {
-      // Dark mode: ensure bright, luminous neon/pastel pop on dark surfaces
-      r = Math.min(255, Math.max(40, Math.round(r * 0.85 + 48)));
-      g = Math.min(255, Math.max(40, Math.round(g * 0.85 + 48)));
-      b = Math.min(255, Math.max(40, Math.round(b * 0.85 + 48)));
+      r = Math.min(255, Math.max(40, Math.round(r * 0.88 + 38)));
+      g = Math.min(255, Math.max(40, Math.round(g * 0.88 + 38)));
+      b = Math.min(255, Math.max(40, Math.round(b * 0.88 + 38)));
     } else {
-      // Light mode: deepen tone for crisp contrast against white/light glass surfaces
-      r = Math.min(220, Math.max(12, Math.round(r * 0.78)));
-      g = Math.min(220, Math.max(12, Math.round(g * 0.78)));
-      b = Math.min(220, Math.max(12, Math.round(b * 0.78)));
+      r = Math.min(215, Math.max(12, Math.round(r * 0.76)));
+      g = Math.min(215, Math.max(12, Math.round(g * 0.76)));
+      b = Math.min(215, Math.max(12, Math.round(b * 0.76)));
     }
 
     const toHex = (n: number) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0');
@@ -1054,7 +1075,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
       resolvedAccentHex: `#${toHex(r)}${toHex(g)}${toHex(b)}`,
       resolvedAccentRgb: `${r}, ${g}, ${b}`,
     };
-  }, [accentColor, selectedCustomId, customWallpaperRgb, wallpaper, auroraColor, theme, dynamicWorldTick]);
+  }, [accentColor, selectedCustomId, customWallpaperRgb, wallpaper, auroraColor, nebulaPreset, theme, dynamicWorldTick]);
 
   // Sync CSS variables & data attributes with custom slider, theme, wallpaper tone, and accent color values
   useEffect(() => {
@@ -1601,7 +1622,13 @@ export function OSProvider({ children }: { children: ReactNode }) {
           closed: false,
           maximized: false,
           desktopId: activeDesktopId,
-          payload: { appInfo: app, url: app.url, isCustomApp: Boolean(app.url) },
+          payload: {
+            appInfo: app,
+            url: app.url,
+            tsxSource: app.tsxSource,
+            fileName: app.fileName,
+            isCustomApp: Boolean(app.url || app.tsxSource),
+          },
         };
         return [...ws, win];
       });
@@ -1832,12 +1859,12 @@ export function OSProvider({ children }: { children: ReactNode }) {
 
   const toggleStart = useCallback(() => setStartOpen((v) => !v), []);
 
-  const installApp = useCallback((app: Partial<StoreApp> & { name: string; icon: string; description: string; author: string; category: 'utilities' | 'games' }) => {
+  const installApp = useCallback((app: Partial<StoreApp> & { name: string; icon: string; description: string; author: string; category: 'utilities' | 'games' | 'office' | 'audio' }) => {
     playSound('notify');
     setInstalledApps((list) => {
       const id = app.id || `custom-${Date.now()}`;
       if (list.some((a) => a.id === id)) return list;
-      const appId = app.builtInAppId ?? (app.url ? `custom:${id}` : id);
+      const appId = app.builtInAppId ?? (app.tsxSource ? `tsx:${id}` : app.url ? `custom:${id}` : id);
       return [
         ...list,
         {
@@ -1851,7 +1878,9 @@ export function OSProvider({ children }: { children: ReactNode }) {
           installedAt: Date.now(),
           builtInAppId: app.builtInAppId,
           url: app.url,
-          isCustom: Boolean(app.url),
+          tsxSource: app.tsxSource,
+          fileName: app.fileName,
+          isCustom: Boolean(app.url || app.tsxSource),
         },
       ];
     });

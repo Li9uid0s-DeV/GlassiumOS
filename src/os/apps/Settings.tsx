@@ -413,7 +413,7 @@ interface ShellModeOption {
 const SHELL_MODES: ShellModeOption[] = [
   {
     id: 'windows',
-    label: 'GlasispectUI (GlassiumOS 5 u1 標準)',
+    label: 'GlasispectUI (GlassiumOS 5 u4 標準)',
     desc: '直線と余白による GlasispectUI ミニマルデザイン・タスクバーAIオムニバー統合',
     mockupType: 'gl5',
   },
@@ -1151,19 +1151,19 @@ export function SettingsApp() {
           </nav>
         </div>
 
-        {/* System Version Tag & u3 Release Notes Button */}
+        {/* System Version Tag & u4 Release Notes Button */}
         <div
           className={`px-2.5 pt-3 text-[11px] border-t flex items-center justify-between font-mono ${
             isLight ? 'border-slate-200/90' : 'border-white/[0.07]'
           }`}
         >
-          <span className="opacity-65 font-bold">GlassiumOS 5 u3</span>
+          <span className="opacity-65 font-bold">GlassiumOS 5 u4</span>
           <button
             type="button"
-            onClick={() => window.dispatchEvent(new CustomEvent('open-glassium-u3-notes'))}
+            onClick={() => window.dispatchEvent(new CustomEvent('open-glassium-u4-notes'))}
             className="px-2 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-300 text-[10px] font-bold transition cursor-pointer"
           >
-            u3 新機能
+            u4 新機能
           </button>
         </div>
       </div>
@@ -1186,21 +1186,21 @@ export function SettingsApp() {
                   <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <h1 className="text-2xl font-bold tracking-tight">
-                        {isJa ? 'システム (GlassiumOS 5 u3)' : 'System (GlassiumOS 5 u3)'}
+                        {isJa ? 'システム (GlassiumOS 5 u4)' : 'System (GlassiumOS 5 u4)'}
                       </h1>
                       <p className="text-xs opacity-50 mt-1">
                         {isJa
-                          ? 'ディスプレイ、動的環境背景 (u3)、サウンド、電源、マルチタスク環境を管理します'
-                          : 'Manage display, dynamic world backgrounds (u3), audio, power, and multitasking behavior'}
+                          ? 'ディスプレイ、動的環境背景、サウンド、電源、マルチタスク環境を管理します'
+                          : 'Manage display, dynamic world backgrounds, audio, power, and multitasking behavior'}
                       </p>
                     </div>
                     <button
                       type="button"
-                      onClick={() => window.dispatchEvent(new CustomEvent('open-glassium-u3-notes'))}
+                      onClick={() => window.dispatchEvent(new CustomEvent('open-glassium-u4-notes'))}
                       className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-fuchsia-500/25 hover:from-cyan-500/40 hover:to-fuchsia-500/40 border border-cyan-400/40 text-xs font-bold text-cyan-200 flex items-center gap-2 transition cursor-pointer shadow-md"
                     >
                       <Icon name="Sparkles" size={15} className="text-cyan-300" />
-                      <span>GlassiumOS 5 u3 新機能ショーケースを見る</span>
+                      <span>GlassiumOS 5 u4 アップデート内容を見る</span>
                     </button>
                   </div>
 
@@ -1323,13 +1323,13 @@ export function SettingsApp() {
                 <div className="space-y-6">
                   {renderBreadcrumbHeader('ディスプレイと背景', 'Display & Wallpapers', () => setSystemSubView('main'))}
 
-                  {/* 0. GlassiumOS 5 u3 Dynamic World Wallpaper Control Studio */}
+                  {/* 0. GlassiumOS 5 u4 Dynamic World Wallpaper Control Studio */}
                   <div className={`${cardSurfaceClass} p-4 space-y-3 border border-cyan-400/30`}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-[10px] font-extrabold text-cyan-300">
-                            u3 NEW
+                            u4
                           </span>
                           <h3 className="text-[13px] font-bold tracking-tight">
                             動的環境デスクトップ背景 (時間・風速・風向・天候・季節・ハロウィン/クリスマス連動)

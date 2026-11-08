@@ -605,11 +605,11 @@ export function Taskbar(_props?: TaskbarProps) {
                 type="button"
                 onClick={handleStartClick}
                 className="h-11 px-2 flex items-center gap-2 transition-opacity hover:opacity-100 relative"
-                title="GlassiumOS 5 スタート"
+                title="GlassiumOS 5 u4 スタート"
               >
                 {startOpen && <span className="absolute top-0 left-0 right-0 h-0.5 bg-[var(--os-accent)]" />}
                 <AppLogo size={20} />
-                <span className="text-xs font-bold tracking-tight hidden md:inline">GlassiumOS 5</span>
+                <span className="text-xs font-bold tracking-tight hidden md:inline">GlassiumOS 5 u4</span>
               </button>
 
               <div className={`h-4 w-px ${isLight ? 'bg-slate-300' : 'bg-white/10'}`} />

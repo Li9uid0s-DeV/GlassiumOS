@@ -1208,7 +1208,7 @@ export function StudyReferenceHubApp({ initialTab = 'dictionary' }: { initialTab
     { term: 'HTTP 405 (Method Not Allowed)', desc: '対象URLで許可されていないHTTPメソッドが送信された際の応答コード。' },
     { term: 'TypeScript', desc: 'JavaScriptに静的型付けを加えたプログラミング言語。' },
     { term: 'WebGL', desc: 'ブラウザ上でGPUを用いて2D/3Dグラフィックスを描画する標準仕様。' },
-    { term: 'GlassiumOS 5', desc: 'マルチシェル対応・Surface Material Engine搭載のデスクトップWeb OS環境。' },
+    { term: 'GlassiumOS 5 u4', desc: 'マルチシェル対応・Surface Material Engine搭載のデスクトップWeb OS環境。' },
   ];
 
   const handleAiLookup = async () => {
@@ -1379,8 +1379,8 @@ export function SysInfoView() {
   const { shellMode, designEngine, theme, language } = useOS();
 
   const specs = [
-    { label: 'OS バージョン', value: 'GlassiumOS 5' },
-    { label: '現在のシェルモード', value: shellMode === 'windows' ? 'GlassiumOS 5' : shellMode },
+    { label: 'OS バージョン', value: 'GlassiumOS 5 u4' },
+    { label: '現在のシェルモード', value: shellMode === 'windows' ? 'GlassiumOS 5 u4' : shellMode },
     { label: 'サーフェスマテリアル', value: designEngine },
     { label: 'テーマ / 表示言語', value: `${theme} / ${language.toUpperCase()}` },
     { label: 'CPU 論理コア数', value: `${navigator.hardwareConcurrency || 8}` },

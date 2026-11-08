@@ -99,6 +99,13 @@ const ICON_MAP: Record<string, FluentIconType> = {
   studio: 'pentool',
   paint: 'palette',
   'spect-studio': 'palette',
+  sonicstudio: 'volume',
+  glassword: 'notepad',
+  glassexcel: 'grid3x3',
+  glassppt: 'monitor',
+  glassnote: 'notepad',
+  tsxrunner: 'terminal',
+  ShoppingBag: 'appstore',
 
   // Lucide icon name mappings
   Globe: 'browser',

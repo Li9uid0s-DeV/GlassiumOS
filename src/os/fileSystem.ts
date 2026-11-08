@@ -104,16 +104,16 @@ const initial: VirtualFolder = {
         txt(
           'doc-welcome',
           'Welcome.txt',
-          'Welcome to GlassiumOS 5 u1 (GlasispectUI)!\n\nThis web operating system includes multi-shell desktop modes, Surface Material Engine, restored Live2D silk wallpapers, SpectClip Calculator, Spatial Layer File Preview, and 3DMaze 50-Floor Roguelike.',
+          'Welcome to GlassiumOS 5 u4 (GlasispectUI)!\n\nThis web operating system includes multi-shell desktop modes, Surface Material Engine, Liquid Glass Music, Weather Radar, and Office Suite.',
           ['OS5開発', '重要'],
-          'GlassiumOS 5 u1 ウェルカムガイド'
+          'GlassiumOS 5 u4 ウェルカムガイド'
         ),
         txt(
           'doc-notes',
           'SystemNotes.txt',
-          'GlassiumOS 5 u1 Highlights:\n- GlasispectUI Design Architecture\n- Restored Default 5-Color Live2D Wallpapers (Amethyst & Cyan Silk, Abyssal Deep Ocean, Polar Emerald Aurora, Neon Cyber Dusk, Crimson Rose Nebula)\n- SpectClip & Liquid Glass Mini Widget Calculator\n- Spatial Layer Preview, Smart Drop Zone, Smart Tag Binder & AI Semantic Action in Files\n- 3DMaze 50-Floor Roguelike & Fixed Slope Physics',
+          'GlassiumOS 5 u4 Highlights:\n- Music App: Liquid Glass UI, Playlist Import, Lyric Translation & 10-Band EQ\n- Weather App: Location Search, Saved Locations, Rain Radar Map & 5-Min Server Sync\n- App Store: Progress Bar Downloads, Sonic 3D, Write, Sheet, Stage, Note & TSX Runner\n- Dynamic Accent Color & Liquid Glass Lock Screen Clock',
           ['OS5開発'],
-          'GlassiumOS 5 u1 リリースノート'
+          'GlassiumOS 5 u4 リリースノート'
         ),
         pdf(
           'doc-spec-pdf',
