@@ -31,6 +31,7 @@ export const LiquidGlassMusicWidget: React.FC<LiquidGlassMusicWidgetProps> = ({
       : defaultShape;
   });
   const [showShapeMenu, setShowShapeMenu] = useState(false);
+  const [weatherInPill, setWeatherInPill] = useState<'Sun' | 'CloudRain'>('Sun');
 
   useEffect(() => {
     return subscribeMusicState((st) => setMusicState(st));
@@ -92,7 +93,8 @@ export const LiquidGlassMusicWidget: React.FC<LiquidGlassMusicWidgetProps> = ({
       {shape === 'capsule' && (
         <motion.div
           layout
-          className="relative flex items-center gap-4 px-4 py-3 rounded-full bg-white/[0.12] backdrop-blur-3xl border border-white/25 shadow-[0_20px_60px_rgba(0,0,0,0.65)] min-w-[340px] max-w-[480px] overflow-hidden"
+          tabIndex={0}
+          className="group liquid-music-pill-container relative flex items-center gap-3.5 px-4 py-3 rounded-full bg-white/[0.12] backdrop-blur-3xl border border-white/25 shadow-[0_20px_60px_rgba(0,0,0,0.65)] min-w-[360px] max-w-[540px] overflow-hidden focus:outline-none focus:ring-2 focus:ring-cyan-300/50"
         >
           {/* SVG liquid glass displacement overlay */}
           <div className="liquid-music-pill-body absolute inset-0 pointer-events-none z-0" />
@@ -119,14 +121,40 @@ export const LiquidGlassMusicWidget: React.FC<LiquidGlassMusicWidgetProps> = ({
               <div className="truncate font-black text-xs text-white drop-shadow">
                 {currentTrack.title}
               </div>
-              <button
-                type="button"
-                onClick={() => setShowShapeMenu(!showShapeMenu)}
-                className="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition cursor-pointer"
-                title="UIの形状を変更"
-              >
-                <Icon name="Sliders" size={12} />
-              </button>
+              <div className="flex items-center gap-1">
+                {/* Weather icon inside the pill with focused animation */}
+                <button
+                  type="button"
+                  onClick={() => setWeatherInPill((w) => (w === 'Sun' ? 'CloudRain' : 'Sun'))}
+                  className="liquid-weather-pill-btn flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-[10px] text-white/90 transition cursor-pointer relative"
+                  title="クリックして天気アイコンを切替 (フォーカス時にアニメーション発動)"
+                >
+                  {weatherInPill === 'Sun' ? (
+                    <div className="liquid-weather-icon-sun flex items-center justify-center text-amber-400">
+                      <Icon name="Sun" size={13} />
+                    </div>
+                  ) : (
+                    <div className="relative flex flex-col items-center">
+                      <div className="liquid-weather-icon-rain text-cyan-300">
+                        <Icon name="CloudRain" size={13} />
+                      </div>
+                      <div className="liquid-weather-raindrop w-0.5 h-1.5 bg-cyan-300 rounded-full absolute -bottom-1" />
+                    </div>
+                  )}
+                  <span className="font-mono text-[10px] text-white/80">
+                    {weatherInPill === 'Sun' ? '21°' : '18°'}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowShapeMenu(!showShapeMenu)}
+                  className="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-white/80 hover:text-white transition cursor-pointer"
+                  title="UIの形状を変更"
+                >
+                  <Icon name="Sliders" size={12} />
+                </button>
+              </div>
             </div>
             <div className="text-[11px] text-white/70 truncate">{currentTrack.artist}</div>
 

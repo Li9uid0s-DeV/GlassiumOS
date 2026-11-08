@@ -26,6 +26,13 @@ import { useOS } from '../OSContext';
 import { globalAudio } from '../globalAudioManager';
 import { backendFetch } from '../backendConfig';
 import { DrumPadTunerView } from './ExtraAppsSuite';
+import {
+  generatePronunciationGuide,
+  calculateLeadInState,
+  KARAOKE_COLOR_THEMES,
+  KaraokeColorTheme,
+  getLyricTranslation,
+} from '../karaokeGuide';
 
 type AppleMusicNavId =
   | 'listen-now'
@@ -164,12 +171,42 @@ const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
   {
     id: 'mv-yoasobi-yuusha',
     youtubeId: 'OIBODIPC_8Y',
-    title: '勇者 (The Brave) — 葬送のフリーレン OP',
+    title: '勇者 (The Brave)',
     artist: 'YOASOBI',
     album: 'THE BOOK 3',
     durationLabel: '3:24',
     viewsLabel: '1.1億回視聴',
     year: 2023,
+  },
+  {
+    id: 'mv-yoasobi-monster',
+    youtubeId: 'dy90tA3TT1c',
+    title: '怪物 (Monster)',
+    artist: 'YOASOBI',
+    album: 'THE BOOK 2',
+    durationLabel: '3:26',
+    viewsLabel: '3.6億回視聴',
+    year: 2021,
+  },
+  {
+    id: 'mv-yoasobi-gunjou',
+    youtubeId: 'Y4nEEZwckuU',
+    title: '群青 (Gunjou)',
+    artist: 'YOASOBI',
+    album: 'THE BOOK',
+    durationLabel: '4:08',
+    viewsLabel: '2.1億回視聴',
+    year: 2020,
+  },
+  {
+    id: 'mv-yoasobi-shukufuku',
+    youtubeId: '3eytpBOkOFA',
+    title: '祝福 (The Blessing)',
+    artist: 'YOASOBI',
+    album: 'THE BOOK 3',
+    durationLabel: '3:17',
+    viewsLabel: '1.4億回視聴',
+    year: 2022,
   },
   {
     id: 'mv-kenshi-kickback',
@@ -192,6 +229,36 @@ const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
     year: 2018,
   },
   {
+    id: 'mv-kenshi-kanden',
+    youtubeId: 'KFStSc5cTSo',
+    title: '感電 (Kanden)',
+    artist: '米津玄師',
+    album: 'STRAY SHEEP',
+    durationLabel: '4:24',
+    viewsLabel: '2.5億回視聴',
+    year: 2020,
+  },
+  {
+    id: 'mv-kenshi-chikyugi',
+    youtubeId: 'VUsXA__081c',
+    title: '地球儀 (Spinning Globe)',
+    artist: '米津玄師',
+    album: 'LOST CORNER',
+    durationLabel: '4:33',
+    viewsLabel: '5,800万回視聴',
+    year: 2023,
+  },
+  {
+    id: 'mv-kenshi-sayonara',
+    youtubeId: '-ubEP_bB05E',
+    title: 'さよーならまたいつか！',
+    artist: '米津玄師',
+    album: 'LOST CORNER',
+    durationLabel: '3:22',
+    viewsLabel: '6,200万回視聴',
+    year: 2024,
+  },
+  {
     id: 'mv-ado-show',
     youtubeId: 'pgXpM4l_MwI',
     title: '唱 (Show)',
@@ -212,6 +279,16 @@ const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
     year: 2020,
   },
   {
+    id: 'mv-ado-newgenesis',
+    youtubeId: '1FliVTcX8bQ',
+    title: '新時代 (New Genesis)',
+    artist: 'Ado',
+    album: 'ウタの歌 ONE PIECE FILM RED',
+    durationLabel: '3:49',
+    viewsLabel: '2.2億回視聴',
+    year: 2022,
+  },
+  {
     id: 'mv-higedan-pretender',
     youtubeId: 'TQ8WlA2GXbk',
     title: 'Pretender',
@@ -229,6 +306,16 @@ const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
     album: 'Rejoice',
     durationLabel: '5:14',
     viewsLabel: '1.9億回視聴',
+    year: 2022,
+  },
+  {
+    id: 'mv-higedan-mixednuts',
+    youtubeId: 'CbH2F0kXgTY',
+    title: 'ミックスナッツ (Mixed Nuts)',
+    artist: 'Official髭男dism',
+    album: 'Rejoice',
+    durationLabel: '3:33',
+    viewsLabel: '1.6億回視聴',
     year: 2022,
   },
   {
@@ -252,6 +339,26 @@ const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
     year: 2023,
   },
   {
+    id: 'mv-mga-dancehall',
+    youtubeId: 'x2rvSf0STBM',
+    title: 'ダンスホール (Dancehall)',
+    artist: 'Mrs. GREEN APPLE',
+    album: 'Unity',
+    durationLabel: '3:24',
+    viewsLabel: '1.8億回視聴',
+    year: 2022,
+  },
+  {
+    id: 'mv-mga-aotonatsu',
+    youtubeId: 'm34VTZqqncg',
+    title: '青と夏 (Ao to Natsu)',
+    artist: 'Mrs. GREEN APPLE',
+    album: 'Attitude',
+    durationLabel: '4:30',
+    viewsLabel: '2.1億回視聴',
+    year: 2018,
+  },
+  {
     id: 'mv-vaundy-kaiju',
     youtubeId: 'UM9XNpgrqVk',
     title: '怪獣の花唄 (Kaiju no Hanauta)',
@@ -262,6 +369,26 @@ const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
     year: 2020,
   },
   {
+    id: 'mv-vaundy-odoriko',
+    youtubeId: '7HgJIAUtICU',
+    title: '踊り子 (Odoriko)',
+    artist: 'Vaundy',
+    album: 'replica',
+    durationLabel: '3:45',
+    viewsLabel: '1.3億回視聴',
+    year: 2021,
+  },
+  {
+    id: 'mv-vaundy-timeparadox',
+    youtubeId: 'EDnP4h_n0Z0',
+    title: 'タイムパラドックス (Time Paradox)',
+    artist: 'Vaundy',
+    album: 'Time Paradox Single',
+    durationLabel: '3:47',
+    viewsLabel: '7,800万回視聴',
+    year: 2024,
+  },
+  {
     id: 'mv-creepynuts-bling',
     youtubeId: 'mLW35YMzELE',
     title: 'Bling-Bang-Bang-Born',
@@ -270,6 +397,66 @@ const OFFICIAL_MV_CATALOG: MusicVideoItem[] = [
     durationLabel: '2:52',
     viewsLabel: '2.9億回視聴',
     year: 2024,
+  },
+  {
+    id: 'mv-creepynuts-otonoke',
+    youtubeId: 'ba4bV_3A-Xg',
+    title: 'オトノケ (Otonoke) — ダンダダン OP',
+    artist: 'Creepy Nuts',
+    album: 'Otonoke Single',
+    durationLabel: '3:04',
+    viewsLabel: '6,400万回視聴',
+    year: 2024,
+  },
+  {
+    id: 'mv-creepynuts-nobishiro',
+    youtubeId: 'n_sUo0D4E4I',
+    title: 'のびしろ (Nobishiro)',
+    artist: 'Creepy Nuts',
+    album: 'Case',
+    durationLabel: '3:57',
+    viewsLabel: '8,500万回視聴',
+    year: 2021,
+  },
+  {
+    id: 'mv-fujiikaze-michiteyuku',
+    youtubeId: 'cDS0vU2Fq5s',
+    title: '満ちてゆく (Overflowing)',
+    artist: '藤井 風',
+    album: 'Michiteyuku Single',
+    durationLabel: '5:13',
+    viewsLabel: '6,800万回視聴',
+    year: 2024,
+  },
+  {
+    id: 'mv-fujiikaze-shinunogaiiwa',
+    youtubeId: 'dusrG7hZk78',
+    title: '死ぬのがいいわ (Shinunoga E-Wa)',
+    artist: '藤井 風',
+    album: 'HELP EVER HURT NEVER',
+    durationLabel: '3:08',
+    viewsLabel: '1.2億回視聴',
+    year: 2020,
+  },
+  {
+    id: 'mv-kinggnu-specialz',
+    youtubeId: 'fhzKLBZJC3w',
+    title: 'SPECIALZ — 呪術廻戦 渋谷事変 OP',
+    artist: 'King Gnu',
+    album: 'THE GREATEST UNKNOWN',
+    durationLabel: '3:58',
+    viewsLabel: '1.4億回視聴',
+    year: 2023,
+  },
+  {
+    id: 'mv-kinggnu-hakujitsu',
+    youtubeId: 'ony539T074U',
+    title: '白日 (Hakujitsu)',
+    artist: 'King Gnu',
+    album: 'CEREMONY',
+    durationLabel: '4:35',
+    viewsLabel: '4.8億回視聴',
+    year: 2019,
   },
   {
     id: 'mv-daftpunk-onemoretime',
@@ -653,13 +840,23 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   } | null>(null);
   const lyricFetchSeqRef = useRef<number>(0);
 
+  // Karaoke Engine States
+  const [isKaraokeMode, setIsKaraokeMode] = useState<boolean>(true);
+  const [showPronunciationGuide, setShowPronunciationGuide] = useState<boolean>(true);
+  const [showLyricsTranslation, setShowLyricsTranslation] = useState<boolean>(true);
+  const [karaokeTheme, setKaraokeTheme] = useState<KaraokeColorTheme>('neon-gold');
+
   const handlePillPointerDown = useCallback(
     (e: React.PointerEvent<HTMLElement>) => {
       const target = e.target as HTMLElement;
       if (target.closest('button, input, select, a, [data-no-pill-drag="true"]')) {
         return;
       }
-      e.currentTarget.setPointerCapture(e.pointerId);
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        // ignore
+      }
       setIsDraggingPill(true);
       pillDragStartRef.current = {
         pointerX: e.clientX,
@@ -675,8 +872,16 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     if (!pillDragStartRef.current) return;
     const dx = e.clientX - pillDragStartRef.current.pointerX;
     const dy = e.clientY - pillDragStartRef.current.pointerY;
-    const clampedX = Math.max(-460, Math.min(460, pillDragStartRef.current.originX + dx));
-    const clampedY = Math.max(-520, Math.min(20, pillDragStartRef.current.originY + dy));
+
+    // Dynamic viewport-responsive dragging across entire screen without getting stuck
+    const winW = typeof window !== 'undefined' ? window.innerWidth : 1200;
+    const winH = typeof window !== 'undefined' ? window.innerHeight : 800;
+    const maxHalfW = Math.max(300, Math.round(winW / 2 - 30));
+    const maxH = 40;
+    const minH = -Math.max(250, Math.round(winH - 80));
+
+    const clampedX = Math.max(-maxHalfW, Math.min(maxHalfW, pillDragStartRef.current.originX + dx));
+    const clampedY = Math.max(minH, Math.min(maxH, pillDragStartRef.current.originY + dy));
     setPillOffset({ x: clampedX, y: clampedY });
   }, []);
 
@@ -1546,15 +1751,81 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         {/* Lyrics Control Header (Liquid Glass Bar) */}
         <div className="px-5 py-3 border-b border-white/[0.1] bg-white/[0.03] backdrop-blur-2xl flex flex-wrap items-center justify-between gap-2 shrink-0 z-10">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-xs font-semibold tracking-tight text-white">
-              Time-Synced Lyrics
+            <span className="text-xs font-semibold tracking-tight text-white flex items-center gap-1">
+              <span className="material-symbols-rounded text-sm text-amber-400">mic</span>
+              カラオケ & 同期歌詞
             </span>
             <span className="text-[10px] text-white/50 font-mono tabular-nums">
-              · 60fps rAF · {currentTrack.lyrics.length} lines
+              · 60fps rAF · {currentTrack.lyrics.length} 行
             </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
+            {/* Karaoke Mode Toggle */}
+            <button
+              type="button"
+              onClick={() => setIsKaraokeMode((v) => !v)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition border flex items-center gap-1 ${
+                isKaraokeMode
+                  ? 'bg-amber-400 text-black border-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
+                  : 'apple-liquid-glass-pill text-white/80 hover:text-white'
+              }`}
+              title="カラオケハイライト表示切替 (色変化エフェクト)"
+            >
+              <span className="material-symbols-rounded text-xs">mic</span>
+              カラオケ
+            </button>
+
+            {/* Pronunciation Guide (Furigana / Romaji) Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowPronunciationGuide((v) => !v)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition border flex items-center gap-1 ${
+                showPronunciationGuide
+                  ? 'bg-cyan-500 text-black border-cyan-300 shadow-[0_0_12px_rgba(6,182,212,0.5)]'
+                  : 'apple-liquid-glass-pill text-white/80 hover:text-white'
+              }`}
+              title="ローマ字・発音ガイド表示切替"
+            >
+              <span className="text-[10px] font-mono">あ/A</span>
+              発音ガイド
+            </button>
+
+            {/* Lyrics Translation (歌詞通訳・日本語対訳) Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowLyricsTranslation((v) => !v)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition border flex items-center gap-1 ${
+                showLyricsTranslation
+                  ? 'bg-emerald-400 text-black border-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.5)]'
+                  : 'apple-liquid-glass-pill text-white/80 hover:text-white'
+              }`}
+              title="歌詞通訳・日本語対訳の表示切替"
+            >
+              <span className="material-symbols-rounded text-xs">translate</span>
+              歌詞通訳
+            </button>
+
+            {/* Karaoke Color Theme Selector */}
+            {isKaraokeMode && (
+              <button
+                type="button"
+                onClick={() => {
+                  const themes: KaraokeColorTheme[] = ['neon-gold', 'cyber-cyan', 'ruby-rose', 'rainbow-glow'];
+                  const nextIdx = (themes.indexOf(karaokeTheme) + 1) % themes.length;
+                  setKaraokeTheme(themes[nextIdx]);
+                }}
+                className="px-2 py-1 rounded-md apple-liquid-glass-pill text-[10px] font-mono text-white/90 hover:text-white transition flex items-center gap-1.5"
+                title="カラオケ演出カラーを変更"
+              >
+                <span
+                  className="w-2.5 h-2.5 rounded-full inline-block border border-white/40 shadow-sm"
+                  style={{ background: KARAOKE_COLOR_THEMES[karaokeTheme].activeGradient }}
+                />
+                {KARAOKE_COLOR_THEMES[karaokeTheme].name.split(' ')[0]}
+              </button>
+            )}
+
             {/* Sync Offset Calibration Controls (-0.2s / 0.0s / +0.2s) */}
             <div className="flex items-center apple-liquid-glass-pill px-1.5 py-0.5 text-[10px] font-mono tabular-nums rounded-md">
               <button
@@ -1789,6 +2060,10 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                       return acc;
                     }, []);
 
+            const leadIn = calculateLeadInState(line.time, effectiveLyricTime);
+            const pronunciation = showPronunciationGuide ? generatePronunciationGuide(line.text) : '';
+            const translation = showLyricsTranslation ? getLyricTranslation(line.text) : '';
+
             return (
               <div
                 key={idx}
@@ -1801,6 +2076,44 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   isActive ? 'bg-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.16)]' : 'hover:bg-white/[0.05]'
                 }`}
               >
+                {/* Lead-in Timing Indicator (歌い出しタイミング検知・カウントダウン) */}
+                {leadIn.isActive && (
+                  <div className="flex items-center gap-2 mb-2 animate-pulse select-none">
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border flex items-center gap-1.5 transition-all ${
+                        leadIn.isUrgent
+                          ? 'bg-rose-500/30 text-rose-200 border-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.7)]'
+                          : 'bg-amber-500/25 text-amber-200 border-amber-400/50 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
+                      }`}
+                    >
+                      <span className="material-symbols-rounded text-xs">mic</span>
+                      {leadIn.label}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {[1, 2, 3].map((dot) => (
+                        <span
+                          key={dot}
+                          className={`w-2 h-2 rounded-full transition-all duration-200 ${
+                            leadIn.dotsLit >= dot
+                              ? 'bg-amber-400 scale-125 shadow-[0_0_10px_rgba(251,191,36,0.95)]'
+                              : 'bg-white/20 scale-90'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Pronunciation Guide (発音ガイド: ふりがな / ローマ字) */}
+                {showPronunciationGuide && pronunciation && (
+                  <div className="text-[11px] sm:text-xs font-mono font-medium tracking-wider text-amber-300/85 mb-1 select-none flex items-center gap-1.5 opacity-90">
+                    <span className="text-[9px] px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-400/30 font-sans leading-none">
+                      発音
+                    </span>
+                    <span className="truncate">{pronunciation}</span>
+                  </div>
+                )}
+
                 <div className="flex items-baseline justify-between gap-4">
                   <div
                     className={`font-bold tracking-tight leading-snug ${
@@ -1821,7 +2134,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                           const isWordCurrent = wProg > 0 && wProg < 1;
                           const isWordSung = wProg >= 1;
                           const lift = isWordCurrent
-                            ? `${(-2.4 * Math.sin(wProg * Math.PI)).toFixed(2)}px`
+                            ? `${(-2.8 * Math.sin(wProg * Math.PI)).toFixed(2)}px`
                             : isWordSung
                             ? '-0.8px'
                             : '0px';
@@ -1830,13 +2143,19 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                             <span
                               key={wIdx}
                               id={`apple-lyric-word-${idx}-${wIdx}`}
-                              className="apple-karaoke-word"
+                              className={`apple-karaoke-word ${
+                                isKaraokeMode ? `karaoke-theme-${karaokeTheme}` : ''
+                              }`}
                               style={
                                 {
                                   '--word-progress': pct,
                                   '--word-lift': lift,
-                                  '--word-glow': isWordCurrent ? '12px' : isWordSung ? '4px' : '0px',
-                                  '--word-scale': isWordCurrent ? '1.03' : '1',
+                                  '--word-glow': isWordCurrent
+                                    ? '14px'
+                                    : isWordSung
+                                    ? '6px'
+                                    : '0px',
+                                  '--word-scale': isWordCurrent ? '1.04' : '1',
                                 } as React.CSSProperties
                               }
                             >
@@ -1844,6 +2163,21 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                             </span>
                           );
                         })}
+                      </span>
+                    ) : isActive && isKaraokeMode ? (
+                      /* Smooth line-level color sweep when word-level timing is pending */
+                      <span
+                        className="inline-block transition-all duration-75"
+                        style={{
+                          backgroundImage: KARAOKE_COLOR_THEMES[karaokeTheme].activeGradient,
+                          backgroundSize: '100% 100%',
+                          WebkitBackgroundClip: 'text',
+                          backgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                          filter: `drop-shadow(0 0 10px ${KARAOKE_COLOR_THEMES[karaokeTheme].glowColor})`,
+                        }}
+                      >
+                        {line.text}
                       </span>
                     ) : (
                       <span className={isActive ? 'text-white' : 'text-white/85'}>
@@ -1862,6 +2196,29 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                     {formatSecs(line.time)}
                   </span>
                 </div>
+
+                {/* Lyrics Translation Subtitle (歌詞の通訳・日本語対訳) */}
+                {showLyricsTranslation && translation && !line.isInterlude && (
+                  <div className="text-xs sm:text-sm text-emerald-300/95 font-medium tracking-normal mt-1.5 mb-0.5 select-none leading-relaxed flex items-center gap-1.5">
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 font-sans leading-none shrink-0 shadow-xs">
+                      通訳
+                    </span>
+                    <span className="truncate">{translation}</span>
+                  </div>
+                )}
+
+                {/* Real-time Karaoke Pitch & Rhythm Bar for Active Line */}
+                {isActive && isKaraokeMode && (
+                  <div className="karaoke-pitch-progress-track mt-3 w-full max-w-md">
+                    <div
+                      className="karaoke-pitch-progress-fill"
+                      style={{
+                        width: `${(lineProgress * 100).toFixed(1)}%`,
+                        background: KARAOKE_COLOR_THEMES[karaokeTheme].activeGradient,
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             );
           })}
@@ -4172,7 +4529,8 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             onPointerMove={handlePillPointerMove}
             onPointerUp={handlePillPointerUp}
             onPointerCancel={handlePillPointerUp}
-            className="pointer-events-auto relative rounded-2xl liquid-glass-music-dock liquid-glass-window overflow-hidden px-3.5 py-2 flex items-center gap-3 shadow-[0_20px_50px_rgba(0,0,0,0.7)] border border-white/25 cursor-grab active:cursor-grabbing max-w-md"
+            style={{ touchAction: 'none' }}
+            className="pointer-events-auto relative rounded-2xl liquid-glass-music-dock liquid-glass-window overflow-hidden px-3.5 py-2 flex items-center gap-3 shadow-[0_20px_50px_rgba(0,0,0,0.7)] border border-white/25 cursor-grab active:cursor-grabbing max-w-md select-none"
             title="ドラッグして移動 / ボタンで操作・展開"
           >
             {/* Moving Artwork Underglow */}
@@ -4258,7 +4616,8 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             onPointerMove={handlePillPointerMove}
             onPointerUp={handlePillPointerUp}
             onPointerCancel={handlePillPointerUp}
-            className="pointer-events-auto relative w-full max-w-6xl rounded-2xl liquid-glass-music-dock liquid-glass-window overflow-hidden px-3.5 sm:px-5 py-2.5 flex flex-col gap-2 cursor-grab active:cursor-grabbing"
+            style={{ touchAction: 'none' }}
+            className="pointer-events-auto relative w-full max-w-6xl rounded-2xl liquid-glass-music-dock liquid-glass-window overflow-hidden px-3.5 sm:px-5 py-2.5 flex flex-col gap-2 cursor-grab active:cursor-grabbing select-none"
           >
             {/* Moving Artwork-Pattern Gradient Underglow Inside the Liquid Glass Dock */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden z-0 opacity-65">
