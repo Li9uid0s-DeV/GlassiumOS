@@ -153,7 +153,8 @@ export async function autoConnectBackendServer(): Promise<BackendConnectionState
   try {
     const res = await nativeFetch(healthUrl, {
       mode: useLocal ? 'same-origin' : 'cors',
-      signal: AbortSignal.timeout(useLocal ? 4000 : 8000),
+      // 22s timeout for external Render backend to accommodate ~15.2s free-tier cold start (D3)
+      signal: AbortSignal.timeout(useLocal ? 5000 : 22000),
     });
     if (res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -240,7 +241,7 @@ export async function backendFetch(
     return nativeFetch(targetUrl, {
       ...init,
       mode: 'cors',
-      signal: init?.signal ?? AbortSignal.timeout(15000),
+      signal: init?.signal ?? AbortSignal.timeout(25000),
     });
   }
 

@@ -483,7 +483,8 @@ export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
         <div
           onPointerDown={startDrag}
           onDoubleClick={() => toggleMaximize(win.id)}
-          className={`relative flex shrink-0 items-center justify-between select-none ${getTitleBarClass()}`}
+          style={!isUbuntuMode ? { backgroundColor: 'var(--os-titlebar)' } : undefined}
+          className={`relative flex shrink-0 items-center justify-between select-none transition-colors duration-200 ${getTitleBarClass()}`}
         >
           {/* Left Side: macOS Traffic Lights OR App Title */}
           {isMacMode ? (
@@ -836,8 +837,11 @@ export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
           )}
         </div>
 
-        {/* Window Content Container with Per-Shell Layout Class */}
-        <div className={`window-body-shell-${shellMode} relative flex-1 overflow-hidden`}>
+        {/* Window Content Container with Per-Shell Layout Class & OS-Wide Theme Surface */}
+        <div
+          style={{ backgroundColor: 'var(--os-surface-solid)' }}
+          className={`window-body-shell-${shellMode} relative flex-1 overflow-hidden transition-colors duration-200`}
+        >
           {children}
         </div>
       </div>

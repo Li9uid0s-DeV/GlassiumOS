@@ -5542,6 +5542,15 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                     <span className="text-xs sm:text-sm font-bold text-white truncate">
                       {currentTrack.title}
                     </span>
+                    {currentTrack.isPreview ? (
+                      <span className="px-1.5 py-0.5 rounded bg-amber-500/25 border border-amber-400/40 text-[9px] font-bold text-amber-200 shrink-0">
+                        Preview
+                      </span>
+                    ) : (
+                      <span className="px-1.5 py-0.5 rounded bg-white/10 border border-white/15 text-[9px] font-mono text-white/75 shrink-0">
+                        {currentTrack.bitrate || '320 kbps'}
+                      </span>
+                    )}
                     {isBuffering && (
                       <span className="text-[10px] font-mono text-white/60 animate-pulse">
                         読込中...

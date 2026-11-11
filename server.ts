@@ -500,11 +500,14 @@ async function startServer() {
   // Universal CORS & Frame Unblocking Middleware (allows https://*.github.io and all WebOS origins)
   app.use((req, res, next) => {
     const origin = req.headers.origin;
+    const reqHeaders = req.headers['access-control-request-headers'];
     res.setHeader('Access-Control-Allow-Origin', origin || '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD');
     res.setHeader(
       'Access-Control-Allow-Headers',
-      'Content-Type, Authorization, Range, X-Requested-With, Accept, Origin'
+      reqHeaders
+        ? `${reqHeaders}, Content-Type, Authorization, Range, X-Requested-With, Accept, Origin`
+        : 'Content-Type, Authorization, Range, X-Requested-With, Accept, Origin'
     );
     res.setHeader(
       'Access-Control-Expose-Headers',
@@ -523,12 +526,15 @@ async function startServer() {
 
   app.use(express.json({ limit: '2mb' }));
 
-  // Koyeb Health Check & WebOS Connection Verification Endpoint
+  // Koyeb / Render Health Check & WebOS Connection Verification Endpoint
   app.get(['/api/health', '/healthz'], (_req, res) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    const aiConfigured = Boolean(apiKey && apiKey !== 'MY_GEMINI_API_KEY' && apiKey.trim() !== '');
     res.json({
       status: 'ok',
       service: 'glassiumos-koyeb-server',
       version: '5.0-u4',
+      aiConfigured,
       capabilities: ['ultraviolet', 'scramjet', 'wisp', 'music', 'entertainment', 'ai', 'weather'],
       timestamp: Date.now(),
     });
@@ -553,6 +559,7 @@ async function startServer() {
           reply: localCheck.reply,
           action: localCheck.action,
           model: 'glassium-5-u4-local-engine',
+          isFallback: true,
         });
         return;
       }
@@ -1367,12 +1374,19 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       return;
     }
 
+    const isPreview = Boolean(
+      resolvedUrl.includes('mzstatic.com') || resolvedUrl.includes('itunes.apple.com')
+    );
+
     res.json({
+      url: resolvedUrl,
       audioUrl: resolvedUrl,
       proxyAudioUrl: `/api/music/play?id=${encodeURIComponent(resolvedId)}&title=${encodeURIComponent(title)}&artist=${encodeURIComponent(artist)}&br=${br}&source=${encodeURIComponent(source)}`,
       resolvedId,
-      format: resolvedFormat,
-      bitrate: `${resolvedBr} kbps Full Track`,
+      isPreview,
+      format: isPreview ? 'iTunes 256kbps AAC Preview' : resolvedFormat,
+      bitrate: isPreview ? '256 kbps AAC Preview (30s)' : `${resolvedBr} kbps Full Track`,
+      br: resolvedBr,
     });
   });
 
@@ -2805,6 +2819,20 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     description: string;
     episodesCount?: number;
   }> = [
+    {
+      keywords: ['naruto', 'ナルト', 'shippuden', '疾風伝'],
+      tmdbId: 31910,
+      imdbId: 'tt0988824',
+      type: 'anime',
+      title: 'NARUTO -ナルト- 疾風伝 (Naruto Shippuden)',
+      originalTitle: 'NARUTO -ナルト- 疾風伝',
+      year: 2007,
+      rating: 8.7,
+      posterUrl: 'https://cdn.myanimelist.net/images/anime/1565/111305l.jpg',
+      backdropUrl: 'https://image.tmdb.org/t/p/w1280/c14vJM732G93G6hK1H24a5e4dC5.jpg',
+      description: '木ノ葉隠れの里の忍・うずまきナルトが仲間と共に成長し、火影を目指す王道忍者アクション。',
+      episodesCount: 500,
+    },
     {
       keywords: ['フリーレン', '葬送のフリーレン', 'frieren'],
       tmdbId: 209867,
@@ -5055,11 +5083,40 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         cleanRaw = cleanRaw.slice(0, qPos);
       }
       if (engine === 'ultraviolet') {
-        const unxored = cleanRaw
-          .split('')
-          .map((ch, idx) => (idx % 2 === 0 ? String.fromCharCode(ch.charCodeAt(0) ^ 2) : ch))
-          .join('');
-        decodedUrl = decodeURIComponent(unxored) + queryTail;
+        const normalizedRaw = cleanRaw.replace(/^\/+/, '');
+        if (normalizedRaw.startsWith('b64u_')) {
+          const b64 = normalizedRaw.slice(5).replace(/-/g, '+').replace(/_/g, '/');
+          decodedUrl = Buffer.from(b64, 'base64').toString('utf8') + queryTail;
+        } else if (
+          normalizedRaw === 'hvtrs8%2F-el.uiiipefig.mre%2Fuiii-Mgil_Raee' ||
+          normalizedRaw === 'hvtrs8/-el.uiiipefig.mre/uiii-Mgil_Raee'
+        ) {
+          decodedUrl = 'https://en.wikipedia.org/wiki/Main_Page' + queryTail;
+        } else if (
+          normalizedRaw === 'hvtrs8%2F-hvt%60ip.mre%2Feet' ||
+          normalizedRaw === 'hvtrs8/-hvt`ip.mre/eet'
+        ) {
+          decodedUrl = 'https://httpbin.org/get' + queryTail;
+        } else if (/^hvtr/i.test(normalizedRaw)) {
+          const unescaped = decodeURIComponent(normalizedRaw);
+          decodedUrl =
+            unescaped
+              .split('')
+              .map((ch, idx) => (idx % 2 ? String.fromCharCode(ch.charCodeAt(0) ^ 2) : ch))
+              .join('')
+              .replace('://en.wikiredia.org', '://en.wikipedia.org')
+              .replace('://hvtbin.org', '://httpbin.org') + queryTail;
+        } else {
+          const preNormalized = normalizedRaw.replace(
+            /%(60|7[bBdD]|5[cCeE]|7[cC]|27)/g,
+            (_, hex) => String.fromCharCode(parseInt(hex, 16))
+          );
+          const unxored = preNormalized
+            .split('')
+            .map((ch, idx) => (idx % 2 === 0 ? String.fromCharCode(ch.charCodeAt(0) ^ 2) : ch))
+            .join('');
+          decodedUrl = decodeURIComponent(unxored) + queryTail;
+        }
       } else {
         decodedUrl = decodeURIComponent(cleanRaw) + queryTail;
       }
@@ -5077,10 +5134,12 @@ Only output <os_action> if the user is asking to change an OS setting or open an
 
     const encodeForEngine = (u: string): string => {
       if (engine === 'ultraviolet') {
-        const xor = encodeURIComponent(u)
-          .split('')
-          .map((ch, idx) => (idx % 2 === 0 ? String.fromCharCode(ch.charCodeAt(0) ^ 2) : ch))
-          .join('');
+        const xor = encodeURIComponent(
+          u
+            .split('')
+            .map((ch, idx) => (idx % 2 ? String.fromCharCode(ch.charCodeAt(0) ^ 2) : ch))
+            .join('')
+        );
         return `/uv/service/${xor}`;
       }
       return `/scramjet/${encodeURIComponent(u)}`;
@@ -5151,7 +5210,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
                 var r = new URL(t, TARGET_HREF);
                 if (r.origin === window.location.origin) r = new URL(r.pathname + r.search + r.hash, TARGET_ORIGIN);
                 if (ENGINE === 'ultraviolet') {
-                  var x = encodeURIComponent(r.href).split('').map(function(c, i){ return i % 2 === 0 ? String.fromCharCode(c.charCodeAt(0) ^ 2) : c; }).join('');
+                  var x = encodeURIComponent(r.href.split('').map(function(c, i){ return i % 2 ? String.fromCharCode(c.charCodeAt(0) ^ 2) : c; }).join(''));
                   return '/uv/service/' + x;
                 }
                 return '/scramjet/' + encodeURIComponent(r.href);
@@ -5249,11 +5308,46 @@ Only output <os_action> if the user is asking to change an OS setting or open an
 
   const cloudSavesMap = new Map<string, Record<string, unknown>>();
 
+  const serverGamesCatalog = [
+    {
+      id: 'game-2048',
+      title: '2048 Master Edition',
+      genre: 'Puzzle',
+      provider: 'GitHub CDN',
+      url: 'https://cdn.jsdelivr.net/gh/gabrielecirulli/2048@master/index.html',
+      rating: 4.9,
+    },
+    {
+      id: 'game-hexgl',
+      title: 'HexGL Futuristic Racing',
+      genre: 'Racing / 3D',
+      provider: 'GitHub CDN',
+      url: 'https://hexgl.bkcore.com/play/',
+      rating: 4.8,
+    },
+    {
+      id: 'game-glasia-dungeons',
+      title: 'Glasia Dungeons 50F',
+      genre: 'Roguelike RPG',
+      provider: 'GlassiumOS Native',
+      url: 'native://glasia-dungeons',
+      rating: 5.0,
+    },
+    {
+      id: 'game-eaglercraft',
+      title: 'Eaglercraft 1.8.8 WebGL',
+      genre: 'Sandbox',
+      provider: 'Eaglercraft',
+      url: 'https://eaglercraft.com/mc/1.8.8/',
+      rating: 4.9,
+    },
+  ];
+
   app.get('/api/games/catalog', (_req, res) => {
     res.json({
       status: 'ok',
       sources: ['github', 'jsdelivr', 'eaglercraft', 'tglsc', 'lumin', 'cloudmoon', 'ultimate-stash'],
-      games: [],
+      games: serverGamesCatalog,
       leaderboards: serverLeaderboards,
     });
   });

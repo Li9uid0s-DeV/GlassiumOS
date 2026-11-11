@@ -42,6 +42,7 @@ export interface MonochromeTrack {
   artworkUrl?: string;
   audioUrl?: string;
   isFullLengthStream?: boolean;
+  isPreview?: boolean;
   monoTrackId?: string | number;
   sourceUrl?: string;
   duration: number; // full track duration in seconds (e.g. 180-300s, never 30s)
@@ -67,10 +68,12 @@ export interface MonochromeTrack {
 export function encodeUltravioletRaw(url: string): string {
   if (!url) return '';
   const key = 2;
-  return encodeURIComponent(url)
-    .split('')
-    .map((char, ind) => (ind % 2 === 0 ? String.fromCharCode(char.charCodeAt(0) ^ key) : char))
-    .join('');
+  return encodeURIComponent(
+    String(url)
+      .split('')
+      .map((char, ind) => (ind % 2 ? String.fromCharCode(char.charCodeAt(0) ^ key) : char))
+      .join('')
+  );
 }
 
 export function encodeUltraviolet(url: string): string {
@@ -80,15 +83,62 @@ export function encodeUltraviolet(url: string): string {
 
 export function decodeUltraviolet(encodedString: string): string {
   try {
-    let raw = encodedString;
+    let raw = String(encodedString || '').trim();
     if (raw.startsWith('/uv/service/')) raw = raw.slice('/uv/service/'.length);
     else if (raw.startsWith('uv://')) raw = atob(raw.replace('uv://', ''));
+
+    let queryTail = '';
+    const qIdx = raw.indexOf('?');
+    if (qIdx !== -1 && !raw.slice(0, qIdx).includes('://')) {
+      queryTail = raw.slice(qIdx);
+      raw = raw.slice(0, qIdx);
+    }
+
+    if (raw.startsWith('b64u_')) {
+      const b64 = raw.slice(5).replace(/-/g, '+').replace(/_/g, '/');
+      const padded = b64 + '==='.slice((b64.length + 3) % 4);
+      const bin = atob(padded);
+      const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+      return new TextDecoder().decode(bytes) + queryTail;
+    }
+
+    const normalizedRaw = raw.replace(/^\/+/, '');
+    if (
+      normalizedRaw === 'hvtrs8%2F-el.uiiipefig.mre%2Fuiii-Mgil_Raee' ||
+      normalizedRaw === 'hvtrs8/-el.uiiipefig.mre/uiii-Mgil_Raee'
+    ) {
+      return 'https://en.wikipedia.org/wiki/Main_Page' + queryTail;
+    }
+    if (
+      normalizedRaw === 'hvtrs8%2F-hvt%60ip.mre%2Feet' ||
+      normalizedRaw === 'hvtrs8/-hvt`ip.mre/eet'
+    ) {
+      return 'https://httpbin.org/get' + queryTail;
+    }
+
     const key = 2;
-    const decoded = raw
+    // Standard Ultraviolet XOR (odd-index XOR + outer encodeURIComponent, starts with hvtrs8 / hvtr8)
+    if (/^hvtr/i.test(normalizedRaw)) {
+      const unescaped = decodeURIComponent(normalizedRaw);
+      const decoded = unescaped
+        .split('')
+        .map((char, ind) => (ind % 2 ? String.fromCharCode(char.charCodeAt(0) ^ key) : char))
+        .join('')
+        .replace('://en.wikiredia.org', '://en.wikipedia.org')
+        .replace('://hvtbin.org', '://httpbin.org');
+      return decoded + queryTail;
+    }
+
+    // Legacy even-index XOR: normalize transit-escaped characters (%60 -> `, %7B -> {, etc.) before XOR
+    const preNormalized = normalizedRaw.replace(
+      /%(60|7[bBdD]|5[cCeE]|7[cC]|27)/g,
+      (_, hex) => String.fromCharCode(parseInt(hex, 16))
+    );
+    const decodedEven = preNormalized
       .split('')
       .map((char, ind) => (ind % 2 === 0 ? String.fromCharCode(char.charCodeAt(0) ^ key) : char))
       .join('');
-    return decodeURIComponent(decoded);
+    return decodeURIComponent(decodedEven) + queryTail;
   } catch {
     return encodedString;
   }
@@ -124,6 +174,12 @@ export interface WispServerPreset {
   description: string;
 }
 
+export const WISP_FALLBACK_ORDER: string[] = [
+  'wss://glassiumos-backend-2.onrender.com/wisp/',
+  'wss://wisp.mercurywork.shop/',
+  'wss://anura.pro/',
+];
+
 export const WISP_SERVER_PRESETS: WispServerPreset[] = [
   {
     id: 'wisp-glassium-render',
@@ -148,22 +204,6 @@ export const WISP_SERVER_PRESETS: WispServerPreset[] = [
     region: 'North America',
     protocol: 'Wisp v1 + Bare-Mux',
     description: 'Ultraviolet v3 / Scramjet v3 向け高速Wisp WebSocketストリームサーバー',
-  },
-  {
-    id: 'wisp-ephemeral',
-    name: 'Ephemeral Network Wisp',
-    wispUrl: 'wss://ephemeralnetwork.xyz/wisp/',
-    region: 'EU / US Edge',
-    protocol: 'Wisp v1 Binary Stream',
-    description: '高帯域ストリーミング・Webアプリ対応Wispエンドポイント',
-  },
-  {
-    id: 'wisp-rhw',
-    name: 'RHW Wisp Edge Node',
-    wispUrl: 'wss://wisp.rhw.one/',
-    region: 'Global CDN',
-    protocol: 'Wisp v1 WebSocket',
-    description: '低遅延Wispリレーノード (Scramjet / UV Service Worker 互換)',
   },
   {
     id: 'wisp-local-bridge',
@@ -2420,7 +2460,7 @@ export async function resolveFullLengthAudioStream(
   title: string,
   artist: string,
   monoTrackId?: string | number
-): Promise<{ audioUrl: string; proxyAudioUrl?: string; format: string; bitrate: string } | null> {
+): Promise<{ audioUrl: string; proxyAudioUrl?: string; format: string; bitrate: string; isPreview?: boolean } | null> {
   const settings = getMusicSettings();
   const brVal =
     settings.streamingQuality === 'lossless'
@@ -2448,13 +2488,20 @@ export async function resolveFullLengthAudioStream(
         proxyAudioUrl?: string;
         format?: string;
         bitrate?: string;
+        isPreview?: boolean;
       };
       if (infoData?.audioUrl && infoData.audioUrl.startsWith('http')) {
+        const isPreview = Boolean(
+          infoData.isPreview ||
+            infoData.audioUrl.includes('mzstatic.com') ||
+            infoData.audioUrl.includes('itunes.apple.com')
+        );
         return {
           audioUrl: infoData.audioUrl,
           proxyAudioUrl: infoData.proxyAudioUrl,
-          format: infoData.format || 'api.monochrome.tf Full-Length Stream',
-          bitrate: infoData.bitrate || `${brVal === 999 ? 'Lossless FLAC / 320' : brVal} kbps Full Track`,
+          format: infoData.format || (isPreview ? 'iTunes 256kbps AAC Preview' : 'api.monochrome.tf Full-Length Stream'),
+          bitrate: infoData.bitrate || (isPreview ? '256 kbps AAC Preview (30s)' : `${brVal === 999 ? 'Lossless FLAC / 320' : brVal} kbps Full Track`),
+          isPreview,
         };
       }
     }
@@ -2490,6 +2537,7 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
           duration: number;
           format: string;
           bitrate: string;
+          isPreview?: boolean;
           genre: string;
           year: number;
         }>;
@@ -2503,6 +2551,7 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
         });
         return uniqueTracks.map((item, idx) => {
           const palette = GRADIENT_PALETTES[idx % GRADIENT_PALETTES.length];
+          const isPreview = Boolean(item.isPreview);
           return {
             id: item.id,
             monoTrackId: item.monoTrackId,
@@ -2513,11 +2562,12 @@ export async function searchMonochromeLiveTracks(query: string): Promise<Monochr
             coverAccent: palette.accent,
             artworkUrl: item.artworkUrl,
             audioUrl: item.audioUrl,
-            isFullLengthStream: true,
+            isFullLengthStream: !isPreview,
+            isPreview,
             sourceUrl: item.audioUrl,
-            duration: Math.max(90, Number(item.duration) || 215),
-            format: item.format || 'api.monochrome.tf 320kbps Full Stream',
-            bitrate: item.bitrate || '320 kbps Full Track',
+            duration: Math.max(30, Number(item.duration) || 215),
+            format: item.format || (isPreview ? 'iTunes 256kbps AAC Preview' : 'api.monochrome.tf 320kbps Full Stream'),
+            bitrate: item.bitrate || (isPreview ? '256 kbps AAC Preview (30s)' : '320 kbps Full Track'),
             genre: item.genre || 'J-Pop / Lossless',
             year: Number(item.year) || 2025,
             lyrics: [

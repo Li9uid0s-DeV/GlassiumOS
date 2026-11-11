@@ -158,7 +158,15 @@ export type ThemeMode =
   | 'system'
   | 'sunset-sunrise';
 
-export type AccentColor = 'dynamic' | 'cyan' | 'blue' | 'violet' | 'emerald' | 'rose' | 'amber';
+export type AccentColor =
+  | 'dynamic'
+  | 'cyan'
+  | 'blue'
+  | 'violet'
+  | 'emerald'
+  | 'rose'
+  | 'amber'
+  | (string & {});
 
 export const ACCENT_COLOR_PRESETS: {
   id: AccentColor;
@@ -171,8 +179,8 @@ export const ACCENT_COLOR_PRESETS: {
   {
     id: 'dynamic',
     label: 'Dynamic',
-    labelJa: '動的 (背景・画像・ダーク/ライト連動)',
-    descJa: '背景の色やアップロードした画像にあわせてアクセントカラー、ダーク、ライトかで変動する',
+    labelJa: '動的 (背景・壁紙から連続抽出 / 自由色対応)',
+    descJa: 'プリセットに丸めず壁紙の実際の色を連続抽出、またはカラーピッカーで24bit自由指定',
     hex: '#38bdf8',
     rgb: '56, 189, 248',
   },

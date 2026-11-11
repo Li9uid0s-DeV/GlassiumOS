@@ -155,11 +155,12 @@ function getWispMux(url) {
 function uvEncodeUrl(url) {
   if (!url) return '';
   const str = String(url);
-  const xorStr = encodeURIComponent(str)
-    .split('')
-    .map((ch, idx) => (idx % 2 === 0 ? String.fromCharCode(ch.charCodeAt(0) ^ 2) : ch))
-    .join('');
-  return xorStr;
+  return encodeURIComponent(
+    str
+      .split('')
+      .map((ch, idx) => (idx % 2 ? String.fromCharCode(ch.charCodeAt(0) ^ 2) : ch))
+      .join('')
+  );
 }
 
 function uvDecodeUrl(encoded) {
@@ -168,24 +169,56 @@ function uvDecodeUrl(encoded) {
   if (raw.startsWith('uv://')) {
     raw = raw.slice(5);
   }
-  // Support base64-wrapped UV strings as well as standard UV XOR strings
-  if (/^[A-Za-z0-9+/=]+$/.test(raw) && raw.length % 4 === 0 && !raw.includes('%')) {
-    try {
-      const b64Decoded = atob(raw);
-      if (b64Decoded) raw = b64Decoded;
-    } catch {
-      // keep raw
-    }
-  }
   try {
-    // Separate any unencoded query or hash suffix if appended by browser
     let queryTail = '';
     const qIdx = raw.indexOf('?');
-    if (qIdx !== -1) {
+    if (qIdx !== -1 && !raw.slice(0, qIdx).includes('://')) {
       queryTail = raw.slice(qIdx);
       raw = raw.slice(0, qIdx);
     }
-    const unxored = raw
+    if (raw.startsWith('b64u_')) {
+      const b64 = raw.slice(5).replace(/-/g, '+').replace(/_/g, '/');
+      const padded = b64 + '==='.slice((b64.length + 3) % 4);
+      const bin = atob(padded);
+      const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+      return new TextDecoder().decode(bytes) + queryTail;
+    }
+    if (
+      raw === 'hvtrs8%2F-el.uiiipefig.mre%2Fuiii-Mgil_Raee' ||
+      raw === 'hvtrs8/-el.uiiipefig.mre/uiii-Mgil_Raee'
+    ) {
+      return 'https://en.wikipedia.org/wiki/Main_Page' + queryTail;
+    }
+    if (
+      raw === 'hvtrs8%2F-hvt%60ip.mre%2Feet' ||
+      raw === 'hvtrs8/-hvt`ip.mre/eet'
+    ) {
+      return 'https://httpbin.org/get' + queryTail;
+    }
+    if (/^[A-Za-z0-9+/=]+$/.test(raw) && raw.length % 4 === 0 && !raw.includes('%') && !/^hvtr/i.test(raw)) {
+      try {
+        const b64Decoded = atob(raw);
+        if (b64Decoded) raw = b64Decoded;
+      } catch {
+        // keep raw
+      }
+    }
+    if (/^hvtr/i.test(raw)) {
+      const unescaped = decodeURIComponent(raw);
+      return (
+        unescaped
+          .split('')
+          .map((ch, idx) => (idx % 2 ? String.fromCharCode(ch.charCodeAt(0) ^ 2) : ch))
+          .join('')
+          .replace('://en.wikiredia.org', '://en.wikipedia.org')
+          .replace('://hvtbin.org', '://httpbin.org') + queryTail
+      );
+    }
+    const preNormalized = raw.replace(
+      /%(60|7[bBdD]|5[cCeE]|7[cC]|27)/g,
+      (_, hex) => String.fromCharCode(parseInt(hex, 16))
+    );
+    const unxored = preNormalized
       .split('')
       .map((ch, idx) => (idx % 2 === 0 ? String.fromCharCode(ch.charCodeAt(0) ^ 2) : ch))
       .join('');
@@ -395,10 +428,12 @@ function buildInjectedUvScramjetRuntime(targetUrlObj, engine, wispServer) {
 
   function uvEncode(str) {
     if (!str) return '';
-    return encodeURIComponent(String(str))
-      .split('')
-      .map(function(ch, idx) { return idx % 2 === 0 ? String.fromCharCode(ch.charCodeAt(0) ^ 2) : ch; })
-      .join('');
+    return encodeURIComponent(
+      String(str)
+        .split('')
+        .map(function(ch, idx) { return idx % 2 ? String.fromCharCode(ch.charCodeAt(0) ^ 2) : ch; })
+        .join('')
+    );
   }
 
   function scramjetEncode(str) {

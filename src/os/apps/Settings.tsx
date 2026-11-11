@@ -770,6 +770,9 @@ export function SettingsApp() {
     setThemeMode,
     accentColor,
     setAccentColor,
+    customThemeHex,
+    setCustomThemeHex,
+    activeThemeRgb,
     resolvedAccentHex,
     resolvedAccentRgb,
     language,
@@ -1123,32 +1126,20 @@ export function SettingsApp() {
     themeMode === 'dynamic' || themeMode === 'dynamic-dark' || themeMode === 'dynamic-light';
   const rowHoverClass = isLight ? 'hover:bg-slate-200/50' : 'hover:bg-white/[0.04]';
   const dividerClass = isLight ? 'divide-slate-200/80 border-slate-200/80' : 'divide-white/[0.07] border-white/[0.08]';
-  const cardSurfaceClass = isDynamicSurfaceMode
-    ? isLight
-      ? 'bg-[var(--os-surface-elevated)] border border-slate-300/75 shadow-xs rounded-2xl overflow-hidden'
-      : 'bg-[var(--os-surface-elevated)] border border-white/[0.12] rounded-2xl overflow-hidden'
-    : isLight
-    ? 'bg-white/80 border border-slate-200/90 shadow-xs rounded-2xl overflow-hidden'
-    : 'bg-white/[0.025] border border-white/[0.08] rounded-2xl overflow-hidden';
+  const cardSurfaceClass = isLight
+    ? 'bg-[var(--os-surface-elevated)] border border-slate-300/75 shadow-xs rounded-2xl overflow-hidden'
+    : 'bg-[var(--os-surface-elevated)] border border-white/[0.12] rounded-2xl overflow-hidden';
 
   return (
     <div
-      style={
-        isDynamicSurfaceMode
-          ? { backgroundColor: 'var(--os-surface-solid)' }
-          : undefined
-      }
+      style={{ backgroundColor: 'var(--os-surface-solid)' }}
       className={`flex h-full w-full select-none overflow-hidden font-sans transition-colors duration-300 ${
         isLight ? 'bg-slate-50 text-slate-900' : 'bg-[#090d16] text-slate-100'
       }`}
     >
       {/* Left Sidebar Navigation */}
       <div
-        style={
-          isDynamicSurfaceMode
-            ? { backgroundColor: 'var(--os-titlebar)' }
-            : undefined
-        }
+        style={{ backgroundColor: 'var(--os-titlebar)' }}
         className={`w-60 shrink-0 border-r px-3.5 py-4 flex flex-col justify-between transition-colors duration-300 ${
           isLight ? 'bg-slate-100/90 border-slate-200/90' : 'bg-black/35 border-white/[0.07]'
         }`}
@@ -2770,35 +2761,43 @@ export function SettingsApp() {
                         })}
                       </div>
 
-                      {/* When Dynamic mode is active, show base Dark/Light switcher + live blended color preview */}
-                      {isDynamicSurfaceMode && (
-                        <div
-                          className={`mt-2 p-3 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${
-                            isLight
-                              ? 'bg-white/75 border-slate-300/80 text-slate-800'
-                              : 'bg-black/35 border-white/15 text-white'
-                          }`}
-                        >
+                      {/* OS-Wide Theme & Liquid Glass Color Control (Auto Wallpaper Continuous Extraction + 24-bit Free Color Picker) */}
+                      <div
+                        className={`mt-2 p-3.5 rounded-xl border space-y-3 ${
+                          isLight
+                            ? 'bg-white/75 border-slate-300/80 text-slate-800'
+                            : 'bg-black/35 border-white/15 text-white'
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
                           <div className="flex items-center gap-2.5">
                             <span
-                              className="w-6 h-6 rounded-lg border border-white/30 shadow-inner shrink-0"
-                              style={{ backgroundColor: 'var(--os-surface-solid)' }}
+                              className="w-7 h-7 rounded-lg border border-white/30 shadow-inner shrink-0"
+                              style={{ background: 'var(--os-glass-window-bg)' }}
+                              title="Liquid Glass 透過ティントプレビュー"
                             />
                             <div>
                               <div className="text-xs font-bold flex items-center gap-1.5">
-                                <span>動的ブレンド背景が有効</span>
+                                <span>
+                                  {isJa
+                                    ? 'OS全体テーマ＆Liquid Glass ティントカラー'
+                                    : 'OS-Wide Theme & Liquid Glass Tint Color'}
+                                </span>
                                 <span
-                                  className="inline-block w-2.5 h-2.5 rounded-full"
-                                  style={{ backgroundColor: `rgb(${resolvedAccentRgb})` }}
+                                  className="inline-block w-2.5 h-2.5 rounded-full border border-white/40"
+                                  style={{
+                                    backgroundColor: `rgb(${activeThemeRgb[0]}, ${activeThemeRgb[1]}, ${activeThemeRgb[2]})`,
+                                  }}
                                 />
                               </div>
                               <div className="text-[10px] opacity-65">
-                                {theme === 'dark'
-                                  ? '黒 (#04060c) と現在の背景色をブレンドしたダークサーフェス'
-                                  : '白 (#ffffff) に現在の背景色をほんのり混ぜたライトサーフェス'}
+                                {customThemeHex
+                                  ? `自由指定カラー (${customThemeHex}) を全アプリ＆Liquid Glassに反映中`
+                                  : `壁紙からプリセットに丸めず連続抽出 (RGB: ${activeThemeRgb.join(', ')}) を全アプリ＆ガラスに反映中`}
                               </div>
                             </div>
                           </div>
+
                           <div className="flex items-center gap-1.5">
                             <button
                               type="button"
@@ -2812,7 +2811,7 @@ export function SettingsApp() {
                                   : 'bg-white/10 hover:bg-white/20 opacity-75'
                               }`}
                             >
-                              黒＋背景色 (ダーク)
+                              黒＋テーマ色 (ダーク)
                             </button>
                             <button
                               type="button"
@@ -2826,11 +2825,100 @@ export function SettingsApp() {
                                   : 'bg-slate-300/60 hover:bg-slate-300 text-slate-800 opacity-75'
                               }`}
                             >
-                              白＋背景色 (ライト)
+                              白＋テーマ色 (ライト)
                             </button>
                           </div>
                         </div>
-                      )}
+
+                        {/* Free 24-bit Theme & Glass Color Picker */}
+                        <div className="pt-2 border-t border-current/10 flex flex-wrap items-center justify-between gap-2.5">
+                          <div className="flex items-center gap-2">
+                            <label className="relative flex items-center gap-2 cursor-pointer px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 border border-white/20 text-xs font-bold">
+                              <input
+                                type="color"
+                                value={
+                                  customThemeHex ||
+                                  `#${activeThemeRgb
+                                    .map((n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0'))
+                                    .join('')}`
+                                }
+                                onChange={(e) => {
+                                  const hex = e.target.value;
+                                  setCustomThemeHex(hex);
+                                  setAccentColor(hex);
+                                }}
+                                className="w-5 h-5 rounded cursor-pointer border-0 bg-transparent p-0"
+                              />
+                              <span>{isJa ? '自由に色を選ぶ (24bit)' : 'Pick Any Color'}</span>
+                            </label>
+
+                            <input
+                              type="text"
+                              value={
+                                customThemeHex ||
+                                `#${activeThemeRgb
+                                  .map((n) => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0'))
+                                  .join('')}`
+                              }
+                              onChange={(e) => {
+                                const v = e.target.value.trim();
+                                if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+                                  setCustomThemeHex(v);
+                                  setAccentColor(v);
+                                }
+                              }}
+                              placeholder="#38bdf8"
+                              className={`w-24 px-2 py-1 rounded-lg border font-mono text-xs outline-none ${
+                                isLight
+                                  ? 'bg-white border-slate-300 text-slate-900'
+                                  : 'bg-black/40 border-white/15 text-white'
+                              }`}
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            {/* Quick continuous spectrum swatches */}
+                            {[
+                              '#00f2fe',
+                              '#4facfe',
+                              '#667eea',
+                              '#a18cd1',
+                              '#ff758c',
+                              '#ff9a44',
+                              '#f6d365',
+                              '#43e97b',
+                              '#38f9d7',
+                            ].map((hex) => (
+                              <button
+                                key={hex}
+                                type="button"
+                                onClick={() => {
+                                  playSound('click');
+                                  setCustomThemeHex(hex);
+                                  setAccentColor(hex);
+                                }}
+                                style={{ backgroundColor: hex }}
+                                className="w-5 h-5 rounded-full border border-white/40 shadow-xs hover:scale-115 transition cursor-pointer"
+                                title={hex}
+                              />
+                            ))}
+
+                            {(customThemeHex || accentColor !== 'dynamic') && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  playSound('click');
+                                  setCustomThemeHex(null);
+                                  setAccentColor('dynamic');
+                                }}
+                                className="ml-1 px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-[11px] font-bold transition cursor-pointer"
+                              >
+                                {isJa ? '壁紙から自動抽出に戻す' : 'Auto Wallpaper'}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     <button
@@ -3075,13 +3163,99 @@ export function SettingsApp() {
                   </div>
                 </div>
               ) : personalSubView === 'accent' ? (
-                /* ---------------- ACCENT COLOR ---------------- */
+                /* ---------------- ACCENT COLOR (FREE 24-BIT PICKER + CONTINUOUS DYNAMIC + PRESETS) ---------------- */
                 <div className="space-y-6">
-                  {renderBreadcrumbHeader('アクセントカラー', 'Accent Color', () => setPersonalSubView('main'))}
+                  {renderBreadcrumbHeader('アクセントカラー・自由色選択', 'Accent & Glass Tint Color', () => setPersonalSubView('main'))}
 
+                  {/* 1. Free 24-Bit Custom Color Picker Card */}
+                  <div className={`${cardSurfaceClass} p-4 space-y-4`}>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="w-10 h-10 rounded-2xl border border-white/30 shadow-md flex items-center justify-center shrink-0"
+                          style={{ background: 'var(--os-glass-window-bg)' }}
+                        >
+                          <span
+                            className="w-5 h-5 rounded-full border border-white/80 shadow-xs"
+                            style={{ backgroundColor: resolvedAccentHex }}
+                          />
+                        </span>
+                        <div>
+                          <div className="text-sm font-bold flex items-center gap-2">
+                            <span>{isJa ? '自由カラーピッカー (24-bit フルカラー)' : 'Free 24-Bit Color Picker'}</span>
+                            <span className="px-2 py-0.5 rounded-full bg-[var(--os-accent)]/20 text-[var(--os-accent)] font-mono text-[11px]">
+                              {resolvedAccentHex}
+                            </span>
+                          </div>
+                          <p className="text-[11px] opacity-60 mt-0.5">
+                            {isJa
+                              ? 'プリセットに縛られず好きな色を自由に選択できます。選択した色はOS全体のアプリ背景とLiquid Glassのガラス色に反映されます。'
+                              : 'Freely choose any 24-bit color without preset restrictions. Reflects across all OS apps and Liquid Glass tint.'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <label className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--os-accent)] text-black font-bold text-xs cursor-pointer shadow-sm hover:brightness-110 transition">
+                          <input
+                            type="color"
+                            value={resolvedAccentHex}
+                            onChange={(e) => {
+                              const hex = e.target.value;
+                              setAccentColor(hex);
+                              setCustomThemeHex(hex);
+                            }}
+                            className="w-5 h-5 rounded cursor-pointer border-0 bg-transparent p-0"
+                          />
+                          <span>{isJa ? 'カラーパレットを開く' : 'Open Color Picker'}</span>
+                        </label>
+                      </div>
+                    </div>
+
+                    {/* Interactive Continuous Hue Strip */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] opacity-75">
+                        <span>{isJa ? '連続スペクトラムバー (クリックまたはドラッグで自由選択)' : 'Continuous Spectrum'}</span>
+                        <span className="font-mono">RGB({resolvedAccentRgb})</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={360}
+                        defaultValue={195}
+                        onChange={(e) => {
+                          const h = Number(e.target.value);
+                          // Convert HSL(h, 88%, 56%) to #rrggbb
+                          const s = 0.88;
+                          const l = 0.56;
+                          const c = (1 - Math.abs(2 * l - 1)) * s;
+                          const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+                          const m = l - c / 2;
+                          let r1 = 0, g1 = 0, b1 = 0;
+                          if (h < 60) { r1 = c; g1 = x; b1 = 0; }
+                          else if (h < 120) { r1 = x; g1 = c; b1 = 0; }
+                          else if (h < 180) { r1 = 0; g1 = c; b1 = x; }
+                          else if (h < 240) { r1 = 0; g1 = x; b1 = c; }
+                          else if (h < 300) { r1 = x; g1 = 0; b1 = c; }
+                          else { r1 = c; g1 = 0; b1 = x; }
+                          const toH = (v: number) => Math.round((v + m) * 255).toString(16).padStart(2, '0');
+                          const hex = `#${toH(r1)}${toH(g1)}${toH(b1)}`;
+                          setAccentColor(hex);
+                          setCustomThemeHex(hex);
+                        }}
+                        style={{
+                          background:
+                            'linear-gradient(90deg, #ff3b30 0%, #ff9500 17%, #ffcc00 33%, #34c759 50%, #00c7be 67%, #007aff 83%, #af52de 92%, #ff2d55 100%)',
+                        }}
+                        className="w-full h-3 rounded-full appearance-none cursor-pointer border border-white/25"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 2. Dynamic Mode & Quick Presets */}
                   <div className={`${cardSurfaceClass} divide-y ${dividerClass}`}>
                     {ACCENT_COLOR_PRESETS.map((p) => {
-                      const selected = accentColor === p.id;
+                      const selected = accentColor === p.id && (!customThemeHex || p.id !== 'dynamic');
                       const isDynamic = p.id === 'dynamic';
                       const swatchColor = isDynamic ? resolvedAccentHex : p.hex;
                       return (
@@ -3091,6 +3265,11 @@ export function SettingsApp() {
                           onClick={() => {
                             playSound('click');
                             setAccentColor(p.id);
+                            if (p.id === 'dynamic') {
+                              setCustomThemeHex(null);
+                            } else {
+                              setCustomThemeHex(p.hex);
+                            }
                           }}
                           className={`w-full py-4 px-4 flex items-center justify-between transition text-left ${
                             selected ? 'bg-[var(--os-accent)]/10 font-bold' : rowHoverClass
@@ -3115,7 +3294,7 @@ export function SettingsApp() {
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className={`text-[13px] font-bold tracking-tight ${selected ? 'text-[var(--os-accent)]' : ''}`}>
-                                  {isDynamic ? '動的 (Dynamic)' : p.labelJa}
+                                  {isDynamic ? '動的 (壁紙から連続抽出)' : p.labelJa}
                                 </span>
                                 {isDynamic && (
                                   <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-mono">

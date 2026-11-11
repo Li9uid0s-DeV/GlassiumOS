@@ -2303,7 +2303,10 @@ export function Desktop() {
         }`}
       >
         {/* Quick Spotlight (Ctrl+K) & Window Tile Group Memory Trigger Pill */}
-        <div className="pointer-events-auto flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-slate-950/80 hover:bg-slate-950/90 backdrop-blur-2xl border border-white/15 hover:border-white/30 shadow-xl transition">
+        <div
+          style={{ background: 'var(--os-glass-taskbar-bg)', borderColor: 'var(--os-glass-border)' }}
+          className="pointer-events-auto flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-slate-950/75 hover:bg-slate-950/85 backdrop-blur-2xl border border-white/15 hover:border-white/30 shadow-xl transition"
+        >
           <button
             type="button"
             onClick={() => window.dispatchEvent(new CustomEvent('glassium-open-spotlight'))}
@@ -2571,10 +2574,11 @@ export function Desktop() {
               >
                 <div
                   onClick={() => setMusicPillExpanded((v) => !v)}
+                  style={{ background: 'var(--os-glass-taskbar-bg)', borderColor: 'var(--os-glass-border)' }}
                   className={`relative overflow-hidden cursor-pointer px-4 py-1.5 rounded-3xl backdrop-blur-2xl border transition-all duration-300 flex flex-col gap-2 shadow-2xl ${
                     musicState.isPlaying
-                      ? 'bg-slate-950/90 border-white/25 shadow-[0_10px_32px_rgba(244,63,94,0.28)]'
-                      : 'bg-slate-950/82 border-white/15 hover:border-white/30'
+                      ? 'bg-slate-950/80 border-white/25 shadow-[0_10px_32px_rgba(244,63,94,0.28)]'
+                      : 'bg-slate-950/72 border-white/15 hover:border-white/30'
                   }`}
                   title="ホバーまたはクリックでシークバー・音量・2行歌詞を展開"
                 >

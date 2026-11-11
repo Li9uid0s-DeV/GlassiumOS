@@ -872,9 +872,17 @@ class GlobalAudioManager {
     a.addEventListener('loadedmetadata', () => {
       if (Number.isFinite(a.duration) && a.duration > 10) {
         const realDur = Math.round(a.duration);
+        const isShortPreview = realDur <= 35;
         this.updateState({
           duration: a.duration,
-          track: this.state.track ? { ...this.state.track, duration: realDur } : null,
+          track: this.state.track
+            ? {
+                ...this.state.track,
+                duration: realDur,
+                isPreview: isShortPreview ? true : this.state.track.isPreview,
+                bitrate: isShortPreview ? '256 kbps AAC Preview (30s)' : this.state.track.bitrate,
+              }
+            : null,
         });
       }
     });
@@ -1215,11 +1223,25 @@ class GlobalAudioManager {
           this.playPromise = this.audio.play();
           await this.playPromise;
           this.playPromise = null;
+          const isPreview = Boolean(
+            directStream?.isPreview ||
+              clientAudioUrl.includes('mzstatic.com') ||
+              clientAudioUrl.includes('itunes.apple.com')
+          );
           this.updateState({
             isPlaying: true,
             isBuffering: false,
             error: null,
-            statusMessage: `フル尺再生中 (Direct 320kbps): ${track.title} — ${cleanArtist}`,
+            track: this.state.track
+              ? {
+                  ...this.state.track,
+                  isPreview,
+                  bitrate: directStream?.bitrate || (isPreview ? '256 kbps AAC Preview (30s)' : this.state.track.bitrate),
+                }
+              : null,
+            statusMessage: isPreview
+              ? `Preview (256kbps AAC 30s): ${track.title} — ${cleanArtist}`
+              : `フル尺再生中 (Direct 320kbps): ${track.title} — ${cleanArtist}`,
           });
           return;
         }

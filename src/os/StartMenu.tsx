@@ -580,7 +580,8 @@ export function StartMenu({ open, onClose }: Props) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 18 }}
               transition={{ duration: 0.18 }}
-              className="fixed bottom-14 left-3 z-[5200] w-[min(520px,calc(100vw-24px))] h-[min(480px,calc(100vh-72px))] rounded-2xl shadow-2xl border border-white/15 bg-slate-900/90 backdrop-blur-2xl p-5 flex flex-col select-none text-white"
+              style={{ background: 'var(--os-glass-window-bg)', borderColor: 'var(--os-glass-border)' }}
+              className="fixed bottom-14 left-3 z-[5200] w-[min(520px,calc(100vw-24px))] h-[min(480px,calc(100vh-72px))] rounded-2xl shadow-2xl border bg-slate-900/90 backdrop-blur-2xl p-5 flex flex-col select-none text-white"
             >
               <div className="flex items-center gap-2 bg-white/10 rounded-xl px-3.5 py-2 mb-4 border border-white/10 shrink-0">
                 <Icon name="Search" size={14} className="text-cyan-300" fluent={false} />
@@ -629,10 +630,11 @@ export function StartMenu({ open, onClose }: Props) {
                 exit={{ opacity: 0, y: 12 }}
                 transition={{ duration: 0.16 }}
                 onClick={(e) => e.stopPropagation()}
+                style={{ background: 'var(--os-glass-window-bg)', borderColor: 'var(--os-glass-border)' }}
                 className={`pointer-events-auto w-full max-w-[660px] max-h-[calc(100vh-64px)] flex flex-col backdrop-blur-2xl border-t border-x select-none ${
                   isLight
-                    ? 'bg-white/95 border-slate-300 text-slate-900 shadow-2xl'
-                    : 'bg-slate-950/95 border-white/15 text-white shadow-[0_24px_60px_rgba(0,0,0,0.8)]'
+                    ? 'bg-white/85 border-slate-300 text-slate-900 shadow-2xl'
+                    : 'bg-slate-950/85 border-white/15 text-white shadow-[0_24px_60px_rgba(0,0,0,0.8)]'
                 }`}
               >
                 {/* Top Hairline Search & AI Bar */}
@@ -818,6 +820,7 @@ export function StartMenu({ open, onClose }: Props) {
                 exit={{ opacity: 0, y: 16, scale: 0.98 }}
                 transition={{ type: 'spring', stiffness: 440, damping: 34 }}
                 onClick={(e) => e.stopPropagation()}
+                style={{ background: 'var(--os-glass-window-bg)', borderColor: 'var(--os-glass-border)' }}
                 className={`pointer-events-auto w-full max-w-[600px] max-h-[calc(100vh-72px)] rounded-xl overflow-hidden flex flex-col backdrop-blur-2xl border select-none transition-colors duration-200 ${
                   isLight
                     ? 'bg-slate-50/50 border-slate-900/12 text-slate-900 shadow-[0_24px_60px_rgba(15,23,42,0.18)]'
