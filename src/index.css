@@ -135,34 +135,34 @@ body,
 
 :root,
 [data-theme='dark'] {
-  --os-surface: rgba(15, 23, 42, 0.84);
-  --os-surface-solid: #0f172a;
-  --os-surface-elevated: rgba(30, 41, 59, 0.72);
-  --os-surface-panel: rgba(255, 255, 255, 0.04);
-  --os-surface-hover: rgba(255, 255, 255, 0.08);
+  --os-surface: var(--os-dynamic-surface, rgba(15, 23, 42, 0.84));
+  --os-surface-solid: var(--os-dynamic-surface-solid, #0f172a);
+  --os-surface-elevated: var(--os-dynamic-surface-elevated, rgba(30, 41, 59, 0.72));
+  --os-surface-panel: var(--os-dynamic-surface-panel, rgba(255, 255, 255, 0.04));
+  --os-surface-hover: var(--os-dynamic-surface-hover, rgba(255, 255, 255, 0.08));
   --os-border: rgba(255, 255, 255, 0.1);
   --os-border-strong: rgba(255, 255, 255, 0.18);
   --os-text: #f8fafc;
   --os-text-muted: rgba(248, 250, 252, 0.62);
   --os-text-subtle: rgba(248, 250, 252, 0.42);
-  --os-titlebar: rgba(15, 23, 42, 0.65);
+  --os-titlebar: var(--os-dynamic-titlebar, rgba(15, 23, 42, 0.65));
   --theme-blur: 20px;
   --theme-opacity: 0.84;
   --theme-radius: 12px;
 }
 
 [data-theme='light'] {
-  --os-surface: rgba(248, 250, 252, 0.9);
-  --os-surface-solid: #f8fafc;
-  --os-surface-elevated: rgba(255, 255, 255, 0.85);
-  --os-surface-panel: rgba(15, 23, 42, 0.04);
-  --os-surface-hover: rgba(15, 23, 42, 0.07);
+  --os-surface: var(--os-dynamic-surface, rgba(248, 250, 252, 0.9));
+  --os-surface-solid: var(--os-dynamic-surface-solid, #f8fafc);
+  --os-surface-elevated: var(--os-dynamic-surface-elevated, rgba(255, 255, 255, 0.85));
+  --os-surface-panel: var(--os-dynamic-surface-panel, rgba(15, 23, 42, 0.04));
+  --os-surface-hover: var(--os-dynamic-surface-hover, rgba(15, 23, 42, 0.07));
   --os-border: rgba(15, 23, 42, 0.11);
   --os-border-strong: rgba(15, 23, 42, 0.2);
   --os-text: #0f172a;
   --os-text-muted: rgba(15, 23, 42, 0.66);
   --os-text-subtle: rgba(15, 23, 42, 0.46);
-  --os-titlebar: rgba(241, 245, 249, 0.88);
+  --os-titlebar: var(--os-dynamic-titlebar, rgba(241, 245, 249, 0.88));
 }
 
 * {
@@ -1443,5 +1443,67 @@ input[type='range'].glass-slider::-moz-range-thumb {
   backdrop-filter: url(#filter-points);
   -webkit-backdrop-filter: url(#filter-points);
 }
+
+/* ============================================================
+   CLOCK APP TIMER CIRCULAR PROGRESS & LOW-TIME RED GLOW ANIMATIONS
+   ============================================================ */
+
+@keyframes timerActiveCyanGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 6px rgba(34, 211, 238, 0.45))
+            drop-shadow(0 0 14px rgba(129, 140, 248, 0.25));
+  }
+  50% {
+    filter: drop-shadow(0 0 12px rgba(34, 211, 238, 0.8))
+            drop-shadow(0 0 24px rgba(129, 140, 248, 0.45));
+  }
+}
+
+@keyframes timerLowTimeRedGlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 8px rgba(244, 63, 94, 0.55))
+            drop-shadow(0 0 18px rgba(239, 68, 68, 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 16px rgba(244, 63, 94, 0.95))
+            drop-shadow(0 0 32px rgba(239, 68, 68, 0.65));
+  }
+}
+
+@keyframes timerLowTimeContainerPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 22px rgba(244, 63, 94, 0.18),
+      inset 0 0 18px rgba(244, 63, 94, 0.12);
+    border-color: rgba(244, 63, 94, 0.38);
+  }
+  50% {
+    box-shadow:
+      0 0 38px rgba(244, 63, 94, 0.36),
+      inset 0 0 28px rgba(244, 63, 94, 0.24);
+    border-color: rgba(251, 113, 133, 0.68);
+  }
+}
+
+.clock-timer-progress-circle {
+  transition:
+    stroke-dashoffset 0.12s linear,
+    stroke 0.45s ease,
+    filter 0.45s ease;
+  will-change: stroke-dashoffset, filter;
+}
+
+.clock-timer-progress-circle.is-running {
+  animation: timerActiveCyanGlow 2.4s ease-in-out infinite;
+}
+
+.clock-timer-progress-circle.is-low-time {
+  animation: timerLowTimeRedGlow 1.25s ease-in-out infinite;
+}
+
+.clock-timer-low-card {
+  animation: timerLowTimeContainerPulse 1.5s ease-in-out infinite;
+}
+
 
 

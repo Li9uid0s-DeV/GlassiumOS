@@ -17,6 +17,7 @@ import {
 } from '../types';
 import {
   DynamicWorldWallpaperConfig,
+  DYNAMIC_LOCATION_PRESETS,
   loadDynamicWorldConfig,
   saveDynamicWorldConfig,
 } from '../DynamicWorldWallpaper';
@@ -764,11 +765,13 @@ export function SettingsApp() {
     selectedCustomId,
     setSelectedCustomId,
     theme,
+    setTheme,
     themeMode,
     setThemeMode,
     accentColor,
     setAccentColor,
     resolvedAccentHex,
+    resolvedAccentRgb,
     language,
     setLanguage,
     setUiStyle,
@@ -1080,21 +1083,37 @@ export function SettingsApp() {
     </div>
   );
 
+  const isDynamicSurfaceMode =
+    themeMode === 'dynamic' || themeMode === 'dynamic-dark' || themeMode === 'dynamic-light';
   const rowHoverClass = isLight ? 'hover:bg-slate-200/50' : 'hover:bg-white/[0.04]';
   const dividerClass = isLight ? 'divide-slate-200/80 border-slate-200/80' : 'divide-white/[0.07] border-white/[0.08]';
-  const cardSurfaceClass = isLight
+  const cardSurfaceClass = isDynamicSurfaceMode
+    ? isLight
+      ? 'bg-[var(--os-surface-elevated)] border border-slate-300/75 shadow-xs rounded-2xl overflow-hidden'
+      : 'bg-[var(--os-surface-elevated)] border border-white/[0.12] rounded-2xl overflow-hidden'
+    : isLight
     ? 'bg-white/80 border border-slate-200/90 shadow-xs rounded-2xl overflow-hidden'
     : 'bg-white/[0.025] border border-white/[0.08] rounded-2xl overflow-hidden';
 
   return (
     <div
-      className={`flex h-full w-full select-none overflow-hidden font-sans ${
+      style={
+        isDynamicSurfaceMode
+          ? { backgroundColor: 'var(--os-surface-solid)' }
+          : undefined
+      }
+      className={`flex h-full w-full select-none overflow-hidden font-sans transition-colors duration-300 ${
         isLight ? 'bg-slate-50 text-slate-900' : 'bg-[#090d16] text-slate-100'
       }`}
     >
       {/* Left Sidebar Navigation */}
       <div
-        className={`w-60 shrink-0 border-r px-3.5 py-4 flex flex-col justify-between ${
+        style={
+          isDynamicSurfaceMode
+            ? { backgroundColor: 'var(--os-titlebar)' }
+            : undefined
+        }
+        className={`w-60 shrink-0 border-r px-3.5 py-4 flex flex-col justify-between transition-colors duration-300 ${
           isLight ? 'bg-slate-100/90 border-slate-200/90' : 'bg-black/35 border-white/[0.07]'
         }`}
       >
@@ -1323,20 +1342,17 @@ export function SettingsApp() {
                 <div className="space-y-6">
                   {renderBreadcrumbHeader('ディスプレイと背景', 'Display & Wallpapers', () => setSystemSubView('main'))}
 
-                  {/* 0. GlassiumOS 5 u4 Dynamic World Wallpaper Control Studio */}
+                  {/* 0. Dynamic World Wallpaper Control Studio (Location, Terrain, Weather & Snow Accumulation) */}
                   <div className={`${cardSurfaceClass} p-4 space-y-3 border border-cyan-400/30`}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 border border-cyan-400/40 text-[10px] font-extrabold text-cyan-300">
-                            u4
-                          </span>
                           <h3 className="text-[13px] font-bold tracking-tight">
-                            動的環境デスクトップ背景 (時間・風速・風向・天候・季節・ハロウィン/クリスマス連動)
+                            季節・場所・天候・積雪ライブ壁紙 (Dynamic World Wallpaper)
                           </h3>
                         </div>
                         <p className="text-[11px] opacity-65 mt-0.5">
-                          時刻・風向き・風速・天気・四季・季節イベントに合わせて空や雲、桜・紅葉・雪・ハロウィン・クリスマスがリアルタイムに変化します
+                          場所設定に応じて都市部（高層ビル・密集住宅）、埼玉・郊外平原（遠い山と広い原っぱ）、山岳部（連なる山々）に地形が変化し、全12種の天候や積雪量の増加がリアルタイムに反映されます
                         </p>
                       </div>
                       <button
@@ -1356,7 +1372,144 @@ export function SettingsApp() {
                       </button>
                     </div>
 
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1 text-xs">
+                      <div>
+                        <label className="block text-[10px] opacity-65 mb-1 font-semibold">
+                          📍 場所設定 (Location)
+                        </label>
+                        <select
+                          value={dynWorldCfg.locationId}
+                          onChange={(e) => {
+                            setSelectedCustomId(null);
+                            setWallpaper('dynamic-world');
+                            updateDynWorld({ locationId: e.target.value });
+                          }}
+                          className={`w-full p-2 rounded-lg text-xs border outline-none ${
+                            isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-black/40 border-white/15 text-white'
+                          }`}
+                        >
+                          {DYNAMIC_LOCATION_PRESETS.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.labelJa}
+                            </option>
+                          ))}
+                        </select>
+                        {dynWorldCfg.locationId === 'custom' && (
+                          <input
+                            type="text"
+                            value={dynWorldCfg.customLocationName || ''}
+                            onChange={(e) => {
+                              setSelectedCustomId(null);
+                              setWallpaper('dynamic-world');
+                              updateDynWorld({ customLocationName: e.target.value });
+                            }}
+                            placeholder="例: さいたま / 渋谷 / 軽井沢..."
+                            className={`mt-1.5 w-full p-1.5 rounded-lg text-xs border outline-none ${
+                              isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-black/40 border-white/15 text-white'
+                            }`}
+                          />
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] opacity-65 mb-1 font-semibold">
+                          🏞️ 地形・街並みスタイル (Terrain)
+                        </label>
+                        <select
+                          value={dynWorldCfg.terrainType}
+                          onChange={(e) => {
+                            setSelectedCustomId(null);
+                            setWallpaper('dynamic-world');
+                            updateDynWorld({
+                              terrainType: e.target.value as DynamicWorldWallpaperConfig['terrainType'],
+                            });
+                          }}
+                          className={`w-full p-2 rounded-lg text-xs border outline-none ${
+                            isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-black/40 border-white/15 text-white'
+                          }`}
+                        >
+                          <option value="auto">🔄 場所から自動判定</option>
+                          <option value="suburban-plains">🌾 埼玉・郊外平原 (遠い山と広い原)</option>
+                          <option value="urban">🏙️ 都市部 (高層ビル・密集住宅)</option>
+                          <option value="mountain">⛰️ 山岳部 (連なる山々・森林)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] opacity-65 mb-1 font-semibold">
+                          🌦️ 天候 (Weather — 全12種 + 自動連動)
+                        </label>
+                        <select
+                          value={dynWorldCfg.weather}
+                          onChange={(e) => {
+                            setSelectedCustomId(null);
+                            setWallpaper('dynamic-world');
+                            const nextW = e.target.value as DynamicWorldWallpaperConfig['weather'];
+                            updateDynWorld({
+                              weather: nextW,
+                              ...(nextW === 'HeavySnow' && dynWorldCfg.snowAccumulation < 40
+                                ? { snowAccumulation: 65 }
+                                : nextW === 'Snow' && dynWorldCfg.snowAccumulation < 15
+                                ? { snowAccumulation: 30 }
+                                : {}),
+                            });
+                          }}
+                          className={`w-full p-2 rounded-lg text-xs border outline-none ${
+                            isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-black/40 border-white/15 text-white'
+                          }`}
+                        >
+                          <option value="auto">🔄 現地の天気に自動連動</option>
+                          <option value="Sunny">☀️ 快晴 (Sunny)</option>
+                          <option value="PartlyCloudy">🌤️ 晴れ時々曇り (Partly Cloudy)</option>
+                          <option value="Cloudy">☁️ 曇天 (Cloudy)</option>
+                          <option value="LightRain">🌦️ 小雨・霧雨 (Light Rain)</option>
+                          <option value="Rainy">🌧️ 雨 (Rainy)</option>
+                          <option value="HeavyRain">⛈️ 豪雨・暴風雨 (Heavy Rain)</option>
+                          <option value="Thunderstorm">⚡ 雷雨・稲妻 (Thunderstorm)</option>
+                          <option value="Fog">🌫️ 霧・濃霧 (Fog)</option>
+                          <option value="Snow">❄️ 雪 (Snow)</option>
+                          <option value="HeavySnow">🌨️ 大雪・吹雪 (Heavy Snow)</option>
+                          <option value="Sunshower">🌈 天気雨・虹 (Sunshower)</option>
+                          <option value="Aurora">🌌 オーロラ (Aurora)</option>
+                        </select>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1 text-xs">
+                      <div>
+                        <label className="block text-[10px] opacity-65 mb-1 font-semibold">
+                          ❄️ 積雪量 ({Math.round(dynWorldCfg.snowAccumulation)}%)
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            step={1}
+                            value={dynWorldCfg.snowAccumulation}
+                            onChange={(e) => {
+                              setSelectedCustomId(null);
+                              setWallpaper('dynamic-world');
+                              updateDynWorld({ snowAccumulation: Number(e.target.value) });
+                            }}
+                            className="flex-1 accent-cyan-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedCustomId(null);
+                              setWallpaper('dynamic-world');
+                              updateDynWorld({
+                                snowAccumulation: dynWorldCfg.snowAccumulation >= 80 ? 0 : 85,
+                              });
+                            }}
+                            className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-[10px] font-mono font-bold"
+                          >
+                            {dynWorldCfg.snowAccumulation >= 80 ? '除雪' : '豪雪'}
+                          </button>
+                        </div>
+                      </div>
+
                       <div>
                         <label className="block text-[10px] opacity-65 mb-1 font-semibold">季節 (Season)</label>
                         <select
@@ -1372,31 +1525,9 @@ export function SettingsApp() {
                         >
                           <option value="auto">自動 (現在の月)</option>
                           <option value="spring">春 (桜吹雪)</option>
-                          <option value="summer">夏 (入道雲・蛍)</option>
+                          <option value="summer">夏 (新緑・蛍)</option>
                           <option value="autumn">秋 (紅葉・落ち葉)</option>
-                          <option value="winter">冬 (結晶雪)</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] opacity-65 mb-1 font-semibold">イベント (Event)</label>
-                        <select
-                          value={dynWorldCfg.event}
-                          onChange={(e) => {
-                            setSelectedCustomId(null);
-                            setWallpaper('dynamic-world');
-                            updateDynWorld({ event: e.target.value as DynamicWorldWallpaperConfig['event'] });
-                          }}
-                          className={`w-full p-2 rounded-lg text-xs border outline-none ${
-                            isLight ? 'bg-white border-slate-300 text-slate-900' : 'bg-black/40 border-white/15 text-white'
-                          }`}
-                        >
-                          <option value="auto">日付自動判定</option>
-                          <option value="none">通常 (イベントなし)</option>
-                          <option value="halloween">🎃 ハロウィン</option>
-                          <option value="christmas">🎄 クリスマス</option>
-                          <option value="newyear">🎍 お正月・初日の出</option>
-                          <option value="tanabata">🎋 七夕・天の川</option>
+                          <option value="winter">冬 (銀世界・雪)</option>
                         </select>
                       </div>
 
@@ -2505,22 +2636,27 @@ export function SettingsApp() {
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="text-[13px] font-bold tracking-tight">
-                                {isJa ? 'ライト / ダークモード (外観モード)' : 'Appearance Mode'}
+                                {isJa ? 'ライト / ダーク / 動的 (背景カラー・外観モード)' : 'Appearance & Dynamic Surface Mode'}
                               </span>
                               <span className="px-2 py-0.5 rounded-full bg-white/10 text-[10px] font-mono opacity-80">
-                                現在: {theme === 'dark' ? 'ダーク' : 'ライト'}
+                                現在:{' '}
+                                {isDynamicSurfaceMode
+                                  ? `動的 (${theme === 'dark' ? '黒＋背景色' : '白＋背景色'})`
+                                  : theme === 'dark'
+                                  ? 'ダーク'
+                                  : 'ライト'}
                               </span>
                             </div>
                             <div className="text-[11px] opacity-50 mt-0.5">
                               {isJa
-                                ? 'ダーク、ライト、OSに合わせる、日没・日の出に合わせるから選択できます'
-                                : 'Choose Dark, Light, Sync with OS, or Sunset/Sunrise automatic switching'}
+                                ? 'ダーク、ライトに加えて「動的」を選択すると、ダーク時は黒＋背景色、ライト時は白＋少し背景色が混ざった色になります'
+                                : 'Choose Dark, Light, or Dynamic (blends wallpaper color with black in Dark mode or white in Light mode)'}
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
                         {(
                           [
                             {
@@ -2538,22 +2674,38 @@ export function SettingsApp() {
                               icon: 'Sun',
                             },
                             {
-                              id: 'system' as ThemeMode,
-                              labelJa: 'OSに合わせる',
-                              labelEn: 'Match OS',
-                              subJa: 'デバイスの外観設定と連動',
-                              icon: 'Monitor',
+                              id: 'dynamic' as ThemeMode,
+                              labelJa: '動的 (背景色ブレンド)',
+                              labelEn: 'Dynamic Blend',
+                              subJa: 'ダーク時は黒＋背景色 / ライト時は白＋少し背景色',
+                              icon: 'Sparkles',
                             },
                             {
-                              id: 'sunset-sunrise' as ThemeMode,
-                              labelJa: '日没・日の出に合わせる',
-                              labelEn: 'Sunset / Sunrise',
-                              subJa: '日の出〜日没はライト / 夜はダーク',
+                              id: 'dynamic-dark' as ThemeMode,
+                              labelJa: '動的ダーク (黒＋背景色)',
+                              labelEn: 'Dynamic Dark',
+                              subJa: '黒と壁紙の色を混ぜたダーク背景',
+                              icon: 'Palette',
+                            },
+                            {
+                              id: 'dynamic-light' as ThemeMode,
+                              labelJa: '動的ライト (白＋背景色)',
+                              labelEn: 'Dynamic Light',
+                              subJa: '白に少し壁紙の色が混ざったライト背景',
+                              icon: 'Sun',
+                            },
+                            {
+                              id: 'system' as ThemeMode,
+                              labelJa: 'OS / 日没連動',
+                              labelEn: 'Auto / Sunset',
+                              subJa: '時間帯やOS設定に合わせて自動切替',
                               icon: 'CloudSun',
                             },
                           ] as const
                         ).map((opt) => {
-                          const active = themeMode === opt.id;
+                          const active =
+                            themeMode === opt.id ||
+                            (opt.id === 'system' && themeMode === 'sunset-sunrise');
                           return (
                             <button
                               key={opt.id}
@@ -2581,6 +2733,68 @@ export function SettingsApp() {
                           );
                         })}
                       </div>
+
+                      {/* When Dynamic mode is active, show base Dark/Light switcher + live blended color preview */}
+                      {isDynamicSurfaceMode && (
+                        <div
+                          className={`mt-2 p-3 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${
+                            isLight
+                              ? 'bg-white/75 border-slate-300/80 text-slate-800'
+                              : 'bg-black/35 border-white/15 text-white'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span
+                              className="w-6 h-6 rounded-lg border border-white/30 shadow-inner shrink-0"
+                              style={{ backgroundColor: 'var(--os-surface-solid)' }}
+                            />
+                            <div>
+                              <div className="text-xs font-bold flex items-center gap-1.5">
+                                <span>動的ブレンド背景が有効</span>
+                                <span
+                                  className="inline-block w-2.5 h-2.5 rounded-full"
+                                  style={{ backgroundColor: `rgb(${resolvedAccentRgb})` }}
+                                />
+                              </div>
+                              <div className="text-[10px] opacity-65">
+                                {theme === 'dark'
+                                  ? '黒 (#04060c) と現在の背景色をブレンドしたダークサーフェス'
+                                  : '白 (#ffffff) に現在の背景色をほんのり混ぜたライトサーフェス'}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                playSound('click');
+                                setTheme('dark');
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                                theme === 'dark'
+                                  ? 'bg-[var(--os-accent)] text-black shadow-xs'
+                                  : 'bg-white/10 hover:bg-white/20 opacity-75'
+                              }`}
+                            >
+                              黒＋背景色 (ダーク)
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                playSound('click');
+                                setTheme('light');
+                              }}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                                theme === 'light'
+                                  ? 'bg-[var(--os-accent)] text-black shadow-xs'
+                                  : 'bg-slate-300/60 hover:bg-slate-300 text-slate-800 opacity-75'
+                              }`}
+                            >
+                              白＋背景色 (ライト)
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <button

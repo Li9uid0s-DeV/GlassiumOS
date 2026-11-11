@@ -91,7 +91,7 @@ function renderApp(appId: string, payload?: unknown) {
     case 'clock':
     case 'pomodoro':
     case 'worldclock':
-      return <ClockApp initialTab={appId} />;
+      return <ClockApp initialTab={(payload as { tab?: string } | undefined)?.tab || appId} />;
     case 'ai':
       return <AIAssistantApp />;
     case 'studio':
@@ -267,8 +267,7 @@ export function Desktop() {
     return localStorage.getItem('glassium_show_desktop_widget') === 'true';
   });
   const [showWhatsNewModal, setShowWhatsNewModal] = useState<boolean>(() => {
-    const dismissed = localStorage.getItem('glassium_v5.0_u4_whats_new_dismissed');
-    return !dismissed;
+    return localStorage.getItem('glassium_v5.0_u4_whats_new_dismissed') !== 'true';
   });
 
   useEffect(() => {
@@ -338,6 +337,32 @@ export function Desktop() {
     desktopPillDragRef.current = null;
     setIsDraggingDesktopPill(false);
   };
+
+  // OS-Level Top Timer Pill / Dock State
+  const [timerPillState, setTimerPillState] = useState<{
+    running: boolean;
+    remaining: number;
+    duration: number;
+    formatted: string;
+    remainingPercent: number;
+    progressPercent: number;
+    isLowTime: boolean;
+  } | null>(null);
+  const [timerPillDismissed, setTimerPillDismissed] = useState(false);
+
+  useEffect(() => {
+    const onTimerState = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) {
+        setTimerPillState(detail);
+        if (detail.running) {
+          setTimerPillDismissed(false);
+        }
+      }
+    };
+    window.addEventListener('glassium-timer-state', onTimerState);
+    return () => window.removeEventListener('glassium-timer-state', onTimerState);
+  }, []);
 
   useEffect(() => {
     const onMusicState = (e: Event) => {
@@ -598,34 +623,8 @@ export function Desktop() {
         />
       )}
 
-      {/* u4 Dynamic World Live Wallpaper (Time, Wind Speed, Wind Direction, Weather, Season, Halloween & Christmas Events) */}
+      {/* Dynamic World Live Wallpaper (Location, Terrain, Weather, Snow Accumulation, Time, Wind, Season, Events) */}
       {useDynamicWorld && !customWallpaper && <DynamicWorldWallpaper showControllerHud={true} />}
-
-      {/* Quick Wallpaper Switcher Pill Bar (Black Hole 3D / Dynamic World / What's New) */}
-      <div className="fixed top-9 right-4 z-20 pointer-events-auto flex items-center gap-1.5">
-        <button
-          type="button"
-          onClick={() => {
-            setSelectedCustomId(null);
-            setWallpaper(wallpaper === 'space' ? 'dynamic-world' : 'space');
-          }}
-          className={`px-3 py-1.5 rounded-xl backdrop-blur-xl border text-[11px] font-semibold flex items-center gap-1.5 shadow-xl transition cursor-pointer ${
-            wallpaper === 'space'
-              ? 'bg-amber-950/70 border-amber-500/50 text-amber-200 hover:bg-amber-900/80'
-              : 'bg-black/60 border-cyan-400/40 text-cyan-200 hover:bg-black/80'
-          }`}
-          title={wallpaper === 'space' ? '動的環境壁紙に戻す' : '3Dブラックホール (アインシュタインリング・降着円盤) に切替'}
-        >
-          <span>{wallpaper === 'space' ? '🌍 動的環境壁紙に切替' : '🕳️ ブラックホール壁紙'}</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setShowWhatsNewModal(true)}
-          className="px-2.5 py-1.5 rounded-xl bg-black/55 hover:bg-black/75 backdrop-blur-xl border border-white/15 text-[11px] text-white/85 font-semibold transition cursor-pointer"
-        >
-          u4 新機能
-        </button>
-      </div>
 
       {/* 2D Interactive Aurora Silk & PS5 Golden Sparkle Live Wallpaper */}
       {useLive2D && !customWallpaper && (
@@ -1618,20 +1617,6 @@ export function Desktop() {
               type="button"
               onClick={() => {
                 setSelectedCustomId(null);
-                setWallpaper('space');
-                setContextMenu(null);
-              }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition ${
-                theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-white/10'
-              }`}
-            >
-              <span className="text-sm">🕳️</span>
-              <span>3Dブラックホール壁紙 (Gargantua)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedCustomId(null);
                 setWallpaper('dynamic-world');
                 setContextMenu(null);
               }}
@@ -1640,7 +1625,7 @@ export function Desktop() {
               }`}
             >
               <span className="text-sm">🌍</span>
-              <span>動的環境壁紙 (季節・気象・時刻連動)</span>
+              <span>季節のライブ壁紙 (場所・天候・積雪設定)</span>
             </button>
             <div className={`my-1 border-t ${theme === 'light' ? 'border-slate-200' : 'border-white/10'}`} />
             <button
@@ -1655,19 +1640,6 @@ export function Desktop() {
             >
               <Icon name="Settings" size={14} className="text-cyan-400" />
               <span>OS設定</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowWhatsNewModal(true);
-                setContextMenu(null);
-              }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition ${
-                theme === 'light' ? 'hover:bg-slate-100' : 'hover:bg-white/10'
-              }`}
-            >
-              <Icon name="Sparkles" size={14} className="text-fuchsia-400" />
-              <span>What's New (更新内容を見る)</span>
             </button>
           </motion.div>
         )}
@@ -2174,6 +2146,319 @@ export function Desktop() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ========================================================
+          OS-LEVEL TOP FLOATING PILL / DOCK BAR (Timer Pill & Music Pill)
+          Fixed at top-center of screen with smooth circular progress rings
+         ======================================================== */}
+      <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[4500] flex flex-wrap items-center justify-center gap-2.5 max-w-[96vw] pointer-events-none select-none">
+        <AnimatePresence>
+          {timerPillState &&
+            !timerPillDismissed &&
+            (timerPillState.running ||
+              timerPillState.remaining < timerPillState.duration ||
+              windows.some((w) => w.appId === 'clock')) && (
+              <motion.div
+                key="os-top-timer-pill"
+                initial={{ y: -50, opacity: 0, scale: 0.92 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: -40, opacity: 0, scale: 0.9 }}
+                transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+                className="pointer-events-auto"
+              >
+                <div
+                  onClick={() => openApp('clock', { payload: { tab: 'timer' } })}
+                  className={`cursor-pointer px-4 py-1.5 rounded-full backdrop-blur-2xl border transition-all duration-300 flex items-center gap-3 shadow-2xl ${
+                    timerPillState.isLowTime && timerPillState.running
+                      ? 'bg-rose-950/85 border-rose-400/65 clock-timer-low-card'
+                      : timerPillState.running
+                      ? 'bg-slate-950/85 border-cyan-400/50 shadow-[0_10px_30px_rgba(6,182,212,0.28)]'
+                      : 'bg-slate-950/80 border-white/20 hover:border-white/35'
+                  }`}
+                  title="クリックしてタイマー画面を表示"
+                >
+                  {/* Smooth Circular Progress Ring */}
+                  <div className="relative w-7 h-7 flex items-center justify-center shrink-0">
+                    <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="14"
+                        stroke="rgba(255,255,255,0.14)"
+                        strokeWidth="3.2"
+                        fill="transparent"
+                      />
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="14"
+                        stroke={timerPillState.isLowTime ? '#fb7185' : '#22d3ee'}
+                        strokeWidth="3.2"
+                        fill="transparent"
+                        strokeDasharray="87.96"
+                        strokeDashoffset={
+                          87.96 - (87.96 * timerPillState.remainingPercent) / 100
+                        }
+                        strokeLinecap="round"
+                        className={`clock-timer-progress-circle ${
+                          timerPillState.running
+                            ? timerPillState.isLowTime
+                              ? 'is-low-time'
+                              : 'is-running'
+                            : ''
+                        }`}
+                      />
+                    </svg>
+                    <Icon
+                      name="Clock"
+                      size={12}
+                      className={
+                        timerPillState.isLowTime ? 'text-rose-300' : 'text-cyan-300'
+                      }
+                    />
+                  </div>
+
+                  {/* Countdown Readout */}
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-[10px] font-mono font-bold uppercase tracking-wider ${
+                        timerPillState.isLowTime && timerPillState.running
+                          ? 'text-rose-300 animate-pulse'
+                          : 'text-cyan-300'
+                      }`}
+                    >
+                      TIMER
+                    </span>
+                    <span
+                      className={`text-sm sm:text-base font-black font-mono tabular-nums tracking-tight ${
+                        timerPillState.isLowTime && timerPillState.running
+                          ? 'text-rose-200'
+                          : 'text-white'
+                      }`}
+                    >
+                      {timerPillState.formatted}
+                    </span>
+                  </div>
+
+                  {/* Quick Controls inside Top Pill */}
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 border-l border-white/15 pl-2.5"
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new CustomEvent('glassium-timer-command', {
+                            detail: { action: 'toggle' },
+                          })
+                        )
+                      }
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black transition cursor-pointer ${
+                        timerPillState.running
+                          ? 'bg-amber-400 text-slate-950 hover:bg-amber-300'
+                          : timerPillState.isLowTime
+                          ? 'bg-rose-500 text-white hover:bg-rose-400'
+                          : 'bg-cyan-400 text-slate-950 hover:bg-cyan-300'
+                      }`}
+                    >
+                      {timerPillState.running ? '一時停止' : '開始'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new CustomEvent('glassium-timer-command', {
+                            detail: { action: 'add-seconds', seconds: 60 },
+                          })
+                        )
+                      }
+                      className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-[10px] font-mono font-bold text-white/85 cursor-pointer"
+                      title="1分追加"
+                    >
+                      +1m
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTimerPillDismissed(true)}
+                      className="w-5 h-5 rounded-full hover:bg-white/15 text-white/50 hover:text-white flex items-center justify-center transition cursor-pointer"
+                      title="ピルを隠す"
+                    >
+                      <Icon name="X" size={11} />
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+        </AnimatePresence>
+
+        {/* OS-LEVEL TOP FLOATING MUSIC PILL / DOCK (Matches Timer Pill UX) */}
+        <AnimatePresence>
+          {musicState &&
+            !pillDismissed &&
+            (musicState.isPlaying || windows.some((w) => w.appId === 'synth')) && (
+              <motion.div
+                key="os-top-music-pill"
+                initial={{ y: -50, opacity: 0, scale: 0.92 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: -40, opacity: 0, scale: 0.9 }}
+                transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+                className="pointer-events-auto"
+              >
+                <div
+                  onClick={() => openApp('synth')}
+                  className={`relative overflow-hidden cursor-pointer px-4 py-1.5 rounded-full backdrop-blur-2xl border transition-all duration-300 flex items-center gap-3 shadow-2xl ${
+                    musicState.isPlaying
+                      ? 'bg-slate-950/88 border-white/25 shadow-[0_10px_32px_rgba(244,63,94,0.28)]'
+                      : 'bg-slate-950/80 border-white/15 hover:border-white/30'
+                  }`}
+                  title="クリックして Music プレイヤーを表示"
+                >
+                  {/* Subtle Artwork Ambient Glow Inside Top Pill */}
+                  <div
+                    className="pointer-events-none absolute inset-0 opacity-35 blur-xl transition-all duration-700"
+                    style={{
+                      background: `linear-gradient(90deg, ${
+                        musicState.palette?.c1 || '#fa243c'
+                      } 0%, ${musicState.palette?.c2 || '#8b5cf6'} 50%, ${
+                        musicState.palette?.c3 || '#06b6d4'
+                      } 100%)`,
+                    }}
+                  />
+
+                  {/* Smooth Circular Progress Ring + Album Artwork */}
+                  <div className="relative z-10 w-8 h-8 flex items-center justify-center shrink-0">
+                    <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="15.5"
+                        stroke="rgba(255,255,255,0.16)"
+                        strokeWidth="2.8"
+                        fill="transparent"
+                      />
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="15.5"
+                        stroke={musicState.palette?.c1 || resolvedAccentHex}
+                        strokeWidth="2.8"
+                        fill="transparent"
+                        strokeDasharray="97.39"
+                        strokeDashoffset={
+                          97.39 -
+                          (97.39 *
+                            Math.min(
+                              100,
+                              ((musicState.currentTime || 0) /
+                                Math.max(1, musicState.duration || 210)) *
+                                100
+                            )) /
+                            100
+                        }
+                        strokeLinecap="round"
+                        className="clock-timer-progress-circle is-running"
+                      />
+                    </svg>
+                    <div className="absolute inset-[4px] rounded-full overflow-hidden bg-slate-800 flex items-center justify-center">
+                      {musicState.artworkUrl ? (
+                        <img
+                          src={musicState.artworkUrl}
+                          alt=""
+                          className={`w-full h-full object-cover ${
+                            musicState.isPlaying ? 'animate-[spin_12s_linear_infinite]' : ''
+                          }`}
+                        />
+                      ) : (
+                        <Icon name="Music" size={11} className="text-rose-300" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Track Title, Artist & Synchronized Live Lyric Snippet */}
+                  <div className="relative z-10 min-w-0 max-w-[170px] sm:max-w-[250px] flex flex-col justify-center">
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-rose-300 shrink-0">
+                        MUSIC
+                      </span>
+                      <span className="text-xs font-extrabold text-white truncate">
+                        {musicState.title || 'Now Playing'}
+                      </span>
+                      <span className="text-[10px] text-white/60 truncate">
+                        · {musicState.artist || 'Artist'}
+                      </span>
+                    </div>
+                    {musicState.lyricLine ? (
+                      <span className="text-[10px] text-white/90 font-semibold truncate">
+                        ♪ {musicState.lyricLine}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-white/55 font-mono tabular-nums truncate">
+                        {Math.floor((musicState.currentTime || 0) / 60)}:
+                        {String(Math.floor((musicState.currentTime || 0) % 60)).padStart(2, '0')} /{' '}
+                        {Math.floor((musicState.duration || 210) / 60)}:
+                        {String(Math.floor((musicState.duration || 210) % 60)).padStart(2, '0')}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Quick Transport Controls inside Top Music Pill */}
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="relative z-10 flex items-center gap-1 border-l border-white/15 pl-2.5"
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new CustomEvent('glassium-music-command', { detail: { action: 'prev' } })
+                        )
+                      }
+                      className="w-6 h-6 rounded-full hover:bg-white/15 text-white/80 hover:text-white flex items-center justify-center transition cursor-pointer"
+                      title="前の曲"
+                    >
+                      <span className="material-symbols-rounded text-[16px]">skip_previous</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new CustomEvent('glassium-music-command', {
+                            detail: { action: 'toggle-play' },
+                          })
+                        )
+                      }
+                      className="px-2.5 py-0.5 rounded-full bg-white text-slate-950 hover:bg-white/90 text-[10px] font-black transition cursor-pointer flex items-center gap-0.5"
+                      title={musicState.isPlaying ? '一時停止' : '再生'}
+                    >
+                      <span>{musicState.isPlaying ? '一時停止' : '再生'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        window.dispatchEvent(
+                          new CustomEvent('glassium-music-command', { detail: { action: 'next' } })
+                        )
+                      }
+                      className="w-6 h-6 rounded-full hover:bg-white/15 text-white/80 hover:text-white flex items-center justify-center transition cursor-pointer"
+                      title="次の曲"
+                    >
+                      <span className="material-symbols-rounded text-[16px]">skip_next</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPillDismissed(true)}
+                      className="w-5 h-5 rounded-full hover:bg-white/15 text-white/50 hover:text-white flex items-center justify-center transition cursor-pointer"
+                      title="ピルを隠す"
+                    >
+                      <Icon name="X" size={11} />
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+        </AnimatePresence>
+      </div>
 
       {/* ========================================================
           OS-LEVEL FLOATING BOTTOM DOCK MUSIC BAR (GlassiumOS Liquid Glass Dock)

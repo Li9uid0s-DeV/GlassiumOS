@@ -28,7 +28,6 @@ import { backendFetch } from '../backendConfig';
 import { DrumPadTunerView } from './ExtraAppsSuite';
 import { MusicEqualizerPanel } from './MusicEqualizerPanel';
 import {
-  detectLyricLanguage,
   translateLyricsBatchViaServer,
   getLyricTranslation,
 } from '../karaokeGuide';
@@ -2127,65 +2126,83 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   }, [favoriteTracks, userPlaylists]);
 
   // -----------------------------------------------------------------------
-  // Synchronized Lyrics & Bidirectional Translation Panel (NO KARAOKE)
+  // Apple Music Live Lyrics & DeepL Bilingual Translation Panel
   // -----------------------------------------------------------------------
   const renderSyncedLyricsPanel = (fullScreenMode = false) => {
     const currentFav = isFavorite(currentTrack.id);
+    const effectivePlayhead = currentTime + lyricOffsetSec;
+
     return (
       <div
         className={`${
           fullScreenMode
             ? 'flex-1'
-            : 'w-full lg:w-[420px] xl:w-[460px] border-l border-white/[0.12]'
-        } flex flex-col min-h-0 relative overflow-hidden apple-liquid-glass shrink-0`}
+            : 'w-full lg:w-[430px] xl:w-[480px] border-l border-white/[0.12]'
+        } flex flex-col min-h-0 relative overflow-hidden shrink-0 bg-zinc-950/80`}
       >
-        {/* Lyrics Control Header */}
-        <div className="px-5 py-3 border-b border-white/[0.1] bg-white/[0.03] backdrop-blur-2xl flex flex-wrap items-center justify-between gap-2 shrink-0 z-10">
+        {/* Apple Music Dynamic Blurred Album Artwork Mesh Background */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
+          {currentTrack.artworkUrl ? (
+            <>
+              <img
+                src={currentTrack.artworkUrl}
+                alt=""
+                className="absolute -inset-16 w-[135%] h-[135%] max-w-none object-cover blur-[72px] saturate-200 opacity-55 scale-125 transition-all duration-1000"
+              />
+              <img
+                src={currentTrack.artworkUrl}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover blur-[96px] saturate-150 opacity-35 mix-blend-screen"
+              />
+            </>
+          ) : (
+            <div
+              className={`absolute inset-0 bg-gradient-to-br ${currentTrack.coverGradient} blur-3xl opacity-55`}
+            />
+          )}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `radial-gradient(circle at 20% 25%, ${artworkPalette.c1}44 0%, transparent 55%), radial-gradient(circle at 80% 75%, ${artworkPalette.c2}44 0%, transparent 60%), linear-gradient(180deg, rgba(9,9,11,0.45) 0%, rgba(9,9,11,0.72) 100%)`,
+            }}
+          />
+        </div>
+
+        {/* Minimal Floating Apple Music Lyrics Header */}
+        <div className="px-5 py-3 border-b border-white/[0.08] bg-black/20 backdrop-blur-2xl flex flex-wrap items-center justify-between gap-2 shrink-0 z-10">
           <div className="flex items-center gap-2 min-w-0">
-            <span
-              className="material-symbols-rounded text-sm"
-              style={{ color: resolvedAccentHex }}
-            >
-              lyrics
+            <span className="material-symbols-rounded text-base text-white/90">lyrics</span>
+            <span className="text-xs font-bold tracking-tight text-white/95">
+              Apple Music Live Lyrics
             </span>
-            <span className="text-xs font-semibold tracking-tight text-white">
-              同期歌詞 &amp; 多言語翻訳
-            </span>
-            <span className="text-[10px] text-white/50 font-mono">
-              ({currentTrack.lyrics.length}行{isTranslatingLyrics ? ' · 翻訳中...' : ''})
-            </span>
+            {isTranslatingLyrics && (
+              <span className="text-[10px] text-white/60 font-mono animate-pulse">
+                · DeepL 翻訳同期中...
+              </span>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
-            {/* Lyric Translation Toggle */}
+            {/* DeepL Translation Toggle */}
             <button
               type="button"
               onClick={() => setShowLyricsTranslation((v) => !v)}
-              style={
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition flex items-center gap-1 cursor-pointer ${
                 showLyricsTranslation
-                  ? {
-                      backgroundColor: resolvedAccentHex,
-                      borderColor: resolvedAccentHex,
-                      color: '#ffffff',
-                    }
-                  : undefined
-              }
-              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition border flex items-center gap-1 ${
-                showLyricsTranslation
-                  ? 'shadow-sm'
-                  : 'apple-liquid-glass-pill text-white/80 hover:text-white'
+                  ? 'bg-white text-black shadow-sm'
+                  : 'bg-white/10 text-white/75 hover:bg-white/20 hover:text-white'
               }`}
-              title="日本語→英語 / 英語→日本語 / その他→日本語 自動翻訳"
+              title="DeepL 自動通訳表示の切り替え"
             >
               <span className="material-symbols-rounded text-xs">translate</span>
-              翻訳 {showLyricsTranslation ? 'ON' : 'OFF'}
+              <span>通訳 {showLyricsTranslation ? 'ON' : 'OFF'}</span>
             </button>
 
             {/* Sync Offset Controls */}
-            <div className="flex items-center apple-liquid-glass-pill px-1.5 py-0.5 text-[10px] font-mono tabular-nums rounded-md">
+            <div className="flex items-center bg-white/10 px-1.5 py-0.5 text-[10px] font-mono tabular-nums rounded-lg">
               <button
                 onClick={() => setLyricOffsetSec((o) => Math.round((o - 0.2) * 10) / 10)}
-                className="px-1.5 py-0.5 hover:bg-white/15 text-white/75 hover:text-white transition"
+                className="px-1.5 py-0.5 hover:bg-white/15 rounded text-white/75 hover:text-white transition"
               >
                 -0.2s
               </button>
@@ -2197,7 +2214,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               </button>
               <button
                 onClick={() => setLyricOffsetSec((o) => Math.round((o + 0.2) * 10) / 10)}
-                className="px-1.5 py-0.5 hover:bg-white/15 text-white/75 hover:text-white transition"
+                className="px-1.5 py-0.5 hover:bg-white/15 rounded text-white/75 hover:text-white transition"
               >
                 +0.2s
               </button>
@@ -2210,55 +2227,34 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   setCustomLyricInput(JSON.stringify(currentTrack.lyrics.slice(0, 6), null, 2));
                 }
               }}
-              className="px-2.5 py-1 rounded-md text-[11px] font-medium apple-liquid-glass-pill text-white/80 hover:text-white transition"
+              className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-white/10 text-white/80 hover:bg-white/20 hover:text-white transition"
             >
               編集
             </button>
 
             <button
               onClick={() => toggleFavorite(currentTrack)}
-              style={
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition ${
                 currentFav
-                  ? { backgroundColor: resolvedAccentHex, borderColor: resolvedAccentHex }
-                  : undefined
-              }
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition border ${
-                currentFav ? 'text-white' : 'apple-liquid-glass-pill text-white/80 hover:text-white'
+                  ? 'bg-rose-500 text-white'
+                  : 'bg-white/10 text-white/80 hover:bg-white/20 hover:text-white'
               }`}
             >
-              {currentFav ? '保存済' : '保存'}
+              {currentFav ? '♥ 保存済' : '♡ 保存'}
             </button>
 
             <button
               onClick={() => loadLyricsForTrack(currentTrack)}
               disabled={isFetchingLyrics}
-              className="px-2.5 py-1 rounded-md apple-liquid-glass-pill text-[11px] text-white/80 hover:text-white transition"
+              className="px-2.5 py-1 rounded-lg bg-white/10 text-[11px] text-white/80 hover:bg-white/20 hover:text-white transition"
             >
               {isFetchingLyrics ? '取得中...' : '再取得'}
             </button>
           </div>
         </div>
 
-        {/* Translation Rule Info Bar */}
-        {showLyricsTranslation && (
-          <div className="px-5 py-1.5 bg-white/[0.03] border-b border-white/[0.06] flex items-center justify-between text-[11px] text-white/70">
-            <span className="flex items-center gap-1.5">
-              <span
-                style={{ backgroundColor: resolvedAccentHex }}
-                className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold text-white"
-              >
-                DeepL 自動通訳
-              </span>
-              <span>日本語 ↔ 英語 / 多言語 → 日本語</span>
-            </span>
-            <span className="font-mono text-[10px] text-white/50">
-              {isTranslatingLyrics ? 'DeepL 翻訳中...' : 'LRCLIB + DeepL Sync'}
-            </span>
-          </div>
-        )}
-
         {showCustomLyricEditor && (
-          <div className="p-4 border-b border-white/[0.12] bg-black/65 backdrop-blur-3xl space-y-2.5 z-20">
+          <div className="p-4 border-b border-white/[0.12] bg-black/75 backdrop-blur-3xl space-y-2.5 z-20">
             <div className="text-[11px] font-semibold text-white/90">
               歌詞データ編集 (LRC / TTML / JSON)
             </div>
@@ -2295,39 +2291,48 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         )}
 
         {userScrolledLyrics && (
-          <div className="absolute top-20 right-5 z-20">
+          <div className="absolute top-16 right-5 z-20">
             <button
               onClick={() => {
                 setUserScrolledLyrics(false);
                 scrollToActiveLyric(true);
               }}
-              style={{ backgroundColor: resolvedAccentHex }}
-              className="px-4 py-1.5 rounded-full text-white font-semibold text-xs shadow-lg transition"
+              className="px-4 py-1.5 rounded-full bg-white/90 text-black font-bold text-xs shadow-xl hover:bg-white transition cursor-pointer"
             >
-              現在位置へ戻る
+              同期に戻る
             </button>
           </div>
         )}
 
-        {/* Scrolling Time-Synced Lyrics List */}
+        {/* Apple Music Live Lyrics Scroll Container */}
         <div
           ref={lyricsContainerRef}
           onWheel={handleManualLyricsWheel}
           onTouchMove={handleManualLyricsWheel}
-          className={`flex-1 overflow-y-auto ${
-            fullScreenMode ? 'px-10 sm:px-16 py-12' : 'px-6 py-10'
-          } space-y-5 select-none`}
+          className={`relative z-10 flex-1 overflow-y-auto ${
+            fullScreenMode ? 'px-8 sm:px-16 py-16' : 'px-6 py-12'
+          } space-y-7 select-none`}
+          style={{
+            maskImage:
+              'linear-gradient(to bottom, transparent 0%, black 10%, black 88%, transparent 100%)',
+            WebkitMaskImage:
+              'linear-gradient(to bottom, transparent 0%, black 10%, black 88%, transparent 100%)',
+          }}
         >
-          <div className="h-8" />
+          <div className="h-12" />
           {currentTrack.lyrics.map((line: LyricLine, idx: number) => {
             const isActive = idx === currentLyricIndex;
+            const isPast = idx < currentLyricIndex;
             const distance = Math.abs(idx - currentLyricIndex);
 
-            const depthStateClass = isActive
-              ? 'is-active'
+            // Apple Music progressive optical depth-of-field blur
+            const appleBlurClass = isActive
+              ? 'blur-0 opacity-100 scale-[1.03]'
               : distance === 1
-              ? 'is-neighbor'
-              : 'is-inactive';
+              ? 'blur-[1px] opacity-45 scale-100'
+              : distance === 2
+              ? 'blur-[2.2px] opacity-30 scale-[0.98]'
+              : 'blur-[3.5px] opacity-20 scale-[0.96]';
 
             if (line.isInterlude) {
               if (!isActive && distance > 1) return null;
@@ -2339,26 +2344,46 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                     seekToSeconds(line.time);
                     if (!isPlaying) togglePlay();
                   }}
-                  className={`apple-lyric-line ${depthStateClass} cursor-pointer py-3 px-4 rounded-xl`}
+                  className={`cursor-pointer py-4 px-3 rounded-2xl transition-all duration-500 origin-left ${appleBlurClass} hover:blur-0 hover:opacity-90`}
                 >
-                  <div className="flex items-center gap-2.5">
-                    {[0, 1, 2].map((dotIdx) => (
-                      <span
-                        key={dotIdx}
-                        className={`inline-block w-2.5 h-2.5 rounded-full ${
-                          isActive ? 'bg-white' : 'bg-white/25'
-                        }`}
-                      />
-                    ))}
+                  <div className="flex items-center gap-3">
+                    {[0, 1, 2].map((dotIdx) => {
+                      const pulseScale = isActive
+                        ? 1 + 0.35 * Math.sin(effectivePlayhead * 4.5 - dotIdx * 0.9)
+                        : 1;
+                      return (
+                        <span
+                          key={dotIdx}
+                          style={{
+                            transform: `scale(${pulseScale.toFixed(2)})`,
+                          }}
+                          className={`inline-block w-3.5 h-3.5 rounded-full transition-transform duration-150 ${
+                            isActive
+                              ? 'bg-white shadow-[0_0_16px_rgba(255,255,255,0.9)]'
+                              : 'bg-white/35'
+                          }`}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               );
             }
 
-            const langInfo = detectLyricLanguage(line.text);
             const translation = showLyricsTranslation
               ? getLyricTranslation(line.text, serverLyricTranslations)
               : '';
+
+            const nextLineTime =
+              line.endTime ??
+              currentTrack.lyrics[idx + 1]?.time ??
+              line.time + 4.5;
+            const lineDuration = Math.max(0.4, nextLineTime - line.time);
+            const lineProgress = isActive
+              ? Math.max(0, Math.min(1, (effectivePlayhead - line.time) / lineDuration))
+              : isPast
+              ? 1
+              : 0;
 
             return (
               <div
@@ -2368,52 +2393,92 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   seekToSeconds(line.time);
                   if (!isPlaying) togglePlay();
                 }}
-                className={`apple-lyric-line ${depthStateClass} group cursor-pointer py-3 px-4 rounded-2xl transition ${
-                  isActive
-                    ? 'bg-white/[0.08] border border-white/15 shadow-sm'
-                    : 'hover:bg-white/[0.04]'
-                }`}
+                className={`group cursor-pointer py-3 px-4 -mx-4 rounded-2xl transition-all duration-500 ease-out origin-left ${appleBlurClass} hover:blur-0 hover:opacity-95 hover:bg-white/[0.06]`}
               >
-                <div className="flex items-baseline justify-between gap-4">
-                  <div
-                    className={`font-bold tracking-tight leading-snug ${
-                      fullScreenMode ? 'text-2xl sm:text-3xl' : 'text-lg sm:text-xl'
-                    } ${isActive ? 'text-white' : 'text-white/75'}`}
-                  >
-                    {line.text}
-                  </div>
-                  <span
-                    className={`text-[11px] font-mono tabular-nums shrink-0 ${
-                      isActive
-                        ? 'opacity-80 text-white/80'
-                        : 'opacity-0 group-hover:opacity-70 text-white/50'
-                    }`}
-                  >
-                    {formatSecs(line.time)}
-                  </span>
-                </div>
-
-                {/* Translated Lyric Line via DeepL (JA->EN, EN->JA, Other->JA) */}
-                {showLyricsTranslation && translation && (
-                  <div className="mt-1.5 flex items-start gap-2 text-xs sm:text-sm font-medium leading-relaxed">
+                {/* Primary Lyric Line with Apple Music Sing Word-by-Word Fill */}
+                <div
+                  className={`font-extrabold tracking-tight leading-[1.22] transition-all duration-300 ${
+                    fullScreenMode
+                      ? 'text-2xl sm:text-4xl lg:text-[40px]'
+                      : 'text-xl sm:text-2xl'
+                  } ${
+                    isActive
+                      ? 'text-white drop-shadow-[0_4px_26px_rgba(255,255,255,0.38)]'
+                      : 'text-white/85'
+                  }`}
+                >
+                  {isActive && Array.isArray(line.words) && line.words.length > 0 ? (
+                    <span className="inline">
+                      {line.words.map((w, wIdx) => {
+                        const wDur = Math.max(0.08, w.end - w.start);
+                        const wProg = Math.max(
+                          0,
+                          Math.min(1, (effectivePlayhead - w.start) / wDur)
+                        );
+                        const isWordSung = wProg >= 1;
+                        const isWordCurrent = wProg > 0 && wProg < 1;
+                        return (
+                          <span
+                            key={wIdx}
+                            style={
+                              isWordCurrent
+                                ? {
+                                    backgroundImage: `linear-gradient(90deg, #ffffff ${Math.round(
+                                      wProg * 100
+                                    )}%, rgba(255,255,255,0.42) ${Math.round(wProg * 100)}%)`,
+                                    WebkitBackgroundClip: 'text',
+                                    WebkitTextFillColor: 'transparent',
+                                    transform: 'translateY(-1px)',
+                                  }
+                                : undefined
+                            }
+                            className={`inline-block transition-transform duration-150 ${
+                              isWordSung
+                                ? 'text-white'
+                                : isWordCurrent
+                                ? 'text-white'
+                                : 'text-white/45'
+                            }`}
+                          >
+                            {w.text}
+                          </span>
+                        );
+                      })}
+                    </span>
+                  ) : isActive ? (
                     <span
                       style={{
-                        borderColor: `${resolvedAccentHex}66`,
-                        color: resolvedAccentHex,
+                        backgroundImage: `linear-gradient(90deg, #ffffff ${Math.round(
+                          lineProgress * 100
+                        )}%, rgba(255,255,255,0.55) ${Math.min(
+                          100,
+                          Math.round(lineProgress * 100) + 12
+                        )}%)`,
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
                       }}
-                      className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/[0.06] border shrink-0 mt-0.5"
                     >
-                      DeepL · {langInfo.badgeLabel}
+                      {line.text}
                     </span>
-                    <span className={isActive ? 'text-white/95' : 'text-white/65'}>
-                      {translation}
-                    </span>
+                  ) : (
+                    <span>{line.text}</span>
+                  )}
+                </div>
+
+                {/* Apple Music Clean Bilingual DeepL Sub-line */}
+                {showLyricsTranslation && translation && (
+                  <div
+                    className={`mt-2 font-semibold tracking-tight leading-snug transition-opacity duration-300 ${
+                      fullScreenMode ? 'text-base sm:text-xl' : 'text-xs sm:text-sm'
+                    } ${isActive ? 'text-white/85' : 'text-white/55'}`}
+                  >
+                    {translation}
                   </div>
                 )}
               </div>
             );
           })}
-          <div className="h-36" />
+          <div className="h-44" />
         </div>
       </div>
     );
@@ -3360,6 +3425,120 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           </div>
         </div>
       )}
+
+      {/* ===================================================================
+          IN-APP TOP MUSIC PILL / DOCK BAR (Matches ClockApp Top Timer Pill)
+         =================================================================== */}
+      <div className="relative z-20 flex items-center justify-center px-3 pt-2 pb-0.5 shrink-0">
+        <div
+          onClick={() => setActiveNav('lyrics')}
+          className="cursor-pointer px-4 py-1.5 rounded-full bg-black/55 backdrop-blur-2xl border border-white/20 hover:border-white/35 shadow-xl flex items-center gap-3 max-w-full transition-all duration-300"
+          title="クリックして Apple Music ライブ歌詞を表示"
+        >
+          {/* Smooth Circular Track Progress Ring + Artwork */}
+          <div className="relative w-7 h-7 flex items-center justify-center shrink-0">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+              <circle
+                cx="18"
+                cy="18"
+                r="15"
+                stroke="rgba(255,255,255,0.16)"
+                strokeWidth="2.8"
+                fill="transparent"
+              />
+              <circle
+                cx="18"
+                cy="18"
+                r="15"
+                stroke={artworkPalette.c1 || resolvedAccentHex}
+                strokeWidth="2.8"
+                fill="transparent"
+                strokeDasharray="94.25"
+                strokeDashoffset={
+                  94.25 -
+                  (94.25 *
+                    Math.min(
+                      100,
+                      (currentTime / Math.max(1, currentTrack.duration || 210)) * 100
+                    )) /
+                    100
+                }
+                strokeLinecap="round"
+                className="clock-timer-progress-circle is-running"
+              />
+            </svg>
+            <div className="absolute inset-[3.5px] rounded-full overflow-hidden bg-zinc-800 flex items-center justify-center">
+              {currentTrack.artworkUrl ? (
+                <img
+                  src={currentTrack.artworkUrl}
+                  alt=""
+                  className={`w-full h-full object-cover ${
+                    isPlaying ? 'animate-[spin_12s_linear_infinite]' : ''
+                  }`}
+                />
+              ) : (
+                <span className="material-symbols-rounded text-[12px] text-white/80">
+                  music_note
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Track Readout & Active Lyric Snippet */}
+          <div className="min-w-0 max-w-[200px] sm:max-w-[340px] flex flex-col justify-center">
+            <div className="flex items-center gap-1.5 truncate">
+              <span
+                className="text-[10px] font-mono font-bold uppercase tracking-wider shrink-0"
+                style={{ color: resolvedAccentHex }}
+              >
+                NOW PLAYING
+              </span>
+              <span className="text-xs font-extrabold text-white truncate">
+                {currentTrack.title}
+              </span>
+              <span className="text-[10px] text-white/60 truncate">
+                · {cleanPrimaryArtistName(currentTrack.artist)}
+              </span>
+            </div>
+            <div className="text-[10px] text-white/85 truncate font-medium">
+              {currentTrack.lyrics && currentLyricIndex >= 0 && currentTrack.lyrics[currentLyricIndex]
+                ? `♪ ${currentTrack.lyrics[currentLyricIndex].text}`
+                : `${formatSecs(currentTime)} / ${formatSecs(currentTrack.duration)}`}
+            </div>
+          </div>
+
+          {/* Transport Controls */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-1 border-l border-white/15 pl-2.5 shrink-0"
+          >
+            <button
+              type="button"
+              onClick={prevTrack}
+              className="w-6 h-6 rounded-full hover:bg-white/15 text-white/80 hover:text-white flex items-center justify-center transition cursor-pointer"
+              title="前の曲"
+            >
+              <span className="material-symbols-rounded text-[16px]">skip_previous</span>
+            </button>
+            <button
+              type="button"
+              onClick={togglePlay}
+              style={{ backgroundColor: isPlaying ? '#fbbf24' : resolvedAccentHex }}
+              className="px-2.5 py-0.5 rounded-full text-[10px] font-black text-slate-950 hover:brightness-110 transition cursor-pointer"
+            >
+              {isPlaying ? '一時停止' : '再生'}
+            </button>
+            <button
+              type="button"
+              onClick={nextTrack}
+              className="w-6 h-6 rounded-full hover:bg-white/15 text-white/80 hover:text-white flex items-center justify-center transition cursor-pointer"
+              title="次の曲"
+            >
+              <span className="material-symbols-rounded text-[16px]">skip_next</span>
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* ===================================================================
           MAIN SPOTIFY-INSPIRED LIQUID GLASS WORKSPACE
@@ -4682,12 +4861,28 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             </div>
           )}
 
-          {/* VIEW: FULL-SCREEN LYRICS & TRANSLATION */}
+          {/* VIEW: FULL-SCREEN APPLE MUSIC LIVE LYRICS & TRANSLATION */}
           {activeNav === 'lyrics' && (
-            <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden relative">
-              <div className="relative z-10 w-full lg:w-[360px] p-6 sm:p-8 flex flex-col justify-center items-center apple-liquid-glass border-b lg:border-b-0 lg:border-r border-white/[0.12] shrink-0">
-                <div className="w-full max-w-[260px] space-y-5">
-                  <div className="aspect-square w-full rounded-2xl overflow-hidden bg-zinc-900 border border-white/25 shadow-2xl">
+            <div className="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden relative bg-zinc-950">
+              {/* Shared Apple Music Blurred Artwork Backdrop across both columns */}
+              <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
+                {currentTrack.artworkUrl && (
+                  <img
+                    src={currentTrack.artworkUrl}
+                    alt=""
+                    className="absolute -inset-20 w-[140%] h-[140%] max-w-none object-cover blur-[88px] saturate-200 opacity-50"
+                  />
+                )}
+                <div className="absolute inset-0 bg-black/40" />
+              </div>
+
+              <div className="relative z-10 w-full lg:w-[380px] xl:w-[420px] p-6 sm:p-10 flex flex-col justify-center items-center border-b lg:border-b-0 lg:border-r border-white/[0.08] shrink-0">
+                <div className="w-full max-w-[290px] space-y-6">
+                  <div
+                    className={`aspect-square w-full rounded-3xl overflow-hidden bg-zinc-900 border border-white/20 shadow-[0_24px_60px_rgba(0,0,0,0.65)] transition-transform duration-700 ${
+                      isPlaying ? 'scale-100' : 'scale-95 opacity-85'
+                    }`}
+                  >
                     {currentTrack.artworkUrl ? (
                       <img
                         src={currentTrack.artworkUrl}
@@ -4700,15 +4895,18 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                       />
                     )}
                   </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-white truncate">{currentTrack.title}</h2>
+                  <div className="space-y-1">
+                    <h2 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight truncate">
+                      {currentTrack.title}
+                    </h2>
                     <button
                       type="button"
                       onClick={() => openArtistPage(currentTrack.artist)}
-                      className="text-sm text-white/70 hover:text-white hover:underline truncate mt-0.5 block"
+                      className="text-sm sm:text-base font-semibold text-white/75 hover:text-white hover:underline truncate block"
                     >
                       {cleanPrimaryArtistName(currentTrack.artist)}
                     </button>
+                    <p className="text-xs text-white/50 truncate">{currentTrack.album}</p>
                   </div>
                 </div>
               </div>

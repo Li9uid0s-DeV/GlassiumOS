@@ -33,12 +33,14 @@ export function ClockApp({ initialTab }: { initialTab?: string }) {
   const { playSound, addNotification, triggerDynamicIsland } = useOS();
   const [activeTab, setActiveTab] = useState<Tab>(() => {
     if (initialTab === 'pomodoro') return 'pomodoro';
+    if (initialTab === 'timer') return 'timer';
     return 'clock';
   });
   const [now, setNow] = useState(new Date());
 
   useEffect(() => {
     if (initialTab === 'pomodoro') setActiveTab('pomodoro');
+    else if (initialTab === 'timer') setActiveTab('timer');
     else if (initialTab === 'worldclock') setActiveTab('clock');
   }, [initialTab]);
 
@@ -213,22 +215,29 @@ export function ClockApp({ initialTab }: { initialTab?: string }) {
   const [customMinutes, setCustomMinutes] = useState(45);
   const [customSeconds, setCustomSeconds] = useState(0);
   const timerIntervalRef = useRef<number | null>(null);
+  const lastTickTimeRef = useRef<number>(performance.now());
 
   useEffect(() => {
     try {
       localStorage.setItem('glassium_clock_timer_duration', String(timerDuration));
-      localStorage.setItem('glassium_clock_timer_remaining', String(timerRemaining));
+      localStorage.setItem('glassium_clock_timer_remaining', String(Math.ceil(timerRemaining)));
     } catch {
       // ignore
     }
   }, [timerDuration, timerRemaining]);
 
+  // Smooth sub-second countdown loop (80ms ticks) so the outer circular progress bar glides smoothly
   useEffect(() => {
     if (timerRunning) {
+      lastTickTimeRef.current = performance.now();
       timerIntervalRef.current = window.setInterval(() => {
+        const nowPerf = performance.now();
+        const dtSec = Math.max(0.01, Math.min(0.5, (nowPerf - lastTickTimeRef.current) / 1000));
+        lastTickTimeRef.current = nowPerf;
+
         setTimerRemaining((prev) => {
-          if (prev <= 1) {
-            clearInterval(timerIntervalRef.current!);
+          if (prev <= dtSec) {
+            if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
             setTimerRunning(false);
             playAlarmSound('chime');
             addNotification({
@@ -239,9 +248,9 @@ export function ClockApp({ initialTab }: { initialTab?: string }) {
             triggerDynamicIsland('Timer Completed', '00:00:00', 'Timer');
             return 0;
           }
-          return prev - 1;
+          return prev - dtSec;
         });
-      }, 1000);
+      }, 80);
     } else {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     }
@@ -277,26 +286,73 @@ export function ClockApp({ initialTab }: { initialTab?: string }) {
     setTimerRemaining((prev) => {
       const next = Math.max(0, prev + deltaSecs);
       if (next > timerDuration) {
-        setTimerDuration(next);
+        setTimerDuration(Math.ceil(next));
       }
       return next;
     });
   };
 
   const formatTimer = (secs: number) => {
-    const h = Math.floor(secs / 3600);
-    const m = Math.floor((secs % 3600) / 60);
-    const s = secs % 60;
+    const whole = Math.max(0, Math.ceil(secs));
+    const h = Math.floor(whole / 3600);
+    const m = Math.floor((whole % 3600) / 60);
+    const s = whole % 60;
     if (h > 0) {
       return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     }
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const progressPercent = useMemo(() => {
-    if (timerDuration === 0) return 0;
-    return Math.min(100, Math.max(0, ((timerDuration - timerRemaining) / timerDuration) * 100));
+  // Remaining ratio (100% -> 0% as countdown progresses) and Elapsed ratio (0% -> 100%)
+  const remainingPercent = useMemo(() => {
+    if (timerDuration <= 0) return 0;
+    return Math.min(100, Math.max(0, (timerRemaining / timerDuration) * 100));
   }, [timerDuration, timerRemaining]);
+
+  const progressPercent = useMemo(() => {
+    return 100 - remainingPercent;
+  }, [remainingPercent]);
+
+  // Low-time warning state: <= 60 seconds left OR <= 20% of duration left
+  const isLowTime = useMemo(() => {
+    if (timerRemaining <= 0) return false;
+    return timerRemaining <= 60 || timerRemaining / Math.max(1, timerDuration) <= 0.2;
+  }, [timerRemaining, timerDuration]);
+
+  // Listen for OS-level Top Timer Pill / Dock commands
+  useEffect(() => {
+    const onTimerCommand = (e: Event) => {
+      const detail = (e as CustomEvent<{ action?: string; seconds?: number }>).detail;
+      if (!detail?.action) return;
+      if (detail.action === 'toggle') {
+        setTimerRunning((r) => !r);
+      } else if (detail.action === 'reset') {
+        setTimerRunning(false);
+        setTimerRemaining(timerDuration);
+      } else if (detail.action === 'add-seconds' && typeof detail.seconds === 'number') {
+        adjustTimerSeconds(detail.seconds);
+      }
+    };
+    window.addEventListener('glassium-timer-command', onTimerCommand);
+    return () => window.removeEventListener('glassium-timer-command', onTimerCommand);
+  }, [timerDuration]);
+
+  // Broadcast live timer state to the OS Top Timer Pill / Dock
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent('glassium-timer-state', {
+        detail: {
+          running: timerRunning,
+          remaining: timerRemaining,
+          duration: timerDuration,
+          formatted: formatTimer(timerRemaining),
+          remainingPercent,
+          progressPercent,
+          isLowTime,
+        },
+      })
+    );
+  }, [timerRunning, timerRemaining, timerDuration, remainingPercent, progressPercent, isLowTime]);
 
   const TABS: { id: Tab; label: string; icon: string }[] = [
     { id: 'clock', label: '世界時計', icon: 'Globe' },
@@ -346,6 +402,116 @@ export function ClockApp({ initialTab }: { initialTab?: string }) {
               <span>{t.label}</span>
             </button>
           ))}
+        </div>
+      </div>
+
+      {/* Top Floating Timer Pill / Dock inside ClockApp */}
+      <div className="px-5 pt-3 pb-1 flex justify-center shrink-0 z-10">
+        <div
+          onClick={() => setActiveTab('timer')}
+          className={`group cursor-pointer px-4 py-2 rounded-full backdrop-blur-2xl border transition-all duration-300 flex items-center gap-3.5 shadow-xl ${
+            timerRunning && isLowTime
+              ? 'bg-rose-950/75 border-rose-400/60 clock-timer-low-card'
+              : timerRunning
+              ? 'bg-slate-900/85 border-cyan-400/50 shadow-[0_0_24px_rgba(34,211,238,0.2)]'
+              : 'bg-slate-900/70 border-white/15 hover:border-white/30'
+          }`}
+        >
+          {/* Mini Circular Progress Ring inside the Top Pill */}
+          <div className="relative w-7 h-7 flex items-center justify-center shrink-0">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+              <circle
+                cx="18"
+                cy="18"
+                r="14"
+                stroke="rgba(255,255,255,0.14)"
+                strokeWidth="3.2"
+                fill="transparent"
+              />
+              <circle
+                cx="18"
+                cy="18"
+                r="14"
+                stroke={isLowTime ? '#fb7185' : '#22d3ee'}
+                strokeWidth="3.2"
+                fill="transparent"
+                strokeDasharray="87.96"
+                strokeDashoffset={87.96 - (87.96 * remainingPercent) / 100}
+                strokeLinecap="round"
+                className={`clock-timer-progress-circle ${
+                  timerRunning ? (isLowTime ? 'is-low-time' : 'is-running') : ''
+                }`}
+              />
+            </svg>
+            <span
+              className={`w-2 h-2 rounded-full ${
+                timerRunning
+                  ? isLowTime
+                    ? 'bg-rose-400 animate-ping'
+                    : 'bg-cyan-300 animate-pulse'
+                  : 'bg-white/40'
+              }`}
+            />
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <span
+              className={`text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                isLowTime && timerRunning
+                  ? 'bg-rose-500/30 text-rose-200 border border-rose-400/40'
+                  : timerRunning
+                  ? 'bg-cyan-500/20 text-cyan-300'
+                  : 'bg-white/10 text-white/60'
+              }`}
+            >
+              {timerRunning ? (isLowTime ? '残りわずか' : 'タイマー稼働中') : 'タイマー待機'}
+            </span>
+            <span
+              className={`text-base sm:text-lg font-black font-mono tabular-nums tracking-tight ${
+                isLowTime && timerRunning ? 'text-rose-300' : 'text-white'
+              }`}
+            >
+              {formatTimer(timerRemaining)}
+            </span>
+          </div>
+
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-1.5 border-l border-white/15 pl-3"
+          >
+            <button
+              type="button"
+              onClick={() => {
+                playSound('click');
+                setTimerRunning(!timerRunning);
+              }}
+              className={`px-3 py-1 rounded-full text-[11px] font-black transition cursor-pointer ${
+                timerRunning
+                  ? 'bg-amber-400 text-slate-950 hover:bg-amber-300'
+                  : isLowTime
+                  ? 'bg-rose-500 text-white hover:bg-rose-400'
+                  : 'bg-cyan-400 text-slate-950 hover:bg-cyan-300'
+              }`}
+            >
+              {timerRunning ? '一時停止' : '開始'}
+            </button>
+            <button
+              type="button"
+              onClick={() => adjustTimerSeconds(60)}
+              className="px-2 py-1 rounded-full bg-white/10 hover:bg-white/20 text-[10px] font-mono font-bold text-white/90 transition cursor-pointer"
+              title="1分追加"
+            >
+              +1分
+            </button>
+            <button
+              type="button"
+              onClick={() => setTimerPreset(timerDuration)}
+              className="p-1 rounded-full bg-white/10 hover:bg-white/20 text-white/75 hover:text-white transition cursor-pointer"
+              title="リセット"
+            >
+              <Icon name="RotateCcw" size={12} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -684,42 +850,92 @@ export function ClockApp({ initialTab }: { initialTab?: string }) {
           {activeTab === 'timer' && (
             <div className="max-w-3xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-center py-2">
               {/* Left: Circular Progress Ring + Quick Add Buttons */}
-              <div className="lg:col-span-6 p-6 rounded-3xl bg-white/[0.04] border border-white/15 shadow-2xl flex flex-col items-center justify-center space-y-5">
-                <div className="relative w-60 h-60 flex items-center justify-center">
-                  <svg className="w-full h-full -rotate-90" viewBox="0 0 240 240">
-                    <circle
-                      cx="120"
-                      cy="120"
-                      r="104"
-                      stroke="rgba(255,255,255,0.08)"
-                      strokeWidth="8"
-                      fill="transparent"
-                    />
-                    <circle
-                      cx="120"
-                      cy="120"
-                      r="104"
-                      stroke="url(#timerGrad)"
-                      strokeWidth="8"
-                      fill="transparent"
-                      strokeDasharray="653.45"
-                      strokeDashoffset={653.45 - (653.45 * progressPercent) / 100}
-                      strokeLinecap="round"
-                      className="transition-all duration-300"
-                    />
+              <div
+                className={`lg:col-span-6 p-6 rounded-3xl bg-white/[0.04] border transition-all duration-500 shadow-2xl flex flex-col items-center justify-center space-y-5 ${
+                  isLowTime && timerRunning
+                    ? 'clock-timer-low-card bg-rose-950/20'
+                    : 'border-white/15'
+                }`}
+              >
+                <div className="relative w-64 h-64 flex items-center justify-center">
+                  {/* Soft ambient radial backlight when running or low time */}
+                  <div
+                    className={`pointer-events-none absolute inset-4 rounded-full blur-2xl transition-all duration-700 ${
+                      timerRunning
+                        ? isLowTime
+                          ? 'bg-rose-500/25 scale-105'
+                          : 'bg-cyan-400/15 scale-100'
+                        : 'bg-transparent scale-90'
+                    }`}
+                  />
+
+                  <svg className="w-full h-full -rotate-90 overflow-visible" viewBox="0 0 240 240">
                     <defs>
                       <linearGradient id="timerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
                         <stop offset="0%" stopColor="#22d3ee" />
                         <stop offset="100%" stopColor="#818cf8" />
                       </linearGradient>
+                      <linearGradient id="timerLowRedGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#fb7185" />
+                        <stop offset="50%" stopColor="#f43f5e" />
+                        <stop offset="100%" stopColor="#dc2626" />
+                      </linearGradient>
                     </defs>
+
+                    {/* Subtle Outer Track Ring */}
+                    <circle
+                      cx="120"
+                      cy="120"
+                      r="104"
+                      stroke={isLowTime ? 'rgba(244, 63, 94, 0.16)' : 'rgba(255, 255, 255, 0.08)'}
+                      strokeWidth="9"
+                      fill="transparent"
+                    />
+
+                    {/* Smoothly Animating Outer Circular Progress Bar */}
+                    <circle
+                      cx="120"
+                      cy="120"
+                      r="104"
+                      stroke={isLowTime ? 'url(#timerLowRedGrad)' : 'url(#timerGrad)'}
+                      strokeWidth="9"
+                      fill="transparent"
+                      strokeDasharray="653.45"
+                      strokeDashoffset={653.45 - (653.45 * remainingPercent) / 100}
+                      strokeLinecap="round"
+                      className={`clock-timer-progress-circle ${
+                        timerRunning
+                          ? isLowTime
+                            ? 'is-low-time'
+                            : 'is-running'
+                          : isLowTime
+                          ? 'is-low-time'
+                          : ''
+                      }`}
+                    />
                   </svg>
 
                   <div className="absolute flex flex-col items-center text-center">
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-300">
-                      {timerRunning ? 'COUNTDOWN ACTIVE' : 'EXTENDED TIMER'}
+                    <span
+                      className={`text-[10px] font-mono font-bold uppercase tracking-widest transition-colors ${
+                        isLowTime
+                          ? 'text-rose-400 animate-pulse'
+                          : 'text-cyan-300'
+                      }`}
+                    >
+                      {timerRunning
+                        ? isLowTime
+                          ? 'LOW TIME WARNING'
+                          : 'COUNTDOWN ACTIVE'
+                        : 'EXTENDED TIMER'}
                     </span>
-                    <div className="text-4xl sm:text-5xl font-black font-mono tracking-tight text-white tabular-nums mt-1">
+                    <div
+                      className={`text-4xl sm:text-5xl font-black font-mono tracking-tight tabular-nums mt-1 transition-colors duration-300 ${
+                        isLowTime
+                          ? 'text-rose-200 drop-shadow-[0_0_16px_rgba(244,63,94,0.65)]'
+                          : 'text-white'
+                      }`}
+                    >
                       {formatTimer(timerRemaining)}
                     </div>
                     <span className="text-[11px] text-white/50 font-mono mt-1">

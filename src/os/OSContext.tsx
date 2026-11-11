@@ -834,7 +834,13 @@ export function OSProvider({ children }: { children: ReactNode }) {
   const toggleLaunchpad = useCallback(() => setLaunchpadOpen((v) => !v), []);
 
   const setTheme = useCallback((t: Theme) => {
-    setThemeModeState(t);
+    setThemeModeState((prev) => {
+      if (prev === 'dynamic') return 'dynamic';
+      if (prev === 'dynamic-dark' || prev === 'dynamic-light') {
+        return t === 'dark' ? 'dynamic-dark' : 'dynamic-light';
+      }
+      return t;
+    });
     setThemeState(t);
     setQuickSettings((q) => ({ ...q, darkMode: t === 'dark' }));
   }, []);
@@ -844,14 +850,36 @@ export function OSProvider({ children }: { children: ReactNode }) {
     if (m === 'dark' || m === 'light') {
       setThemeState(m);
       setQuickSettings((q) => ({ ...q, darkMode: m === 'dark' }));
+    } else if (m === 'dynamic-dark') {
+      setThemeState('dark');
+      setQuickSettings((q) => ({ ...q, darkMode: true }));
+    } else if (m === 'dynamic-light') {
+      setThemeState('light');
+      setQuickSettings((q) => ({ ...q, darkMode: false }));
     }
   }, []);
 
-  // Sync theme when themeMode is 'system' (OSに合わせる) or 'sunset-sunrise' (日没・日の出に合わせる)
+  // Sync theme when themeMode is 'system' (OSに合わせる) or 'sunset-sunrise' (日没・日の出に合わせる) or 'dynamic-*'
   useEffect(() => {
     if (themeMode === 'dark' || themeMode === 'light') {
       setThemeState(themeMode);
       setQuickSettings((q) => ({ ...q, darkMode: themeMode === 'dark' }));
+      return;
+    }
+
+    if (themeMode === 'dynamic-dark') {
+      setThemeState('dark');
+      setQuickSettings((q) => ({ ...q, darkMode: true }));
+      return;
+    }
+
+    if (themeMode === 'dynamic-light') {
+      setThemeState('light');
+      setQuickSettings((q) => ({ ...q, darkMode: false }));
+      return;
+    }
+
+    if (themeMode === 'dynamic') {
       return;
     }
 
@@ -980,15 +1008,9 @@ export function OSProvider({ children }: { children: ReactNode }) {
     ? customWallpaperBright
     : Boolean(WALLPAPERS[wallpaper]?.isBright);
 
-  // Compute resolved accent color (supports 'dynamic' which adapts to background/uploaded image + Dark/Light mode)
-  const { resolvedAccentHex, resolvedAccentRgb } = useMemo(() => {
+  // Extract base RGB from active wallpaper (custom image, dynamic world, aurora, nebula, or static preset)
+  const wallpaperBaseRgb = useMemo<[number, number, number]>(() => {
     void dynamicWorldTick;
-    if (accentColor !== 'dynamic') {
-      const preset = ACCENT_COLOR_PRESETS.find((p) => p.id === accentColor) ?? ACCENT_COLOR_PRESETS[1];
-      return { resolvedAccentHex: preset.hex, resolvedAccentRgb: preset.rgb };
-    }
-
-    // 1. Determine base RGB from uploaded custom image OR active wallpaper
     let baseRgb: [number, number, number] = [56, 189, 248];
     if (selectedCustomId && customWallpaperRgb) {
       baseRgb = customWallpaperRgb;
@@ -1023,8 +1045,10 @@ export function OSProvider({ children }: { children: ReactNode }) {
       else if (eventMode === 'tanabata') baseRgb = [56, 189, 248];
       else if (weatherMode === 'Aurora') baseRgb = [16, 185, 129];
       else if (weatherMode === 'Thunderstorm') baseRgb = [168, 85, 247];
-      else if (weatherMode === 'Rainy') baseRgb = [14, 165, 233];
-      else if (weatherMode === 'Snow') baseRgb = [96, 165, 250];
+      else if (weatherMode === 'Rainy' || weatherMode === 'HeavyRain') baseRgb = [14, 165, 233];
+      else if (weatherMode === 'Snow' || weatherMode === 'Blizzard') baseRgb = [96, 165, 250];
+      else if (weatherMode === 'SakuraBlizzard') baseRgb = [244, 114, 182];
+      else if (weatherMode === 'AutumnGale') baseRgb = [245, 158, 11];
       else if (timeMode === 'dusk' || (timeMode === 'auto' && hour >= 16.5 && hour < 19)) baseRgb = [249, 115, 22]; // Sunset warm amber-coral
       else if (timeMode === 'dawn' || (timeMode === 'auto' && hour >= 5 && hour < 7.5)) baseRgb = [236, 72, 153]; // Dawn rose-gold
       else if (timeMode === 'night') baseRgb = [139, 92, 246]; // Night violet-indigo
@@ -1057,9 +1081,18 @@ export function OSProvider({ children }: { children: ReactNode }) {
     } else if (wallpaper === 'ocean' || wallpaper === 'bloom') {
       baseRgb = [59, 130, 246];
     }
+    return baseRgb;
+  }, [selectedCustomId, customWallpaperRgb, wallpaper, auroraColor, nebulaPreset, dynamicWorldTick]);
 
-    // 2. Adapt luminance & saturation based on whether Dark or Light mode is active
-    let [r, g, b] = baseRgb;
+  // Compute resolved accent color (supports 'dynamic' which adapts to background/uploaded image + Dark/Light mode)
+  const { resolvedAccentHex, resolvedAccentRgb } = useMemo(() => {
+    if (accentColor !== 'dynamic') {
+      const preset = ACCENT_COLOR_PRESETS.find((p) => p.id === accentColor) ?? ACCENT_COLOR_PRESETS[1];
+      return { resolvedAccentHex: preset.hex, resolvedAccentRgb: preset.rgb };
+    }
+
+    // Adapt luminance & saturation based on whether Dark or Light mode is active
+    let [r, g, b] = wallpaperBaseRgb;
     const avg = (r + g + b) / 3;
     r = Math.round(avg + (r - avg) * 1.35);
     g = Math.round(avg + (g - avg) * 1.35);
@@ -1080,27 +1113,77 @@ export function OSProvider({ children }: { children: ReactNode }) {
       resolvedAccentHex: `#${toHex(r)}${toHex(g)}${toHex(b)}`,
       resolvedAccentRgb: `${r}, ${g}, ${b}`,
     };
-  }, [accentColor, selectedCustomId, customWallpaperRgb, wallpaper, auroraColor, nebulaPreset, theme, dynamicWorldTick]);
+  }, [accentColor, wallpaperBaseRgb, theme]);
 
-  // Sync CSS variables & data attributes with custom slider, theme, wallpaper tone, and accent color values
+  // Sync CSS variables & data attributes with custom slider, theme, wallpaper tone, dynamic surface blend, and accent color values
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    document.documentElement.setAttribute('data-theme-mode', themeMode);
-    document.documentElement.setAttribute('data-accent', accentColor);
-    document.documentElement.setAttribute('data-ui-style', uiStyle);
-    document.documentElement.setAttribute('data-shell-mode', shellMode);
-    document.documentElement.setAttribute('data-design-engine', designEngine);
-    document.documentElement.setAttribute('data-wallpaper-tone', isWallpaperBright ? 'bright' : 'dark');
-    document.documentElement.lang = language;
-    document.documentElement.style.setProperty('--os-accent', resolvedAccentHex);
-    document.documentElement.style.setProperty('--os-accent-rgb', resolvedAccentRgb);
-    document.documentElement.style.setProperty('--theme-blur', `${blurAmount}px`);
-    document.documentElement.style.setProperty('--theme-opacity', `${(100 - transparency) / 100}`);
-    document.documentElement.style.setProperty('--theme-radius', `${cornerRadius}px`);
-    document.documentElement.style.setProperty('--glass-curvature', `${glassCurvature}px`);
-    document.documentElement.style.setProperty('--glass-specular', `${glassSpecular / 100}`);
-    document.documentElement.style.setProperty('--glass-wobble', `${glassWobble / 100}`);
-  }, [theme, themeMode, accentColor, resolvedAccentHex, resolvedAccentRgb, language, uiStyle, shellMode, designEngine, isWallpaperBright, blurAmount, transparency, cornerRadius, glassCurvature, glassSpecular, glassWobble]);
+    const root = document.documentElement;
+    root.setAttribute('data-theme', theme);
+    root.setAttribute('data-theme-mode', themeMode);
+    root.setAttribute('data-accent', accentColor);
+    root.setAttribute('data-ui-style', uiStyle);
+    root.setAttribute('data-shell-mode', shellMode);
+    root.setAttribute('data-design-engine', designEngine);
+    root.setAttribute('data-wallpaper-tone', isWallpaperBright ? 'bright' : 'dark');
+    root.lang = language;
+    root.style.setProperty('--os-accent', resolvedAccentHex);
+    root.style.setProperty('--os-accent-rgb', resolvedAccentRgb);
+    root.style.setProperty('--os-wallpaper-rgb', `${wallpaperBaseRgb[0]}, ${wallpaperBaseRgb[1]}, ${wallpaperBaseRgb[2]}`);
+    root.style.setProperty('--theme-blur', `${blurAmount}px`);
+    root.style.setProperty('--theme-opacity', `${(100 - transparency) / 100}`);
+    root.style.setProperty('--theme-radius', `${cornerRadius}px`);
+    root.style.setProperty('--glass-curvature', `${glassCurvature}px`);
+    root.style.setProperty('--glass-specular', `${glassSpecular / 100}`);
+    root.style.setProperty('--glass-wobble', `${glassWobble / 100}`);
+
+    const isDynamicSurface =
+      themeMode === 'dynamic' || themeMode === 'dynamic-dark' || themeMode === 'dynamic-light';
+    if (isDynamicSurface) {
+      const [wr, wg, wb] = wallpaperBaseRgb;
+      if (theme === 'dark') {
+        // Dark mode + Wallpaper color blend (黒 + 背景色ブレンド)
+        const sr = Math.round(4 * 0.74 + wr * 0.26);
+        const sg = Math.round(6 * 0.74 + wg * 0.26);
+        const sb = Math.round(12 * 0.74 + wb * 0.26);
+        const er = Math.min(255, Math.round(14 * 0.66 + wr * 0.34));
+        const eg = Math.min(255, Math.round(18 * 0.66 + wg * 0.34));
+        const eb = Math.min(255, Math.round(28 * 0.66 + wb * 0.34));
+        const tr = Math.round(2 * 0.78 + wr * 0.22);
+        const tg = Math.round(4 * 0.78 + wg * 0.22);
+        const tb = Math.round(8 * 0.78 + wb * 0.22);
+        root.style.setProperty('--os-dynamic-surface', `rgba(${sr}, ${sg}, ${sb}, 0.86)`);
+        root.style.setProperty('--os-dynamic-surface-solid', `rgb(${sr}, ${sg}, ${sb})`);
+        root.style.setProperty('--os-dynamic-surface-elevated', `rgba(${er}, ${eg}, ${eb}, 0.78)`);
+        root.style.setProperty('--os-dynamic-surface-panel', `rgba(${wr}, ${wg}, ${wb}, 0.10)`);
+        root.style.setProperty('--os-dynamic-surface-hover', `rgba(${wr}, ${wg}, ${wb}, 0.16)`);
+        root.style.setProperty('--os-dynamic-titlebar', `rgba(${tr}, ${tg}, ${tb}, 0.76)`);
+      } else {
+        // Light mode + Subtle Wallpaper color blend (白 + 少し背景色ブレンド)
+        const sr = Math.round(255 * 0.86 + wr * 0.14);
+        const sg = Math.round(255 * 0.86 + wg * 0.14);
+        const sb = Math.round(255 * 0.86 + wb * 0.14);
+        const er = Math.round(255 * 0.91 + wr * 0.09);
+        const eg = Math.round(255 * 0.91 + wg * 0.09);
+        const eb = Math.round(255 * 0.91 + wb * 0.09);
+        const tr = Math.round(248 * 0.83 + wr * 0.17);
+        const tg = Math.round(250 * 0.83 + wg * 0.17);
+        const tb = Math.round(252 * 0.83 + wb * 0.17);
+        root.style.setProperty('--os-dynamic-surface', `rgba(${sr}, ${sg}, ${sb}, 0.91)`);
+        root.style.setProperty('--os-dynamic-surface-solid', `rgb(${sr}, ${sg}, ${sb})`);
+        root.style.setProperty('--os-dynamic-surface-elevated', `rgba(${er}, ${eg}, ${eb}, 0.88)`);
+        root.style.setProperty('--os-dynamic-surface-panel', `rgba(${wr}, ${wg}, ${wb}, 0.08)`);
+        root.style.setProperty('--os-dynamic-surface-hover', `rgba(${wr}, ${wg}, ${wb}, 0.14)`);
+        root.style.setProperty('--os-dynamic-titlebar', `rgba(${tr}, ${tg}, ${tb}, 0.89)`);
+      }
+    } else {
+      root.style.removeProperty('--os-dynamic-surface');
+      root.style.removeProperty('--os-dynamic-surface-solid');
+      root.style.removeProperty('--os-dynamic-surface-elevated');
+      root.style.removeProperty('--os-dynamic-surface-panel');
+      root.style.removeProperty('--os-dynamic-surface-hover');
+      root.style.removeProperty('--os-dynamic-titlebar');
+    }
+  }, [theme, themeMode, accentColor, resolvedAccentHex, resolvedAccentRgb, wallpaperBaseRgb, language, uiStyle, shellMode, designEngine, isWallpaperBright, blurAmount, transparency, cornerRadius, glassCurvature, glassSpecular, glassWobble]);
 
   // Persist Settings
   useEffect(() => {

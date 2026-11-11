@@ -149,7 +149,14 @@ export const DESKTOP_ICON_SIZE_PRESETS: Record<
   },
 };
 
-export type ThemeMode = 'dark' | 'light' | 'system' | 'sunset-sunrise';
+export type ThemeMode =
+  | 'dark'
+  | 'light'
+  | 'dynamic'
+  | 'dynamic-dark'
+  | 'dynamic-light'
+  | 'system'
+  | 'sunset-sunrise';
 
 export type AccentColor = 'dynamic' | 'cyan' | 'blue' | 'violet' | 'emerald' | 'rose' | 'amber';
 

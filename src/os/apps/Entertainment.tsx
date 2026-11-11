@@ -46,17 +46,17 @@ const PROVIDER_METADATA: Record<
   StreamingProvider,
   { name: string; badge: string; color: string; desc: string }
 > = {
-  vidlink: {
-    name: 'VidCore 1080p (Sandbox解除済)',
-    badge: '最推奨 (Primary)',
-    color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    desc: 'Sandboxチェック不要・高速1080pダイレクトシネマサーバー',
-  },
   'mapple-fun': {
-    name: 'VidLink Pro HD',
-    badge: '高速サーバー 1',
-    color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30',
-    desc: '映画・アニメ・海外ドラマ マルチオーディオ対応ストリーム',
+    name: 'mapple.fun (Proxy Main)',
+    badge: '最推奨 (mapple.fun Proxy)',
+    color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+    desc: 'mapple.fun ソースをサーバープロキシ経由でストリーム再生',
+  },
+  vidlink: {
+    name: 'VidCore 1080p (Proxy)',
+    badge: '高速ミラー 1 (Proxy)',
+    color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+    desc: 'プロキシ経由・高速1080pダイレクトシネマサーバー',
   },
   streamex: {
     name: 'AutoEmbed.me (Proxy)',
@@ -66,21 +66,21 @@ const PROVIDER_METADATA: Record<
   },
   flixhd: {
     name: '2Embed Cinema (Proxy)',
-    badge: 'ミラー 3 (IMDb/TMDB)',
+    badge: 'ミラー 3 (Proxy)',
     color: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-    desc: 'document.domainブロック解除済 2Embed / VidCore連動サーバー',
+    desc: 'document.domainブロック解除済 2Embed プロキシサーバー',
   },
   mapletv: {
-    name: 'VidFast / NontonGo',
-    badge: 'ミラー 4 (Edge)',
+    name: 'VidFast / NontonGo (Proxy)',
+    badge: 'ミラー 4 (Proxy)',
     color: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
-    desc: '分散エッジ中継シネマ＆アニメサーバー',
+    desc: '分散エッジ中継プロキシシネマ＆アニメサーバー',
   },
   youtube: {
-    name: 'YouTube / 公式PV・Direct HD',
-    badge: '公式トレイラー・Direct MP4',
+    name: 'YouTube / Direct HD (Proxy)',
+    badge: '公式PV・Direct Proxy',
     color: 'bg-rose-500/20 text-rose-400 border-rose-500/30',
-    desc: 'TMDB公式YouTube本予告＆Apple iTunes Direct HDストリーム',
+    desc: 'TMDB公式YouTube本予告＆Apple iTunes Direct Proxyストリーム',
   },
 };
 
@@ -600,7 +600,7 @@ function optimizePosterUrl(url?: string): string {
   return url.replace('/t/p/w500/', '/t/p/w342/').replace('/t/p/w1280/', '/t/p/w780/');
 }
 
-const ENT_STATE_KEY = 'glassium_entertainment_saved_state_v2';
+const ENT_STATE_KEY = 'glassium_entertainment_saved_state_v3';
 
 export function EntertainmentApp({ initialTab, payload }: { initialTab?: string; payload?: { videoId?: string; mode?: string } }) {
   const savedState = useMemo(() => {
@@ -620,7 +620,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
   });
 
   const [provider, setProvider] = useState<StreamingProvider>(
-    (savedState?.provider as StreamingProvider) || 'vidlink'
+    (savedState?.provider as StreamingProvider) || 'mapple-fun'
   );
   const [searchQuery, setSearchQuery] = useState<string>(savedState?.searchQuery || '');
   const [selectedGenre, setSelectedGenre] = useState<string>(savedState?.selectedGenre || 'All');
@@ -861,14 +861,19 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
   const currentEmbedUrl = useMemo(() => {
     if (!selectedMedia) return '';
 
-    // If item has a direct .m4v / .mp4 video file URL and user hasn't picked a specific external provider
+    // If item has a direct .m4v / .mp4 video file URL and user hasn't picked a specific external provider, route via server video proxy
     if (
       selectedMedia.embedUrl &&
       (selectedMedia.embedUrl.includes('.m4v') || selectedMedia.embedUrl.includes('.mp4')) &&
       !selectedMedia.tmdbId &&
       !selectedMedia.imdbId
     ) {
-      return selectedMedia.embedUrl;
+      if (selectedMedia.embedUrl.includes('/api/entertainment/video-proxy')) {
+        return resolveBackendUrl(selectedMedia.embedUrl);
+      }
+      return resolveBackendUrl(
+        `/api/entertainment/video-proxy?url=${encodeURIComponent(selectedMedia.embedUrl)}`
+      );
     }
 
     const tmdbId = selectedMedia.tmdbId ? String(selectedMedia.tmdbId) : '';
@@ -1015,12 +1020,12 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
             onChange={(e) => setProvider(e.target.value as StreamingProvider)}
             className="bg-black/60 border border-white/15 text-white text-xs font-semibold rounded-lg px-2.5 py-1.5 outline-none hover:border-white/30 transition cursor-pointer"
           >
-            <option value="vidlink">VidLink Pro (1080p 最推奨)</option>
-            <option value="mapple-fun">VidSrc CC / Mapple (高速1)</option>
-            <option value="streamex">AutoEmbed HD (ミラー2)</option>
-            <option value="flixhd">2Embed Cinema (ミラー3)</option>
-            <option value="mapletv">Embed.su Pro (ミラー4)</option>
-            <option value="youtube">YouTube / 公式PV</option>
+            <option value="mapple-fun">mapple.fun (Proxy メインソース)</option>
+            <option value="vidlink">VidCore 1080p (Proxy ミラー1)</option>
+            <option value="streamex">AutoEmbed HD (Proxy ミラー2)</option>
+            <option value="flixhd">2Embed Cinema (Proxy ミラー3)</option>
+            <option value="mapletv">VidFast / NontonGo (Proxy ミラー4)</option>
+            <option value="youtube">YouTube / Direct HD (Proxy)</option>
           </select>
         </div>
       </header>
@@ -1068,12 +1073,12 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
                       <div className="flex items-center gap-1 bg-black/80 backdrop-blur-md p-1 rounded-full border border-white/20 pointer-events-auto overflow-x-auto max-w-full">
                         {(
                           [
-                            ['vidlink', 'VidCore 1080p'],
-                            ['mapple-fun', 'VidLink Pro'],
-                            ['flixhd', '2Embed (Sandbox解除)'],
-                            ['streamex', 'AutoEmbed.me'],
-                            ['mapletv', 'VidFast / NontonGo'],
-                            ['youtube', '公式PV / Direct HD'],
+                            ['mapple-fun', 'mapple.fun (Proxy)'],
+                            ['vidlink', 'VidCore 1080p (Proxy)'],
+                            ['flixhd', '2Embed (Proxy)'],
+                            ['streamex', 'AutoEmbed (Proxy)'],
+                            ['mapletv', 'VidFast (Proxy)'],
+                            ['youtube', 'Direct HD (Proxy)'],
                           ] as Array<[StreamingProvider, string]>
                         ).map(([provKey, label]) => (
                           <button

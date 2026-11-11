@@ -199,26 +199,31 @@ export const VintageAndroidWeatherSky: React.FC<VintageAndroidWeatherSkyProps> =
     camera.position.set(0, 2.2, 13.5);
     camera.lookAt(0, 1.0, -6);
 
-    const renderer = new THREE.WebGLRenderer({
-      antialias: !isSoftwareGl,
-      powerPreference: 'high-performance',
-    });
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.12;
-    renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 2));
-    renderer.setSize(width, height);
-    renderer.shadowMap.enabled = !isSoftwareGl;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({
+        antialias: !isSoftwareGl,
+        powerPreference: 'high-performance',
+      });
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.12;
+      renderer.setPixelRatio(isSoftwareGl ? 1 : Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(width, height);
+      renderer.shadowMap.enabled = !isSoftwareGl;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-    container.innerHTML = '';
-    container.appendChild(renderer.domElement);
+      container.innerHTML = '';
+      container.appendChild(renderer.domElement);
 
-    // Studio Environment Map (RoomEnvironment + PMREMGenerator)
-    const pmremGenerator = new THREE.PMREMGenerator(renderer);
-    const envTarget = pmremGenerator.fromScene(new RoomEnvironment(), 0.04);
-    scene.environment = envTarget.texture;
-    pmremGenerator.dispose();
+      // Studio Environment Map (RoomEnvironment + PMREMGenerator)
+      const pmremGenerator = new THREE.PMREMGenerator(renderer);
+      const envTarget = pmremGenerator.fromScene(new RoomEnvironment(), 0.04);
+      scene.environment = envTarget.texture;
+      pmremGenerator.dispose();
+    } catch {
+      return;
+    }
 
     // -----------------------------------------------------------------------
     // 2. LIGHTING RIG (Warm/Cool Key + Hemisphere + Lightning PointLight)

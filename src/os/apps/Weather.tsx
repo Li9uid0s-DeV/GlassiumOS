@@ -149,6 +149,21 @@ export function WeatherApp() {
     }
   }, [savedLocations]);
 
+  const wmoCodeToCondition = (code: number): { condition: string; icon: string } => {
+    if (code === 0) return { condition: '快晴', icon: '☀️' };
+    if (code === 1) return { condition: '晴れ', icon: '🌤️' };
+    if (code === 2) return { condition: '一部曇り', icon: '⛅' };
+    if (code === 3) return { condition: '曇り', icon: '☁️' };
+    if (code === 45 || code === 48) return { condition: '霧', icon: '🌫️' };
+    if (code >= 51 && code <= 57) return { condition: '霧雨', icon: '🌦️' };
+    if (code >= 61 && code <= 67) return { condition: '雨', icon: '🌧️' };
+    if (code >= 71 && code <= 77) return { condition: '雪', icon: '❄️' };
+    if (code >= 80 && code <= 82) return { condition: 'にわか雨', icon: '🌦️' };
+    if (code >= 85 && code <= 86) return { condition: '吹雪', icon: '🌨️' };
+    if (code >= 95) return { condition: '雷雨', icon: '⛈️' };
+    return { condition: '晴れ時々曇り', icon: '⛅' };
+  };
+
   const fetchWeatherDirectFallback = useCallback(
     async (loc: SavedWeatherLocation): Promise<WeatherApiResponse> => {
       const meteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(loc.lat)}&longitude=${encodeURIComponent(loc.lon)}&current=temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,cloud_cover,surface_pressure,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,sunrise,sunset,uv_index_max&timezone=auto&forecast_days=7`;
@@ -169,55 +184,81 @@ export function WeatherApp() {
           const past = Array.isArray(rJson?.radar?.past) ? rJson.radar.past : [];
           const nowcast = Array.isArray(rJson?.radar?.nowcast) ? rJson.radar.nowcast : [];
           radarFrames = [
-            ...past.slice(-6).map((f: { time: number; path: string }) => ({ time: f.time, path: f.path, isForecast: false })),
-            ...nowcast.slice(0, 3).map((f: { time: number; path: string }) => ({ time: f.time, path: f.path, isForecast: true })),
+            ...past.slice(-6).map((f: { time: number; path: string }) => ({ time: f.time, path: f.path })),
+            ...nowcast.slice(0, 3).map((f: { time: number; path: string }) => ({ time: f.time, path: f.path })),
           ];
         } catch {
           // ignore radar parse errors
         }
       }
+
+      const curCode = Number(meteo?.current?.weather_code ?? 1);
+      const curInfo = wmoCodeToCondition(curCode);
+      const nowIso = new Date().toISOString().slice(0, 13);
+      const hourlyTimes: string[] = Array.isArray(meteo?.hourly?.time) ? meteo.hourly.time : [];
+      let startIdx = hourlyTimes.findIndex((t) => String(t).startsWith(nowIso));
+      if (startIdx < 0) startIdx = 0;
+
+      const hourly: HourlyForecastItem[] = hourlyTimes.slice(startIdx, startIdx + 24).map((t, idx) => {
+        const i = startIdx + idx;
+        const code = Number(meteo?.hourly?.weather_code?.[i] ?? 1);
+        const info = wmoCodeToCondition(code);
+        return {
+          time: String(t).slice(11, 16) || `${idx}:00`,
+          temp: Math.round(Number(meteo?.hourly?.temperature_2m?.[i] ?? 20) * 10) / 10,
+          precipProb: Math.round(Number(meteo?.hourly?.precipitation_probability?.[i] ?? 0)),
+          precipMm: Math.round(Number(meteo?.hourly?.precipitation?.[i] ?? 0) * 10) / 10,
+          windSpeed: Math.round(Number(meteo?.hourly?.wind_speed_10m?.[i] ?? 6) * 10) / 10,
+          icon: info.icon,
+          condition: info.condition,
+        };
+      });
+
+      const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+      const dailyTimes: string[] = Array.isArray(meteo?.daily?.time) ? meteo.daily.time : [];
+      const daily: DailyForecastItem[] = dailyTimes.slice(0, 7).map((dateStr, i) => {
+        const d = new Date(dateStr);
+        const dayLabel = i === 0 ? '今日' : i === 1 ? '明日' : `${dayNames[d.getDay()] || '月'}曜`;
+        const code = Number(meteo?.daily?.weather_code?.[i] ?? 1);
+        const info = wmoCodeToCondition(code);
+        return {
+          date: String(dateStr),
+          day: dayLabel,
+          icon: info.icon,
+          condition: info.condition,
+          high: Math.round(Number(meteo?.daily?.temperature_2m_max?.[i] ?? 22)),
+          low: Math.round(Number(meteo?.daily?.temperature_2m_min?.[i] ?? 14)),
+          precipProb: Math.round(Number(meteo?.daily?.precipitation_probability_max?.[i] ?? 10)),
+          precipSum: Math.round(Number(meteo?.daily?.precipitation_sum?.[i] ?? 0) * 10) / 10,
+        };
+      });
+
       const nowMs = Date.now();
       return {
-        location: { lat: loc.lat, lon: loc.lon, name: loc.name, timezone: meteo.timezone || 'Asia/Tokyo' },
-        updatedAt: nowMs,
-        nextUpdateAt: nowMs + FIVE_MINUTES_MS,
-        refreshIntervalMs: FIVE_MINUTES_MS,
-        cached: false,
-        current: meteo.current || {
-          temperature_2m: 20,
-          relative_humidity_2m: 55,
-          apparent_temperature: 20,
-          is_day: 1,
-          precipitation: 0,
-          weather_code: 1,
-          cloud_cover: 20,
-          surface_pressure: 1013,
-          wind_speed_10m: 8,
-          wind_direction_10m: 180,
-        },
-        hourly: meteo.hourly || {
-          time: [],
-          temperature_2m: [],
-          precipitation_probability: [],
-          precipitation: [],
-          weather_code: [],
-          wind_speed_10m: [],
-        },
-        daily: meteo.daily || {
-          time: [],
-          weather_code: [],
-          temperature_2m_max: [],
-          temperature_2m_min: [],
-          precipitation_sum: [],
-          precipitation_probability_max: [],
-          sunrise: [],
-          sunset: [],
-          uv_index_max: [],
-        },
+        location: { lat: loc.lat, lon: loc.lon, name: loc.name },
+        temp: Math.round(Number(meteo?.current?.temperature_2m ?? 20) * 10) / 10,
+        feelsLike: Math.round(Number(meteo?.current?.apparent_temperature ?? 20) * 10) / 10,
+        humidity: Math.round(Number(meteo?.current?.relative_humidity_2m ?? 55)),
+        wind: Math.round(Number(meteo?.current?.wind_speed_10m ?? 8) * 10) / 10,
+        windDirection: Math.round(Number(meteo?.current?.wind_direction_10m ?? 180)),
+        pressure: Math.round(Number(meteo?.current?.surface_pressure ?? 1013)),
+        precipitation: Math.round(Number(meteo?.current?.precipitation ?? 0) * 10) / 10,
+        uvIndex: Math.round(Number(meteo?.daily?.uv_index_max?.[0] ?? 4)),
+        sunrise: String(meteo?.daily?.sunrise?.[0] || '').slice(11, 16) || '05:45',
+        sunset: String(meteo?.daily?.sunset?.[0] || '').slice(11, 16) || '18:15',
+        condition: curInfo.condition,
+        icon: curInfo.icon,
+        high: daily[0]?.high ?? 22,
+        low: daily[0]?.low ?? 14,
+        hourly,
+        daily,
         radar: {
           host: radarHost,
           frames: radarFrames,
         },
+        serverTimestamp: nowMs,
+        nextUpdateAt: nowMs + FIVE_MINUTES_MS,
+        updateIntervalMinutes: 5,
       };
     },
     []
@@ -236,7 +277,7 @@ export function WeatherApp() {
             const ct = res.headers.get('content-type') || '';
             if (ct.includes('json')) {
               const parsed = (await res.json()) as WeatherApiResponse;
-              if (parsed && parsed.current) {
+              if (parsed && (typeof parsed.temp === 'number' || Array.isArray(parsed.daily))) {
                 data = parsed;
               }
             }
@@ -783,7 +824,7 @@ export function WeatherApp() {
                 </button>
               </div>
               <div className="flex gap-2.5 overflow-x-auto pb-2">
-                {(weather?.hourly && weather.hourly.length > 0
+                {(Array.isArray(weather?.hourly) && weather.hourly.length > 0
                   ? weather.hourly
                   : Array.from({ length: 12 }, (_, i) => ({
                       time: `${(new Date().getHours() + i) % 24}:00`,
@@ -820,7 +861,7 @@ export function WeatherApp() {
             >
               <h3 className="text-xs font-bold mb-3">週間天気予報 (7日間)</h3>
               <div className="divide-y divide-white/10">
-                {(weather?.daily || []).map((d) => (
+                {(Array.isArray(weather?.daily) ? weather.daily : []).map((d) => (
                   <div key={d.date} className="py-2.5 flex items-center justify-between text-xs gap-3">
                     <div className="w-24 font-bold">
                       {d.day}{' '}

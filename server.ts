@@ -3011,8 +3011,8 @@ Only output <os_action> if the user is asking to change an OS setting or open an
             imdbId: item.imdbId,
             embedUrl:
               item.type === 'movie'
-                ? `https://vidlink.pro/movie/${item.tmdbId}`
-                : `https://vidlink.pro/tv/${item.tmdbId}/1/1`,
+                ? `/api/entertainment/embed-proxy?url=${encodeURIComponent(`https://mapple.fun/watch/movie/${item.tmdbId}`)}`
+                : `/api/entertainment/embed-proxy?url=${encodeURIComponent(`https://mapple.fun/watch/tv/${item.tmdbId}/1/1`)}`,
           });
         }
       }
@@ -3089,7 +3089,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
           backdropUrl: backdropPath ? `https://image.tmdb.org/t/p/w1280${backdropPath}` : undefined,
           description: String(it.overview || '劇場公開映画のストリーミング配信データです。'),
           tmdbId: idNum,
-          embedUrl: `https://vidlink.pro/movie/${idNum}`,
+          embedUrl: `/api/entertainment/embed-proxy?url=${encodeURIComponent(`https://mapple.fun/watch/movie/${idNum}`)}`,
         });
       }
 
@@ -3414,46 +3414,93 @@ Only output <os_action> if the user is asking to change an OS setting or open an
   });
 
   // -------------------------------------------------------------------------
+  // Direct Video Stream Proxy (/api/entertainment/video-proxy)
+  // Proxies .mp4 / .m4v / .webm movie streams with HTTP Range support
+  // -------------------------------------------------------------------------
+  app.get('/api/entertainment/video-proxy', async (req, res) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    const rawUrl = String(req.query.url || '').trim();
+    if (!rawUrl || !/^https?:\/\//i.test(rawUrl)) {
+      res.status(400).send('Invalid video URL');
+      return;
+    }
+    try {
+      const parsed = new URL(rawUrl);
+      const reqHeaders: Record<string, string> = {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+        Accept: '*/*',
+        Referer: `${parsed.origin}/`,
+      };
+      if (req.headers.range) {
+        reqHeaders.Range = String(req.headers.range);
+      }
+      const upstream = await fetch(rawUrl, {
+        headers: reqHeaders,
+        redirect: 'follow',
+        signal: AbortSignal.timeout(12000),
+      });
+      res.status(upstream.status);
+      const forwardHeaders = ['content-type', 'content-length', 'content-range', 'accept-ranges'];
+      for (const h of forwardHeaders) {
+        const val = upstream.headers.get(h);
+        if (val) res.setHeader(h, val);
+      }
+      if (upstream.body) {
+        Readable.fromWeb(upstream.body as unknown as import('node:stream/web').ReadableStream).pipe(res);
+      } else {
+        res.end();
+      }
+    } catch {
+      res.status(502).end();
+    }
+  });
+
+  // -------------------------------------------------------------------------
   // Movie & Anime Embed Sanitizer Proxy (/api/entertainment/embed-proxy)
   // Neutralizes `document.domain` Sandbox checks ("Sandbox not allowed"),
   // strips disable-devtool & popup ads, and removes X-Frame-Options/CSP
-  // so 2embed.cc, vidsrc.tw, vidfast.vc, autoembed.me, nontongo.win open cleanly!
+  // so mapple.fun, mapple.tv, vidlink.pro, vidcore.io, 2embed.cc, autoembed.me open cleanly!
   // -------------------------------------------------------------------------
   app.get('/api/entertainment/embed-proxy', async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.removeHeader('X-Frame-Options');
     res.removeHeader('Content-Security-Policy');
     const rawUrl = String(req.query.url || '').trim();
+    const fallbackUrl = String(req.query.fallback || '').trim();
     if (!rawUrl || !/^https?:\/\//i.test(rawUrl)) {
       res.status(400).send('Invalid embed URL');
       return;
     }
 
-    try {
-      const parsed = new URL(rawUrl);
-      const upstreamRes = await fetch(rawUrl, {
+    const fetchAndSanitizeEmbed = async (targetUrl: string): Promise<{ status: number; contentType: string; body: Buffer | string }> => {
+      const parsed = new URL(targetUrl);
+      const upstreamRes = await fetch(targetUrl, {
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
           Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
-          Referer: `${parsed.origin}/`,
+          Referer: 'https://mapple.fun/',
+          Origin: 'https://mapple.fun',
         },
         redirect: 'follow',
         signal: AbortSignal.timeout(6500),
       });
 
+      if (!upstreamRes.ok && upstreamRes.status >= 400) {
+        throw new Error(`Upstream HTTP ${upstreamRes.status}`);
+      }
+
       const contentType = upstreamRes.headers.get('content-type') || 'text/html; charset=utf-8';
       if (!contentType.toLowerCase().includes('html')) {
-        res.setHeader('Content-Type', contentType);
         const ab = await upstreamRes.arrayBuffer();
-        res.status(upstreamRes.status).end(Buffer.from(ab));
-        return;
+        return { status: upstreamRes.status, contentType, body: Buffer.from(ab) };
       }
 
       let html = await upstreamRes.text();
 
-      // If 2embed.cc embeds streamsrcs.2embed.cc/vcr.js with swish-id, route straight to clean vidcore.io player
+      // If 2embed.cc embeds streamsrcs.2embed.cc/vcr.js with swish-id, route through embed-proxy to vidcore.io
       const swishMatch = html.match(/swish-id=["']([^"']+)["']/i);
       if (swishMatch && swishMatch[1]) {
         const swishId = swishMatch[1];
@@ -3462,8 +3509,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
           parts.length === 3
             ? `https://vidcore.io/tv/${parts[0]}/${parts[1]}/${parts[2]}?autoplay=true`
             : `https://vidcore.io/movie/${swishId}?autoplay=true`;
-        res.redirect(302, cleanDirectUrl);
-        return;
+        return fetchAndSanitizeEmbed(cleanDirectUrl);
       }
 
       // Strip disable-devtool, sbx.js sandbox blocker, and popup ad scripts
@@ -3496,6 +3542,10 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       set: function(v) { _fakeDomain = String(v || _fakeDomain); return true; },
       configurable: true
     });
+    Object.defineProperty(document, 'referrer', {
+      get: function() { return 'https://mapple.fun/'; },
+      configurable: true
+    });
   } catch (e) {}
   window.isReallySandboxed = function() { return false; };
   window.DisableDevtool = function() {};
@@ -3505,7 +3555,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     if (f && (!f.getAttribute('src') || f.getAttribute('src') === '') && f.getAttribute('data-src')) {
       var ds = f.getAttribute('data-src');
       if (ds.indexOf('//') === 0) ds = 'https:' + ds;
-      f.setAttribute('src', ds);
+      f.setAttribute('src', '/api/entertainment/embed-proxy?url=' + encodeURIComponent(ds));
     }
   });
 })();
@@ -3517,19 +3567,33 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         html = `${sandboxBypassShim}\n${html}`;
       }
 
-      res.setHeader('Content-Type', 'text/html; charset=utf-8');
-      res.status(200).send(html);
-    } catch (err) {
-      res.status(200).send(`<!DOCTYPE html><html><body style="margin:0;background:#090d16;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;"><div style="text-align:center;padding:24px;"><p style="font-size:14px;opacity:0.8;">外部ストリームサーバーへ再接続中... 上部の別サーバータブを選択してください (${String(err).slice(0, 60)})</p></div></body></html>`);
+      return { status: 200, contentType: 'text/html; charset=utf-8', body: html };
+    };
+
+    try {
+      const result = await fetchAndSanitizeEmbed(rawUrl);
+      res.setHeader('Content-Type', result.contentType);
+      res.status(result.status).send(result.body);
+      return;
+    } catch (primaryErr) {
+      if (fallbackUrl && /^https?:\/\//i.test(fallbackUrl)) {
+        try {
+          const fbResult = await fetchAndSanitizeEmbed(fallbackUrl);
+          res.setHeader('Content-Type', fbResult.contentType);
+          res.status(fbResult.status).send(fbResult.body);
+          return;
+        } catch {
+          // fall through
+        }
+      }
+      res.status(200).send(`<!DOCTYPE html><html><body style="margin:0;background:#090d16;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;"><div style="text-align:center;padding:24px;"><p style="font-size:14px;opacity:0.8;">mapple.fun プロキシストリームへ再接続中... 下部の別ミラータブを選択してください (${String(primaryErr).slice(0, 60)})</p></div></body></html>`);
     }
   });
 
   // -------------------------------------------------------------------------
   // Unified Cinema Gateway (/api/entertainment/player)
-  // Always returns HTTP 200 on our own origin in <120ms so iframes NEVER fail
-  // with "Refused to connect" or "Sandbox not allowed".
-  // Combines Direct MP4/M4V video, TMDB Official YouTube streams, and
-  // Sandbox-Sanitized Multi-Server Cinema Embeds (VidCore, VidLink, 2Embed, AutoEmbed, VidFast).
+  // Uses mapple.fun as primary source and routes all movie/series streams
+  // through /api/entertainment/embed-proxy & /api/entertainment/video-proxy.
   // -------------------------------------------------------------------------
   const cinemaMetaCache = new Map<
     string,
@@ -3547,7 +3611,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     const ep = Math.max(1, Number(req.query.ep) || 1);
     const title = String(req.query.title || 'Cinema Stream').trim();
     const originalTitle = String(req.query.originalTitle || title).trim();
-    const provider = String(req.query.provider || 'vidlink').trim();
+    const provider = String(req.query.provider || 'mapple-fun').trim();
     const fallbackYtId = String(req.query.ytId || '').trim();
     const isMovie = mediaType === 'movie';
     const tmdbKey = 'a07e22bc18f5cb106bfe4cc1f83ad8ed';
@@ -3587,7 +3651,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
             }
           }
         })(),
-        // 2. Resolve direct Apple iTunes HD .m4v stream (100% native <video> playback with 0 iframe blocks)
+        // 2. Resolve direct Apple iTunes HD .m4v stream (proxied via /api/entertainment/video-proxy)
         (async () => {
           const searchTerms = Array.from(new Set([title, originalTitle].filter(Boolean)));
           const entity = isMovie ? 'movie' : 'tvSeason';
@@ -3612,7 +3676,6 @@ Only output <os_action> if the user is asking to change an OS setting or open an
               // ignore
             }
           }
-          // Try US iTunes store if JP had no previewUrl
           for (const term of searchTerms) {
             try {
               const cleanTerm = term.replace(/\s*\(.*?\)\s*/g, ' ').trim();
@@ -3648,45 +3711,52 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     const numTmdb = tmdbId || '693134';
     const cleanImdb = imdbId || 'tt15239678';
 
-    // Build verified embed URLs for each server (using clean vidcore.io & sanitized embed-proxy!)
-    const vidcoreUrl = isMovie
+    // All movie & anime sources routed through /api/entertainment/embed-proxy with mapple.fun as primary source!
+    const mappleFunTarget = isMovie
+      ? `https://mapple.fun/watch/movie/${numTmdb}`
+      : `https://mapple.fun/watch/tv/${numTmdb}/1/${ep}`;
+    const vidlinkTarget = isMovie
+      ? `https://vidlink.pro/movie/${numTmdb}?autoplay=true`
+      : `https://vidlink.pro/tv/${numTmdb}/1/${ep}?autoplay=true`;
+    const vidcoreTarget = isMovie
       ? `https://vidcore.io/movie/${numTmdb}?autoplay=true`
       : `https://vidcore.io/tv/${numTmdb}/1/${ep}?autoplay=true`;
 
-    const vidlinkUrl = isMovie
-      ? `https://vidlink.pro/movie/${numTmdb}?autoplay=true`
-      : `https://vidlink.pro/tv/${numTmdb}/1/${ep}?autoplay=true`;
+    const mappleFunProxied = `/api/entertainment/embed-proxy?url=${encodeURIComponent(mappleFunTarget)}&fallback=${encodeURIComponent(vidlinkTarget)}`;
+    const vidcoreProxied = `/api/entertainment/embed-proxy?url=${encodeURIComponent(vidcoreTarget)}&fallback=${encodeURIComponent(vidlinkTarget)}`;
 
     const twoEmbedTarget = isMovie
       ? `https://www.2embed.cc/embed/${imdbId || numTmdb}`
       : `https://www.2embed.cc/embedtv/${imdbId || numTmdb}&s=1&e=${ep}`;
-    const twoEmbedProxied = `/api/entertainment/embed-proxy?url=${encodeURIComponent(twoEmbedTarget)}`;
+    const twoEmbedProxied = `/api/entertainment/embed-proxy?url=${encodeURIComponent(twoEmbedTarget)}&fallback=${encodeURIComponent(vidcoreTarget)}`;
 
     const autoEmbedTarget = isMovie
       ? `https://player.autoembed.me/embed/movie/${numTmdb}`
       : `https://player.autoembed.me/embed/tv/${numTmdb}/1/${ep}`;
-    const autoEmbedProxied = `/api/entertainment/embed-proxy?url=${encodeURIComponent(autoEmbedTarget)}`;
+    const autoEmbedProxied = `/api/entertainment/embed-proxy?url=${encodeURIComponent(autoEmbedTarget)}&fallback=${encodeURIComponent(vidlinkTarget)}`;
 
+    const mappleTvTarget = isMovie
+      ? `https://mapple.tv/watch/movie/${numTmdb}`
+      : `https://mapple.tv/watch/tv/${numTmdb}/1/${ep}`;
     const vidfastTarget = isMovie
-      ? `https://vidfast.vc/embed/movie/${ imdbId || numTmdb }`
-      : `https://vidfast.vc/embed/tv/${ imdbId || numTmdb }/1/${ep}`;
-    const vidfastProxied = `/api/entertainment/embed-proxy?url=${encodeURIComponent(vidfastTarget)}`;
-
-    const nontonTarget = isMovie
-      ? `https://www.NontonGo.win/embed/movie/${numTmdb}`
-      : `https://www.NontonGo.win/embed/tv/${numTmdb}/1/${ep}`;
-    const nontonProxied = `/api/entertainment/embed-proxy?url=${encodeURIComponent(nontonTarget)}`;
+      ? `https://vidfast.vc/embed/movie/${imdbId || numTmdb}`
+      : `https://vidfast.vc/embed/tv/${imdbId || numTmdb}/1/${ep}`;
+    const mappleTvProxied = `/api/entertainment/embed-proxy?url=${encodeURIComponent(mappleTvTarget)}&fallback=${encodeURIComponent(vidfastTarget)}`;
 
     const youtubeEmbedUrl = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(
       meta.youtubeKey || 'Way9Dexny3w'
     )}?autoplay=1&rel=0&modestbranding=1`;
+
+    const proxiedDirectVideoUrl = meta.directVideoUrl
+      ? `/api/entertainment/video-proxy?url=${encodeURIComponent(meta.directVideoUrl)}`
+      : '';
 
     const pageHtml = `<!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>${title.replace(/[<>&"]/g, '')} — Glassium Cinema Gateway</title>
+<title>${title.replace(/[<>&"]/g, '')} — mapple.fun Proxy Cinema</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; background: #05070e; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
@@ -3716,22 +3786,22 @@ Only output <os_action> if the user is asking to change an OS setting or open an
   <div class="player-wrap" id="mount"></div>
   <div class="bottom-bar">
     <div class="edge-pills" id="pills"></div>
-    <div class="status-tag" id="statusLabel">Glassium Cinema Proxy Active</div>
+    <div class="status-tag" id="statusLabel">mapple.fun Proxy Stream Active</div>
   </div>
 </div>
 <script>
 (function(){
   var sources = [
-    { key: 'vidlink', label: 'VidCore / VidLink 1080p', type: 'iframe', url: ${JSON.stringify(vidcoreUrl)}, altUrl: ${JSON.stringify(vidlinkUrl)} },
-    { key: 'mapple-fun', label: 'VidLink Pro HD', type: 'iframe', url: ${JSON.stringify(vidlinkUrl)} },
-    { key: 'flixhd', label: '2Embed (Sandbox解除済)', type: 'iframe', url: ${JSON.stringify(twoEmbedProxied)} },
-    { key: 'streamex', label: 'AutoEmbed.me (Proxy)', type: 'iframe', url: ${JSON.stringify(autoEmbedProxied)} },
-    { key: 'mapletv', label: 'VidFast / NontonGo', type: 'iframe', url: ${JSON.stringify(vidfastProxied)}, altUrl: ${JSON.stringify(nontonProxied)} },
+    { key: 'mapple-fun', label: 'mapple.fun (Proxy Main)', type: 'iframe', url: ${JSON.stringify(mappleFunProxied)} },
+    { key: 'vidlink', label: 'mapple.fun Mirror / VidCore (Proxy)', type: 'iframe', url: ${JSON.stringify(vidcoreProxied)} },
+    { key: 'flixhd', label: '2Embed (Proxy)', type: 'iframe', url: ${JSON.stringify(twoEmbedProxied)} },
+    { key: 'streamex', label: 'AutoEmbed (Proxy)', type: 'iframe', url: ${JSON.stringify(autoEmbedProxied)} },
+    { key: 'mapletv', label: 'mapple.tv / VidFast (Proxy)', type: 'iframe', url: ${JSON.stringify(mappleTvProxied)} },
     { key: 'youtube', label: '公式本予告 / YouTube HD', type: 'iframe', url: ${JSON.stringify(youtubeEmbedUrl)} }
   ];
-  var directVideoUrl = ${JSON.stringify(meta.directVideoUrl || '')};
+  var directVideoUrl = ${JSON.stringify(proxiedDirectVideoUrl)};
   if (directVideoUrl) {
-    sources.push({ key: 'direct-mp4', label: 'Direct HD Stream (MP4)', type: 'video', url: directVideoUrl });
+    sources.push({ key: 'direct-mp4', label: 'Direct HD Stream (Proxy MP4)', type: 'video', url: directVideoUrl });
   }
 
   var initialKey = ${JSON.stringify(provider)};
@@ -3758,7 +3828,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       f.allowFullscreen = true;
       mount.appendChild(f);
     }
-    statusLabel.textContent = srcObj.label + ' 再生中 (${cleanImdb})';
+    statusLabel.textContent = srcObj.label + ' [Proxy経由: mapple.fun] (${cleanImdb})';
     renderPills();
   }
 
