@@ -28,11 +28,28 @@ export function getBackendConnectionState(): BackendConnectionState {
   return currentConnectionState;
 }
 
+export function isValidBackendUrl(rawUrl: string): boolean {
+  if (!rawUrl || typeof rawUrl !== 'string') return false;
+  try {
+    const parsed = new URL(rawUrl.trim());
+    if (parsed.protocol === 'https:') return true;
+    if (
+      parsed.protocol === 'http:' &&
+      (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')
+    ) {
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export function getBackendBaseUrl(): string {
   if (typeof window === 'undefined') return DEFAULT_BACKEND_URL;
   try {
     const saved = localStorage.getItem(BACKEND_URL_STORAGE_KEY);
-    if (saved && saved.trim() && saved.trim().startsWith('http')) {
+    if (saved && isValidBackendUrl(saved)) {
       return saved.trim().replace(/\/+$/, '');
     }
   } catch {
@@ -40,7 +57,7 @@ export function getBackendBaseUrl(): string {
   }
   const envUrl = (import.meta as unknown as { env?: Record<string, string> }).env
     ?.VITE_BACKEND_URL;
-  if (envUrl && envUrl.trim() && envUrl.trim().startsWith('http')) {
+  if (envUrl && isValidBackendUrl(envUrl)) {
     return envUrl.trim().replace(/\/+$/, '');
   }
   return DEFAULT_BACKEND_URL;
@@ -48,7 +65,11 @@ export function getBackendBaseUrl(): string {
 
 export function setBackendBaseUrl(url: string): void {
   if (typeof window === 'undefined') return;
-  const cleaned = (url.trim() || DEFAULT_BACKEND_URL).replace(/\/+$/, '');
+  const candidate = url.trim();
+  const cleaned = (isValidBackendUrl(candidate) ? candidate : DEFAULT_BACKEND_URL).replace(
+    /\/+$/,
+    ''
+  );
   try {
     localStorage.setItem(BACKEND_URL_STORAGE_KEY, cleaned);
     window.dispatchEvent(
@@ -61,16 +82,8 @@ export function setBackendBaseUrl(url: string): void {
 
 export function isStaticHostWithoutBackend(): boolean {
   if (typeof window === 'undefined') return false;
-  const host = window.location.hostname.toLowerCase();
-  const hasCustomBackend = Boolean(getBackendBaseUrl());
-  if (hasCustomBackend) return false;
-  return (
-    host.endsWith('.github.io') ||
-    host.endsWith('.dpdns.org') ||
-    host.endsWith('.pages.dev') ||
-    host.endsWith('.netlify.app') ||
-    host.endsWith('.vercel.app')
-  );
+  if (hasIntegratedLocalServer()) return false;
+  return currentConnectionState.status !== 'connected';
 }
 
 export function hasIntegratedLocalServer(): boolean {
@@ -130,7 +143,7 @@ const nativeFetch: typeof fetch =
 
 /**
  * Automatically pings the active backend server (/api/health) to verify connection
- * without blocking on external dead servers when the integrated local server is active.
+ * and honestly reports standby state if the server is unreachable.
  */
 export async function autoConnectBackendServer(): Promise<BackendConnectionState> {
   const useLocal = hasIntegratedLocalServer();
@@ -168,14 +181,14 @@ export async function autoConnectBackendServer(): Promise<BackendConnectionState
       return currentConnectionState;
     }
   } catch {
-    // Keep state connected via server cluster
+    // Health check failed or timed out; mark honestly as standby
   }
 
   currentConnectionState = {
-    status: 'connected',
+    status: 'standby',
     url: base,
     engines: ['ultraviolet', 'scramjet', 'wisp', 'music', 'entertainment', 'ai', 'games'],
-    latencyMs: 12,
+    latencyMs: 0,
     lastChecked: Date.now(),
   };
   if (typeof window !== 'undefined') {
@@ -221,37 +234,30 @@ export async function backendFetch(
     return nativeFetch(cleanPath, init);
   }
 
-  // 2. Route to external Backend Server only when deployed on a static-only host
+  // 2. Route to external Backend Server when deployed on a static-only host
   if (base && isBackendRoute) {
     const targetUrl = `${base}${cleanPath}`;
-    try {
-      const res = await nativeFetch(targetUrl, {
-        ...init,
-        mode: 'cors',
-        signal: AbortSignal.timeout(6000),
-      });
-      if (res.ok) {
-        return res;
-      }
-    } catch {
-      // Fall through
-    }
+    return nativeFetch(targetUrl, {
+      ...init,
+      mode: 'cors',
+      signal: init?.signal ?? AbortSignal.timeout(15000),
+    });
   }
 
   return nativeFetch(input, init);
 }
 
-
 let interceptorInstalled = false;
+let healthCheckIntervalId: number | null = null;
 
 export function installBackendFetchInterceptor(): void {
   if (typeof window === 'undefined' || interceptorInstalled) return;
   interceptorInstalled = true;
 
-  // Ensure default backend URL is stored automatically if empty
+  // Ensure default backend URL is stored automatically if empty or invalid
   try {
     const existing = localStorage.getItem(BACKEND_URL_STORAGE_KEY);
-    if (!existing || !existing.trim().startsWith('http')) {
+    if (!existing || !isValidBackendUrl(existing)) {
       localStorage.setItem(BACKEND_URL_STORAGE_KEY, DEFAULT_BACKEND_URL);
     }
   } catch {
@@ -271,7 +277,10 @@ export function installBackendFetchInterceptor(): void {
 
   // Verify backend server connection on boot and periodically
   autoConnectBackendServer().catch(() => {});
-  window.setInterval(() => {
+  if (healthCheckIntervalId !== null) {
+    window.clearInterval(healthCheckIntervalId);
+  }
+  healthCheckIntervalId = window.setInterval(() => {
     autoConnectBackendServer().catch(() => {});
   }, 9 * 60 * 1000);
 }

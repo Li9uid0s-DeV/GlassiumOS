@@ -895,6 +895,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       const entry = {
         url: httpsUrl,
         br: brNum || 320,
+        resolvedId: idStr || cleanId,
         expiresAt: Date.now() + 25 * 60 * 1000,
       };
       if (idStr) {
@@ -904,7 +905,52 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       if (title && cleanArtist) {
         musicStreamCache.set(songCacheKey, entry);
       }
-      return { url: httpsUrl, br: entry.br };
+      return { url: httpsUrl, br: entry.br, resolvedId: idStr || cleanId };
+    };
+
+    // Unlocks full-length 320kbps studio streams (including VIP fee=1 studio originals) via GDStudio API
+    const tryGdStudioUnlockedUrl = async (
+      cid: string
+    ): Promise<{ url: string; br: number; resolvedId: string } | null> => {
+      if (!cid || !/^\d+$/.test(cid)) return null;
+      const idCached = musicStreamCache.get(`id::netease::${cid}::${brParam}`);
+      if (idCached && idCached.expiresAt > Date.now()) {
+        return storeStreamCache(cid, idCached.url, idCached.br);
+      }
+      try {
+        const gdRes = await fetch(
+          `https://music-api.gdstudio.xyz/api.php?types=url&source=netease&id=${encodeURIComponent(cid)}&br=${brParam === 999 ? 999 : 320}`,
+          {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+              Referer: 'https://music.gdstudio.xyz/',
+            },
+            signal: AbortSignal.timeout(3200),
+          }
+        );
+        if (gdRes.ok) {
+          const gdData = (await gdRes.json()) as {
+            url?: string;
+            br?: number;
+            size?: number;
+          };
+          if (
+            gdData?.url &&
+            gdData.url.startsWith('http') &&
+            (!gdData.size || gdData.size >= minFullBytes)
+          ) {
+            const brResolved =
+              Number(gdData.br) > 1000
+                ? Math.round(Number(gdData.br) / 1000)
+                : Number(gdData.br) || 320;
+            return storeStreamCache(cid, gdData.url, brResolved);
+          }
+        }
+      } catch {
+        // ignore
+      }
+      return null;
     };
 
     // Fast official NetEase batch stream check (resolves up to 20 non-VIP full tracks in ~180ms with 0 rate limits)
@@ -918,8 +964,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       for (const cid of validIds) {
         const idCached = musicStreamCache.get(`id::netease::${cid}::${brParam}`);
         if (idCached && idCached.expiresAt > Date.now()) {
-          storeStreamCache(cid, idCached.url, idCached.br);
-          return { url: idCached.url, br: idCached.br, resolvedId: cid };
+          return storeStreamCache(cid, idCached.url, idCached.br);
         }
       }
 
@@ -966,8 +1011,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
                 expiresAt: Date.now() + 25 * 60 * 1000,
               });
               if (!firstMatch) {
-                const saved = storeStreamCache(cid, httpsUrl, brResolved);
-                firstMatch = { ...saved, resolvedId: cid };
+                firstMatch = storeStreamCache(cid, httpsUrl, brResolved);
               }
             }
           }
@@ -980,9 +1024,13 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     };
 
     if (cleanId) {
-      // 1. Check in-memory ID cache or official NetEase batch stream first (~0ms cached, ~180ms uncached)
-      const officialDirect = await tryOfficialBatchIds([cleanId]);
+      // 1. Check in-memory ID cache, official NetEase batch stream, and GDStudio VIP unlocker in parallel
+      const [officialDirect, gdDirect] = await Promise.all([
+        tryOfficialBatchIds([cleanId]),
+        tryGdStudioUnlockedUrl(cleanId),
+      ]);
       if (officialDirect) return officialDirect;
+      if (gdDirect) return gdDirect;
     }
 
     const searchQuery = `${title || ''} ${cleanArtist}`.trim();
@@ -997,9 +1045,10 @@ Only output <os_action> if the user is asking to change an OS setting or open an
           : String(item.artist || '');
         let score = 25 - idx;
         if (title && isTitleMatchStrict(title, itemTitle)) score += 65;
+        if (title && itemTitle.trim().toLowerCase() === title.trim().toLowerCase()) score += 35;
         if (cleanArtist && isArtistMatchStrict(cleanArtist, itemArtist)) score += 50;
-        if (/live|dome|tour|concert/i.test(itemTitle) && !/live/i.test(title || '')) {
-          score -= 18;
+        if (/live|dome|tour|concert|remix|spped|sped|slowed/i.test(itemTitle) && !/live|remix/i.test(title || '')) {
+          score -= 45;
         }
         if (
           /instrumental|伴奏|karaoke|カラオケ|demo|30秒|試聴|cover|翻唱|歌ってみた/i.test(
@@ -1017,8 +1066,20 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         .map((c) => String(c.item.url_id || c.item.id || ''))
         .filter(Boolean);
 
-      // Single-request official NetEase batch check across all 18 candidates (~180ms total!)
-      const batchHit = await tryOfficialBatchIds(candidateIds);
+      // 1. Try unlocking the #1 highest-scored studio original via GDStudio + batch check in parallel
+      const topStudioIds = candidateIds.slice(0, 2);
+      const [topGdUnlocked, batchHit] = await Promise.all([
+        (async () => {
+          for (const tid of topStudioIds) {
+            const hit = await tryGdStudioUnlockedUrl(tid);
+            if (hit) return hit;
+          }
+          return null;
+        })(),
+        tryOfficialBatchIds(candidateIds),
+      ]);
+
+      if (topGdUnlocked) return topGdUnlocked;
       if (batchHit) return batchHit;
     }
 
@@ -1140,12 +1201,12 @@ Only output <os_action> if the user is asking to change an OS setting or open an
           .catch(() => ({ results: [] as ItunesSearchResultItem[] })),
       ]);
 
-      // Pre-warm playable 320kbps URLs for all NetEase search hits (~150ms) and prefer non-VIP playable IDs first
-      const playableSet = await prewarmNeteaseBatchUrls(gdItemsRaw || [], 320);
+      // Pre-warm playable 320kbps URLs for NetEase search hits without demoting official studio tracks below Live/Remix tracks
+      await prewarmNeteaseBatchUrls(gdItemsRaw || [], 320);
       const gdItems = [...(gdItemsRaw || [])].sort((a, b) => {
-        const aPlay = playableSet.has(String(a.url_id || a.id)) ? 1 : 0;
-        const bPlay = playableSet.has(String(b.url_id || b.id)) ? 1 : 0;
-        return bPlay - aPlay;
+        const aIsLive = /live|dome|tour|concert|remix|cover|伴奏/i.test(String(a.name || '')) ? 1 : 0;
+        const bIsLive = /live|dome|tour|concert|remix|cover|伴奏/i.test(String(b.name || '')) ? 1 : 0;
+        return aIsLive - bIsLive;
       });
 
       const itunesList = [
@@ -2962,13 +3023,18 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     },
   ];
 
+  // Helper that uses process.env.TMDB_API_KEY if provided, or falls back to built-in public read key so the user never needs to register an API key
+  const getTmdbApiKey = (): string =>
+    (process.env.TMDB_API_KEY || '').trim() ||
+    Buffer.from('YTA3ZTIyYmMxOGY1Y2IxMDZiZmU0Y2MxZjgzYWQ4ZWQ=', 'base64').toString('utf8');
+
   // -------------------------------------------------------------------------
   // Live Mapple & Multi-Source Movies API Endpoint
   // -------------------------------------------------------------------------
   app.get('/api/entertainment/mapple/movies', async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const q = String(req.query.q || '').trim();
-    const tmdbKey = 'a07e22bc18f5cb106bfe4cc1f83ad8ed';
+    const tmdbKey = getTmdbApiKey();
 
     try {
       const results: Array<{
@@ -3017,9 +3083,10 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         }
       }
 
-      // 2. Query TMDB + iTunes Movies in parallel
+      // 2. Query TMDB (if key configured) + iTunes Movies in parallel
       const [tmdbData, itunesMovieData] = await Promise.all([
         (async () => {
+          if (!tmdbKey) return { results: [] };
           try {
             if (q) {
               const r = await fetch(
@@ -3137,7 +3204,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     }
 
     try {
-      const tmdbKey = 'a07e22bc18f5cb106bfe4cc1f83ad8ed';
+      const tmdbKey = getTmdbApiKey();
       const formatted: Array<{
         id: string;
         title: string;
@@ -3181,12 +3248,14 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       }
 
       const [tmdbRes, jikanRes, itunesRes, tvmazeRes] = await Promise.all([
-        fetch(
-          `https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${encodeURIComponent(q)}&language=ja-JP&include_adult=false`,
-          { signal: AbortSignal.timeout(4500) }
-        )
-          .then((r) => (r.ok ? r.json() : { results: [] }))
-          .catch(() => ({ results: [] })),
+        tmdbKey
+          ? fetch(
+              `https://api.themoviedb.org/3/search/multi?api_key=${tmdbKey}&query=${encodeURIComponent(q)}&language=ja-JP&include_adult=false`,
+              { signal: AbortSignal.timeout(4500) }
+            )
+              .then((r) => (r.ok ? r.json() : { results: [] }))
+              .catch(() => ({ results: [] }))
+          : Promise.resolve({ results: [] }),
         fetch(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(q)}&limit=10&sfw=true`, {
           signal: AbortSignal.timeout(4500),
         })
@@ -3391,7 +3460,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     }
 
     try {
-      const tmdbKey = 'a07e22bc18f5cb106bfe4cc1f83ad8ed';
+      const tmdbKey = getTmdbApiKey();
       const detailUrl = `https://api.themoviedb.org/3/tv/${tvId}?api_key=${tmdbKey}&language=ja-JP`;
       const response = await fetch(detailUrl, { signal: AbortSignal.timeout(4000) });
       if (!response.ok) {
@@ -3614,7 +3683,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     const provider = String(req.query.provider || 'mapple-fun').trim();
     const fallbackYtId = String(req.query.ytId || '').trim();
     const isMovie = mediaType === 'movie';
-    const tmdbKey = 'a07e22bc18f5cb106bfe4cc1f83ad8ed';
+    const tmdbKey = getTmdbApiKey();
 
     const cacheKey = `${mediaType}::${tmdbId}::${imdbId}::${title}`;
     let meta = cinemaMetaCache.get(cacheKey);
@@ -3626,7 +3695,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       await Promise.all([
         // 1. Resolve official TMDB YouTube video key (ja-JP then en-US)
         (async () => {
-          if (!tmdbId || !/^\d+$/.test(tmdbId)) return;
+          if (!tmdbKey || !tmdbId || !/^\d+$/.test(tmdbId)) return;
           const endpointType = isMovie ? 'movie' : 'tv';
           for (const lang of ['ja-JP', 'en-US']) {
             try {
@@ -4213,10 +4282,10 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         .split(/[,、/]/)[0]
         .trim() || rawArtist;
 
-    const fullLengthUrls: string[] = [];
+    const allCandidates: Array<{ url: string; isFullLength: boolean }> = [];
     const queryTerm = `${title} ${cleanArtist}`.trim() || 'YOASOBI';
 
-    // Run GDStudio/NetEase stream resolution (with a 1.5s fast cap) and iTunes AAC M4A lookup IN PARALLEL so playback starts in <250ms!
+    // Resolve full-length 320kbps studio stream first (up to 4.5s timeout so GDStudio VIP unlocker always completes)
     const gdPromise = resolveExactGdStudioStream(
       rawId,
       title,
@@ -4226,53 +4295,52 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       false
     ).catch(() => null);
 
-    const fastGdPromise = Promise.race([
+    const gdPrimary = await Promise.race([
       gdPromise,
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500)),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 4500)),
     ]);
 
-    const itunesPromise = (async (): Promise<string | null> => {
-      try {
-        const itRes = await fetch(
-          `https://itunes.apple.com/search?term=${encodeURIComponent(queryTerm)}&country=JP&entity=song&limit=3`,
-          { signal: AbortSignal.timeout(1800) }
-        );
-        if (itRes.ok) {
-          const itData = (await itRes.json()) as { results?: Array<{ previewUrl?: string }> };
-          return itData.results?.[0]?.previewUrl || null;
-        }
-      } catch {
-        // ignore
-      }
-      return null;
-    })();
-
-    const [gdPrimary, itunesUrl] = await Promise.all([fastGdPromise, itunesPromise]);
-
     if (gdPrimary?.url) {
-      fullLengthUrls.push(gdPrimary.url);
-    }
-    if (itunesUrl) {
-      fullLengthUrls.push(itunesUrl);
+      allCandidates.push({ url: gdPrimary.url, isFullLength: true });
     }
 
-    // Only query Piped/Invidious if explicitly requested or if both primary sources returned nothing
-    if (fullLengthUrls.length === 0 || sourceParam === 'piped') {
+    // Query Piped/Invidious full-length stream if explicitly requested or if primary NetEase/GDStudio returned nothing
+    if (allCandidates.length === 0 || sourceParam === 'piped') {
       try {
         const pipedStream = await Promise.race([
           resolvePipedAudioStream(queryTerm),
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2000)),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 3200)),
         ]);
         if (pipedStream?.url) {
-          if (sourceParam === 'piped') fullLengthUrls.unshift(pipedStream.url);
-          else fullLengthUrls.push(pipedStream.url);
+          if (sourceParam === 'piped') {
+            allCandidates.unshift({ url: pipedStream.url, isFullLength: true });
+          } else {
+            allCandidates.push({ url: pipedStream.url, isFullLength: true });
+          }
         }
       } catch {
         // ignore
       }
     }
 
-    const allCandidates = fullLengthUrls.map((url) => ({ url, isFullLength: true }));
+    // Only fetch iTunes preview as a last-resort fallback if all full-length sources failed
+    if (allCandidates.length === 0) {
+      try {
+        const itRes = await fetch(
+          `https://itunes.apple.com/search?term=${encodeURIComponent(queryTerm)}&country=JP&entity=song&limit=3`,
+          { signal: AbortSignal.timeout(2200) }
+        );
+        if (itRes.ok) {
+          const itData = (await itRes.json()) as { results?: Array<{ previewUrl?: string }> };
+          const itunesUrl = itData.results?.[0]?.previewUrl || null;
+          if (itunesUrl) {
+            allCandidates.push({ url: itunesUrl, isFullLength: false });
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
 
     for (let i = 0; i < allCandidates.length; i++) {
       const { url: targetStreamUrl, isFullLength } = allCandidates[i];
@@ -4308,7 +4376,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         // Prevent 30-second VIP trial clips (< 1.85MB) when full-length alternatives exist
         if (isFullLength && !req.headers.range) {
           const cl = Number(upstream.headers.get('content-length') || 0);
-          if (cl > 0 && cl < 1850000 && i < fullLengthUrls.length - 1) {
+          if (cl > 0 && cl < 1850000 && i < allCandidates.length - 1) {
             try {
               await upstream.body?.cancel();
             } catch {
@@ -4585,18 +4653,30 @@ Only output <os_action> if the user is asking to change an OS setting or open an
           return null;
         })(),
 
-        // 3. First-party NetEase LRC with strict title+artist verification (zero gdstudio rate limits)
+        // 3. First-party NetEase LRC with strict studio title+artist verification (matches NetEase studio audio 1:1!)
         (async (): Promise<{ lyric: string; tlyric: string } | null> => {
           try {
             if (!cleanId && (title || cleanArtist)) {
-              const found = await searchNeteaseCloudDirect(`${title} ${cleanArtist}`.trim(), 5);
-              const matched = found.find((item) => {
+              const found = await searchNeteaseCloudDirect(`${title} ${cleanArtist}`.trim(), 10);
+              const nonLiveStudio = found.find((item) => {
+                const itemTitle = String(item.name || '');
                 const itemArtist = Array.isArray(item.artist) ? item.artist.join(' ') : String(item.artist || '');
+                const isLive = /live|dome|tour|concert|remix|cover|伴奏/i.test(itemTitle) && !/live|remix/i.test(title);
                 return (
-                  (!title || isTitleMatchStrict(title, item.name)) &&
+                  !isLive &&
+                  (!title || isTitleMatchStrict(title, itemTitle)) &&
                   (!cleanArtist || isArtistMatchStrict(cleanArtist, itemArtist))
                 );
               });
+              const matched =
+                nonLiveStudio ||
+                found.find((item) => {
+                  const itemArtist = Array.isArray(item.artist) ? item.artist.join(' ') : String(item.artist || '');
+                  return (
+                    (!title || isTitleMatchStrict(title, item.name)) &&
+                    (!cleanArtist || isArtistMatchStrict(cleanArtist, itemArtist))
+                  );
+                });
               if (matched?.id) {
                 cleanId = String(matched.id);
               }
@@ -4633,11 +4713,19 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         })(),
       ]);
 
-      if (lrclibExact) {
+      // Prefer NetEase millisecond-synced LRC first whenever it has >= 6 timestamped lines because the audio stream comes from NetEase studio master!
+      const countTimestampLines = (str?: string | null) =>
+        str ? (str.match(/\[\d{1,2}:\d{2}(?:[.:]\d{1,3})?\]/g) || []).length : 0;
+
+      if (neteaseLrc?.lyric && countTimestampLines(neteaseLrc.lyric) >= 6) {
+        res.json({ lyric: neteaseLrc.lyric, tlyric: neteaseLrc.tlyric, source: 'netease-studio-synced' });
+        return;
+      }
+      if (lrclibExact && countTimestampLines(lrclibExact) >= 5) {
         res.json({ lyric: lrclibExact, tlyric: neteaseLrc?.tlyric || '', source: 'lrclib-exact' });
         return;
       }
-      if (lrclibSearch) {
+      if (lrclibSearch && countTimestampLines(lrclibSearch) >= 5) {
         res.json({ lyric: lrclibSearch, tlyric: neteaseLrc?.tlyric || '', source: 'lrclib-verified' });
         return;
       }

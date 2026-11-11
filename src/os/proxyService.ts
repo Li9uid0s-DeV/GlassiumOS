@@ -126,12 +126,12 @@ export interface WispServerPreset {
 
 export const WISP_SERVER_PRESETS: WispServerPreset[] = [
   {
-    id: 'wisp-local-bridge',
-    name: 'Local Wisp Hybrid Bridge (/api/wisp)',
-    wispUrl: 'wss://localhost/api/wisp',
-    region: 'Local Server Bridge',
-    protocol: 'Wisp v1 + HTTP/2 Binary Tunnel',
-    description: 'ローカルNodeバックエンドと直結し、100%確実にバイナリ・JS・CSS・音声を中継します',
+    id: 'wisp-glassium-render',
+    name: 'GlassiumOS Official Server (Render)',
+    wispUrl: 'wss://glassiumos-backend-2.onrender.com/wisp/',
+    region: 'GlassiumOS Dedicated Cloud',
+    protocol: 'Wisp v1 + UV/Scramjet Server',
+    description: 'GlassiumOS専用のRender常時接続サーバー (Ultraviolet / Scramjet / Wisp / 音楽 / 映画 / AI 直結)',
   },
   {
     id: 'wisp-mercury',
@@ -166,12 +166,12 @@ export const WISP_SERVER_PRESETS: WispServerPreset[] = [
     description: '低遅延Wispリレーノード (Scramjet / UV Service Worker 互換)',
   },
   {
-    id: 'wisp-glassium-render',
-    name: 'GlassiumOS Official Server (Render)',
-    wispUrl: 'wss://glassiumos-backend-2.onrender.com/wisp/',
-    region: 'GlassiumOS Dedicated Cloud',
-    protocol: 'Wisp v1 + UV/Scramjet Server',
-    description: 'GlassiumOS専用のRender常時接続サーバー (Ultraviolet / Scramjet / Wisp / 音楽 / 映画 / AI 直結)',
+    id: 'wisp-local-bridge',
+    name: 'Local Wisp Hybrid Bridge (/api/wisp · ローカル開発環境用)',
+    wispUrl: 'wss://localhost/api/wisp',
+    region: 'Local Dev Bridge',
+    protocol: 'Wisp v1 + HTTP/2 Binary Tunnel',
+    description: 'ローカル開発サーバー (localhost) と直結し、バイナリ・JS・CSS・音声を中継します',
   },
 ];
 
@@ -309,9 +309,11 @@ export async function testWispServerConnection(
     }
   }
 
-  // 2. Verify Local Wisp Bridge (/api/wisp-info)
+  // 2. Verify Wisp Bridge (/api/wisp-info) via resolveBackendUrl
   try {
-    const infoRes = await fetch('./api/wisp-info', { signal: AbortSignal.timeout(2500) });
+    const infoRes = await fetch(resolveBackendUrl('/api/wisp-info'), {
+      signal: AbortSignal.timeout(2500),
+    });
     if (infoRes.ok) {
       return {
         ok: true,
@@ -324,9 +326,9 @@ export async function testWispServerConnection(
   }
 
   return {
-    ok: true,
+    ok: false,
     latencyMs: Math.max(12, Math.round(performance.now() - t0)),
-    mode: 'SW Multi-Node Edge Tunnel',
+    mode: 'SW Multi-Node Edge Tunnel (Standby)',
   };
 }
 

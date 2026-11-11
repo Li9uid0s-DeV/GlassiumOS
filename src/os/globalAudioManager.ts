@@ -742,6 +742,8 @@ class GlobalAudioManager {
     }
   }
 
+  private lastOrbitNotifyMs = 0;
+
   private syncOrbitTimer() {
     if (typeof window === 'undefined') return;
     if (this.orbitTimer) {
@@ -753,7 +755,7 @@ class GlobalAudioManager {
         if (!this.state.isPlaying || !this.state.dolbyAtmosEnabled || !this.state.spatialDetails.autoOrbit) {
           return;
         }
-        const step = 3.2 * (this.state.spatialDetails.orbitSpeed || 1.0);
+        const step = 4.0 * (this.state.spatialDetails.orbitSpeed || 1.0);
         let nextAz = this.state.spatialDetails.azimuthDeg + step;
         if (nextAz > 180) nextAz -= 360;
         const nextSpatial: SpatialAudioDetails = {
@@ -762,8 +764,12 @@ class GlobalAudioManager {
         };
         this.state = { ...this.state, spatialDetails: nextSpatial };
         this.applyDolbyAtmosParameters(this.state.dolbyAtmosEnabled, this.state.dolbyAtmosPreset);
-        this.listeners.forEach((l) => l(this.getState()));
-      }, 65);
+        const nowMs = Date.now();
+        if (nowMs - this.lastOrbitNotifyMs >= 500) {
+          this.lastOrbitNotifyMs = nowMs;
+          this.listeners.forEach((l) => l(this.getState()));
+        }
+      }, 120);
     }
   }
 
@@ -1138,12 +1144,13 @@ class GlobalAudioManager {
       }
     }
 
+    // Only treat non-iTunes full-length direct stream URLs as direct HTTPS streams (never 30-second iTunes/mzstatic previews)
     const hasDirectHttpsStream =
       typeof track.sourceUrl === 'string' &&
       /^https:\/\//i.test(track.sourceUrl) &&
-      (track.sourceUrl.includes('itunes.apple.com') ||
-        track.sourceUrl.includes('mzstatic.com') ||
-        track.sourceUrl.includes('saavncdn.com') ||
+      !track.sourceUrl.includes('itunes.apple.com') &&
+      !track.sourceUrl.includes('mzstatic.com') &&
+      (track.sourceUrl.includes('saavncdn.com') ||
         /\.(m4a|mp3|aac|flac|ogg)(\?|$)/i.test(track.sourceUrl));
 
     if (hasDirectHttpsStream && !numericId) {
@@ -1157,8 +1164,8 @@ class GlobalAudioManager {
             isPlaying: true,
             isBuffering: false,
             error: null,
-            statusMessage: `再生中 (${
-              settings.streamingQuality === 'lossless' ? '256kbps AAC / 320kbps' : `${settings.streamingQuality}kbps`
+            statusMessage: `フル尺再生中 (${
+              settings.streamingQuality === 'lossless' ? '320kbps Master' : `${settings.streamingQuality}kbps`
             }): ${track.title} — ${cleanArtist}`,
           });
         }
@@ -1168,93 +1175,30 @@ class GlobalAudioManager {
       }
     }
 
-    // Stage 1: Server Full-Length Stream Proxy (/api/music/play) with 2.2s fast race guard
+    // Stage 1: Server Full-Length Stream Proxy (/api/music/play) — wait for full 320kbps studio stream without cutting off to 30s preview
     try {
       this.audio.src = resolvedUrl;
       this.playPromise = this.audio.play();
-      const timeoutGuard = new Promise<'timeout'>((resolve) =>
-        setTimeout(() => resolve('timeout'), 2200)
-      );
-      const raceResult = await Promise.race([
-        this.playPromise.then(() => 'playing' as const),
-        timeoutGuard,
-      ]);
-      if (raceResult === 'playing') {
-        this.playPromise = null;
-        if (this.pendingTrack === track) {
-          const realDur =
-            Number.isFinite(this.audio.duration) && this.audio.duration > 45
-              ? Math.round(this.audio.duration)
-              : track.duration;
-          this.updateState({
-            isPlaying: true,
-            isBuffering: false,
-            duration: realDur,
-            error: null,
-            statusMessage: `フル尺再生中 (Server 320kbps): ${track.title} — ${cleanArtist}`,
-          });
-        }
-        return;
-      }
-      // If server stream took >2.2s and we have a direct HTTPS stream, switch immediately
-      if (hasDirectHttpsStream && this.pendingTrack === track) {
-        this.audio.src = track.sourceUrl!;
-        this.playPromise = this.audio.play();
-        await this.playPromise;
-        this.playPromise = null;
+      await this.playPromise;
+      this.playPromise = null;
+      if (this.pendingTrack === track) {
+        const realDur =
+          Number.isFinite(this.audio.duration) && this.audio.duration > 45
+            ? Math.round(this.audio.duration)
+            : track.duration;
         this.updateState({
           isPlaying: true,
           isBuffering: false,
+          duration: realDur,
           error: null,
-          statusMessage: `高速ストリーム再生中: ${track.title} — ${cleanArtist}`,
+          statusMessage: `フル尺再生中 (Server 320kbps): ${track.title} — ${cleanArtist}`,
         });
-        return;
       }
-      await this.playPromise;
-      this.playPromise = null;
       return;
     } catch (err: unknown) {
       this.playPromise = null;
       if ((err as Error)?.name === 'AbortError' || this.pendingTrack !== track) {
         return;
-      }
-    }
-
-    // Stage 2: Direct HTTPS stream or iTunes instant lookup fallback
-    if (this.pendingTrack === track) {
-      try {
-        let fastUrl = hasDirectHttpsStream ? track.sourceUrl! : '';
-        if (!fastUrl) {
-          const q = encodeURIComponent(`${track.title} ${cleanArtist}`.trim());
-          const itunesRes = await fetch(
-            `https://itunes.apple.com/search?term=${q}&country=JP&media=music&entity=song&limit=3`,
-            { signal: AbortSignal.timeout(2000) }
-          ).catch(() => null);
-          if (itunesRes && itunesRes.ok) {
-            const itunesData = await itunesRes.json();
-            const firstMatch = (itunesData?.results || []).find(
-              (r: { previewUrl?: string }) => typeof r?.previewUrl === 'string' && r.previewUrl.startsWith('http')
-            );
-            if (firstMatch?.previewUrl) {
-              fastUrl = firstMatch.previewUrl;
-            }
-          }
-        }
-        if (fastUrl && this.pendingTrack === track) {
-          this.audio.src = fastUrl;
-          this.playPromise = this.audio.play();
-          await this.playPromise;
-          this.playPromise = null;
-          this.updateState({
-            isPlaying: true,
-            isBuffering: false,
-            error: null,
-            statusMessage: `再生中: ${track.title} — ${cleanArtist}`,
-          });
-          return;
-        }
-      } catch {
-        this.playPromise = null;
       }
     }
 
@@ -1438,6 +1382,24 @@ class GlobalAudioManager {
     const clamped = Math.max(0.5, Math.min(2.0, rate));
     this.audio.playbackRate = clamped;
     this.updateState({ playbackRate: clamped });
+  }
+
+  public updateTrackLyrics(trackId: string, lyrics: MonochromeTrack['lyrics']): void {
+    if (this.state.track && this.state.track.id === trackId && Array.isArray(lyrics) && lyrics.length > 0) {
+      this.state = {
+        ...this.state,
+        track: {
+          ...this.state.track,
+          lyrics,
+        },
+      };
+    }
+    if (this.pendingTrack && this.pendingTrack.id === trackId && Array.isArray(lyrics) && lyrics.length > 0) {
+      this.pendingTrack = {
+        ...this.pendingTrack,
+        lyrics,
+      };
+    }
   }
 
   public stop(): void {

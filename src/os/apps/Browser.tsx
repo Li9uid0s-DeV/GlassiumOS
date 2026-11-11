@@ -1637,7 +1637,7 @@ export function BrowserApp({ payload }: Props) {
                   onLoad={() => setIsLoading(false)}
                   className="h-full w-full border-0 bg-white"
                   title="proxy-browser-srcdoc"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                  sandbox="allow-scripts allow-forms allow-popups allow-modals"
                 />
               )}
 

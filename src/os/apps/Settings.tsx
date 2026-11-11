@@ -888,31 +888,67 @@ export function SettingsApp() {
   // App search
   const [appSearch, setAppSearch] = useState('');
 
-  const handleCustomWallpaperUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const compressImageFile = (
+    file: File,
+    maxWidth: number,
+    maxHeight: number,
+    quality: number
+  ): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('ファイルの読み込みに失敗しました'));
+      reader.onload = () => {
+        if (typeof reader.result !== 'string') {
+          reject(new Error('画像データが不正です'));
+          return;
+        }
+        const img = new Image();
+        img.onerror = () => reject(new Error('画像のデコードに失敗しました'));
+        img.onload = () => {
+          let w = img.naturalWidth || img.width || maxWidth;
+          let h = img.naturalHeight || img.height || maxHeight;
+          const scale = Math.min(1, maxWidth / w, maxHeight / h);
+          w = Math.max(1, Math.round(w * scale));
+          h = Math.max(1, Math.round(h * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(reader.result as string);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+  const handleCustomWallpaperUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        addCustomWallpaper(file.name.replace(/\.[^.]+$/, ''), reader.result);
-        playSound('notify');
-        addNotification({ title: 'Display', message: 'カスタム壁紙を追加して適用しました' });
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressedDataUrl = await compressImageFile(file, 1440, 900, 0.78);
+      addCustomWallpaper(file.name.replace(/\.[^.]+$/, ''), compressedDataUrl);
+      playSound('notify');
+      addNotification({ title: 'Display', message: 'カスタム壁紙を最適化して適用しました' });
+    } catch {
+      addNotification({ title: 'Display', message: '壁紙画像の読み込みまたは保存に失敗しました' });
+    }
   };
 
-  const handleCustomAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCustomAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setCustomAvatarUrl(reader.result);
-        playSound('notify');
-      }
-    };
-    reader.readAsDataURL(file);
+    try {
+      const compressedDataUrl = await compressImageFile(file, 256, 256, 0.82);
+      setCustomAvatarUrl(compressedDataUrl);
+      playSound('notify');
+    } catch {
+      addNotification({ title: 'Account', message: 'アバター画像の読み込みに失敗しました' });
+    }
   };
 
   const handleTestAIConnection = async () => {

@@ -336,8 +336,11 @@ export function Calculator({ initialTab }: { initialTab?: string }) {
         .replace(/×/g, '*')
         .replace(/÷/g, '/')
         .replace(/−/g, '-');
+      if (!/^[0-9+\-*/().%\s]+$/.test(clean)) {
+        return 0;
+      }
       const fn = new Function(`return (${clean})`);
-      const val = fn();
+      const val = Number(fn());
       return isFinite(val) ? Math.round(val * 1e10) / 1e10 : 0;
     } catch {
       return 0;

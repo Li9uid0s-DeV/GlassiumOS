@@ -2499,7 +2499,7 @@ export function CloudAndAIGameHub({
               title={activeAiGame.title}
               srcDoc={activeAiGame.htmlCode}
               className="w-full flex-1 border-0 bg-black"
-              sandbox="allow-scripts allow-pointer-lock allow-same-origin"
+              sandbox="allow-scripts allow-pointer-lock"
             />
           )}
         </div>
@@ -2700,7 +2700,11 @@ export function CloudAndAIGameHub({
               }
               className="w-full flex-1 border-0 bg-black"
               allow="autoplay; fullscreen; gamepad; pointer-lock; accelerometer; gyroscope; clipboard-read; clipboard-write"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups"
+              sandbox={
+                activeHtmlSrcDoc
+                  ? 'allow-scripts allow-forms allow-pointer-lock allow-popups'
+                  : 'allow-scripts allow-same-origin allow-forms allow-pointer-lock allow-popups'
+              }
             />
           )}
         </div>

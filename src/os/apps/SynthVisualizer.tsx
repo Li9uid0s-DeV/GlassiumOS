@@ -697,10 +697,21 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
   const currentTrack: MonochromeTrack = useMemo(() => {
     const found = tracks.find((t) => t.id === currentTrackId);
-    if (found) return found;
+    if (found && activeTrackOverride && activeTrackOverride.id === currentTrackId) {
+      return {
+        ...found,
+        duration: activeTrackOverride.duration || found.duration,
+        lyrics:
+          activeTrackOverride.lyrics &&
+          activeTrackOverride.lyrics.length >= (found.lyrics?.length || 0)
+            ? activeTrackOverride.lyrics
+            : found.lyrics,
+      };
+    }
     if (activeTrackOverride && activeTrackOverride.id === currentTrackId) {
       return activeTrackOverride;
     }
+    if (found) return found;
     return tracks[0] ?? INITIAL_ENRICHED_CATALOG[0];
   }, [tracks, currentTrackId, activeTrackOverride]);
 
@@ -884,8 +895,9 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     [musicSettings]
   );
 
-  // Draggable & Minimizable Player Pill State
+  // Draggable, Minimizable & Dismissible Player Pill State
   const [isPillMinimized, setIsPillMinimized] = useState<boolean>(false);
+  const [isPillHidden, setIsPillHidden] = useState<boolean>(false);
   const [pillOffset, setPillOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDraggingPill, setIsDraggingPill] = useState<boolean>(false);
   const pillDragStartRef = useRef<{
@@ -895,6 +907,9 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     originY: number;
   } | null>(null);
   const lyricFetchSeqRef = useRef<number>(0);
+  const lastFetchedTrackIdRef = useRef<string>('');
+  const lastBroadcastTimeRef = useRef<number>(0);
+  const lastBroadcastKeyRef = useRef<string>('');
 
   const handlePillPointerDown = useCallback(
     (e: React.PointerEvent<HTMLElement>) => {
@@ -947,30 +962,44 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
   useEffect(() => {
     const unsubscribe = globalAudio.subscribe((aState) => {
-      setIsPlaying(aState.isPlaying);
-      setIsBuffering(aState.isBuffering);
-      setCurrentTime(aState.currentTime);
-      setSpatialDetails(aState.spatialDetails);
+      setIsPlaying((prev) => (prev !== aState.isPlaying ? aState.isPlaying : prev));
+      setIsBuffering((prev) => (prev !== aState.isBuffering ? aState.isBuffering : prev));
+      setCurrentTime((prev) =>
+        Math.abs(aState.currentTime - prev) >= 0.12 || aState.currentTime === 0
+          ? aState.currentTime
+          : prev
+      );
       if (aState.statusMessage) {
-        setStatusBanner(aState.statusMessage);
+        setStatusBanner((prev) => (prev !== aState.statusMessage ? aState.statusMessage! : prev));
       }
       if (aState.track) {
-        setCurrentTrackId(aState.track.id);
+        setCurrentTrackId((prev) => (prev !== aState.track!.id ? aState.track!.id : prev));
         const realDur =
           Number.isFinite(aState.duration) && aState.duration > 35
             ? Math.round(aState.duration)
             : aState.track.duration;
-        setActiveTrackOverride((prev) => ({
-          ...aState.track!,
-          duration: realDur,
-          lyrics:
+        setActiveTrackOverride((prev) => {
+          const nextLyrics =
             prev &&
             prev.id === aState.track!.id &&
             prev.lyrics &&
-            prev.lyrics.length > aState.track!.lyrics.length
+            prev.lyrics.length >= (aState.track!.lyrics?.length || 0)
               ? prev.lyrics
-              : aState.track!.lyrics,
-        }));
+              : aState.track!.lyrics;
+          if (
+            prev &&
+            prev.id === aState.track!.id &&
+            prev.duration === realDur &&
+            prev.lyrics === nextLyrics
+          ) {
+            return prev;
+          }
+          return {
+            ...aState.track!,
+            duration: realDur,
+            lyrics: nextLyrics,
+          };
+        });
       }
     });
     return unsubscribe;
@@ -1104,6 +1133,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
   const loadLyricsForTrack = useCallback(async (track: MonochromeTrack) => {
     const reqSeq = ++lyricFetchSeqRef.current;
+    lastFetchedTrackIdRef.current = track.id;
     setIsFetchingLyrics(true);
     try {
       const synced = await fetchSynchronizedLyricsFromLrclib(
@@ -1114,6 +1144,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       );
       if (reqSeq !== lyricFetchSeqRef.current) return;
       if (synced && synced.length >= 3) {
+        globalAudio.updateTrackLyrics(track.id, synced);
         setTracks((prev) =>
           prev.map((t) => (t.id === track.id ? { ...t, lyrics: synced } : t))
         );
@@ -1124,7 +1155,9 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           prev.map((t) => (t.id === track.id ? { ...t, lyrics: synced } : t))
         );
         setActiveTrackOverride((prev) =>
-          prev && prev.id === track.id ? { ...prev, lyrics: synced } : prev
+          prev && prev.id === track.id
+            ? { ...prev, lyrics: synced }
+            : { ...track, lyrics: synced }
         );
         // Immediately pipe fetched lyrics into DeepL automatic translation
         const rawLines = synced
@@ -1150,12 +1183,16 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     }
   }, []);
 
+  // Automatically fetch full synchronized lyrics whenever the active track only has stub lyrics (<= 8 lines)
   useEffect(() => {
-    const initial = INITIAL_ENRICHED_CATALOG[0];
-    if (initial) {
-      loadLyricsForTrack(initial);
+    if (
+      currentTrack &&
+      (!currentTrack.lyrics || currentTrack.lyrics.length <= 8) &&
+      lastFetchedTrackIdRef.current !== currentTrack.id
+    ) {
+      loadLyricsForTrack(currentTrack);
     }
-  }, [loadLyricsForTrack]);
+  }, [currentTrack, loadLyricsForTrack]);
 
   const loadMonochromeWebProxy = useCallback(
     async (
@@ -1343,11 +1380,11 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
         if (globalAudio.getState().track?.id === currentTrack.id) {
           globalAudio.resume();
         } else {
-          startTrackPlayback(currentTrack, currentTime);
+          playTrack(currentTrack);
         }
       }
     }
-  }, [currentTrack, currentTime, isPlaying, startTrackPlayback]);
+  }, [currentTrack, isPlaying, playTrack]);
 
   const seekToSeconds = useCallback((targetSec: number) => {
     globalAudio.seek(targetSec);
@@ -1707,7 +1744,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
     };
   }, [currentTrack.artworkUrl, currentTrack.coverGradient, resolvedAccentHex]);
 
-  // Broadcast Now Playing Dock state to OS Desktop
+  // Broadcast Now Playing Dock state to OS Desktop (throttled to avoid DOM thrashing)
   useEffect(() => {
     const activeLyricText =
       currentTrack.lyrics && currentLyricIndex >= 0
@@ -1717,9 +1754,19 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       currentTrack.lyrics && currentLyricIndex >= 0
         ? currentTrack.lyrics[currentLyricIndex + 1]?.text || ''
         : currentTrack.lyrics?.[0]?.text || '';
+
+    const stateKey = `${currentTrack.id}::${isPlaying}::${currentLyricIndex}::${isMuted ? 0 : volume}`;
+    const now = performance.now();
+    if (stateKey === lastBroadcastKeyRef.current && now - lastBroadcastTimeRef.current < 450) {
+      return;
+    }
+    lastBroadcastKeyRef.current = stateKey;
+    lastBroadcastTimeRef.current = now;
+
     window.dispatchEvent(
       new CustomEvent('glassium-music-state', {
         detail: {
+          trackId: currentTrack.id,
           isPlaying,
           title: currentTrack.title,
           artist: currentTrack.artist,
@@ -2261,30 +2308,23 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             : 'w-full lg:w-[430px] xl:w-[480px] border-l border-white/[0.12]'
         } flex flex-col min-h-0 relative overflow-hidden shrink-0 bg-zinc-950/80`}
       >
-        {/* Apple Music Dynamic Blurred Album Artwork Mesh Background */}
+        {/* Apple Music Dynamic Album Artwork Ambient Mesh Background (GPU-optimized) */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
           {currentTrack.artworkUrl ? (
-            <>
-              <img
-                src={currentTrack.artworkUrl}
-                alt=""
-                className="absolute -inset-16 w-[135%] h-[135%] max-w-none object-cover blur-[72px] saturate-200 opacity-55 scale-125 transition-all duration-1000"
-              />
-              <img
-                src={currentTrack.artworkUrl}
-                alt=""
-                className="absolute inset-0 w-full h-full object-cover blur-[96px] saturate-150 opacity-35 mix-blend-screen"
-              />
-            </>
+            <img
+              src={currentTrack.artworkUrl}
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover blur-3xl saturate-150 opacity-40 scale-110"
+            />
           ) : (
             <div
-              className={`absolute inset-0 bg-gradient-to-br ${currentTrack.coverGradient} blur-3xl opacity-55`}
+              className={`absolute inset-0 bg-gradient-to-br ${currentTrack.coverGradient} blur-2xl opacity-50`}
             />
           )}
           <div
             className="absolute inset-0"
             style={{
-              background: `radial-gradient(circle at 20% 25%, ${artworkPalette.c1}44 0%, transparent 55%), radial-gradient(circle at 80% 75%, ${artworkPalette.c2}44 0%, transparent 60%), linear-gradient(180deg, rgba(9,9,11,0.45) 0%, rgba(9,9,11,0.72) 100%)`,
+              background: `radial-gradient(circle at 20% 25%, ${artworkPalette.c1}44 0%, transparent 55%), radial-gradient(circle at 80% 75%, ${artworkPalette.c2}44 0%, transparent 60%), linear-gradient(180deg, rgba(9,9,11,0.5) 0%, rgba(9,9,11,0.78) 100%)`,
             }}
           />
         </div>
@@ -2508,14 +2548,14 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             const isPast = idx < currentLyricIndex;
             const distance = Math.abs(idx - currentLyricIndex);
 
-            // Apple Music progressive optical depth-of-field blur
+            // GPU-accelerated Apple Music depth hierarchy (zero per-line Gaussian blur lag)
             const appleBlurClass = isActive
-              ? 'blur-0 opacity-100 scale-[1.03]'
+              ? 'opacity-100 scale-[1.02]'
               : distance === 1
-              ? 'blur-[1px] opacity-45 scale-100'
+              ? 'opacity-50 scale-100'
               : distance === 2
-              ? 'blur-[2.2px] opacity-30 scale-[0.98]'
-              : 'blur-[3.5px] opacity-20 scale-[0.96]';
+              ? 'opacity-30 scale-[0.98]'
+              : 'opacity-20 scale-[0.96]';
 
             if (line.isInterlude) {
               if (!isActive && distance > 1) return null;
@@ -5335,8 +5375,22 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       </div>
 
       {/* ===================================================================
-          DRAGGABLE & MINIMIZABLE LIQUID GLASS PLAYER BAR (Synced with OS Accent)
+          DRAGGABLE, MINIMIZABLE & DISMISSIBLE LIQUID GLASS PLAYER BAR
          =================================================================== */}
+      {isPillHidden ? (
+        <div className="absolute bottom-3 right-4 z-30 pointer-events-auto">
+          <button
+            type="button"
+            onClick={() => setIsPillHidden(false)}
+            style={{ backgroundColor: resolvedAccentHex }}
+            className="px-3.5 py-2 rounded-full text-white text-xs font-bold shadow-2xl border border-white/25 flex items-center gap-1.5 hover:scale-105 transition cursor-pointer"
+            title="音楽ピルを再表示"
+          >
+            <span className="material-symbols-rounded text-[16px]">music_note</span>
+            <span>プレイヤーを表示</span>
+          </button>
+        </div>
+      ) : (
       <div
         className="absolute bottom-2.5 left-3 right-3 z-30 pointer-events-none flex justify-center"
         style={{
@@ -5387,8 +5441,17 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 type="button"
                 onClick={() => setIsPillMinimized(false)}
                 className="w-7 h-7 rounded-lg bg-white/15 hover:bg-white/25 text-white flex items-center justify-center"
+                title="展開"
               >
                 <span className="material-symbols-rounded text-[16px]">open_in_full</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPillHidden(true)}
+                className="w-7 h-7 rounded-lg bg-white/10 hover:bg-rose-500/40 text-white/75 hover:text-white flex items-center justify-center"
+                title="再生中でもピルを消す"
+              >
+                <span className="material-symbols-rounded text-[16px]">close</span>
               </button>
             </div>
           </div>
@@ -5443,6 +5506,15 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                 title="最小化"
               >
                 <span className="material-symbols-rounded text-[14px]">close_fullscreen</span>
+              </button>
+              <button
+                type="button"
+                data-no-pill-drag="true"
+                onClick={() => setIsPillHidden(true)}
+                className="w-6 h-6 rounded-lg bg-white/10 hover:bg-rose-500/40 text-white/80 hover:text-white flex items-center justify-center"
+                title="再生中でもピルを消す"
+              >
+                <span className="material-symbols-rounded text-[14px]">close</span>
               </button>
             </div>
 
@@ -5617,6 +5689,7 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

@@ -460,7 +460,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
     return saved.filter((w) => w && typeof w.id === 'string' && typeof w.appId === 'string');
   });
   const windows = useMemo(() => allWindows.filter((w) => !w.closed), [allWindows]);
-  const mountedWindows = allWindows;
+  const mountedWindows = windows;
   const zCounter = useRef(
     allWindows.reduce((max, w) => Math.max(max, w.zIndex || 60), 60) + 1
   );

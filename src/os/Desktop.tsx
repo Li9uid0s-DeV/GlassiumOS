@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode, useEffect, useRef, useState } from 'react';
+import React, { Component, ErrorInfo, ReactNode, Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useOS } from './OSContext';
 import { WindowFrame } from './WindowFrame';
@@ -13,9 +13,6 @@ import { LockScreen } from './LockScreen';
 import { TerminalApp } from './apps/Terminal';
 import { NotepadApp } from './apps/Notepad';
 import { FileExplorerApp } from './apps/FileExplorer';
-import { BrowserApp } from './apps/Browser';
-import { SettingsApp } from './apps/Settings';
-import { GameApp } from './apps/Game';
 import { AppStoreApp } from './apps/AppStore';
 import { CalendarApp } from './apps/CalendarApp';
 import { WeatherApp } from './apps/Weather';
@@ -23,18 +20,6 @@ import { ClockApp } from './apps/ClockApp';
 import { AIAssistantApp } from './apps/AIAssistantApp';
 import { Calculator } from './apps/Calculator';
 import { TaskManager } from './apps/TaskManager';
-import { SynthVisualizerApp } from './apps/SynthVisualizer';
-import { EntertainmentApp } from './apps/Entertainment';
-import { GlassiumStudioApp } from './apps/GlassiumStudio';
-import { RetroCadeApp } from './apps/RetroCade';
-import {
-  GlassiumSonicStudio,
-  GlassiumSheetApp,
-  GlassiumStageApp,
-  GlassiumNoteApp,
-  GlassiumTsxRunnerApp,
-} from './apps/GlassiumOfficeSuite';
-import { GarageBandApp } from './apps/GarageBand';
 import { renderExtraApp } from './apps/ExtraAppsSuite';
 import { Icon } from './Icon';
 import { AppId, TASKBAR_APPS, DESKTOP_ICON_SIZE_PRESETS } from './types';
@@ -42,6 +27,40 @@ import { AppLogo } from './AppLogo';
 import { GlasiusCard } from './GlasiusCard';
 import { InitialSetupWizard, InitialSetupResult } from './InitialSetupWizard';
 import { DesktopOverlaySuite } from './DesktopOverlaySuite';
+
+const BrowserApp = lazy(() => import('./apps/Browser').then((m) => ({ default: m.BrowserApp })));
+const SettingsApp = lazy(() => import('./apps/Settings').then((m) => ({ default: m.SettingsApp })));
+const GameApp = lazy(() => import('./apps/Game').then((m) => ({ default: m.GameApp })));
+const SynthVisualizerApp = lazy(() =>
+  import('./apps/SynthVisualizer').then((m) => ({ default: m.SynthVisualizerApp }))
+);
+const EntertainmentApp = lazy(() =>
+  import('./apps/Entertainment').then((m) => ({ default: m.EntertainmentApp }))
+);
+const GlassiumStudioApp = lazy(() =>
+  import('./apps/GlassiumStudio').then((m) => ({ default: m.GlassiumStudioApp }))
+);
+const RetroCadeApp = lazy(() =>
+  import('./apps/RetroCade').then((m) => ({ default: m.RetroCadeApp }))
+);
+const GlassiumSonicStudio = lazy(() =>
+  import('./apps/GlassiumOfficeSuite').then((m) => ({ default: m.GlassiumSonicStudio }))
+);
+const GlassiumSheetApp = lazy(() =>
+  import('./apps/GlassiumOfficeSuite').then((m) => ({ default: m.GlassiumSheetApp }))
+);
+const GlassiumStageApp = lazy(() =>
+  import('./apps/GlassiumOfficeSuite').then((m) => ({ default: m.GlassiumStageApp }))
+);
+const GlassiumNoteApp = lazy(() =>
+  import('./apps/GlassiumOfficeSuite').then((m) => ({ default: m.GlassiumNoteApp }))
+);
+const GlassiumTsxRunnerApp = lazy(() =>
+  import('./apps/GlassiumOfficeSuite').then((m) => ({ default: m.GlassiumTsxRunnerApp }))
+);
+const GarageBandApp = lazy(() =>
+  import('./apps/GarageBand').then((m) => ({ default: m.GarageBandApp }))
+);
 
 function renderApp(appId: string, payload?: unknown) {
   switch (appId) {
@@ -177,7 +196,7 @@ function CustomAppView({ payload }: { payload?: { url?: string; isCustomApp?: bo
         src={src}
         className="h-full w-full border-0"
         title={payload?.appInfo?.name || 'custom app'}
-        sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+        sandbox="allow-scripts allow-forms allow-popups allow-modals"
       />
     </div>
   );
@@ -283,6 +302,7 @@ export function Desktop() {
 
   // Global OS Music State & Floating Bottom Liquid Glass Dock State
   const [musicState, setMusicState] = useState<{
+    trackId?: string;
     isPlaying: boolean;
     title?: string;
     artist?: string;
@@ -297,10 +317,17 @@ export function Desktop() {
     palette?: { c1: string; c2: string; c3: string; c4: string };
   } | null>(null);
   const [pillDismissed, setPillDismissed] = useState(false);
+  const [topMusicPillDismissed, setTopMusicPillDismissed] = useState(false);
   const [musicPillExpanded, setMusicPillExpanded] = useState(false);
   const [desktopPillMinimized, setDesktopPillMinimized] = useState(false);
   const [desktopPillOffset, setDesktopPillOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDraggingDesktopPill, setIsDraggingDesktopPill] = useState(false);
+  const [isMouseNearTop, setIsMouseNearTop] = useState(false);
+  const [isHoveringTopBar, setIsHoveringTopBar] = useState(false);
+  const topBarHideTimerRef = useRef<number | null>(null);
+  const lastMusicTrackKeyRef = useRef<string>('');
+  const wasMusicPlayingRef = useRef<boolean>(false);
+  const wasTimerRunningRef = useRef<boolean>(false);
   const desktopPillDragRef = useRef<{
     startX: number;
     startY: number;
@@ -377,14 +404,42 @@ export function Desktop() {
   } | null>(null);
   const [garageBandPillDismissed, setGarageBandPillDismissed] = useState(false);
 
+  // Auto-show Top Pill Bar when user moves mouse cursor near the top of the screen
+  useEffect(() => {
+    const handleTopMouseMove = (e: MouseEvent) => {
+      if (e.clientY <= 52) {
+        if (topBarHideTimerRef.current) {
+          window.clearTimeout(topBarHideTimerRef.current);
+          topBarHideTimerRef.current = null;
+        }
+        setIsMouseNearTop(true);
+      } else if (e.clientY > 145) {
+        if (!topBarHideTimerRef.current) {
+          topBarHideTimerRef.current = window.setTimeout(() => {
+            setIsMouseNearTop(false);
+            topBarHideTimerRef.current = null;
+          }, 320);
+        }
+      }
+    };
+    window.addEventListener('mousemove', handleTopMouseMove, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', handleTopMouseMove);
+      if (topBarHideTimerRef.current) {
+        window.clearTimeout(topBarHideTimerRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     const onTimerState = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail) {
         setTimerPillState(detail);
-        if (detail.running) {
+        if (detail.running && !wasTimerRunningRef.current) {
           setTimerPillDismissed(false);
         }
+        wasTimerRunningRef.current = Boolean(detail.running);
       }
     };
     window.addEventListener('glassium-timer-state', onTimerState);
@@ -396,9 +451,15 @@ export function Desktop() {
       const detail = (e as CustomEvent).detail;
       if (detail) {
         setMusicState(detail);
-        if (detail.isPlaying) {
+        const trackKey = `${detail.trackId || ''}::${detail.title || ''}::${detail.artist || ''}`;
+        const isNewTrack = trackKey !== lastMusicTrackKeyRef.current;
+        const justStartedPlaying = Boolean(detail.isPlaying) && !wasMusicPlayingRef.current;
+        if (detail.isPlaying && (isNewTrack || justStartedPlaying)) {
           setPillDismissed(false);
+          setTopMusicPillDismissed(false);
         }
+        lastMusicTrackKeyRef.current = trackKey;
+        wasMusicPlayingRef.current = Boolean(detail.isPlaying);
       }
     };
     window.addEventListener('glassium-music-state', onMusicState);
@@ -1815,7 +1876,15 @@ export function Desktop() {
             isHidden={Boolean(win.closed || win.minimized || ((win.desktopId || 'desk-1') !== activeDesktopId))}
           >
             <WindowErrorBoundary key={`${win.id}-${win.appId}`} appTitle={win.title}>
-              {renderApp(win.appId, win.payload)}
+              <Suspense
+                fallback={
+                  <div className="flex h-full w-full items-center justify-center bg-slate-950/60 text-xs text-white/60">
+                    読み込み中...
+                  </div>
+                }
+              >
+                {renderApp(win.appId, win.payload)}
+              </Suspense>
             </WindowErrorBoundary>
           </WindowFrame>
         ))}
@@ -2200,9 +2269,39 @@ export function Desktop() {
 
       {/* ========================================================
           OS-LEVEL TOP FLOATING PILL / DOCK BAR
-          (Timer Pill, Music Pill, Weather Alert Pill, GarageBand Recording Pill, & Spotlight/Tile Trigger)
+          Auto-reveals smoothly when moving the mouse cursor to the top edge
          ======================================================== */}
-      <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[4500] flex flex-wrap items-start justify-center gap-2 max-w-[96vw] pointer-events-none select-none">
+      {/* Subtle Top Edge Sensor Indicator (always visible when top bar is tucked away) */}
+      <div
+        onMouseEnter={() => setIsMouseNearTop(true)}
+        className={`fixed top-0 left-1/2 -translate-x-1/2 z-[4499] h-3 w-48 flex items-start justify-center pt-1 cursor-pointer transition-opacity duration-300 ${
+          isMouseNearTop || isHoveringTopBar ? 'opacity-0 pointer-events-none' : 'opacity-75 hover:opacity-100'
+        }`}
+        title="マウスを上に移動してトップバー・ピルを表示"
+      >
+        <div className="h-1 w-20 rounded-full bg-white/35 shadow-[0_0_10px_rgba(255,255,255,0.4)]" />
+      </div>
+
+      <div
+        onMouseEnter={() => {
+          if (topBarHideTimerRef.current) {
+            window.clearTimeout(topBarHideTimerRef.current);
+            topBarHideTimerRef.current = null;
+          }
+          setIsHoveringTopBar(true);
+          setIsMouseNearTop(true);
+        }}
+        onMouseLeave={() => {
+          setIsHoveringTopBar(false);
+          setMusicPillExpanded(false);
+          setTimerPillExpanded(false);
+        }}
+        className={`fixed top-2.5 left-1/2 -translate-x-1/2 z-[4500] flex flex-wrap items-start justify-center gap-2 max-w-[96vw] select-none transition-all duration-300 ease-out ${
+          isMouseNearTop || isHoveringTopBar
+            ? 'translate-y-0 opacity-100 pointer-events-auto'
+            : '-translate-y-16 opacity-0 pointer-events-none'
+        }`}
+      >
         {/* Quick Spotlight (Ctrl+K) & Window Tile Group Memory Trigger Pill */}
         <div className="pointer-events-auto flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-slate-950/80 hover:bg-slate-950/90 backdrop-blur-2xl border border-white/15 hover:border-white/30 shadow-xl transition">
           <button
@@ -2227,6 +2326,23 @@ export function Desktop() {
             <Icon name="Columns" size={12} className="text-violet-400" />
             <span className="hidden md:inline">タイル記憶</span>
           </button>
+          {musicState && (pillDismissed || topMusicPillDismissed) && (
+            <>
+              <span className="h-3.5 w-px bg-white/15" />
+              <button
+                type="button"
+                onClick={() => {
+                  setPillDismissed(false);
+                  setTopMusicPillDismissed(false);
+                }}
+                className="flex items-center gap-1 text-[11px] font-bold text-rose-300 hover:text-rose-200 transition cursor-pointer px-1"
+                title="非表示にした音楽ピルを再表示"
+              >
+                <Icon name="Music" size={11} className="text-rose-400" />
+                <span>音楽ピル復帰</span>
+              </button>
+            </>
+          )}
         </div>
 
         {/* 1. EXPANDABLE TOP TIMER PILL (#1) */}
@@ -2441,7 +2557,7 @@ export function Desktop() {
         {/* 2. EXPANDABLE TOP MUSIC PILL (#1: Hover/Click Expansion with Seek, Volume, 2-Line Lyrics & Waveform) */}
         <AnimatePresence>
           {musicState &&
-            !pillDismissed &&
+            !topMusicPillDismissed &&
             (musicState.isPlaying || windows.some((w) => w.appId === 'synth')) && (
               <motion.div
                 key="os-top-music-pill"
@@ -2625,9 +2741,12 @@ export function Desktop() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setPillDismissed(true)}
-                        className="w-5 h-5 rounded-full hover:bg-white/15 text-white/50 hover:text-white flex items-center justify-center transition cursor-pointer"
-                        title="ピルを隠す"
+                        onClick={() => {
+                          setTopMusicPillDismissed(true);
+                          setMusicPillExpanded(false);
+                        }}
+                        className="w-5 h-5 rounded-full hover:bg-rose-500/40 text-white/50 hover:text-white flex items-center justify-center transition cursor-pointer"
+                        title="再生中でも音楽ピルを消す"
                       >
                         <Icon name="X" size={11} />
                       </button>
@@ -2903,6 +3022,15 @@ export function Desktop() {
                   title="展開"
                 >
                   <span className="material-symbols-rounded text-xs">open_in_full</span>
+                </button>
+                <button
+                  type="button"
+                  data-no-dock-drag="true"
+                  onClick={() => setPillDismissed(true)}
+                  className="w-6 h-6 rounded-lg bg-white/10 hover:bg-rose-500/40 text-white/70 hover:text-white flex items-center justify-center"
+                  title="再生中でもピルを消す"
+                >
+                  <span className="material-symbols-rounded text-xs">close</span>
                 </button>
               </div>
             ) : (

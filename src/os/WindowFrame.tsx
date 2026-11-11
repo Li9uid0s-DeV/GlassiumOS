@@ -68,6 +68,7 @@ export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState<ResizeDir | null>(null);
   const [snapPreview, setSnapPreview] = useState<SnapZone>(null);
+  const snapPreviewRef = useRef<SnapZone>(null);
   const [showSnapFlyout, setShowSnapFlyout] = useState(false);
   const snapFlyoutTimer = useRef<number | null>(null);
 
@@ -137,6 +138,7 @@ export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
 
   const applySnapLayout = (zone: SnapZone) => {
     setShowSnapFlyout(false);
+    snapPreviewRef.current = null;
     setSnapPreview(null);
     if (!zone) return;
     if (zone === 'maximize') {
@@ -183,7 +185,10 @@ export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
         if (win.appId === 'calculator' && ( detectedZone === 'left' || detectedZone === 'right')) {
           detectedZone = null;
         }
-        setSnapPreview(detectedZone);
+        if (snapPreviewRef.current !== detectedZone) {
+          snapPreviewRef.current = detectedZone;
+          setSnapPreview(detectedZone);
+        }
 
         const maxY = window.innerHeight - 56;
         const minY = shellMode === 'mac' || shellMode === 'ubuntu' ? 32 : 0;
@@ -254,6 +259,7 @@ export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
           window.dispatchEvent(new CustomEvent('glasispect-calc-edge-dock', { detail: { side: 'left', docked: true } }));
           setDragging(false);
           setResizing(null);
+          snapPreviewRef.current = null;
           setSnapPreview(null);
           return;
         } else if (liveRectRef.current.x + liveRectRef.current.width >= vw - 36) {
@@ -261,17 +267,19 @@ export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
           window.dispatchEvent(new CustomEvent('glasispect-calc-edge-dock', { detail: { side: 'right', docked: true } }));
           setDragging(false);
           setResizing(null);
+          snapPreviewRef.current = null;
           setSnapPreview(null);
           return;
         }
       }
-      if (dragging && snapPreview) {
-        applySnapLayout(snapPreview);
+      if (dragging && snapPreviewRef.current) {
+        applySnapLayout(snapPreviewRef.current);
       } else if (dragging || resizing) {
         updateWindowRect(win.id, { ...liveRectRef.current });
       }
       setDragging(false);
       setResizing(null);
+      snapPreviewRef.current = null;
       setSnapPreview(null);
     };
 
@@ -284,7 +292,7 @@ export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
       window.removeEventListener('pointerup', handleUp);
       window.removeEventListener('pointercancel', handleUp);
     };
-  }, [dragging, resizing, snapPreview, win.id, updateWindowRect, shellMode]);
+  }, [dragging, resizing, win.id, updateWindowRect, shellMode]);
 
   const hiddenWindow = Boolean(isHidden || win.minimized || win.closed);
 
@@ -738,12 +746,14 @@ export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
                           onClick={() => applySnapLayout('left')}
                           className="bg-white/15 transition-colors hover:bg-cyan-400/60"
                           title="Snap Left 50%"
+                          aria-label="Snap Left 50%"
                         />
                         <button
                           type="button"
                           onClick={() => applySnapLayout('right')}
                           className="bg-white/15 transition-colors hover:bg-cyan-400/60"
                           title="Snap Right 50%"
+                          aria-label="Snap Right 50%"
                         />
                       </div>
 
@@ -754,18 +764,21 @@ export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
                           onClick={() => applySnapLayout('three-left')}
                           className="bg-white/15 transition-colors hover:bg-cyan-400/60"
                           title="Left Column"
+                          aria-label="Snap Left Column"
                         />
                         <button
                           type="button"
                           onClick={() => applySnapLayout('three-center')}
                           className="bg-white/15 transition-colors hover:bg-cyan-400/60"
                           title="Center Column"
+                          aria-label="Snap Center Column"
                         />
                         <button
                           type="button"
                           onClick={() => applySnapLayout('three-right')}
                           className="bg-white/15 transition-colors hover:bg-cyan-400/60"
                           title="Right Column"
+                          aria-label="Snap Right Column"
                         />
                       </div>
 
@@ -776,24 +789,28 @@ export const WindowFrame: React.FC<Props> = ({ win, isHidden, children }) => {
                           onClick={() => applySnapLayout('top-left')}
                           className="bg-white/15 transition-colors hover:bg-cyan-400/60"
                           title="Top Left"
+                          aria-label="Snap Top Left"
                         />
                         <button
                           type="button"
                           onClick={() => applySnapLayout('top-right')}
                           className="bg-white/15 transition-colors hover:bg-cyan-400/60"
                           title="Top Right"
+                          aria-label="Snap Top Right"
                         />
                         <button
                           type="button"
                           onClick={() => applySnapLayout('bottom-left')}
                           className="bg-white/15 transition-colors hover:bg-cyan-400/60"
                           title="Bottom Left"
+                          aria-label="Snap Bottom Left"
                         />
                         <button
                           type="button"
                           onClick={() => applySnapLayout('bottom-right')}
                           className="bg-white/15 transition-colors hover:bg-cyan-400/60"
                           title="Bottom Right"
+                          aria-label="Snap Bottom Right"
                         />
                       </div>
                     </div>
