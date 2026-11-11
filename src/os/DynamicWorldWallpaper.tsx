@@ -116,6 +116,7 @@ export interface DynamicEnvironmentConfig {
   terrainType: DynamicTerrainType;
   snowAccumulation: number; // 0 to 100 (%)
   autoSnowAccumulate: boolean;
+  audioReactiveEnabled?: boolean;
 }
 
 const STORAGE_KEY = 'glasis_dynamic_world_wallpaper_v2';
@@ -133,6 +134,7 @@ const DEFAULT_CONFIG: DynamicEnvironmentConfig = {
   terrainType: 'auto',
   snowAccumulation: 0,
   autoSnowAccumulate: true,
+  audioReactiveEnabled: true,
 };
 
 export function inferTerrainFromLocationName(name: string): Exclude<DynamicTerrainType, 'auto'> {
@@ -433,6 +435,54 @@ export function DynamicWorldWallpaper({
   }, [config.autoSnowAccumulate, effectiveWeather, effectiveSeason, effectiveEvent]);
 
   const windVec = getWindVector(config.windDirection, config.windSpeedMs);
+  const musicPlayingRef = useRef(false);
+
+  useEffect(() => {
+    const onMusic = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) {
+        musicPlayingRef.current = Boolean(detail.isPlaying);
+      }
+    };
+    window.addEventListener('glassium-music-state', onMusic);
+    return () => window.removeEventListener('glassium-music-state', onMusic);
+  }, []);
+
+  // Broadcast Weather & Precipitation Alert Pill State to OS Top Pill Bar
+  useEffect(() => {
+    const isPrecipitation =
+      effectiveWeather === 'LightRain' ||
+      effectiveWeather === 'Rainy' ||
+      effectiveWeather === 'HeavyRain' ||
+      effectiveWeather === 'Thunderstorm' ||
+      effectiveWeather === 'Snow' ||
+      effectiveWeather === 'HeavySnow' ||
+      effectiveWeather === 'Sunshower';
+    window.dispatchEvent(
+      new CustomEvent('glassium-weather-pill-state', {
+        detail: {
+          active: isPrecipitation || config.snowAccumulation >= 25,
+          location: locInfo.displayLabel,
+          weather: effectiveWeather,
+          weatherLabel: WEATHER_MODE_LABELS[effectiveWeather] || effectiveWeather,
+          tempC: liveTempC,
+          snowAccumulation: Math.round(config.snowAccumulation),
+          alertText:
+            effectiveWeather === 'HeavySnow'
+              ? '大雪・吹雪アラート'
+              : effectiveWeather === 'Snow'
+              ? '降雪・路面凍結注意'
+              : effectiveWeather === 'Thunderstorm'
+              ? '雷雨・強風アラート'
+              : effectiveWeather === 'HeavyRain'
+              ? '豪雨アラート'
+              : isPrecipitation
+              ? '降水アラート (傘推奨)'
+              : `積雪 ${Math.round(config.snowAccumulation)}%`,
+        },
+      })
+    );
+  }, [effectiveWeather, locInfo.displayLabel, liveTempC, config.snowAccumulation]);
 
   // Store latest resolved state in ref for 60fps canvas animation loop
   const stateRef = useRef({
@@ -445,6 +495,7 @@ export function DynamicWorldWallpaper({
     windSpeedMs: config.windSpeedMs,
     windDirection: config.windDirection,
     windVec,
+    audioReactiveEnabled: config.audioReactiveEnabled !== false,
   });
 
   useEffect(() => {
@@ -458,6 +509,7 @@ export function DynamicWorldWallpaper({
       windSpeedMs: config.windSpeedMs,
       windDirection: config.windDirection,
       windVec,
+      audioReactiveEnabled: config.audioReactiveEnabled !== false,
     };
   }, [
     effectiveTime,
@@ -469,6 +521,7 @@ export function DynamicWorldWallpaper({
     config.windSpeedMs,
     config.windDirection,
     windVec,
+    config.audioReactiveEnabled,
   ]);
 
   useEffect(() => {
@@ -1548,6 +1601,100 @@ export function DynamicWorldWallpaper({
         }
       }
 
+      // 9C. EVENING / NIGHT STREETLIGHTS, CAR HEADLIGHTS & AUDIO-REACTIVE PULSE
+      const beatPulse =
+        stateRef.current.audioReactiveEnabled && musicPlayingRef.current
+          ? 0.5 + 0.5 * Math.pow(Math.abs(Math.sin(elapsed * 6.4)), 3)
+          : 0;
+
+      if (beatPulse > 0.05) {
+        ctx.save();
+        const beatGrad = ctx.createRadialGradient(
+          width * 0.5,
+          height * 0.32,
+          10,
+          width * 0.5,
+          height * 0.45,
+          width * 0.65
+        );
+        beatGrad.addColorStop(0, `rgba(56, 189, 248, ${(beatPulse * 0.16).toFixed(3)})`);
+        beatGrad.addColorStop(0.5, `rgba(168, 85, 247, ${(beatPulse * 0.1).toFixed(3)})`);
+        beatGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = beatGrad;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+      }
+
+      if ((isNightLike || tMode === 'dawn') && (terrain === 'urban' || terrain === 'suburban-plains')) {
+        const roadY = height * (terrain === 'urban' ? 0.84 : 0.78);
+        const lampCount = terrain === 'urban' ? 9 : 5;
+        ctx.save();
+        for (let l = 0; l < lampCount; l++) {
+          const lx = width * ((l + 0.5) / lampCount);
+          // Pole
+          ctx.strokeStyle = 'rgba(71, 85, 105, 0.85)';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(lx, roadY);
+          ctx.lineTo(lx, roadY - 26);
+          ctx.stroke();
+
+          // Warm Lamp Bulb
+          const lampGlow = 0.75 + beatPulse * 0.25;
+          ctx.fillStyle = `rgba(254, 240, 138, ${lampGlow.toFixed(2)})`;
+          ctx.beginPath();
+          ctx.arc(lx, roadY - 26, 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Light Cone Illuminating Ground / Snow
+          const coneGrad = ctx.createRadialGradient(lx, roadY - 24, 2, lx, roadY + 4, 38);
+          coneGrad.addColorStop(0, `rgba(253, 224, 71, ${(0.28 + snowRatio * 0.14 + beatPulse * 0.1).toFixed(2)})`);
+          coneGrad.addColorStop(1, 'rgba(253, 224, 71, 0)');
+          ctx.fillStyle = coneGrad;
+          ctx.beginPath();
+          ctx.moveTo(lx - 32, roadY + 12);
+          ctx.lineTo(lx, roadY - 26);
+          ctx.lineTo(lx + 32, roadY + 12);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // Gliding Car Headlights & Taillights along the Evening/Night Road
+        const carCount = terrain === 'urban' ? 4 : 2;
+        for (let c = 0; c < carCount; c++) {
+          const dir = c % 2 === 0 ? 1 : -1;
+          const speed = 55 + c * 18;
+          const rawX = (elapsed * speed * dir + c * 310) % (width + 160);
+          const cx = rawX < -80 ? rawX + width + 160 : rawX;
+          const cy = roadY + (dir > 0 ? 3 : -2);
+
+          // Car body silhouette
+          ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+          ctx.fillRect(cx - 8, cy - 5, 16, 5);
+
+          // Headlight beam
+          const beamX = dir > 0 ? cx + 8 : cx - 8;
+          const beamGrad = ctx.createLinearGradient(beamX, cy - 2, beamX + dir * 48, cy + 4);
+          beamGrad.addColorStop(0, 'rgba(254, 249, 195, 0.78)');
+          beamGrad.addColorStop(1, 'rgba(254, 249, 195, 0)');
+          ctx.fillStyle = beamGrad;
+          ctx.beginPath();
+          ctx.moveTo(beamX, cy - 3);
+          ctx.lineTo(beamX + dir * 48, cy - 8);
+          ctx.lineTo(beamX + dir * 48, cy + 5);
+          ctx.closePath();
+          ctx.fill();
+
+          // Red Taillight
+          const tailX = dir > 0 ? cx - 8 : cx + 8;
+          ctx.fillStyle = 'rgba(244, 63, 94, 0.9)';
+          ctx.beginPath();
+          ctx.arc(tailX, cy - 2.5, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
       // 10. WEATHER / SEASONAL / EVENT PARTICLES
       const activeParticleCount =
         wMode === 'HeavySnow' || wMode === 'HeavyRain' || wMode === 'Thunderstorm'
@@ -1927,6 +2074,28 @@ export function DynamicWorldWallpaper({
                     <option value="winter">❄️ 冬 (銀世界)</option>
                   </select>
                 </div>
+              </div>
+
+              {/* 6. Audio-Reactive Beat Sync Toggle */}
+              <div className="flex items-center justify-between pt-1.5 border-t border-white/10 text-[10px]">
+                <span className="text-white/80 font-bold">
+                  🎵 音楽ビート連動 (再生中に夜空・街明かりが脈動)
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateConfig({
+                      audioReactiveEnabled: config.audioReactiveEnabled === false,
+                    })
+                  }
+                  className={`px-2.5 py-0.5 rounded font-bold cursor-pointer ${
+                    config.audioReactiveEnabled !== false
+                      ? 'bg-emerald-400 text-slate-950'
+                      : 'bg-white/10 text-white/60'
+                  }`}
+                >
+                  {config.audioReactiveEnabled !== false ? 'ON' : 'OFF'}
+                </button>
               </div>
             </div>
           )}

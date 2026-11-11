@@ -667,10 +667,33 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
   const [, setProxyLatency] = useState(11);
   const [isBuffering, setIsBuffering] = useState(false);
 
-  // Track Catalog State
-  const [tracks, setTracks] = useState<MonochromeTrack[]>(INITIAL_ENRICHED_CATALOG);
+  // Track Catalog State (including GarageBand exported tracks)
+  const [tracks, setTracks] = useState<MonochromeTrack[]>(() => {
+    try {
+      const gbRaw = localStorage.getItem('glasis_garageband_exported_tracks_v1');
+      if (gbRaw) {
+        const gbParsed = JSON.parse(gbRaw);
+        if (Array.isArray(gbParsed) && gbParsed.length > 0) {
+          return [...gbParsed, ...INITIAL_ENRICHED_CATALOG];
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return INITIAL_ENRICHED_CATALOG;
+  });
   const [currentTrackId, setCurrentTrackId] = useState<string>(INITIAL_ENRICHED_CATALOG[0].id);
   const [activeTrackOverride, setActiveTrackOverride] = useState<MonochromeTrack | null>(null);
+  const [vocalLevelPercent, setVocalLevelPercent] = useState<number>(() =>
+    globalAudio.getVocalLevel()
+  );
+  const [showVocalSingSlider, setShowVocalSingSlider] = useState<boolean>(false);
+
+  const handleVocalLevelChange = useCallback((nextVal: number) => {
+    const clamped = Math.max(0, Math.min(130, Math.round(nextVal)));
+    setVocalLevelPercent(clamped);
+    globalAudio.setVocalLevel(clamped);
+  }, []);
 
   const currentTrack: MonochromeTrack = useMemo(() => {
     const found = tracks.find((t) => t.id === currentTrackId);
@@ -1187,8 +1210,15 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
 
   const playTrack = useCallback(
     (trackToPlay: MonochromeTrack) => {
+      const isDirectAudioData =
+        typeof trackToPlay.audioUrl === 'string' &&
+        (trackToPlay.audioUrl.startsWith('data:audio/') ||
+          trackToPlay.audioUrl.startsWith('blob:'));
+
       const rawIdStr = String(trackToPlay.monoTrackId || trackToPlay.id || '').trim();
-      const isNonNetease = /^(?:mono-itunes-|itunes-|album-|single-|artist-|imp-)/i.test(rawIdStr);
+      const isNonNetease = /^(?:mono-itunes-|itunes-|album-|single-|artist-|imp-|gb-export-)/i.test(
+        rawIdStr
+      );
       const cleanNumericId = isNonNetease
         ? ''
         : rawIdStr
@@ -1197,11 +1227,13 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             .replace(/^mono-live-tf-/, '')
             .replace(/^mono-live-/, '')
             .trim();
-      const exactPlayUrl = `/api/music/play?id=${encodeURIComponent(
-        /^\d+$/.test(cleanNumericId) ? cleanNumericId : ''
-      )}&title=${encodeURIComponent(trackToPlay.title)}&artist=${encodeURIComponent(
-        cleanPrimaryArtistName(trackToPlay.artist)
-      )}`;
+      const exactPlayUrl = isDirectAudioData
+        ? trackToPlay.audioUrl
+        : `/api/music/play?id=${encodeURIComponent(
+            /^\d+$/.test(cleanNumericId) ? cleanNumericId : ''
+          )}&title=${encodeURIComponent(trackToPlay.title)}&artist=${encodeURIComponent(
+            cleanPrimaryArtistName(trackToPlay.artist)
+          )}`;
 
       const normalizedTrack: MonochromeTrack = {
         ...trackToPlay,
@@ -1681,6 +1713,10 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
       currentTrack.lyrics && currentLyricIndex >= 0
         ? currentTrack.lyrics[currentLyricIndex]?.text || ''
         : '';
+    const nextLyricText =
+      currentTrack.lyrics && currentLyricIndex >= 0
+        ? currentTrack.lyrics[currentLyricIndex + 1]?.text || ''
+        : currentTrack.lyrics?.[0]?.text || '';
     window.dispatchEvent(
       new CustomEvent('glassium-music-state', {
         detail: {
@@ -1694,11 +1730,96 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
           duration: currentTrack.duration,
           volume: isMuted ? 0 : volume,
           lyricLine: activeLyricText,
+          nextLyricLine: nextLyricText,
           palette: artworkPalette,
         },
       })
     );
   }, [isPlaying, currentTrack, currentTime, currentLyricIndex, artworkPalette, volume, isMuted]);
+
+  // Listen for OS Top Pill / Bottom Dock / Spotlight commands & GarageBand Export
+  useEffect(() => {
+    const onMusicCommand = (e: Event) => {
+      const detail = (e as CustomEvent).detail || {};
+      if (detail.action === 'toggle-play') {
+        togglePlay();
+      } else if (detail.action === 'next') {
+        nextTrack();
+      } else if (detail.action === 'prev') {
+        prevTrack();
+      } else if (detail.action === 'seek' && typeof detail.time === 'number') {
+        seekToSeconds(Math.max(0, detail.time));
+      } else if (detail.action === 'set-volume' && typeof detail.volume === 'number') {
+        const clampedVol = Math.max(0, Math.min(1, detail.volume));
+        setIsMuted(clampedVol === 0);
+        setVolume(clampedVol);
+      } else if (detail.action === 'play-query' && typeof detail.query === 'string') {
+        const q = detail.query.trim().toLowerCase();
+        const found = tracks.find(
+          (t) =>
+            t.title.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q)
+        );
+        if (found) {
+          playTrack(found);
+        } else {
+          setSearchQuery(detail.query);
+          handleOnlineMusicSearch(detail.query);
+        }
+      }
+    };
+
+    const onGarageBandExport = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.track) {
+        const gbTrack = detail.track as MonochromeTrack;
+        setTracks((prev) => [gbTrack, ...prev.filter((t) => t.id !== gbTrack.id)]);
+        setUserPlaylists((prev) => {
+          const plId = 'pl-garageband-exports';
+          const existing = prev.find((p) => p.id === plId);
+          if (existing) {
+            return prev.map((p) =>
+              p.id === plId
+                ? {
+                    ...p,
+                    tracks: [gbTrack, ...p.tracks.filter((t) => t.id !== gbTrack.id)],
+                  }
+                : p
+            );
+          }
+          const newPl: MusicCollectionViewData = {
+            id: plId,
+            kind: 'PLAYLIST',
+            title: 'GarageBand Studio 書き出し',
+            subtitle: 'GarageBandで作曲・ミックスしたオリジナル楽曲',
+            creator: 'GarageBand Studio',
+            year: new Date().getFullYear(),
+            artworkUrl: gbTrack.artworkUrl || INITIAL_ENRICHED_CATALOG[0]?.artworkUrl || '',
+            coverGradient: 'from-amber-500 via-rose-600 to-indigo-950',
+            sourceService: 'GarageBand Studio',
+            tracks: [gbTrack],
+          };
+          return [newPl, ...prev];
+        });
+        setStatusBanner(`GarageBandから「${gbTrack.title}」を取り込み再生開始しました`);
+        playTrack(gbTrack);
+      }
+    };
+
+    window.addEventListener('glassium-music-command', onMusicCommand);
+    window.addEventListener('glassium-export-track-to-music', onGarageBandExport);
+    return () => {
+      window.removeEventListener('glassium-music-command', onMusicCommand);
+      window.removeEventListener('glassium-export-track-to-music', onGarageBandExport);
+    };
+  }, [
+    togglePlay,
+    nextTrack,
+    prevTrack,
+    seekToSeconds,
+    tracks,
+    playTrack,
+    handleOnlineMusicSearch,
+  ]);
 
   // 60fps Audio Sync Loop
   useEffect(() => {
@@ -2220,6 +2341,23 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
               </button>
             </div>
 
+            {/* Apple Music Sing / Karaoke Vocal Volume Toggle */}
+            <button
+              type="button"
+              onClick={() => setShowVocalSingSlider((v) => !v)}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition flex items-center gap-1 cursor-pointer ${
+                vocalLevelPercent < 95 || showVocalSingSlider
+                  ? 'bg-rose-500 text-white shadow-sm'
+                  : 'bg-white/10 text-white/80 hover:bg-white/20 hover:text-white'
+              }`}
+              title="Apple Music Sing カラオケ・ボーカル音量調整"
+            >
+              <span className="material-symbols-rounded text-xs">mic</span>
+              <span>
+                Sing {vocalLevelPercent === 100 ? 'ボーカル' : `${vocalLevelPercent}%`}
+              </span>
+            </button>
+
             <button
               onClick={() => {
                 setShowCustomLyricEditor((v) => !v);
@@ -2252,6 +2390,51 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
             </button>
           </div>
         </div>
+
+        {/* Apple Music Sing Karaoke Vocal Level Bar */}
+        {showVocalSingSlider && (
+          <div className="px-5 py-2.5 border-b border-white/[0.1] bg-black/55 backdrop-blur-2xl flex flex-wrap items-center justify-between gap-3 z-20">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-rounded text-sm text-rose-400">mic_external_on</span>
+              <div>
+                <div className="text-[11px] font-bold text-white flex items-center gap-1.5">
+                  <span>Apple Music Sing · ボーカル音量調整</span>
+                  <span className="px-1.5 py-0.5 rounded bg-rose-500/25 text-rose-200 font-mono text-[10px]">
+                    {vocalLevelPercent === 0
+                      ? 'カラオケ (Inst)'
+                      : vocalLevelPercent < 100
+                      ? `ボーカル抑制 ${vocalLevelPercent}%`
+                      : vocalLevelPercent === 100
+                      ? '原曲 (100%)'
+                      : `ボーカル強調 ${vocalLevelPercent}%`}
+                  </span>
+                </div>
+                <div className="text-[10px] text-white/55">
+                  中域ボーカル帯域をリアルタイム減衰・強調してカラオケ練習ができます
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-1 max-w-xs">
+              <button
+                type="button"
+                onClick={() => handleVocalLevelChange(vocalLevelPercent <= 15 ? 100 : 10)}
+                className="px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-[10px] font-bold text-white shrink-0 cursor-pointer"
+              >
+                {vocalLevelPercent <= 15 ? '原曲に戻す' : 'カラオケ化'}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={130}
+                step={5}
+                value={vocalLevelPercent}
+                onChange={(e) => handleVocalLevelChange(Number(e.target.value))}
+                style={{ accentColor: '#f43f5e' }}
+                className="flex-1 cursor-pointer h-1.5"
+              />
+            </div>
+          </div>
+        )}
 
         {showCustomLyricEditor && (
           <div className="p-4 border-b border-white/[0.12] bg-black/75 backdrop-blur-3xl space-y-2.5 z-20">
@@ -4581,6 +4764,27 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                     className="px-3.5 py-1.5 rounded-lg text-white text-xs font-semibold"
                   >
                     MV検索
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      window.dispatchEvent(
+                        new CustomEvent('glassium-open-pip', {
+                          detail: {
+                            title: activeMvItem.title,
+                            subtitle: activeMvItem.artist,
+                            videoUrl: activeMvItem.videoUrl,
+                            youtubeId: activeMvItem.youtubeId,
+                            thumbnailUrl: activeMvItem.thumbnailUrl,
+                          },
+                        })
+                      );
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                    title="デスクトップ最前面のPiPミニ動画プレイヤーで再生"
+                  >
+                    <span className="material-symbols-rounded text-sm">picture_in_picture_alt</span>
+                    <span>PiP 小窓再生</span>
                   </button>
                 </form>
               </div>

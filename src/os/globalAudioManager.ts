@@ -571,6 +571,18 @@ class GlobalAudioManager {
     }
   }
 
+  private vocalLevelPercent = 100;
+
+  public getVocalLevel(): number {
+    return this.vocalLevelPercent;
+  }
+
+  public setVocalLevel(percent: number) {
+    this.vocalLevelPercent = Math.max(0, Math.min(130, Math.round(percent)));
+    this.ensureDolbyAtmosGraph();
+    this.applyEqParameters();
+  }
+
   private applyEqParameters() {
     if (!this.graphConnected || !this.audioCtx) return;
     if (this.audioCtx.state === 'suspended') {
@@ -584,8 +596,17 @@ class GlobalAudioManager {
       this.eqPreampNode.gain.setTargetAtTime(targetLinear, now, 0.03);
     }
 
+    // Apple Music Sing / Karaoke Vocal Attenuation offset across vocal formants (250Hz - 4kHz)
+    const vocalDelta = (this.vocalLevelPercent - 100) / 100; // -1.0 (0% karaoke) to +0.3 (130% boost)
+    const vocalBandWeights = [0, 0, 0.15, 0.65, 0.95, 1.0, 1.0, 0.85, 0.2, 0];
+
     this.eqFilterNodes.forEach((node, idx) => {
-      const targetDb = enabled ? Math.max(-12, Math.min(12, this.state.eqBands[idx] || 0)) : 0;
+      const baseDb = enabled ? Math.max(-12, Math.min(12, this.state.eqBands[idx] || 0)) : 0;
+      const vocalOffsetDb =
+        vocalDelta < 0
+          ? vocalDelta * 13.5 * vocalBandWeights[idx]
+          : vocalDelta * 8.0 * vocalBandWeights[idx];
+      const targetDb = Math.max(-15, Math.min(15, baseDb + vocalOffsetDb));
       node.gain.setTargetAtTime(targetDb, now, 0.03);
     });
   }
@@ -1089,7 +1110,34 @@ class GlobalAudioManager {
 
     this.syncMediaSessionMetadata(track);
 
-    // Fast path: if track already has a direct CORS-safe HTTPS stream URL (e.g. iTunes AAC M4A) and no NetEase ID, start immediately while warming server cache in background
+    // Fast path: if track has a local WAV/Blob URL (e.g. GarageBand export) or direct CORS-safe HTTPS stream URL, play immediately
+    const localBlobOrDataUrl =
+      typeof track.audioUrl === 'string' && /^(data:audio\/|blob:)/i.test(track.audioUrl)
+        ? track.audioUrl
+        : typeof track.sourceUrl === 'string' && /^(data:audio\/|blob:)/i.test(track.sourceUrl)
+        ? track.sourceUrl
+        : null;
+
+    if (localBlobOrDataUrl) {
+      try {
+        this.audio.src = localBlobOrDataUrl;
+        this.playPromise = this.audio.play();
+        await this.playPromise;
+        this.playPromise = null;
+        if (this.pendingTrack === track) {
+          this.updateState({
+            isPlaying: true,
+            isBuffering: false,
+            error: null,
+            statusMessage: `GarageBand スタジオ書き出し音源を再生中: ${track.title}`,
+          });
+        }
+        return;
+      } catch {
+        this.playPromise = null;
+      }
+    }
+
     const hasDirectHttpsStream =
       typeof track.sourceUrl === 'string' &&
       /^https:\/\//i.test(track.sourceUrl) &&

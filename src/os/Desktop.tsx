@@ -41,6 +41,7 @@ import { AppId, TASKBAR_APPS, DESKTOP_ICON_SIZE_PRESETS } from './types';
 import { AppLogo } from './AppLogo';
 import { GlasiusCard } from './GlasiusCard';
 import { InitialSetupWizard, InitialSetupResult } from './InitialSetupWizard';
+import { DesktopOverlaySuite } from './DesktopOverlaySuite';
 
 function renderApp(appId: string, payload?: unknown) {
   switch (appId) {
@@ -290,10 +291,13 @@ export function Desktop() {
     coverGradient?: string;
     currentTime?: number;
     duration?: number;
+    volume?: number;
     lyricLine?: string;
+    nextLyricLine?: string;
     palette?: { c1: string; c2: string; c3: string; c4: string };
   } | null>(null);
   const [pillDismissed, setPillDismissed] = useState(false);
+  const [musicPillExpanded, setMusicPillExpanded] = useState(false);
   const [desktopPillMinimized, setDesktopPillMinimized] = useState(false);
   const [desktopPillOffset, setDesktopPillOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDraggingDesktopPill, setIsDraggingDesktopPill] = useState(false);
@@ -349,6 +353,29 @@ export function Desktop() {
     isLowTime: boolean;
   } | null>(null);
   const [timerPillDismissed, setTimerPillDismissed] = useState(false);
+  const [timerPillExpanded, setTimerPillExpanded] = useState(false);
+
+  // OS-Level Top Weather Alert Pill & GarageBand Recording Pill State (#2)
+  const [weatherPillState, setWeatherPillState] = useState<{
+    active: boolean;
+    locationLabel: string;
+    weatherLabel: string;
+    condition: string;
+    temperatureC: number;
+    snowAccumulation: number;
+    alertMessage: string;
+  } | null>(null);
+  const [weatherPillDismissed, setWeatherPillDismissed] = useState(false);
+
+  const [garageBandPillState, setGarageBandPillState] = useState<{
+    isPlaying: boolean;
+    isRecording: boolean;
+    bpm: number;
+    currentBar: number;
+    instrumentName: string;
+    trackCount: number;
+  } | null>(null);
+  const [garageBandPillDismissed, setGarageBandPillDismissed] = useState(false);
 
   useEffect(() => {
     const onTimerState = (e: Event) => {
@@ -376,6 +403,30 @@ export function Desktop() {
     };
     window.addEventListener('glassium-music-state', onMusicState);
     return () => window.removeEventListener('glassium-music-state', onMusicState);
+  }, []);
+
+  useEffect(() => {
+    const onWeatherPill = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) {
+        setWeatherPillState(detail);
+      }
+    };
+    const onGarageBandPill = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) {
+        setGarageBandPillState(detail);
+        if (detail.isPlaying || detail.isRecording) {
+          setGarageBandPillDismissed(false);
+        }
+      }
+    };
+    window.addEventListener('glassium-weather-pill-state', onWeatherPill);
+    window.addEventListener('glassium-garageband-pill-state', onGarageBandPill);
+    return () => {
+      window.removeEventListener('glassium-weather-pill-state', onWeatherPill);
+      window.removeEventListener('glassium-garageband-pill-state', onGarageBandPill);
+    };
   }, []);
 
   useEffect(() => {
@@ -2148,10 +2199,37 @@ export function Desktop() {
       </AnimatePresence>
 
       {/* ========================================================
-          OS-LEVEL TOP FLOATING PILL / DOCK BAR (Timer Pill & Music Pill)
-          Fixed at top-center of screen with smooth circular progress rings
+          OS-LEVEL TOP FLOATING PILL / DOCK BAR
+          (Timer Pill, Music Pill, Weather Alert Pill, GarageBand Recording Pill, & Spotlight/Tile Trigger)
          ======================================================== */}
-      <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[4500] flex flex-wrap items-center justify-center gap-2.5 max-w-[96vw] pointer-events-none select-none">
+      <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[4500] flex flex-wrap items-start justify-center gap-2 max-w-[96vw] pointer-events-none select-none">
+        {/* Quick Spotlight (Ctrl+K) & Window Tile Group Memory Trigger Pill */}
+        <div className="pointer-events-auto flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-slate-950/80 hover:bg-slate-950/90 backdrop-blur-2xl border border-white/15 hover:border-white/30 shadow-xl transition">
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('glassium-open-spotlight'))}
+            className="flex items-center gap-1.5 text-[11px] font-bold text-white/85 hover:text-cyan-300 transition cursor-pointer px-1"
+            title="Spotlight コマンドパレット (Ctrl+K / Alt+Space)"
+          >
+            <Icon name="Search" size={12} className="text-cyan-400" />
+            <span className="hidden sm:inline">検索・コマンド</span>
+            <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-white/10 text-white/60">
+              ⌘K
+            </span>
+          </button>
+          <span className="h-3.5 w-px bg-white/15" />
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('glassium-toggle-tile-manager'))}
+            className="flex items-center gap-1 text-[11px] font-bold text-white/80 hover:text-violet-300 transition cursor-pointer px-1"
+            title="ウィンドウ・タイルグループ記憶＆一括最小化/復元"
+          >
+            <Icon name="Columns" size={12} className="text-violet-400" />
+            <span className="hidden md:inline">タイル記憶</span>
+          </button>
+        </div>
+
+        {/* 1. EXPANDABLE TOP TIMER PILL (#1) */}
         <AnimatePresence>
           {timerPillState &&
             !timerPillDismissed &&
@@ -2164,135 +2242,203 @@ export function Desktop() {
                 animate={{ y: 0, opacity: 1, scale: 1 }}
                 exit={{ y: -40, opacity: 0, scale: 0.9 }}
                 transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+                onMouseEnter={() => setTimerPillExpanded(true)}
+                onMouseLeave={() => setTimerPillExpanded(false)}
                 className="pointer-events-auto"
               >
                 <div
-                  onClick={() => openApp('clock', { payload: { tab: 'timer' } })}
-                  className={`cursor-pointer px-4 py-1.5 rounded-full backdrop-blur-2xl border transition-all duration-300 flex items-center gap-3 shadow-2xl ${
+                  onClick={() => setTimerPillExpanded((v) => !v)}
+                  className={`cursor-pointer px-4 py-1.5 rounded-3xl backdrop-blur-2xl border transition-all duration-300 flex flex-col gap-2 shadow-2xl ${
                     timerPillState.isLowTime && timerPillState.running
-                      ? 'bg-rose-950/85 border-rose-400/65 clock-timer-low-card'
+                      ? 'bg-rose-950/90 border-rose-400/65 clock-timer-low-card'
                       : timerPillState.running
-                      ? 'bg-slate-950/85 border-cyan-400/50 shadow-[0_10px_30px_rgba(6,182,212,0.28)]'
-                      : 'bg-slate-950/80 border-white/20 hover:border-white/35'
+                      ? 'bg-slate-950/88 border-cyan-400/50 shadow-[0_10px_30px_rgba(6,182,212,0.28)]'
+                      : 'bg-slate-950/82 border-white/20 hover:border-white/35'
                   }`}
-                  title="クリックしてタイマー画面を表示"
+                  title="ホバーまたはクリックでタイマー操作を展開"
                 >
-                  {/* Smooth Circular Progress Ring */}
-                  <div className="relative w-7 h-7 flex items-center justify-center shrink-0">
-                    <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                      <circle
-                        cx="18"
-                        cy="18"
-                        r="14"
-                        stroke="rgba(255,255,255,0.14)"
-                        strokeWidth="3.2"
-                        fill="transparent"
-                      />
-                      <circle
-                        cx="18"
-                        cy="18"
-                        r="14"
-                        stroke={timerPillState.isLowTime ? '#fb7185' : '#22d3ee'}
-                        strokeWidth="3.2"
-                        fill="transparent"
-                        strokeDasharray="87.96"
-                        strokeDashoffset={
-                          87.96 - (87.96 * timerPillState.remainingPercent) / 100
+                  <div className="flex items-center gap-3">
+                    {/* Smooth Circular Progress Ring */}
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openApp('clock', { payload: { tab: 'timer' } });
+                      }}
+                      className="relative w-7 h-7 flex items-center justify-center shrink-0"
+                      title="Clockアプリを開く"
+                    >
+                      <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                        <circle
+                          cx="18"
+                          cy="18"
+                          r="14"
+                          stroke="rgba(255,255,255,0.14)"
+                          strokeWidth="3.2"
+                          fill="transparent"
+                        />
+                        <circle
+                          cx="18"
+                          cy="18"
+                          r="14"
+                          stroke={timerPillState.isLowTime ? '#fb7185' : '#22d3ee'}
+                          strokeWidth="3.2"
+                          fill="transparent"
+                          strokeDasharray="87.96"
+                          strokeDashoffset={
+                            87.96 - (87.96 * timerPillState.remainingPercent) / 100
+                          }
+                          strokeLinecap="round"
+                          className={`clock-timer-progress-circle ${
+                            timerPillState.running
+                              ? timerPillState.isLowTime
+                                ? 'is-low-time'
+                                : 'is-running'
+                              : ''
+                          }`}
+                        />
+                      </svg>
+                      <Icon
+                        name="Clock"
+                        size={12}
+                        className={
+                          timerPillState.isLowTime ? 'text-rose-300' : 'text-cyan-300'
                         }
-                        strokeLinecap="round"
-                        className={`clock-timer-progress-circle ${
-                          timerPillState.running
-                            ? timerPillState.isLowTime
-                              ? 'is-low-time'
-                              : 'is-running'
-                            : ''
-                        }`}
                       />
-                    </svg>
-                    <Icon
-                      name="Clock"
-                      size={12}
-                      className={
-                        timerPillState.isLowTime ? 'text-rose-300' : 'text-cyan-300'
-                      }
-                    />
+                    </div>
+
+                    {/* Countdown Readout */}
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openApp('clock', { payload: { tab: 'timer' } });
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      <span
+                        className={`text-[10px] font-mono font-bold uppercase tracking-wider ${
+                          timerPillState.isLowTime && timerPillState.running
+                            ? 'text-rose-300 animate-pulse'
+                            : 'text-cyan-300'
+                        }`}
+                      >
+                        TIMER
+                      </span>
+                      <span
+                        className={`text-sm sm:text-base font-black font-mono tabular-nums tracking-tight ${
+                          timerPillState.isLowTime && timerPillState.running
+                            ? 'text-rose-200'
+                            : 'text-white'
+                        }`}
+                      >
+                        {timerPillState.formatted}
+                      </span>
+                    </div>
+
+                    {/* Quick Controls inside Top Pill */}
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 border-l border-white/15 pl-2.5"
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.dispatchEvent(
+                            new CustomEvent('glassium-timer-command', {
+                              detail: { action: 'toggle' },
+                            })
+                          )
+                        }
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-black transition cursor-pointer ${
+                          timerPillState.running
+                            ? 'bg-amber-400 text-slate-950 hover:bg-amber-300'
+                            : timerPillState.isLowTime
+                            ? 'bg-rose-500 text-white hover:bg-rose-400'
+                            : 'bg-cyan-400 text-slate-950 hover:bg-cyan-300'
+                        }`}
+                      >
+                        {timerPillState.running ? '一時停止' : '開始'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.dispatchEvent(
+                            new CustomEvent('glassium-timer-command', {
+                              detail: { action: 'add-seconds', seconds: 60 },
+                            })
+                          )
+                        }
+                        className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-[10px] font-mono font-bold text-white/85 cursor-pointer"
+                        title="1分追加"
+                      >
+                        +1m
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTimerPillDismissed(true)}
+                        className="w-5 h-5 rounded-full hover:bg-white/15 text-white/50 hover:text-white flex items-center justify-center transition cursor-pointer"
+                        title="ピルを隠す"
+                      >
+                        <Icon name="X" size={11} />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Countdown Readout */}
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`text-[10px] font-mono font-bold uppercase tracking-wider ${
-                        timerPillState.isLowTime && timerPillState.running
-                          ? 'text-rose-300 animate-pulse'
-                          : 'text-cyan-300'
-                      }`}
+                  {/* Hover/Click Expanded Timer Controls (+30s, +1m, +5m, Reset, Open App) */}
+                  {timerPillExpanded && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="pt-1.5 border-t border-white/10 flex items-center justify-between gap-1.5 text-[10px]"
                     >
-                      TIMER
-                    </span>
-                    <span
-                      className={`text-sm sm:text-base font-black font-mono tabular-nums tracking-tight ${
-                        timerPillState.isLowTime && timerPillState.running
-                          ? 'text-rose-200'
-                          : 'text-white'
-                      }`}
-                    >
-                      {timerPillState.formatted}
-                    </span>
-                  </div>
-
-                  {/* Quick Controls inside Top Pill */}
-                  <div
-                    onClick={(e) => e.stopPropagation()}
-                    className="flex items-center gap-1 border-l border-white/15 pl-2.5"
-                  >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        window.dispatchEvent(
-                          new CustomEvent('glassium-timer-command', {
-                            detail: { action: 'toggle' },
-                          })
-                        )
-                      }
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-black transition cursor-pointer ${
-                        timerPillState.running
-                          ? 'bg-amber-400 text-slate-950 hover:bg-amber-300'
-                          : timerPillState.isLowTime
-                          ? 'bg-rose-500 text-white hover:bg-rose-400'
-                          : 'bg-cyan-400 text-slate-950 hover:bg-cyan-300'
-                      }`}
-                    >
-                      {timerPillState.running ? '一時停止' : '開始'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        window.dispatchEvent(
-                          new CustomEvent('glassium-timer-command', {
-                            detail: { action: 'add-seconds', seconds: 60 },
-                          })
-                        )
-                      }
-                      className="px-2 py-0.5 rounded-full bg-white/10 hover:bg-white/20 text-[10px] font-mono font-bold text-white/85 cursor-pointer"
-                      title="1分追加"
-                    >
-                      +1m
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTimerPillDismissed(true)}
-                      className="w-5 h-5 rounded-full hover:bg-white/15 text-white/50 hover:text-white flex items-center justify-center transition cursor-pointer"
-                      title="ピルを隠す"
-                    >
-                      <Icon name="X" size={11} />
-                    </button>
-                  </div>
+                      <div className="flex items-center gap-1">
+                        {[
+                          { label: '+30s', secs: 30 },
+                          { label: '+1m', secs: 60 },
+                          { label: '+5m', secs: 300 },
+                        ].map((preset) => (
+                          <button
+                            key={preset.label}
+                            type="button"
+                            onClick={() =>
+                              window.dispatchEvent(
+                                new CustomEvent('glassium-timer-command', {
+                                  detail: { action: 'add-seconds', seconds: preset.secs },
+                                })
+                              )
+                            }
+                            className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-cyan-500/30 text-white font-mono font-bold cursor-pointer transition"
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            window.dispatchEvent(
+                              new CustomEvent('glassium-timer-command', {
+                                detail: { action: 'reset' },
+                              })
+                            )
+                          }
+                          className="px-2 py-0.5 rounded-md bg-white/10 hover:bg-rose-500/30 text-white/80 hover:text-rose-200 font-bold cursor-pointer transition"
+                        >
+                          リセット
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => openApp('clock', { payload: { tab: 'timer' } })}
+                        className="px-2 py-0.5 rounded-md bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-200 font-bold cursor-pointer"
+                      >
+                        時計を開く →
+                      </button>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
         </AnimatePresence>
 
-        {/* OS-LEVEL TOP FLOATING MUSIC PILL / DOCK (Matches Timer Pill UX) */}
+        {/* 2. EXPANDABLE TOP MUSIC PILL (#1: Hover/Click Expansion with Seek, Volume, 2-Line Lyrics & Waveform) */}
         <AnimatePresence>
           {musicState &&
             !pillDismissed &&
@@ -2303,16 +2449,18 @@ export function Desktop() {
                 animate={{ y: 0, opacity: 1, scale: 1 }}
                 exit={{ y: -40, opacity: 0, scale: 0.9 }}
                 transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+                onMouseEnter={() => setMusicPillExpanded(true)}
+                onMouseLeave={() => setMusicPillExpanded(false)}
                 className="pointer-events-auto"
               >
                 <div
-                  onClick={() => openApp('synth')}
-                  className={`relative overflow-hidden cursor-pointer px-4 py-1.5 rounded-full backdrop-blur-2xl border transition-all duration-300 flex items-center gap-3 shadow-2xl ${
+                  onClick={() => setMusicPillExpanded((v) => !v)}
+                  className={`relative overflow-hidden cursor-pointer px-4 py-1.5 rounded-3xl backdrop-blur-2xl border transition-all duration-300 flex flex-col gap-2 shadow-2xl ${
                     musicState.isPlaying
-                      ? 'bg-slate-950/88 border-white/25 shadow-[0_10px_32px_rgba(244,63,94,0.28)]'
-                      : 'bg-slate-950/80 border-white/15 hover:border-white/30'
+                      ? 'bg-slate-950/90 border-white/25 shadow-[0_10px_32px_rgba(244,63,94,0.28)]'
+                      : 'bg-slate-950/82 border-white/15 hover:border-white/30'
                   }`}
-                  title="クリックして Music プレイヤーを表示"
+                  title="ホバーまたはクリックでシークバー・音量・2行歌詞を展開"
                 >
                   {/* Subtle Artwork Ambient Glow Inside Top Pill */}
                   <div
@@ -2326,132 +2474,361 @@ export function Desktop() {
                     }}
                   />
 
-                  {/* Smooth Circular Progress Ring + Album Artwork */}
-                  <div className="relative z-10 w-8 h-8 flex items-center justify-center shrink-0">
-                    <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                      <circle
-                        cx="18"
-                        cy="18"
-                        r="15.5"
-                        stroke="rgba(255,255,255,0.16)"
-                        strokeWidth="2.8"
-                        fill="transparent"
-                      />
-                      <circle
-                        cx="18"
-                        cy="18"
-                        r="15.5"
-                        stroke={musicState.palette?.c1 || resolvedAccentHex}
-                        strokeWidth="2.8"
-                        fill="transparent"
-                        strokeDasharray="97.39"
-                        strokeDashoffset={
-                          97.39 -
-                          (97.39 *
-                            Math.min(
-                              100,
-                              ((musicState.currentTime || 0) /
-                                Math.max(1, musicState.duration || 210)) *
-                                100
-                            )) /
-                            100
-                        }
-                        strokeLinecap="round"
-                        className="clock-timer-progress-circle is-running"
-                      />
-                    </svg>
-                    <div className="absolute inset-[4px] rounded-full overflow-hidden bg-slate-800 flex items-center justify-center">
-                      {musicState.artworkUrl ? (
-                        <img
-                          src={musicState.artworkUrl}
-                          alt=""
-                          className={`w-full h-full object-cover ${
-                            musicState.isPlaying ? 'animate-[spin_12s_linear_infinite]' : ''
-                          }`}
+                  <div className="relative z-10 flex items-center gap-3">
+                    {/* Smooth Circular Progress Ring + Album Artwork */}
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openApp('synth');
+                      }}
+                      className="relative w-8 h-8 flex items-center justify-center shrink-0"
+                      title="Musicアプリを開く"
+                    >
+                      <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                        <circle
+                          cx="18"
+                          cy="18"
+                          r="15.5"
+                          stroke="rgba(255,255,255,0.16)"
+                          strokeWidth="2.8"
+                          fill="transparent"
                         />
+                        <circle
+                          cx="18"
+                          cy="18"
+                          r="15.5"
+                          stroke={musicState.palette?.c1 || resolvedAccentHex}
+                          strokeWidth="2.8"
+                          fill="transparent"
+                          strokeDasharray="97.39"
+                          strokeDashoffset={
+                            97.39 -
+                            (97.39 *
+                              Math.min(
+                                100,
+                                ((musicState.currentTime || 0) /
+                                  Math.max(1, musicState.duration || 210)) *
+                                  100
+                              )) /
+                              100
+                          }
+                          strokeLinecap="round"
+                          className="clock-timer-progress-circle is-running"
+                        />
+                      </svg>
+                      <div className="absolute inset-[4px] rounded-full overflow-hidden bg-slate-800 flex items-center justify-center">
+                        {musicState.artworkUrl ? (
+                          <img
+                            src={musicState.artworkUrl}
+                            alt=""
+                            className={`w-full h-full object-cover ${
+                              musicState.isPlaying ? 'animate-[spin_12s_linear_infinite]' : ''
+                            }`}
+                          />
+                        ) : (
+                          <Icon name="Music" size={11} className="text-rose-300" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Track Title, Artist & Synchronized Live Lyric Snippet */}
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openApp('synth');
+                      }}
+                      className="min-w-0 max-w-[175px] sm:max-w-[250px] flex flex-col justify-center"
+                    >
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-rose-300 shrink-0">
+                          MUSIC
+                        </span>
+                        <span className="text-xs font-extrabold text-white truncate">
+                          {musicState.title || 'Now Playing'}
+                        </span>
+                        <span className="text-[10px] text-white/60 truncate">
+                          · {musicState.artist || 'Artist'}
+                        </span>
+                      </div>
+                      {musicState.lyricLine ? (
+                        <span className="text-[10px] text-white/90 font-semibold truncate">
+                          ♪ {musicState.lyricLine}
+                        </span>
                       ) : (
-                        <Icon name="Music" size={11} className="text-rose-300" />
+                        <span className="text-[10px] text-white/55 font-mono tabular-nums truncate">
+                          {Math.floor((musicState.currentTime || 0) / 60)}:
+                          {String(Math.floor((musicState.currentTime || 0) % 60)).padStart(2, '0')} /{' '}
+                          {Math.floor((musicState.duration || 210) / 60)}:
+                          {String(Math.floor((musicState.duration || 210) % 60)).padStart(2, '0')}
+                        </span>
                       )}
                     </div>
-                  </div>
 
-                  {/* Track Title, Artist & Synchronized Live Lyric Snippet */}
-                  <div className="relative z-10 min-w-0 max-w-[170px] sm:max-w-[250px] flex flex-col justify-center">
-                    <div className="flex items-center gap-1.5 truncate">
-                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-rose-300 shrink-0">
-                        MUSIC
-                      </span>
-                      <span className="text-xs font-extrabold text-white truncate">
-                        {musicState.title || 'Now Playing'}
-                      </span>
-                      <span className="text-[10px] text-white/60 truncate">
-                        · {musicState.artist || 'Artist'}
-                      </span>
+                    {/* Animated Mini Equalizer Waveform Bars */}
+                    <div className="hidden sm:flex items-end gap-0.5 h-3.5 px-1">
+                      {[0, 1, 2, 3, 4].map((barIdx) => (
+                        <span
+                          key={barIdx}
+                          style={{
+                            height: musicState.isPlaying
+                              ? `${35 + ((Math.floor((musicState.currentTime || 0) * 10) + barIdx * 3) % 65)}%`
+                              : '25%',
+                            backgroundColor: musicState.palette?.c1 || resolvedAccentHex,
+                          }}
+                          className="w-0.5 rounded-full transition-all duration-150"
+                        />
+                      ))}
                     </div>
-                    {musicState.lyricLine ? (
-                      <span className="text-[10px] text-white/90 font-semibold truncate">
-                        ♪ {musicState.lyricLine}
-                      </span>
-                    ) : (
-                      <span className="text-[10px] text-white/55 font-mono tabular-nums truncate">
-                        {Math.floor((musicState.currentTime || 0) / 60)}:
-                        {String(Math.floor((musicState.currentTime || 0) % 60)).padStart(2, '0')} /{' '}
-                        {Math.floor((musicState.duration || 210) / 60)}:
-                        {String(Math.floor((musicState.duration || 210) % 60)).padStart(2, '0')}
-                      </span>
-                    )}
+
+                    {/* Quick Transport Controls inside Top Music Pill */}
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 border-l border-white/15 pl-2.5"
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.dispatchEvent(
+                            new CustomEvent('glassium-music-command', { detail: { action: 'prev' } })
+                          )
+                        }
+                        className="w-6 h-6 rounded-full hover:bg-white/15 text-white/80 hover:text-white flex items-center justify-center transition cursor-pointer"
+                        title="前の曲"
+                      >
+                        <span className="material-symbols-rounded text-[16px]">skip_previous</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.dispatchEvent(
+                            new CustomEvent('glassium-music-command', {
+                              detail: { action: 'toggle-play' },
+                            })
+                          )
+                        }
+                        className="px-2.5 py-0.5 rounded-full bg-white text-slate-950 hover:bg-white/90 text-[10px] font-black transition cursor-pointer flex items-center gap-0.5"
+                        title={musicState.isPlaying ? '一時停止' : '再生'}
+                      >
+                        <span>{musicState.isPlaying ? '一時停止' : '再生'}</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.dispatchEvent(
+                            new CustomEvent('glassium-music-command', { detail: { action: 'next' } })
+                          )
+                        }
+                        className="w-6 h-6 rounded-full hover:bg-white/15 text-white/80 hover:text-white flex items-center justify-center transition cursor-pointer"
+                        title="次の曲"
+                      >
+                        <span className="material-symbols-rounded text-[16px]">skip_next</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPillDismissed(true)}
+                        className="w-5 h-5 rounded-full hover:bg-white/15 text-white/50 hover:text-white flex items-center justify-center transition cursor-pointer"
+                        title="ピルを隠す"
+                      >
+                        <Icon name="X" size={11} />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Quick Transport Controls inside Top Music Pill */}
+                  {/* Expanded Top Music Pill Panel: 2-Line Lyrics, Interactive Seek Scrubber & Volume Slider */}
+                  {musicPillExpanded && (
+                    <div
+                      onClick={(e) => e.stopPropagation()}
+                      className="relative z-10 pt-2 border-t border-white/15 flex flex-col gap-2 min-w-[290px] sm:min-w-[360px]"
+                    >
+                      {/* 2-Line Synchronized Live Lyrics Display */}
+                      <div className="px-2.5 py-1.5 rounded-xl bg-black/40 border border-white/10 space-y-0.5">
+                        <div className="text-[11px] font-extrabold text-white truncate">
+                          {musicState.lyricLine
+                            ? `♪ ${musicState.lyricLine}`
+                            : `♪ ${musicState.title || '再生中'} — ${musicState.artist || ''}`}
+                        </div>
+                        <div className="text-[10px] text-white/55 truncate">
+                          {musicState.nextLyricLine || 'Apple Music Live Lyrics 同期中'}
+                        </div>
+                      </div>
+
+                      {/* Interactive Seek Bar */}
+                      <div className="flex items-center gap-2 text-[10px] font-mono text-white/75">
+                        <span className="w-8 text-right tabular-nums">
+                          {Math.floor((musicState.currentTime || 0) / 60)}:
+                          {String(Math.floor((musicState.currentTime || 0) % 60)).padStart(2, '0')}
+                        </span>
+                        <input
+                          type="range"
+                          min={0}
+                          max={Math.max(1, Math.round(musicState.duration || 210))}
+                          value={Math.round(musicState.currentTime || 0)}
+                          onChange={(e) =>
+                            window.dispatchEvent(
+                              new CustomEvent('glassium-music-command', {
+                                detail: { action: 'seek', time: Number(e.target.value) },
+                              })
+                            )
+                          }
+                          style={{ accentColor: musicState.palette?.c1 || resolvedAccentHex }}
+                          className="flex-1 h-1.5 cursor-pointer"
+                        />
+                        <span className="w-8 tabular-nums">
+                          {Math.floor((musicState.duration || 210) / 60)}:
+                          {String(Math.floor((musicState.duration || 210) % 60)).padStart(2, '0')}
+                        </span>
+                      </div>
+
+                      {/* Volume Slider & Quick Lyrics/Sing Shortcut */}
+                      <div className="flex items-center justify-between gap-3 text-[10px]">
+                        <div className="flex items-center gap-1.5 flex-1">
+                          <span className="material-symbols-rounded text-xs text-white/70">
+                            volume_up
+                          </span>
+                          <input
+                            type="range"
+                            min={0}
+                            max={1}
+                            step={0.02}
+                            value={musicState.volume ?? 0.8}
+                            onChange={(e) =>
+                              window.dispatchEvent(
+                                new CustomEvent('glassium-music-command', {
+                                  detail: { action: 'set-volume', volume: Number(e.target.value) },
+                                })
+                              )
+                            }
+                            style={{ accentColor: resolvedAccentHex }}
+                            className="w-24 h-1 cursor-pointer"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openApp('synth', { payload: { tab: 'lyrics' } })}
+                            className="px-2 py-0.5 rounded-md bg-rose-500/25 hover:bg-rose-500/40 text-rose-200 font-bold cursor-pointer"
+                          >
+                            歌詞・Singカラオケ →
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+        </AnimatePresence>
+
+        {/* 3. TOP WEATHER & PRECIPITATION ALERT PILL (#2) */}
+        <AnimatePresence>
+          {weatherPillState?.active && !weatherPillDismissed && (
+            <motion.div
+              key="os-top-weather-pill"
+              initial={{ y: -45, opacity: 0, scale: 0.92 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: -35, opacity: 0, scale: 0.9 }}
+              className="pointer-events-auto"
+            >
+              <div
+                onClick={() => openApp('weather')}
+                className="cursor-pointer px-3.5 py-1.5 rounded-full bg-slate-950/85 hover:bg-slate-950/95 backdrop-blur-2xl border border-sky-400/45 shadow-[0_8px_24px_rgba(56,189,248,0.22)] flex items-center gap-2 text-xs text-white transition"
+                title="クリックして天気・雨雲レーダーを開く"
+              >
+                <Icon name="CloudRain" size={13} className="text-sky-300 shrink-0" />
+                <span className="text-[11px] font-bold text-sky-100 truncate max-w-[230px]">
+                  {weatherPillState.alertMessage}
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setWeatherPillDismissed(true);
+                  }}
+                  className="w-4 h-4 rounded-full hover:bg-white/15 text-white/50 hover:text-white flex items-center justify-center"
+                  title="閉じる"
+                >
+                  <Icon name="X" size={10} />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 4. TOP GARAGEBAND RECORDING / PLAYBACK PILL (#2) */}
+        <AnimatePresence>
+          {garageBandPillState &&
+            !garageBandPillDismissed &&
+            (garageBandPillState.isPlaying ||
+              garageBandPillState.isRecording ||
+              windows.some((w) => w.appId === 'garageband')) && (
+              <motion.div
+                key="os-top-garageband-pill"
+                initial={{ y: -45, opacity: 0, scale: 0.92 }}
+                animate={{ y: 0, opacity: 1, scale: 1 }}
+                exit={{ y: -35, opacity: 0, scale: 0.9 }}
+                className="pointer-events-auto"
+              >
+                <div
+                  onClick={() => openApp('garageband')}
+                  className={`cursor-pointer px-3.5 py-1.5 rounded-full backdrop-blur-2xl border flex items-center gap-2.5 text-xs text-white shadow-2xl transition ${
+                    garageBandPillState.isRecording
+                      ? 'bg-rose-950/90 border-rose-400/70 shadow-[0_8px_28px_rgba(244,63,94,0.35)]'
+                      : 'bg-slate-950/85 border-amber-400/45'
+                  }`}
+                  title="クリックして GarageBand Studio を表示"
+                >
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      garageBandPillState.isRecording
+                        ? 'bg-rose-500 animate-ping'
+                        : garageBandPillState.isPlaying
+                        ? 'bg-emerald-400 animate-pulse'
+                        : 'bg-amber-400'
+                    }`}
+                  />
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-amber-300">
+                    {garageBandPillState.isRecording ? 'GB REC' : 'GARAGEBAND'}
+                  </span>
+                  <span className="text-[11px] font-bold text-white truncate max-w-[130px]">
+                    {garageBandPillState.instrumentName} · Bar {garageBandPillState.currentBar}
+                  </span>
                   <div
                     onClick={(e) => e.stopPropagation()}
-                    className="relative z-10 flex items-center gap-1 border-l border-white/15 pl-2.5"
+                    className="flex items-center gap-1 border-l border-white/15 pl-2"
                   >
                     <button
                       type="button"
                       onClick={() =>
                         window.dispatchEvent(
-                          new CustomEvent('glassium-music-command', { detail: { action: 'prev' } })
-                        )
-                      }
-                      className="w-6 h-6 rounded-full hover:bg-white/15 text-white/80 hover:text-white flex items-center justify-center transition cursor-pointer"
-                      title="前の曲"
-                    >
-                      <span className="material-symbols-rounded text-[16px]">skip_previous</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        window.dispatchEvent(
-                          new CustomEvent('glassium-music-command', {
+                          new CustomEvent('glassium-garageband-command', {
                             detail: { action: 'toggle-play' },
                           })
                         )
                       }
-                      className="px-2.5 py-0.5 rounded-full bg-white text-slate-950 hover:bg-white/90 text-[10px] font-black transition cursor-pointer flex items-center gap-0.5"
-                      title={musicState.isPlaying ? '一時停止' : '再生'}
+                      className="px-2 py-0.5 rounded-full bg-white text-slate-950 text-[10px] font-black cursor-pointer"
                     >
-                      <span>{musicState.isPlaying ? '一時停止' : '再生'}</span>
+                      {garageBandPillState.isPlaying ? '停止' : '再生'}
                     </button>
                     <button
                       type="button"
                       onClick={() =>
                         window.dispatchEvent(
-                          new CustomEvent('glassium-music-command', { detail: { action: 'next' } })
+                          new CustomEvent('glassium-garageband-command', {
+                            detail: { action: 'export-to-music' },
+                          })
                         )
                       }
-                      className="w-6 h-6 rounded-full hover:bg-white/15 text-white/80 hover:text-white flex items-center justify-center transition cursor-pointer"
-                      title="次の曲"
+                      className="px-2 py-0.5 rounded-full bg-rose-500 hover:bg-rose-400 text-white text-[10px] font-bold cursor-pointer"
+                      title="GarageBandの曲をMusicアプリへワンクリック書き出し"
                     >
-                      <span className="material-symbols-rounded text-[16px]">skip_next</span>
+                      🎵 Musicへ送る
                     </button>
                     <button
                       type="button"
-                      onClick={() => setPillDismissed(true)}
-                      className="w-5 h-5 rounded-full hover:bg-white/15 text-white/50 hover:text-white flex items-center justify-center transition cursor-pointer"
-                      title="ピルを隠す"
+                      onClick={() => setGarageBandPillDismissed(true)}
+                      className="w-4 h-4 rounded-full hover:bg-white/15 text-white/50 hover:text-white flex items-center justify-center"
                     >
-                      <Icon name="X" size={11} />
+                      <Icon name="X" size={10} />
                     </button>
                   </div>
                 </div>
@@ -2795,6 +3172,9 @@ export function Desktop() {
           />
         )}
       </AnimatePresence>
+
+      {/* Spotlight Command Palette (Ctrl+K), Tile Group Memory & Always-on-Top PiP Video Player */}
+      <DesktopOverlaySuite />
     </div>
   );
 }

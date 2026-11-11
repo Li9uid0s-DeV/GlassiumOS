@@ -331,6 +331,12 @@ export function ClockApp({ initialTab }: { initialTab?: string }) {
         setTimerRemaining(timerDuration);
       } else if (detail.action === 'add-seconds' && typeof detail.seconds === 'number') {
         adjustTimerSeconds(detail.seconds);
+      } else if (detail.action === 'start-seconds' && typeof detail.seconds === 'number') {
+        const secs = Math.max(5, Math.min(999 * 60, Math.round(detail.seconds)));
+        setActiveTab('timer');
+        setTimerDuration(secs);
+        setTimerRemaining(secs);
+        setTimerRunning(true);
       }
     };
     window.addEventListener('glassium-timer-command', onTimerCommand);

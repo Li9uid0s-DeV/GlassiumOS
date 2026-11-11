@@ -271,7 +271,7 @@ const LIVE_LOOP_CLIPS = [
 ];
 
 export function GarageBandApp() {
-  const { theme, resolvedAccentHex, saveFile } = useOS();
+  const { theme, resolvedAccentHex, saveFile, openApp, addNotification } = useOS();
   const isLight = theme === 'light';
 
   // Audio Context & Master Graph
@@ -887,50 +887,99 @@ export function GarageBandApp() {
     };
   }, [currentOctave, activeNotes, triggerNoteOn, triggerNoteOff]);
 
+  // Build WAV ArrayBuffer from current tracks & 16-step drum matrix
+  const synthesizeProjectWavBuffer = useCallback(
+    (sampleRate = 22050) => {
+      const durationSec = Math.min(24, Math.max(8, 4 * (60 / bpm) * 4));
+      const numSamples = Math.floor(sampleRate * durationSec);
+      const buffer = new ArrayBuffer(44 + numSamples * 2 * 2);
+      const view = new DataView(buffer);
+
+      const writeString = (offset: number, str: string) => {
+        for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+      };
+      writeString(0, 'RIFF');
+      view.setUint32(4, 36 + numSamples * 4, true);
+      writeString(8, 'WAVE');
+      writeString(12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true); // PCM
+      view.setUint16(22, 2, true); // Stereo
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 4, true);
+      view.setUint16(32, 4, true);
+      view.setUint16(34, 16, true); // 16-bit
+      writeString(36, 'data');
+      view.setUint32(40, numSamples * 4, true);
+
+      const stepSec = 60 / bpm / 4;
+      const barSec = (60 / bpm) * 4;
+      const loopDur = 8 * barSec;
+      const activeMelodicTracks = tracks.filter((tr) => !tr.muted && tr.notes.length > 0);
+
+      let offset = 44;
+      for (let i = 0; i < numSamples; i++) {
+        const t = i / sampleRate;
+        const loopT = t % loopDur;
+        const stepIdx = Math.floor(t / stepSec) % 16;
+        const stepPhase = (t % stepSec) / stepSec;
+
+        let drumSig = 0;
+        if (stepMatrix.kick[stepIdx]) {
+          drumSig += Math.exp(-stepPhase * 16) * Math.sin(stepPhase * stepSec * 115 * Math.PI * 2) * 0.55;
+        }
+        if (stepMatrix.snare[stepIdx]) {
+          drumSig += Math.exp(-stepPhase * 22) * (Math.sin(t * 210 * Math.PI * 2) * 0.4 + ((i * 16807) % 257 / 128 - 1) * 0.35) * 0.42;
+        }
+        if (stepMatrix.hihat[stepIdx]) {
+          drumSig += Math.exp(-stepPhase * 38) * (((i * 48271) % 251) / 125 - 1) * 0.18;
+        }
+
+        let melodicSig = 0;
+        if (activeMelodicTracks.length > 0) {
+          for (const tr of activeMelodicTracks) {
+            for (const ev of tr.notes) {
+              const dtNote = loopT - (ev.time % loopDur);
+              if (dtNote >= 0 && dtNote <= ev.duration + 0.25) {
+                const env = Math.exp(-dtNote * 4.2) * Math.min(1, dtNote * 45);
+                melodicSig +=
+                  (Math.sin(t * ev.freq * Math.PI * 2) * 0.65 +
+                    Math.sin(t * ev.freq * 2 * Math.PI * 2) * 0.22) *
+                  env *
+                  tr.volume *
+                  0.28;
+              }
+            }
+          }
+        } else {
+          // Fallback warm progression if no custom notes recorded
+          const chordFreqs =
+            Math.floor(t / barSec) % 2 === 0
+              ? [261.63, 329.63, 392.0]
+              : [220.0, 261.63, 329.63];
+          melodicSig =
+            (Math.sin(t * chordFreqs[0] * Math.PI * 2) +
+              Math.sin(t * chordFreqs[1] * Math.PI * 2) +
+              Math.sin(t * chordFreqs[2] * Math.PI * 2)) *
+            0.14;
+        }
+
+        const sample = Math.max(-1, Math.min(1, (drumSig + melodicSig) * 0.85));
+        const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+        view.setInt16(offset, intSample, true);
+        view.setInt16(offset + 2, intSample, true);
+        offset += 4;
+      }
+
+      return { buffer, durationSec: Math.round(durationSec) };
+    },
+    [bpm, stepMatrix, tracks]
+  );
+
   // Export Track to Audio WAV File
   const handleExportWav = useCallback(() => {
-    const ctx = ensureAudioCtx();
-    if (!ctx) return;
-
-    // Build uncompressed standard 44.1kHz WAV container
-    const sampleRate = 44100;
-    const durationSec = 8 * (60 / bpm) * 4;
-    const numSamples = Math.floor(sampleRate * Math.min(durationSec, 30));
-    const buffer = new ArrayBuffer(44 + numSamples * 2 * 2);
-    const view = new DataView(buffer);
-
-    // Write WAV Header
-    const writeString = (offset: number, str: string) => {
-      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-    };
-    writeString(0, 'RIFF');
-    view.setUint32(4, 36 + numSamples * 4, true);
-    writeString(8, 'WAVE');
-    writeString(12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true); // PCM
-    view.setUint16(22, 2, true); // Stereo
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * 4, true);
-    view.setUint16(32, 4, true);
-    view.setUint16(34, 16, true); // 16-bit
-    writeString(36, 'data');
-    view.setUint32(40, numSamples * 4, true);
-
-    // Synthesize gentle ambient chords + beat into WAV buffer
-    let offset = 44;
-    for (let i = 0; i < numSamples; i++) {
-      const t = i / sampleRate;
-      const beat = (t * (bpm / 60)) % 1;
-      const kick = Math.exp(-beat * 24) * Math.sin(t * 120 * Math.PI);
-      const chord = (Math.sin(t * 261.63 * Math.PI * 2) + Math.sin(t * 329.63 * Math.PI * 2) + Math.sin(t * 392.00 * Math.PI * 2)) * 0.15;
-      const sample = Math.max(-1, Math.min(1, (kick * 0.4 + chord * 0.6) * 0.8));
-      const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-      view.setInt16(offset, intSample, true);
-      view.setInt16(offset + 2, intSample, true);
-      offset += 4;
-    }
-
+    ensureAudioCtx();
+    const { buffer } = synthesizeProjectWavBuffer(44100);
     const blob = new Blob([buffer], { type: 'audio/wav' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -938,7 +987,113 @@ export function GarageBandApp() {
     a.download = `GarageBand_Project_${Date.now()}.wav`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [bpm, ensureAudioCtx]);
+    addNotification('GarageBand Studio', 'WAVオーディオファイルを書き出しました', 'Download');
+  }, [addNotification, ensureAudioCtx, synthesizeProjectWavBuffer]);
+
+  // 1-Click Export Track to Music App (Glassium Groove)
+  const handleExportToMusicApp = useCallback(() => {
+    ensureAudioCtx();
+    const { buffer, durationSec } = synthesizeProjectWavBuffer(22050);
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+    const dataUrl = `data:audio/wav;base64,${btoa(binary)}`;
+    const activeInstName =
+      tracks.find((t) => t.id === selectedTrackId)?.name || 'GarageBand Synth';
+    const trackId = `gb-export-${Date.now()}`;
+    const exportedTrack = {
+      id: trackId,
+      monoTrackId: trackId,
+      title: `GarageBand Session (${bpm} BPM · ${activeInstName})`,
+      artist: 'GarageBand Studio (あなた)',
+      album: 'GarageBand Creations',
+      coverGradient: 'from-amber-500 via-orange-600 to-rose-900',
+      coverAccent: resolvedAccentHex,
+      artworkUrl: '',
+      audioUrl: dataUrl,
+      sourceUrl: dataUrl,
+      isFullLengthStream: true,
+      duration: durationSec,
+      format: '22.05kHz Stereo WAV',
+      bitrate: 'WAV Master',
+      genre: 'GarageBand Original',
+      year: new Date().getFullYear(),
+      lyrics: [
+        { time: 0, text: `🎹 GarageBand オリジナル制作トラック (${bpm} BPM)` },
+        { time: 3, text: `使用楽器: ${tracks.map((t) => t.name).join(' · ')}` },
+        { time: 6, text: '♪ Glassium Groove と上部ピルでリアルタイム再生中' },
+      ],
+    };
+
+    try {
+      const raw = localStorage.getItem('glasis_garageband_exported_tracks_v1');
+      const prev = raw ? JSON.parse(raw) : [];
+      const next = [exportedTrack, ...(Array.isArray(prev) ? prev : [])].slice(0, 8);
+      localStorage.setItem('glasis_garageband_exported_tracks_v1', JSON.stringify(next));
+    } catch {
+      // ignore storage quota
+    }
+
+    openApp('synth');
+    setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent('glassium-export-track-to-music', { detail: exportedTrack })
+      );
+    }, 140);
+    addNotification(
+      'Music アプリへ書き出し完了',
+      `「${exportedTrack.title}」を Music アプリへ追加し再生を開始しました`,
+      'Music'
+    );
+  }, [
+    addNotification,
+    bpm,
+    ensureAudioCtx,
+    openApp,
+    resolvedAccentHex,
+    selectedTrackId,
+    synthesizeProjectWavBuffer,
+    tracks,
+  ]);
+
+  // Broadcast GarageBand Recording / Playback State to OS Top Pill Bar
+  useEffect(() => {
+    const activeInstName =
+      tracks.find((t) => t.id === selectedTrackId)?.name || 'グランドピアノ';
+    window.dispatchEvent(
+      new CustomEvent('glassium-garageband-pill-state', {
+        detail: {
+          isPlaying,
+          isRecording,
+          bpm,
+          playheadSec,
+          instrumentName: activeInstName,
+        },
+      })
+    );
+  }, [isPlaying, isRecording, bpm, playheadSec, selectedTrackId, tracks]);
+
+  useEffect(() => {
+    const onGbCmd = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (!detail) return;
+      if (detail.action === 'toggle-play') {
+        ensureAudioCtx();
+        setIsPlaying((v) => !v);
+      } else if (detail.action === 'toggle-record') {
+        ensureAudioCtx();
+        setIsRecording((v) => !v);
+        if (!isPlaying) setIsPlaying(true);
+      } else if (detail.action === 'export-to-music') {
+        handleExportToMusicApp();
+      }
+    };
+    window.addEventListener('glassium-garageband-command', onGbCmd);
+    return () => window.removeEventListener('glassium-garageband-command', onGbCmd);
+  }, [ensureAudioCtx, handleExportToMusicApp, isPlaying]);
 
   // Save Project to FileSystem
   const handleSaveProject = useCallback(() => {
@@ -951,8 +1106,8 @@ export function GarageBandApp() {
       version: '5.0 u4',
     };
     saveFile(['Music', 'GarageBand'], `project_${Date.now()}.gbproj`, JSON.stringify(projectData, null, 2));
-    alert('プロジェクトを「/Music/GarageBand/」へ保存しました！');
-  }, [bpm, tracks, stepMatrix, saveFile]);
+    addNotification('GarageBand Studio', 'プロジェクトを「/Music/GarageBand/」へ保存しました', 'Save');
+  }, [addNotification, bpm, tracks, stepMatrix, saveFile]);
 
   // Song Templates
   const loadSongTemplate = useCallback((template: 'lofi' | 'cyberpunk' | 'citypop') => {
@@ -1117,14 +1272,24 @@ export function GarageBandApp() {
             <span className="hidden md:inline">メトロノーム</span>
           </button>
 
+          {/* Export directly to Music App */}
+          <button
+            onClick={handleExportToMusicApp}
+            className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-rose-500 to-amber-500 text-white font-bold text-xs flex items-center gap-1.5 hover:brightness-110 shadow-md transition cursor-pointer"
+            title="作成した曲を Music アプリ (Glassium Groove) のライブラリへ直接追加して再生"
+          >
+            <Icon name="Music" size={13} />
+            <span className="hidden sm:inline">Musicアプリへ書き出し</span>
+          </button>
+
           {/* Export WAV */}
           <button
             onClick={handleExportWav}
             style={{ backgroundColor: resolvedAccentHex }}
-            className="px-3 py-1.5 rounded-lg text-slate-950 font-bold text-xs flex items-center gap-1.5 hover:brightness-110 shadow-md transition"
+            className="px-3 py-1.5 rounded-lg text-slate-950 font-bold text-xs flex items-center gap-1.5 hover:brightness-110 shadow-md transition cursor-pointer"
           >
             <Icon name="Download" size={13} />
-            <span className="hidden sm:inline">WAV書き出し</span>
+            <span className="hidden sm:inline">WAV保存</span>
           </button>
 
           {/* Save Project */}
