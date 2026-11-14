@@ -4,6 +4,13 @@ export const WALLPAPERS: Record<
   Wallpaper,
   { label: string; style: string; preview: string; isBright?: boolean }
 > = {
+  bing: {
+    label: 'Bing 日替わり自然壁紙 (Bing Daily Nature)',
+    style: 'linear-gradient(135deg, #0a192f 0%, #1b4965 55%, #0f2027 100%)',
+    preview:
+      'url("https://www.bing.com/th?id=OHR.BlueHK_JA-JP0477081186_1920x1080.jpg") center/cover no-repeat, linear-gradient(135deg, #0a192f 0%, #1b4965 55%, #0f2027 100%)',
+    isBright: false,
+  },
   'dynamic-world': {
     label: 'Dynamic World u3 (時間・風・天候・季節・イベント連動)',
     style: 'linear-gradient(135deg, #020617 0%, #0f172a 45%, #0369a1 100%)',

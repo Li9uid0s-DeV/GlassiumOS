@@ -541,7 +541,7 @@ export interface StoreTheme {
   config: {
     shellMode: ShellMode;
     designEngine: DesignEngine;
-    wallpaper: 'live2d' | 'golden-sparkle' | 'space' | 'aurora' | 'sunset' | 'ocean' | 'forest' | 'cosmic' | 'bloom' | 'shader';
+    wallpaper: 'bing' | 'dynamic-world' | 'live2d' | 'golden-sparkle' | 'space' | 'aurora' | 'sunset' | 'ocean' | 'forest' | 'cosmic' | 'bloom' | 'shader';
     theme: 'dark' | 'light';
     blurAmount?: number;
     cornerRadius?: number;

@@ -769,7 +769,7 @@ const KNOWN_MEDIA_CATALOG = [
   },
 ];
 
-app.get(['/api/entertainment/search', '/api/entertainment/mapple/movies'], async (req, res) => {
+app.get(['/api/entertainment/search', '/api/entertainment/mapple/movies', '/api/entertainment/toustream/movies'], async (req, res) => {
   const q = String(req.query.q || 'Frieren').trim();
   const qLower = q.toLowerCase();
   const results = [];
@@ -1218,6 +1218,111 @@ app.get('/api/gdrive/html', async (req, res) => {
   }
 });
 
+
+// ============================================================================
+// 5.5 Bing Daily Wallpaper Endpoints (/api/bing-wallpaper & /api/bing-image)
+// ============================================================================
+let cachedKoyebBing = [];
+let cachedKoyebBingAt = 0;
+
+async function fetchKoyebBingList(serverOrigin) {
+  if (cachedKoyebBing.length > 0 && Date.now() - cachedKoyebBingAt < 30 * 60 * 1000) {
+    return cachedKoyebBing;
+  }
+  for (const mkt of ['ja-JP', 'en-US']) {
+    try {
+      const r = await fetch(
+        `https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=6&mkt=${mkt}`,
+        {
+          headers: { 'User-Agent': 'Mozilla/5.0', Accept: 'application/json' },
+          signal: AbortSignal.timeout(5500),
+        }
+      );
+      if (r.ok) {
+        const d = await r.json();
+        const imgs = (d.images || [])
+          .filter((im) => im && (im.url || im.urlbase))
+          .map((im, idx) => {
+            const rawPath = im.url || `${im.urlbase}_1920x1080.jpg`;
+            const rawUrl = rawPath.startsWith('http')
+              ? rawPath
+              : `https://www.bing.com${rawPath.startsWith('/') ? '' : '/'}${rawPath}`;
+            return {
+              rawUrl,
+              url: rawUrl,
+              proxyUrl: `${serverOrigin}/api/bing-image?idx=${idx}&u=${encodeURIComponent(rawUrl)}`,
+              title: im.title || 'Bing 日替わり壁紙',
+              copyright: im.copyright || '© Microsoft Bing Daily Wallpaper',
+              date: im.startdate || new Date().toISOString().slice(0, 10),
+            };
+          });
+        if (imgs.length > 0) {
+          cachedKoyebBing = imgs;
+          cachedKoyebBingAt = Date.now();
+          return imgs;
+        }
+      }
+    } catch {
+      // try next market
+    }
+  }
+  return [];
+}
+
+app.get('/api/bing-wallpaper', async (req, res) => {
+  const serverOrigin = `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers.host}`;
+  const imgs = await fetchKoyebBingList(serverOrigin);
+  if (imgs.length > 0) {
+    res.json({
+      url: imgs[0].rawUrl,
+      rawUrl: imgs[0].rawUrl,
+      title: imgs[0].title,
+      copyright: imgs[0].copyright,
+      date: imgs[0].date,
+      images: imgs,
+    });
+    return;
+  }
+  res.json({
+    url: 'https://www.bing.com/th?id=OHR.BlueHK_JA-JP0477081186_1920x1080.jpg',
+    rawUrl: 'https://www.bing.com/th?id=OHR.BlueHK_JA-JP0477081186_1920x1080.jpg',
+    title: 'Bing 日替わり自然壁紙',
+    copyright: '© Microsoft Bing Daily Wallpaper',
+    date: new Date().toISOString().slice(0, 10),
+    images: [],
+  });
+});
+
+app.get('/api/bing-image', async (req, res) => {
+  const idx = Math.max(0, parseInt(String(req.query.idx || '0'), 10) || 0);
+  let targetUrl = typeof req.query.u === 'string' ? req.query.u : '';
+  const serverOrigin = `${req.headers['x-forwarded-proto'] || req.protocol}://${req.headers.host}`;
+  if (!targetUrl || !targetUrl.startsWith('https://www.bing.com/')) {
+    const list = await fetchKoyebBingList(serverOrigin);
+    if (list.length > 0) {
+      targetUrl = list[idx % list.length].rawUrl;
+    }
+  }
+  if (targetUrl && targetUrl.startsWith('https://www.bing.com/')) {
+    try {
+      const imgRes = await fetch(targetUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0', Referer: 'https://www.bing.com/' },
+        signal: AbortSignal.timeout(7000),
+      });
+      if (imgRes.ok) {
+        const contentType = imgRes.headers.get('content-type') || 'image/jpeg';
+        const arrayBuf = await imgRes.arrayBuffer();
+        res.setHeader('Content-Type', contentType);
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.send(Buffer.from(arrayBuf));
+        return;
+      }
+    } catch {
+      // fall through
+    }
+  }
+  res.redirect(302, 'https://www.bing.com/th?id=OHR.BlueHK_JA-JP0477081186_1920x1080.jpg');
+});
 
 // ============================================================================
 // 6. Start HTTP + Wisp WebSocket Server

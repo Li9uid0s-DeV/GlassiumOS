@@ -3,6 +3,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Icon } from './Icon';
 import { soundService } from './soundService';
 import { requestAIChat } from './aiClient';
+import { backendFetch } from './backendConfig';
+import { useOS } from './OSContext';
+import { WALLPAPERS } from './wallpapers';
+import {
+  DEFAULT_BING_WALLPAPERS,
+  BingWallpaperItem,
+  LockWallpaperConfig,
+  fetchBingWallpapers,
+  loadLockWallpaperConfig,
+  saveLockWallpaperConfig,
+  getDesktopBingIndex,
+  makeFallbackNatureSvgDataUri,
+} from './bingWallpaperService';
 import {
   LiquidGlassClock,
   ClockFontId,
@@ -71,6 +84,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   userName = 'Glassium User',
   userAvatar,
 }) => {
+  const { wallpaper: desktopWallpaper, customWallpapers, selectedCustomId } = useOS();
   const [passwordMode, setPasswordMode] = useState(false);
   const [pinInput, setPinInput] = useState('');
   const [passError, setPassError] = useState(false);
@@ -78,43 +92,47 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   // Slide-up gesture & Bing Daily Nature Wallpaper state
   const [slideOffsetY, setSlideOffsetY] = useState(0);
   const [dragStartY, setDragStartY] = useState<number | null>(null);
-  const [bingImages, setBingImages] = useState<
-    Array<{ url: string; title: string; copyright: string; startdate?: string }>
-  >([
-    {
-      url: '/api/bing-image?idx=0',
-      title: 'Bing 日替わり自然壁紙',
-      copyright: '© Microsoft Bing Daily Wallpaper',
-    },
-  ]);
-  const [bingIndex, setBingIndex] = useState(0);
-  const [useBingWallpaper, setUseBingWallpaper] = useState(true);
+  const [bingImages, setBingImages] = useState<BingWallpaperItem[]>(DEFAULT_BING_WALLPAPERS);
+  const [lockWallCfg, setLockWallCfg] = useState<LockWallpaperConfig>(() =>
+    loadLockWallpaperConfig()
+  );
+  const [imgFallbackTier, setImgFallbackTier] = useState<number>(0);
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/bing-wallpaper')
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (cancelled || !data) return;
-        if (Array.isArray(data.images) && data.images.length > 0) {
-          setBingImages(data.images);
-        } else if (data.url) {
-          setBingImages([
-            {
-              url: data.url,
-              title: data.title || 'Bing 日替わり自然壁紙',
-              copyright: data.copyright || '© Microsoft Bing',
-            },
-          ]);
+    fetchBingWallpapers()
+      .then((items) => {
+        if (!cancelled && Array.isArray(items) && items.length > 0) {
+          setBingImages(items);
+          setImgFallbackTier(0);
         }
       })
-      .catch(() => {
-        // Keep default proxied Bing nature image
-      });
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const onLockWallChanged = (e: Event) => {
+      const detail = (e as CustomEvent<LockWallpaperConfig>).detail;
+      if (detail) {
+        setLockWallCfg(detail);
+      } else {
+        setLockWallCfg(loadLockWallpaperConfig());
+      }
+      setImgFallbackTier(0);
+    };
+    window.addEventListener('glassium-lock-wallpaper-changed', onLockWallChanged);
+    return () => window.removeEventListener('glassium-lock-wallpaper-changed', onLockWallChanged);
+  }, []);
+
+  const updateLockWall = (patch: Partial<LockWallpaperConfig>) => {
+    const next: LockWallpaperConfig = { ...lockWallCfg, ...patch };
+    setLockWallCfg(next);
+    saveLockWallpaperConfig(next);
+    setImgFallbackTier(0);
+  };
 
   // Top-Left Customizable Weather & Personal Info
   const [customInfo, setCustomInfo] = useState<LockScreenCustomInfo>(() => {
@@ -131,7 +149,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   useEffect(() => {
     let active = true;
     const syncLockWeather = () => {
-      fetch('/api/weather?lat=35.6762&lon=139.6503&name=%E6%9D%B1%E4%BA%AC')
+      backendFetch('/api/weather?lat=35.6762&lon=139.6503&name=%E6%9D%B1%E4%BA%AC')
         .then((r) => (r.ok ? r.json() : null))
         .then((w) => {
           if (!active || !w || typeof w.temp !== 'number') return;
@@ -320,6 +338,8 @@ export const LockScreen: React.FC<LockScreenProps> = ({
   };
 
   // Scene background gradients & foreground depth SVG paths
+  const effectiveDepthScene =
+    lockWallCfg.mode === 'depth' ? lockWallCfg.depthScene : customInfo.depthScene;
   const sceneTheme = {
     alpine: {
       bg: 'radial-gradient(circle at 22% 72%, rgba(56, 189, 248, 0.42) 0%, rgba(30, 58, 138, 0.55) 42%, rgba(2, 6, 23, 0.96) 100%)',
@@ -349,10 +369,57 @@ export const LockScreen: React.FC<LockScreenProps> = ({
       ridgeColor2: 'rgba(54, 28, 12, 0.72)',
       ridgeStroke: 'rgba(253, 224, 71, 0.45)',
     },
-  }[customInfo.depthScene];
+  }[effectiveDepthScene || 'alpine'];
 
   const isMediaPlaying = Boolean(musicState?.isPlaying && musicState?.currentTrack);
-  const activeBing = bingImages[bingIndex % bingImages.length] || bingImages[0];
+  const desktopCustomWp = customWallpapers.find((c) => c.id === selectedCustomId);
+  const isBingMode =
+    lockWallCfg.mode === 'bing' ||
+    (lockWallCfg.mode === 'sync-desktop' && desktopWallpaper === 'bing' && !desktopCustomWp);
+  const activeBingIdx =
+    lockWallCfg.mode === 'sync-desktop' && desktopWallpaper === 'bing'
+      ? getDesktopBingIndex()
+      : lockWallCfg.bingIndex;
+  const activeBing =
+    bingImages[Math.abs(activeBingIdx) % Math.max(1, bingImages.length)] ||
+    bingImages[0] ||
+    DEFAULT_BING_WALLPAPERS[0];
+
+  const resolvedBingSrc = (() => {
+    if (!activeBing) return makeFallbackNatureSvgDataUri('Bing Daily Wallpaper');
+    const primary = activeBing.rawUrl || activeBing.url;
+    const backup =
+      activeBing.backupUrl ||
+      `https://wsrv.nl/?url=${encodeURIComponent(primary)}&w=1920&output=jpg`;
+    const proxy =
+      activeBing.proxyUrl ||
+      `https://wsrv.nl/?url=${encodeURIComponent(primary)}&w=1920&output=jpg`;
+    if (imgFallbackTier === 0) return primary;
+    if (imgFallbackTier === 1) return backup;
+    if (imgFallbackTier === 2) return proxy;
+    return makeFallbackNatureSvgDataUri(activeBing.title);
+  })();
+
+  const resolvedLockBgCss = (() => {
+    if (lockWallCfg.mode === 'preset') {
+      return (WALLPAPERS[lockWallCfg.presetWallpaper] ?? WALLPAPERS.live2d).style;
+    }
+    if (lockWallCfg.mode === 'sync-desktop' && !desktopCustomWp && desktopWallpaper !== 'bing') {
+      return (WALLPAPERS[desktopWallpaper] ?? WALLPAPERS.live2d).style;
+    }
+    return sceneTheme.bg;
+  })();
+
+  const resolvedCustomImgUrl = (() => {
+    if (lockWallCfg.mode === 'custom' && lockWallCfg.customImageUrl) {
+      return lockWallCfg.customImageUrl;
+    }
+    if (lockWallCfg.mode === 'sync-desktop' && desktopCustomWp?.dataUrl) {
+      return desktopCustomWp.dataUrl;
+    }
+    return null;
+  })();
+
   const blurAmountPx = passwordMode ? 24 : Math.min(20, Math.round(slideOffsetY / 8));
 
   // If OS is not locked, do not render lock screen
@@ -373,10 +440,10 @@ export const LockScreen: React.FC<LockScreenProps> = ({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         className="fixed inset-0 z-[100] select-none overflow-hidden text-white"
-        style={{ background: sceneTheme.bg }}
+        style={{ background: resolvedLockBgCss }}
       >
         {/* =====================================================================
-            LAYER 0: BING DAILY NATURE WALLPAPER + DYNAMIC SLIDE-UP BLUR
+            LAYER 0: BING DAILY NATURE / CUSTOM / PRESET WALLPAPER + SLIDE-UP BLUR
         ===================================================================== */}
         <div
           className="absolute inset-0 pointer-events-none z-0 overflow-hidden transition-all duration-300"
@@ -385,13 +452,24 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             transform: passwordMode || slideOffsetY > 10 ? 'scale(1.06)' : 'scale(1)',
           }}
         >
-          {useBingWallpaper && activeBing?.url && (
+          {resolvedCustomImgUrl ? (
             <img
-              src={activeBing.url}
-              alt={activeBing.title}
+              src={resolvedCustomImgUrl}
+              alt="Lock Screen Custom Wallpaper"
               className="absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700"
             />
-          )}
+          ) : isBingMode && activeBing ? (
+            <img
+              key={`${activeBing.url}-${imgFallbackTier}`}
+              src={resolvedBingSrc}
+              alt={activeBing.title}
+              referrerPolicy="no-referrer"
+              onError={() => {
+                setImgFallbackTier((prev) => (prev < 3 ? prev + 1 : prev));
+              }}
+              className="absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700"
+            />
+          ) : null}
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/20 to-slate-950/45" />
 
           <div
@@ -504,7 +582,7 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             <div className="w-12 h-1 rounded-full bg-white/40 group-hover:bg-cyan-300 transition-colors" />
           </button>
 
-          {useBingWallpaper && activeBing && (
+          {isBingMode && activeBing && (
             <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 backdrop-blur-xl border border-white/10 text-[10px] text-white/75 max-w-[90vw]">
               <Icon name="Globe" size={11} className="text-cyan-300 shrink-0" />
               <span className="truncate max-w-[260px] sm:max-w-[380px]">
@@ -513,7 +591,12 @@ export const LockScreen: React.FC<LockScreenProps> = ({
               {bingImages.length > 1 && (
                 <button
                   type="button"
-                  onClick={() => setBingIndex((prev) => (prev + 1) % bingImages.length)}
+                  onClick={() =>
+                    updateLockWall({
+                      mode: 'bing',
+                      bingIndex: (lockWallCfg.bingIndex + 1) % bingImages.length,
+                    })
+                  }
                   className="px-1.5 py-0.5 rounded bg-white/10 hover:bg-white/20 text-cyan-200 font-bold shrink-0 cursor-pointer"
                   title="別の日のBing自然壁紙に切替"
                 >
@@ -551,11 +634,23 @@ export const LockScreen: React.FC<LockScreenProps> = ({
             <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => setUseBingWallpaper(!useBingWallpaper)}
+                onClick={() =>
+                  updateLockWall({
+                    mode: lockWallCfg.mode === 'bing' ? 'sync-desktop' : 'bing',
+                  })
+                }
                 className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white/90 text-[11px] font-bold cursor-pointer"
-                title="Bing自然壁紙 / テーマ背景切替"
+                title="Bing自然壁紙 / デスクトップ同期背景 切替"
               >
-                {useBingWallpaper ? '🏞️ Bing自然' : '🌌 オーロラ'}
+                {lockWallCfg.mode === 'bing'
+                  ? '🏞️ Bing自然'
+                  : lockWallCfg.mode === 'sync-desktop'
+                  ? '🖥️ デスクトップ同期'
+                  : lockWallCfg.mode === 'custom'
+                  ? '🖼️ カスタム壁紙'
+                  : lockWallCfg.mode === 'preset'
+                  ? '🎨 プリセット'
+                  : '🌌 オーロラ深度'}
               </button>
               <button
                 type="button"

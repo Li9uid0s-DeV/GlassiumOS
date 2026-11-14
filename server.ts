@@ -2104,7 +2104,8 @@ Only output <os_action> if the user is asking to change an OS setting or open an
                 : `https://www.bing.com${rawPath.startsWith('/') ? '' : '/'}${rawPath}`;
               return {
                 rawUrl,
-                url: `/api/bing-image?idx=${idx}&u=${encodeURIComponent(rawUrl)}`,
+                url: rawUrl,
+                proxyUrl: `/api/bing-image?idx=${idx}&u=${encodeURIComponent(rawUrl)}`,
                 title: im.title || 'Bing 日替わり壁紙',
                 copyright: im.copyright || '© Microsoft Bing Daily Wallpaper',
                 date: im.startdate || new Date().toISOString().slice(0, 10),
@@ -2125,6 +2126,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
 
   app.get('/api/bing-image', async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     res.setHeader('Cache-Control', 'public, max-age=3600');
     const idx = Math.max(0, parseInt(String(req.query.idx || '0'), 10) || 0);
     let targetUrl = typeof req.query.u === 'string' ? req.query.u : '';
@@ -2170,7 +2172,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     const imgs = await fetchBingArchiveList();
     if (imgs.length > 0) {
       res.json({
-        url: imgs[0].url,
+        url: imgs[0].rawUrl,
         rawUrl: imgs[0].rawUrl,
         title: imgs[0].title,
         copyright: imgs[0].copyright,
@@ -3056,10 +3058,13 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     (process.env.TMDB_API_KEY || '').trim() ||
     Buffer.from('YTA3ZTIyYmMxOGY1Y2IxMDZiZmU0Y2MxZjgzYWQ4ZWQ=', 'base64').toString('utf8');
 
+  const TOUSTREAM_TMDB_TOKEN =
+    'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIyYmYwZmFlZWIzZjc3OWRhZDdkOWM3MjY4ZGM0NmNmNiIsIm5iZiI6MTcyMzkzMjM1MS4xNDEyNzIsInN1YiI6IjY2YzExZTJmOTk5ZmYwYTFjNTE2YWRhNCIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.vwZW4D57fT-wlqLgHt_4vhnfTbuIwFOOrWE2DBlRHMQ';
+
   // -------------------------------------------------------------------------
-  // Live Mapple & Multi-Source Movies API Endpoint
+  // Live TouStream (toustream.xyz) & Mapple Multi-Source Movies API Endpoint
   // -------------------------------------------------------------------------
-  app.get('/api/entertainment/mapple/movies', async (req, res) => {
+  app.get(['/api/entertainment/mapple/movies', '/api/entertainment/toustream/movies'], async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     const q = String(req.query.q || '').trim();
     const tmdbKey = getTmdbApiKey();
@@ -3090,44 +3095,46 @@ Only output <os_action> if the user is asking to change an OS setting or open an
           item.originalTitle.toLowerCase().includes(qLower) ||
           item.keywords.some((k) => k.toLowerCase().includes(qLower) || qLower.includes(k.toLowerCase()))
         ) {
+          const touHash = item.type === 'movie' ? `/watch/movie/${item.tmdbId}` : `/watch/tv/${item.tmdbId}/1/1`;
           results.push({
-            id: `mapple-known-${item.tmdbId}`,
+            id: `toustream-known-${item.tmdbId}`,
             title: item.title,
             originalTitle: item.originalTitle,
             type: item.type,
             year: item.year,
             rating: item.rating,
-            genre: item.type === 'movie' ? ['映画', 'シアター', 'HD配信'] : ['アニメ', '人気作品', 'HD配信'],
+            genre: item.type === 'movie' ? ['映画', 'TouStream', 'HD配信'] : ['アニメ', 'TouStream', 'HD配信'],
             posterUrl: item.posterUrl,
             backdropUrl: item.backdropUrl,
             description: item.description,
             tmdbId: item.tmdbId,
             imdbId: item.imdbId,
-            embedUrl:
-              item.type === 'movie'
-                ? `/api/entertainment/embed-proxy?url=${encodeURIComponent(`https://mapple.fun/watch/movie/${item.tmdbId}`)}`
-                : `/api/entertainment/embed-proxy?url=${encodeURIComponent(`https://mapple.fun/watch/tv/${item.tmdbId}/1/1`)}`,
+            embedUrl: `/api/entertainment/embed-proxy?url=${encodeURIComponent('https://toustream.xyz/')}&hashRoute=${encodeURIComponent(touHash)}#${touHash}`,
           });
         }
       }
 
-      // 2. Query TMDB (if key configured) + iTunes Movies in parallel
+      // 2. Query TMDB (via TouStream Bearer Token + API key) + iTunes Movies in parallel
       const [tmdbData, itunesMovieData] = await Promise.all([
         (async () => {
-          if (!tmdbKey) return { results: [] };
           try {
-            if (q) {
-              const r = await fetch(
-                `https://api.themoviedb.org/3/search/movie?api_key=${tmdbKey}&query=${encodeURIComponent(q)}&language=ja-JP&include_adult=false`,
-                { signal: AbortSignal.timeout(4000) }
-              );
-              if (r.ok) return (await r.json()) as { results?: Array<Record<string, unknown>> };
-            } else {
-              const r = await fetch(
-                `https://api.themoviedb.org/3/trending/movie/week?api_key=${tmdbKey}&language=ja-JP`,
-                { signal: AbortSignal.timeout(4000) }
-              );
-              if (r.ok) return (await r.json()) as { results?: Array<Record<string, unknown>> };
+            const endpoint = q
+              ? `https://api.themoviedb.org/3/search/movie?query=${encodeURIComponent(q)}&language=ja-JP&include_adult=false`
+              : `https://api.themoviedb.org/3/trending/movie/week?language=ja-JP`;
+            const r = await fetch(endpoint, {
+              headers: {
+                Accept: 'application/json',
+                Authorization: `Bearer ${TOUSTREAM_TMDB_TOKEN}`,
+              },
+              signal: AbortSignal.timeout(4000),
+            });
+            if (r.ok) return (await r.json()) as { results?: Array<Record<string, unknown>> };
+
+            if (tmdbKey) {
+              const rFallback = await fetch(`${endpoint}&api_key=${tmdbKey}`, {
+                signal: AbortSignal.timeout(4000),
+              });
+              if (rFallback.ok) return (await rFallback.json()) as { results?: Array<Record<string, unknown>> };
             }
           } catch {
             // ignore
@@ -3172,19 +3179,20 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         const year = dateStr ? new Date(dateStr).getFullYear() || 2024 : 2024;
         const posterPath = it.poster_path ? String(it.poster_path) : '';
         const backdropPath = it.backdrop_path ? String(it.backdrop_path) : '';
+        const touHash = `/watch/movie/${idNum}`;
         results.push({
-          id: `mapple-movie-${idNum}`,
+          id: `toustream-movie-${idNum}`,
           title: String(it.title || it.original_title || 'Movie'),
           originalTitle: String(it.original_title || it.title || ''),
           type: 'movie',
           year,
           rating: Number(Number(it.vote_average || 8.0).toFixed(1)),
-          genre: ['映画', 'Mapple Stream', 'HD'],
+          genre: ['映画', 'TouStream', 'Mapple HD'],
           posterUrl: posterPath ? `https://image.tmdb.org/t/p/w500${posterPath}` : '',
           backdropUrl: backdropPath ? `https://image.tmdb.org/t/p/w1280${backdropPath}` : undefined,
           description: String(it.overview || '劇場公開映画のストリーミング配信データです。'),
           tmdbId: idNum,
-          embedUrl: `/api/entertainment/embed-proxy?url=${encodeURIComponent(`https://mapple.fun/watch/movie/${idNum}`)}`,
+          embedUrl: `/api/entertainment/embed-proxy?url=${encodeURIComponent('https://toustream.xyz/')}&hashRoute=${encodeURIComponent(touHash)}#${touHash}`,
         });
       }
 
@@ -3213,9 +3221,9 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         });
       }
 
-      res.json({ results: results.slice(0, 30), source: 'mapple.fun' });
+      res.json({ results: results.slice(0, 30), source: 'toustream.xyz & mapple.fun' });
     } catch {
-      res.json({ results: [], source: 'mapple.fun' });
+      res.json({ results: [], source: 'toustream.xyz & mapple.fun' });
     }
   });
 
@@ -3557,7 +3565,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
   // Movie & Anime Embed Sanitizer Proxy (/api/entertainment/embed-proxy)
   // Neutralizes `document.domain` Sandbox checks ("Sandbox not allowed"),
   // strips disable-devtool & popup ads, and removes X-Frame-Options/CSP
-  // so mapple.fun, mapple.tv, vidlink.pro, vidcore.io, 2embed.cc, autoembed.me open cleanly!
+  // so toustream.xyz, mapple.fun, mapple.tv, vidlink.pro, vidcore.io, 2embed.cc, autoembed.me open cleanly!
   // -------------------------------------------------------------------------
   app.get('/api/entertainment/embed-proxy', async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -3565,6 +3573,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     res.removeHeader('Content-Security-Policy');
     const rawUrl = String(req.query.url || '').trim();
     const fallbackUrl = String(req.query.fallback || '').trim();
+    const hashRoute = String(req.query.hashRoute || '').trim();
     if (!rawUrl || !/^https?:\/\//i.test(rawUrl)) {
       res.status(400).send('Invalid embed URL');
       return;
@@ -3572,14 +3581,19 @@ Only output <os_action> if the user is asking to change an OS setting or open an
 
     const fetchAndSanitizeEmbed = async (targetUrl: string): Promise<{ status: number; contentType: string; body: Buffer | string }> => {
       const parsed = new URL(targetUrl);
+      const isToustreamFamily = /toustream\.xyz|vidstuck\.cc|vidy\.st|cinesrc\.st|vidrift\.net|vidnest\.fun|atlantic\.st|vixsrc\.to|vidfast\.pro|vidzee\.wtf|multiembed\.mov|primewire\.mov/i.test(
+        parsed.hostname
+      );
+      const refOrigin = isToustreamFamily ? 'https://toustream.xyz' : 'https://mapple.fun';
+
       const upstreamRes = await fetch(targetUrl, {
         headers: {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
           Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           'Accept-Language': 'ja,en-US;q=0.9,en;q=0.8',
-          Referer: 'https://mapple.fun/',
-          Origin: 'https://mapple.fun',
+          Referer: `${refOrigin}/`,
+          Origin: refOrigin,
         },
         redirect: 'follow',
         signal: AbortSignal.timeout(6500),
@@ -3609,7 +3623,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         return fetchAndSanitizeEmbed(cleanDirectUrl);
       }
 
-      // Strip disable-devtool, sbx.js sandbox blocker, and popup ad scripts
+      // Strip disable-devtool, sbx.js sandbox blocker, Cloudflare iframe challenge, and popup ad scripts
       html = html
         .replace(/<script[^>]*disable-devtool[^>]*><\/script>/gi, '')
         .replace(/<script[^>]*sbx\.js[^>]*><\/script>/gi, '')
@@ -3617,6 +3631,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
         .replace(/<script[^>]*acscdn[^>]*><\/script>/gi, '')
         .replace(/<script[^>]*tagivi\.com[^>]*><\/script>/gi, '')
         .replace(/<script[^>]*poringasitia\.com[^>]*><\/script>/gi, '')
+        .replace(/<script>\(function\(\)\{function c\(\)\{var b=a\.contentDocument[\s\S]*?<\/script>/gi, '')
         .replace(/function\s+isReallySandboxed\s*\(\)\s*\{[\s\S]*?return\s+false;\s*\}/gi, 'function isReallySandboxed(){return false;}');
 
       // Activate data-src immediately on #iframesrc so it never waits for sbx.js
@@ -3640,9 +3655,22 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       configurable: true
     });
     Object.defineProperty(document, 'referrer', {
-      get: function() { return 'https://mapple.fun/'; },
+      get: function() { return ${JSON.stringify(refOrigin + '/')}; },
       configurable: true
     });
+  } catch (e) {}
+  try {
+    localStorage.setItem('ts_welcome', 'true');
+    var tsSettings = JSON.parse(localStorage.getItem('ts_settings') || '{}');
+    tsSettings.welcome_dismissed = true;
+    tsSettings.autoplay = true;
+    localStorage.setItem('ts_settings', JSON.stringify(tsSettings));
+  } catch (e) {}
+  try {
+    var desiredHash = ${JSON.stringify(hashRoute)};
+    if (desiredHash && (!window.location.hash || window.location.hash === '#' || window.location.hash === '#/')) {
+      window.location.hash = '#' + (desiredHash.charAt(0) === '/' ? desiredHash : '/' + desiredHash);
+    }
   } catch (e) {}
   window.isReallySandboxed = function() { return false; };
   window.DisableDevtool = function() {};
@@ -3683,13 +3711,13 @@ Only output <os_action> if the user is asking to change an OS setting or open an
           // fall through
         }
       }
-      res.status(200).send(`<!DOCTYPE html><html><body style="margin:0;background:#090d16;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;"><div style="text-align:center;padding:24px;"><p style="font-size:14px;opacity:0.8;">mapple.fun プロキシストリームへ再接続中... 下部の別ミラータブを選択してください (${String(primaryErr).slice(0, 60)})</p></div></body></html>`);
+      res.status(200).send(`<!DOCTYPE html><html><body style="margin:0;background:#090d16;color:#fff;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;"><div style="text-align:center;padding:24px;"><p style="font-size:14px;opacity:0.8;">toustream.xyz / mapple.fun プロキシストリームへ再接続中... 下部の別ミラータブを選択してください (${String(primaryErr).slice(0, 60)})</p></div></body></html>`);
     }
   });
 
   // -------------------------------------------------------------------------
   // Unified Cinema Gateway (/api/entertainment/player)
-  // Uses mapple.fun as primary source and routes all movie/series streams
+  // Uses toustream.xyz & mapple.fun as primary sources and routes all streams
   // through /api/entertainment/embed-proxy & /api/entertainment/video-proxy.
   // -------------------------------------------------------------------------
   const cinemaMetaCache = new Map<
@@ -3708,7 +3736,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     const ep = Math.max(1, Number(req.query.ep) || 1);
     const title = String(req.query.title || 'Cinema Stream').trim();
     const originalTitle = String(req.query.originalTitle || title).trim();
-    const provider = String(req.query.provider || 'mapple-fun').trim();
+    const provider = String(req.query.provider || 'toustream').trim();
     const fallbackYtId = String(req.query.ytId || '').trim();
     const isMovie = mediaType === 'movie';
     const tmdbKey = getTmdbApiKey();
@@ -3808,7 +3836,15 @@ Only output <os_action> if the user is asking to change an OS setting or open an
     const numTmdb = tmdbId || '693134';
     const cleanImdb = imdbId || 'tt15239678';
 
-    // All movie & anime sources routed through /api/entertainment/embed-proxy with mapple.fun as primary source!
+    // All movie & anime sources routed through /api/entertainment/embed-proxy with toustream.xyz & mapple.fun as primary sources!
+    const toustreamHash = isMovie
+      ? `/watch/movie/${numTmdb}`
+      : `/watch/tv/${numTmdb}/1/${ep}`;
+    const vidstuckTarget = isMovie
+      ? `https://vidstuck.cc/embed/movie/${numTmdb}?loading=2&color=e63946&overlay=true&back=false&autoplay=true`
+      : `https://vidstuck.cc/embed/tv/${numTmdb}/1/${ep}?loading=2&color=e63946&overlay=true&back=false&nextEpisode=false&episodeSelector=false&autoplayNextEpisode=false`;
+    const toustreamProxied = `/api/entertainment/embed-proxy?url=${encodeURIComponent('https://toustream.xyz/')}&hashRoute=${encodeURIComponent(toustreamHash)}&fallback=${encodeURIComponent(vidstuckTarget)}#${toustreamHash}`;
+
     const mappleFunTarget = isMovie
       ? `https://mapple.fun/watch/movie/${numTmdb}`
       : `https://mapple.fun/watch/tv/${numTmdb}/1/${ep}`;
@@ -3853,7 +3889,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>${title.replace(/[<>&"]/g, '')} — mapple.fun Proxy Cinema</title>
+<title>${title.replace(/[<>&"]/g, '')} — toustream.xyz & mapple.fun Proxy Cinema</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; background: #05070e; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
@@ -3883,12 +3919,13 @@ Only output <os_action> if the user is asking to change an OS setting or open an
   <div class="player-wrap" id="mount"></div>
   <div class="bottom-bar">
     <div class="edge-pills" id="pills"></div>
-    <div class="status-tag" id="statusLabel">mapple.fun Proxy Stream Active</div>
+    <div class="status-tag" id="statusLabel">toustream.xyz & mapple.fun Proxy Stream Active</div>
   </div>
 </div>
 <script>
 (function(){
   var sources = [
+    { key: 'toustream', label: 'toustream.xyz (Proxy 12ミラー)', type: 'iframe', url: ${JSON.stringify(toustreamProxied)} },
     { key: 'mapple-fun', label: 'mapple.fun (Proxy Main)', type: 'iframe', url: ${JSON.stringify(mappleFunProxied)} },
     { key: 'vidlink', label: 'mapple.fun Mirror / VidCore (Proxy)', type: 'iframe', url: ${JSON.stringify(vidcoreProxied)} },
     { key: 'flixhd', label: '2Embed (Proxy)', type: 'iframe', url: ${JSON.stringify(twoEmbedProxied)} },
@@ -3925,7 +3962,7 @@ Only output <os_action> if the user is asking to change an OS setting or open an
       f.allowFullscreen = true;
       mount.appendChild(f);
     }
-    statusLabel.textContent = srcObj.label + ' [Proxy経由: mapple.fun] (${cleanImdb})';
+    statusLabel.textContent = srcObj.label + ' [Proxy経由: toustream.xyz / mapple.fun] (${cleanImdb})';
     renderPills();
   }
 

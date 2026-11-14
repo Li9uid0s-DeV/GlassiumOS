@@ -10,6 +10,14 @@ import { SpaceWallpaper } from './SpaceWallpaper';
 import { Live2DWallpaper } from './Live2DWallpaper';
 import { DynamicWorldWallpaper } from './DynamicWorldWallpaper';
 import { LockScreen } from './LockScreen';
+import {
+  DEFAULT_BING_WALLPAPERS,
+  BingWallpaperItem,
+  fetchBingWallpapers,
+  getDesktopBingIndex,
+  setDesktopBingIndex,
+  makeFallbackNatureSvgDataUri,
+} from './bingWallpaperService';
 import { TerminalApp } from './apps/Terminal';
 import { NotepadApp } from './apps/Notepad';
 import { FileExplorerApp } from './apps/FileExplorer';
@@ -27,6 +35,7 @@ import { AppLogo } from './AppLogo';
 import { GlasiusCard } from './GlasiusCard';
 import { InitialSetupWizard, InitialSetupResult } from './InitialSetupWizard';
 import { DesktopOverlaySuite } from './DesktopOverlaySuite';
+import { Glassium6MaterialLightOverlay } from './Glassium6BetaOverlay';
 
 const BrowserApp = lazy(() => import('./apps/Browser').then((m) => ({ default: m.BrowserApp })));
 const SettingsApp = lazy(() => import('./apps/Settings').then((m) => ({ default: m.SettingsApp })));
@@ -287,7 +296,7 @@ export function Desktop() {
     return localStorage.getItem('glassium_show_desktop_widget') === 'true';
   });
   const [showWhatsNewModal, setShowWhatsNewModal] = useState<boolean>(() => {
-    return localStorage.getItem('glassium_v5.0_u4_whats_new_dismissed') !== 'true';
+    return localStorage.getItem('glassium_v5.0_u4_fix1_whats_new_dismissed') !== 'true';
   });
 
   useEffect(() => {
@@ -499,11 +508,63 @@ export function Desktop() {
   const dateStr = time.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 
   const customWallpaper = customWallpapers.find((c) => c.id === selectedCustomId);
+  const useBingDesktop = wallpaper === 'bing' && !customWallpaper;
   const useDynamicWorld = wallpaper === 'dynamic-world' && !liteMode;
   const useLive2D = (wallpaper === 'live2d' || wallpaper === 'golden-sparkle') && !liteMode;
   const useShader = wallpaper === 'shader' && !liteMode;
   const useSpace = wallpaper === 'space' && !liteMode;
   const shaderOpacity = transparency / 100;
+
+  const [desktopBingImages, setDesktopBingImages] = useState<BingWallpaperItem[]>(
+    DEFAULT_BING_WALLPAPERS
+  );
+  const [desktopBingIdx, setDesktopBingIdx] = useState<number>(() => getDesktopBingIndex());
+  const [desktopBingFallbackTier, setDesktopBingFallbackTier] = useState<number>(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchBingWallpapers()
+      .then((items) => {
+        if (!cancelled && Array.isArray(items) && items.length > 0) {
+          setDesktopBingImages(items);
+          setDesktopBingFallbackTier(0);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onDesktopBingChanged = (e: Event) => {
+      const idx = (e as CustomEvent<{ index?: number }>).detail?.index;
+      setDesktopBingIdx(typeof idx === 'number' ? idx : getDesktopBingIndex());
+      setDesktopBingFallbackTier(0);
+    };
+    window.addEventListener('glassium-desktop-bing-changed', onDesktopBingChanged);
+    return () => window.removeEventListener('glassium-desktop-bing-changed', onDesktopBingChanged);
+  }, []);
+
+  const activeDesktopBing =
+    desktopBingImages[Math.abs(desktopBingIdx) % Math.max(1, desktopBingImages.length)] ||
+    desktopBingImages[0] ||
+    DEFAULT_BING_WALLPAPERS[0];
+
+  const resolvedDesktopBingSrc = (() => {
+    if (!activeDesktopBing) return makeFallbackNatureSvgDataUri('Bing Daily Wallpaper');
+    const primary = activeDesktopBing.rawUrl || activeDesktopBing.url;
+    const backup =
+      activeDesktopBing.backupUrl ||
+      `https://wsrv.nl/?url=${encodeURIComponent(primary)}&w=1920&output=jpg`;
+    const proxy =
+      activeDesktopBing.proxyUrl ||
+      `https://wsrv.nl/?url=${encodeURIComponent(primary)}&w=1920&output=jpg`;
+    if (desktopBingFallbackTier === 0) return primary;
+    if (desktopBingFallbackTier === 1) return backup;
+    if (desktopBingFallbackTier === 2) return proxy;
+    return makeFallbackNatureSvgDataUri(activeDesktopBing.title);
+  })();
 
   const activeDesktopWindows = windows.filter(
     (w) => !w.desktopId || w.desktopId === activeDesktopId
@@ -735,6 +796,43 @@ export function Desktop() {
         />
       )}
 
+      {/* Bing Daily Nature Wallpaper overlay */}
+      {useBingDesktop && activeDesktopBing && (
+        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+          <img
+            key={`${activeDesktopBing.url}-${desktopBingFallbackTier}`}
+            src={resolvedDesktopBingSrc}
+            alt={activeDesktopBing.title}
+            referrerPolicy="no-referrer"
+            onError={() => {
+              setDesktopBingFallbackTier((prev) => (prev < 3 ? prev + 1 : prev));
+            }}
+            className="w-full h-full object-cover object-center transition-opacity duration-700"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/15" />
+          <div className="pointer-events-auto fixed bottom-14 right-4 z-10 flex items-center gap-2 px-3 py-1 rounded-full bg-black/45 backdrop-blur-xl border border-white/15 text-[10px] text-white/85 shadow-lg">
+            <Icon name="Globe" size={11} className="text-cyan-300 shrink-0" />
+            <span className="truncate max-w-[200px] sm:max-w-[280px]" title={activeDesktopBing.copyright}>
+              Bing: {activeDesktopBing.title}
+            </span>
+            {desktopBingImages.length > 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const next = (desktopBingIdx + 1) % desktopBingImages.length;
+                  setDesktopBingIndex(next);
+                }}
+                className="px-1.5 py-0.5 rounded bg-white/15 hover:bg-white/25 text-cyan-200 font-bold cursor-pointer"
+                title="次のBing日替わり壁紙に切替"
+              >
+                切替
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Dynamic World Live Wallpaper (Location, Terrain, Weather, Snow Accumulation, Time, Wind, Season, Events) */}
       {useDynamicWorld && !customWallpaper && <DynamicWorldWallpaper showControllerHud={true} />}
 
@@ -753,7 +851,7 @@ export function Desktop() {
       {useShader && !customWallpaper && <LiquidShader lite={false} opacity={shaderOpacity} />}
 
       {/* Floating orbs */}
-      {!liteMode && !useDynamicWorld && !useLive2D && !useShader && !useSpace && !customWallpaper && <WallpaperOrbs />}
+      {!liteMode && !useBingDesktop && !useDynamicWorld && !useLive2D && !useShader && !useSpace && !customWallpaper && <WallpaperOrbs />}
 
       {/* ========================================================
           1. MAC DESKTOP SHELL: Top Menu Bar + Magnified Bottom Dock
@@ -766,7 +864,7 @@ export function Desktop() {
               <div className="cursor-pointer hover:opacity-80" onClick={() => openApp('settings')}>
                 <AppLogo size={16} />
               </div>
-              <span className="font-bold tracking-tight">GlassiumOS 5 u4</span>
+              <span className="font-bold tracking-tight">GlassiumOS 5 u4(fix 1)</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('explorer')}>Files</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => openApp('settings')}>Settings</span>
               <span className="text-white/60 hover:text-white cursor-pointer" onClick={() => setShellMode('windows')}>View</span>
@@ -2096,7 +2194,7 @@ export function Desktop() {
         )}
       </AnimatePresence>
 
-      {/* What's New Release Notes Modal (GlassiumOS 5 u4) */}
+      {/* What's New Release Notes Modal (GlassiumOS 5 u4(fix 1)) */}
       <AnimatePresence>
         {showWhatsNewModal && (
           <motion.div
@@ -2105,7 +2203,7 @@ export function Desktop() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[9999] bg-black/75 backdrop-blur-2xl flex items-center justify-center p-4 sm:p-6"
             onClick={() => {
-              localStorage.setItem('glassium_v5.0_u4_whats_new_dismissed', 'true');
+              localStorage.setItem('glassium_v5.0_u4_fix1_whats_new_dismissed', 'true');
               setShowWhatsNewModal(false);
             }}
           >
@@ -2124,7 +2222,7 @@ export function Desktop() {
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h2 className="text-lg sm:text-xl font-bold tracking-tight">
-                        GlassiumOS 5 u4 アップデート内容
+                        GlassiumOS 5 u4(fix 1) アップデート一覧
                       </h2>
                       <span
                         className="px-2.5 py-0.5 rounded-md border text-[10px] font-mono font-bold"
@@ -2134,17 +2232,17 @@ export function Desktop() {
                           color: resolvedAccentHex,
                         }}
                       >
-                        UPDATE 4 (GlassiumOS 5 u4)
+                        UPDATE 4 · u4(fix 1)
                       </span>
                     </div>
                     <p className="text-xs text-white/60 font-mono mt-0.5">
-                      GlassiumOS 5 u4 · GlasispectUI Liquid Glass Edition
+                      GlassiumOS 5 u4(fix 1) · GlasispectUI Liquid Glass Edition
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => {
-                    localStorage.setItem('glassium_v5.0_u4_whats_new_dismissed', 'true');
+                    localStorage.setItem('glassium_v5.0_u4_fix1_whats_new_dismissed', 'true');
                     setShowWhatsNewModal(false);
                   }}
                   className="p-1.5 text-white/60 hover:text-white transition cursor-pointer"
@@ -2155,7 +2253,76 @@ export function Desktop() {
 
               {/* Release Notes Content List */}
               <div className="flex-1 overflow-y-auto pr-1 text-xs divide-y divide-white/10 space-y-1">
+                {/* Fix 1 Item 1: Dynamic Theme & Liquid Glass Tint */}
                 <div className="py-3.5 first:pt-0 flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-bold text-fuchsia-300 text-sm">
+                      【Fix 1] テーマ・アクセントカラーの24bit自由選択＆OS全体・Liquid Glass色反映
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        localStorage.setItem('glassium_v5.0_u4_fix1_whats_new_dismissed', 'true');
+                        setShowWhatsNewModal(false);
+                        openApp('settings');
+                      }}
+                      className="px-3 py-1 rounded-lg bg-fuchsia-500/25 hover:bg-fuchsia-500/40 border border-fuchsia-400/40 text-fuchsia-200 text-[11px] font-bold transition cursor-pointer"
+                    >
+                      個人用設定を開く →
+                    </button>
+                  </div>
+                  <p className="text-white/75 leading-relaxed">
+                    動的モードでのプリセット固定を廃止し、ライブ壁紙（Canvasピクセル解析）・カスタム画像・時間帯から連続24bit RGBカラーを自動抽出。さらに24bitカラーピッカー・HEX直接入力・色相スライダーで任意の色を自由に選択可能になりました。設定アプリだけでなくOS全体のウィンドウ・タイトルバーへテーマカラーを反映し、元々Liquid Glassだった箇所はガラス自体の色（ティント）が変化します。
+                  </p>
+                </div>
+
+                {/* Fix 1 Item 2: Music App Full Stream, Lyrics Sync, Dismissible Pill & Auto-Hide Top Bar */}
+                <div className="py-3.5 flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-bold text-rose-300 text-sm">
+                      【Fix 1] 音楽アプリのフル尺再生・歌詞同期ズレ修正・再生中ピル消去＆上部バー自動表示
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        localStorage.setItem('glassium_v5.0_u4_fix1_whats_new_dismissed', 'true');
+                        setShowWhatsNewModal(false);
+                        openApp('synth');
+                      }}
+                      className="px-3 py-1 rounded-lg bg-rose-500/25 hover:bg-rose-500/40 border border-rose-400/40 text-rose-200 text-[11px] font-bold transition cursor-pointer"
+                    >
+                      音楽アプリを開く →
+                    </button>
+                  </div>
+                  <p className="text-white/75 leading-relaxed">
+                    NetEase / GDStudio フル尺ストリーム解決を強化し、30秒プレビューへのフォールバック時は正直に「Preview」バッジを表示するよう改善。歌詞の同期ズレを解消し、音楽ピルは再生中でも✕ボタンで非表示（いつでも再表示可能）にできるようになりました。また、画面上部のステータスバーはマウスを上端へ移動した時だけスライド表示され、デスクトップペットは削除されました。
+                  </p>
+                </div>
+
+                {/* Fix 1 Item 3: Ultraviolet Proxy Codec, Game Runner & Entertainment Search Backend */}
+                <div className="py-3.5 flex flex-col gap-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-bold text-indigo-300 text-sm">
+                      【Fix 1] Ultraviolet XORプロキシ復号修正・ゲームカタログ・映画/アニメ検索＆Wisp通信改善
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        localStorage.setItem('glassium_v5.0_u4_fix1_whats_new_dismissed', 'true');
+                        setShowWhatsNewModal(false);
+                        openApp('browser');
+                      }}
+                      className="px-3 py-1 rounded-lg bg-indigo-500/25 hover:bg-indigo-500/40 border border-indigo-400/40 text-indigo-200 text-[11px] font-bold transition cursor-pointer"
+                    >
+                      ブラウザを開く →
+                    </button>
+                  </div>
+                  <p className="text-white/75 leading-relaxed">
+                    Ultraviolet URLエンコード/デコード時の「%60」エスケープずれ（F1）を修正し、スタンドアロン/統合バックエンド双方の `/api/proxy`・`/api/html-runner`・`/api/games/catalog`（F2）、Naruto等を含む映画・アニメ検索 `/api/entertainment/search`（F3）、AI状態フラグ（D1）、稼働中Wispプリセット整理（D2）、Renderコールドスタート待機時間延長（D3）を完全修正しました。
+                  </p>
+                </div>
+
+                <div className="py-3.5 flex flex-col gap-1.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="font-bold text-cyan-300 text-sm">
                       1. 音楽アプリ (Glassium Music)：新UI・外部プレイリスト読込・歌詞翻訳・設定タブ
@@ -2163,7 +2330,7 @@ export function Desktop() {
                     <button
                       type="button"
                       onClick={() => {
-                        localStorage.setItem('glassium_v5.0_u4_whats_new_dismissed', 'true');
+                        localStorage.setItem('glassium_v5.0_u4_fix1_whats_new_dismissed', 'true');
                         setShowWhatsNewModal(false);
                         openApp('synth');
                       }}
@@ -2185,7 +2352,7 @@ export function Desktop() {
                     <button
                       type="button"
                       onClick={() => {
-                        localStorage.setItem('glassium_v5.0_u4_whats_new_dismissed', 'true');
+                        localStorage.setItem('glassium_v5.0_u4_fix1_whats_new_dismissed', 'true');
                         setShowWhatsNewModal(false);
                         openApp('weather');
                       }}
@@ -2208,7 +2375,7 @@ export function Desktop() {
                       <button
                         type="button"
                         onClick={() => {
-                          localStorage.setItem('glassium_v5.0_u4_whats_new_dismissed', 'true');
+                          localStorage.setItem('glassium_v5.0_u4_fix1_whats_new_dismissed', 'true');
                           setShowWhatsNewModal(false);
                           openApp('appstore');
                         }}
@@ -2219,7 +2386,7 @@ export function Desktop() {
                       <button
                         type="button"
                         onClick={() => {
-                          localStorage.setItem('glassium_v5.0_u4_whats_new_dismissed', 'true');
+                          localStorage.setItem('glassium_v5.0_u4_fix1_whats_new_dismissed', 'true');
                           setShowWhatsNewModal(false);
                           openApp('sonicstudio');
                         }}
@@ -2249,17 +2416,17 @@ export function Desktop() {
               {/* Modal Footer */}
               <div className="pt-3 border-t border-white/10 flex items-center justify-between">
                 <span className="text-[11px] text-white/50 font-mono">
-                  GlassiumOS 5 u4
+                  GlassiumOS 5 u4(fix 1)
                 </span>
                 <button
                   onClick={() => {
-                    localStorage.setItem('glassium_v5.0_u4_whats_new_dismissed', 'true');
+                    localStorage.setItem('glassium_v5.0_u4_fix1_whats_new_dismissed', 'true');
                     setShowWhatsNewModal(false);
                   }}
                   style={{ backgroundColor: resolvedAccentHex }}
                   className="px-5 py-2 rounded-xl text-slate-950 font-black text-xs hover:brightness-110 transition cursor-pointer shadow-lg"
                 >
-                  GlassiumOS 5 u4 をはじめる
+                  GlassiumOS 5 u4(fix 1) をはじめる
                 </button>
               </div>
             </motion.div>
@@ -3304,6 +3471,9 @@ export function Desktop() {
           />
         )}
       </AnimatePresence>
+
+      {/* 【BETA】GlassiumOS 6 future: Glasispect UI 2: Material Mouse-Light Diffuse Reflection & Material Acoustics */}
+      <Glassium6MaterialLightOverlay />
 
       {/* Spotlight Command Palette (Ctrl+K), Tile Group Memory & Always-on-Top PiP Video Player */}
       <DesktopOverlaySuite />

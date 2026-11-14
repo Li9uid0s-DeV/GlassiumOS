@@ -4721,18 +4721,18 @@ export function SynthVisualizerApp({ initialTab }: { initialTab?: string } = {})
                   </div>
                 </section>
 
-                {/* Section 4: バージョン・仕様情報 (GlassiumOS 5 u4) */}
+                {/* Section 4: バージョン・仕様情報 (GlassiumOS 5 u4(fix 1)) */}
                 <section className="rounded-2xl apple-liquid-glass border border-white/15 p-5 space-y-3">
                   <h2 className="text-base font-bold text-white">バージョン・仕様</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">
                       <div className="text-white/50 text-[11px]">システムバージョン</div>
-                      <div className="font-bold text-white mt-0.5">GlassiumOS 5 u4</div>
+                      <div className="font-bold text-white mt-0.5">GlassiumOS 5 u4(fix 1)</div>
                     </div>
                     <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">
                       <div className="text-white/50 text-[11px]">アプリケーション</div>
                       <div className="font-bold text-white mt-0.5">
-                        Glassium Groove 5.0 u4
+                        Glassium Groove 5.0 u4(fix 1)
                       </div>
                     </div>
                     <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10">

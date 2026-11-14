@@ -648,72 +648,77 @@ input[type='range'].glass-slider::-moz-range-thumb {
 }
 
 /* ============================================================
-   OS-WIDE THEME SURFACE REFLECTION FOR ALL APPS (DARK & LIGHT)
-   Ensures all apps (not just Settings) reflect the active theme color
-   while preserving Liquid Glass elements' tinted glass appearance.
+   OS-WIDE THEME SURFACE REFLECTION FOR ALL APPS (DYNAMIC & LIGHT)
+   Standard Dark Mode ([data-theme-mode='dark']) keeps static colors.
+   Dynamic Mode ([data-theme-mode='dynamic']) reflects the active theme color.
    ============================================================ */
 
-[data-theme='dark'] .liquid-glass-window .bg-\[\#090d16\],
-[data-theme='dark'] .liquid-glass-window .bg-\[\#050811\],
-[data-theme='dark'] .liquid-glass-window .bg-\[\#0b0f19\],
-[data-theme='dark'] .liquid-glass-window .bg-\[\#0a0e1a\],
-[data-theme='dark'] .liquid-glass-window .bg-\[\#070a12\],
-[data-theme='dark'] .liquid-glass-window .bg-\[\#060913\],
-[data-theme='dark'] .liquid-glass-window .bg-zinc-950,
-[data-theme='dark'] .liquid-glass-window .bg-slate-950,
-[data-theme='dark'] .liquid-glass-window .bg-neutral-950,
-[data-theme='dark'] .liquid-glass-window .bg-gray-950 {
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-\[\#090d16\],
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-\[\#050811\],
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-\[\#0b0f19\],
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-\[\#0a0e1a\],
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-\[\#070a12\],
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-\[\#060913\],
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-zinc-950,
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-slate-950,
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-neutral-950,
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-gray-950 {
   background-color: var(--os-surface-solid) !important;
 }
 
-[data-theme='dark'] .liquid-glass-window .bg-zinc-950\/90,
-[data-theme='dark'] .liquid-glass-window .bg-slate-950\/60,
-[data-theme='dark'] .liquid-glass-window .bg-slate-950\/70,
-[data-theme='dark'] .liquid-glass-window .bg-slate-950\/80,
-[data-theme='dark'] .liquid-glass-window .bg-slate-950\/90 {
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-zinc-950\/90:not(.weather-sky-preserve):not(.weather-map-hud),
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-slate-950\/60:not(.weather-sky-preserve):not(.weather-map-hud),
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-slate-950\/70:not(.weather-sky-preserve):not(.weather-map-hud),
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-slate-950\/80:not(.weather-sky-preserve):not(.weather-map-hud),
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-slate-950\/90:not(.weather-sky-preserve):not(.weather-map-hud) {
   background-color: var(--os-surface) !important;
 }
 
-[data-theme='dark'] .liquid-glass-window .bg-zinc-900,
-[data-theme='dark'] .liquid-glass-window .bg-zinc-900\/80,
-[data-theme='dark'] .liquid-glass-window .bg-slate-900,
-[data-theme='dark'] .liquid-glass-window .bg-slate-900\/55,
-[data-theme='dark'] .liquid-glass-window .bg-slate-900\/60,
-[data-theme='dark'] .liquid-glass-window .bg-slate-900\/70,
-[data-theme='dark'] .liquid-glass-window .bg-slate-900\/80,
-[data-theme='dark'] .liquid-glass-window .bg-slate-900\/90 {
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-zinc-900:not(.weather-sky-preserve),
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-zinc-900\/80:not(.weather-sky-preserve),
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-slate-900:not(.weather-sky-preserve),
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-slate-900\/55:not(.weather-sky-preserve),
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-slate-900\/60:not(.weather-sky-preserve),
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-slate-900\/70:not(.weather-sky-preserve),
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-slate-900\/80:not(.weather-sky-preserve),
+[data-theme-mode='dynamic'][data-theme='dark'] .liquid-glass-window .bg-slate-900\/90:not(.weather-sky-preserve) {
   background-color: var(--os-surface-elevated) !important;
 }
 
 /* Adapt dark app container backgrounds inside windows when Light Mode is active */
-[data-theme='light'] .liquid-glass-window .bg-\[\#090d16\],
-[data-theme='light'] .liquid-glass-window .bg-\[\#050811\],
-[data-theme='light'] .liquid-glass-window .bg-\[\#0b0f19\],
-[data-theme='light'] .liquid-glass-window .bg-\[\#0a0e1a\],
-[data-theme='light'] .liquid-glass-window .bg-\[\#070a12\],
-[data-theme='light'] .liquid-glass-window .bg-\[\#060913\],
-[data-theme='light'] .liquid-glass-window .bg-slate-50,
-[data-theme='light'] .liquid-glass-window .bg-zinc-950,
-[data-theme='light'] .liquid-glass-window .bg-zinc-950\/90,
-[data-theme='light'] .liquid-glass-window .bg-slate-950,
-[data-theme='light'] .liquid-glass-window .bg-slate-950\/60,
-[data-theme='light'] .liquid-glass-window .bg-slate-950\/70,
-[data-theme='light'] .liquid-glass-window .bg-slate-950\/80 {
+[data-theme='light'] .liquid-glass-window .bg-\[\#090d16\]:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-\[\#050811\]:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-\[\#0b0f19\]:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-\[\#0a0e1a\]:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-\[\#070a12\]:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-\[\#060913\]:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-slate-50:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-zinc-950:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-zinc-950\/90:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-slate-950:not(.weather-sky-preserve):not(.weather-map-hud),
+[data-theme='light'] .liquid-glass-window .bg-slate-950\/60:not(.weather-sky-preserve):not(.weather-map-hud),
+[data-theme='light'] .liquid-glass-window .bg-slate-950\/70:not(.weather-sky-preserve):not(.weather-map-hud),
+[data-theme='light'] .liquid-glass-window .bg-slate-950\/80:not(.weather-sky-preserve):not(.weather-map-hud) {
   background-color: var(--os-surface-solid) !important;
   color: #0f172a !important;
 }
 
-[data-theme='light'] .liquid-glass-window .bg-zinc-900,
-[data-theme='light'] .liquid-glass-window .bg-zinc-900\/80,
-[data-theme='light'] .liquid-glass-window .bg-slate-900,
-[data-theme='light'] .liquid-glass-window .bg-slate-900\/55,
-[data-theme='light'] .liquid-glass-window .bg-slate-900\/60,
-[data-theme='light'] .liquid-glass-window .bg-slate-900\/70,
-[data-theme='light'] .liquid-glass-window .bg-slate-900\/80,
-[data-theme='light'] .liquid-glass-window .bg-slate-100,
-[data-theme='light'] .liquid-glass-window .bg-slate-100\/90 {
+[data-theme='light'] .liquid-glass-window .bg-zinc-900:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-zinc-900\/80:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-slate-900:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-slate-900\/55:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-slate-900\/60:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-slate-900\/70:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-slate-900\/80:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-slate-100:not(.weather-sky-preserve),
+[data-theme='light'] .liquid-glass-window .bg-slate-100\/90:not(.weather-sky-preserve) {
   background-color: var(--os-surface-elevated) !important;
   color: #0f172a !important;
+}
+
+[data-theme='light'] .liquid-glass-window .weather-map-hud,
+[data-theme='light'] .liquid-glass-window .weather-map-hud * {
+  color: #f8fafc !important;
 }
 
 [data-theme='light'] .liquid-glass-window .border-white\/5,

@@ -9,6 +9,8 @@ import { AppLogo } from './AppLogo';
 import { requestAIChat } from './aiClient';
 import { getMusicState, subscribeMusicState, MusicPlayerState } from './musicBridge';
 import { globalAudio } from './globalAudioManager';
+import { Glassium6BetaConfig, loadGlassium6BetaConfig } from './glasispectMaterialEngine';
+import { Glassium6TaskbarRenderer } from './Glassium6BetaOverlay';
 
 interface TaskbarProps {
   onLock?: () => void;
@@ -287,16 +289,45 @@ export function Taskbar(_props?: TaskbarProps) {
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dateStr = now.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
 
+  const [betaCfg, setBetaCfg] = useState<Glassium6BetaConfig>(() => loadGlassium6BetaConfig());
+
+  useEffect(() => {
+    const onBetaChanged = () => setBetaCfg(loadGlassium6BetaConfig());
+    window.addEventListener('glassium6-beta-config-changed', onBetaChanged);
+    return () => window.removeEventListener('glassium6-beta-config-changed', onBetaChanged);
+  }, []);
+
   const isXP = shellMode === 'xp';
   const isVista = shellMode === 'vista';
   const isWin10 = shellMode === 'windows10';
   const isDeX = shellMode === 'dex';
   const isChromeOS = shellMode === 'chromeos';
-  const isGlassium5 = shellMode === 'windows';
+  const useBetaTaskbar =
+    betaCfg.taskbarVariant !== 'glassium5-default' &&
+    !isXP &&
+    !isVista &&
+    !isWin10 &&
+    !isDeX &&
+    !isChromeOS;
+  const isGlassium5 = shellMode === 'windows' && !useBetaTaskbar;
 
   return (
     <>
       <StartMenu open={startOpen} onClose={() => setStartOpen(false)} startPos={startPos} />
+
+      {/* ==============================================================
+          0. 【BETA】GLASSIUMOS 6 FUTURE TASKBAR / DOCK VARIANTS
+             (Cloud/Fog, Dock, Side Dock, Taskbar, Sidebar)
+         ============================================================== */}
+      {useBetaTaskbar && (
+        <Glassium6TaskbarRenderer
+          onStartClick={handleStartClick}
+          onTrayToggle={() => setTrayOpen((v) => !v)}
+          trayOpen={trayOpen}
+          timeStr={timeStr}
+          dateStr={dateStr}
+        />
+      )}
 
       {/* ==============================================================
           1. WINDOWS XP LUNA TASKBAR
@@ -786,7 +817,7 @@ export function Taskbar(_props?: TaskbarProps) {
       {/* ==============================================================
           6. WINDOWS 11 TASKBAR (shellMode === 'windows11')
          ============================================================== */}
-      {!isXP && !isVista && !isWin10 && !isDeX && !isChromeOS && !isGlassium5 && (
+      {!isXP && !isVista && !isWin10 && !isDeX && !isChromeOS && !isGlassium5 && !useBetaTaskbar && (
         <>
           {autoHideTaskbar && (
             <div

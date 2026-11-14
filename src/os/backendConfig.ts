@@ -91,10 +91,14 @@ export function hasIntegratedLocalServer(): boolean {
   const host = window.location.hostname.toLowerCase();
   if (
     host.endsWith('.github.io') ||
+    host.includes('script.google.com') ||
+    host.includes('googleusercontent.com') ||
     host.endsWith('.dpdns.org') ||
     host.endsWith('.pages.dev') ||
     host.endsWith('.netlify.app') ||
-    host.endsWith('.vercel.app')
+    host.endsWith('.vercel.app') ||
+    host.endsWith('.web.app') ||
+    host.endsWith('.firebaseapp.com')
   ) {
     return false;
   }

@@ -31,6 +31,29 @@ import {
   autoConnectBackendServer,
   getBackendConnectionState,
 } from '../backendConfig';
+import {
+  DEFAULT_BING_WALLPAPERS,
+  BingWallpaperItem,
+  LockWallpaperConfig,
+  LockWallpaperMode,
+  fetchBingWallpapers,
+  getDesktopBingIndex,
+  setDesktopBingIndex,
+  loadLockWallpaperConfig,
+  saveLockWallpaperConfig,
+  makeFallbackNatureSvgDataUri,
+} from '../bingWallpaperService';
+import {
+  GLASISPECT_MATERIALS,
+  GlasispectMaterialId,
+  Glassium6BetaConfig,
+  Glassium6TaskbarVariant,
+  Glassium6IconStyle,
+  loadGlassium6BetaConfig,
+  saveGlassium6BetaConfig,
+  materialAcousticSynth,
+} from '../glasispectMaterialEngine';
+import { PINNABLE_APPS_CATALOG } from '../Glassium6BetaOverlay';
 
 const WALLPAPER_KEYS = Object.keys(WALLPAPERS) as Wallpaper[];
 
@@ -765,7 +788,6 @@ export function SettingsApp() {
     selectedCustomId,
     setSelectedCustomId,
     theme,
-    setTheme,
     themeMode,
     setThemeMode,
     accentColor,
@@ -848,7 +870,90 @@ export function SettingsApp() {
   const [accountsSubView, setAccountsSubView] = useState<AccountsSubView>('main');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lockWallpaperInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  // Bing Daily Wallpaper & Lock Screen Wallpaper state
+  const [bingList, setBingList] = useState<BingWallpaperItem[]>(DEFAULT_BING_WALLPAPERS);
+  const [desktopBingIdx, setDesktopBingIdxState] = useState<number>(() => getDesktopBingIndex());
+  const [lockWallCfg, setLockWallCfg] = useState<LockWallpaperConfig>(() =>
+    loadLockWallpaperConfig()
+  );
+
+  useEffect(() => {
+    let active = true;
+    fetchBingWallpapers()
+      .then((items) => {
+        if (active && Array.isArray(items) && items.length > 0) {
+          setBingList(items);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const onLockWallChanged = () => setLockWallCfg(loadLockWallpaperConfig());
+    const onDesktopBingChanged = () => setDesktopBingIdxState(getDesktopBingIndex());
+    window.addEventListener('glassium-lock-wallpaper-changed', onLockWallChanged);
+    window.addEventListener('glassium-desktop-bing-changed', onDesktopBingChanged);
+    return () => {
+      window.removeEventListener('glassium-lock-wallpaper-changed', onLockWallChanged);
+      window.removeEventListener('glassium-desktop-bing-changed', onDesktopBingChanged);
+    };
+  }, []);
+
+  const updateLockWallpaper = (patch: Partial<LockWallpaperConfig>) => {
+    const next: LockWallpaperConfig = { ...lockWallCfg, ...patch };
+    setLockWallCfg(next);
+    saveLockWallpaperConfig(next);
+  };
+
+  // 【BETA】GlassiumOS 6 future — Glasispect UI 2: Material, Icon Styles & Taskbar/Dock state
+  const [betaCfg, setBetaCfg] = useState<Glassium6BetaConfig>(() => loadGlassium6BetaConfig());
+
+  useEffect(() => {
+    const onBetaChanged = () => setBetaCfg(loadGlassium6BetaConfig());
+    window.addEventListener('glassium6-beta-config-changed', onBetaChanged);
+    return () => window.removeEventListener('glassium6-beta-config-changed', onBetaChanged);
+  }, []);
+
+  const updateBetaCfg = (patch: Partial<Glassium6BetaConfig>) => {
+    const next: Glassium6BetaConfig = {
+      ...betaCfg,
+      ...patch,
+      pinnedApps: Array.isArray(patch.pinnedApps)
+        ? patch.pinnedApps.slice(0, 9)
+        : betaCfg.pinnedApps.slice(0, 9),
+    };
+    setBetaCfg(next);
+    saveGlassium6BetaConfig(next);
+  };
+
+  const toggleBetaPinnedApp = (appId: AppId) => {
+    const exists = betaCfg.pinnedApps.includes(appId);
+    if (exists) {
+      if (betaCfg.pinnedApps.length <= 1) {
+        addNotification({
+          title: 'GlassiumOS 6 future (BETA)',
+          message: '最低1つのアプリはピン留めしておく必要があります。',
+        });
+        return;
+      }
+      updateBetaCfg({ pinnedApps: betaCfg.pinnedApps.filter((id) => id !== appId) });
+    } else {
+      if (betaCfg.pinnedApps.length >= 9) {
+        addNotification({
+          title: 'GlassiumOS 6 future (BETA)',
+          message: 'ピン留めできるアプリは最大9個までです。別のアプリのピン留めを解除してから選択してください。',
+        });
+        return;
+      }
+      updateBetaCfg({ pinnedApps: [...betaCfg.pinnedApps, appId] });
+    }
+  };
 
   // AI Assistant & Koyeb Backend state
   const [aiResponseStyle, setAiResponseStyle] = useState<'balanced' | 'concise' | 'detailed'>('balanced');
@@ -939,6 +1044,29 @@ export function SettingsApp() {
       addNotification({ title: 'Display', message: 'カスタム壁紙を最適化して適用しました' });
     } catch {
       addNotification({ title: 'Display', message: '壁紙画像の読み込みまたは保存に失敗しました' });
+    }
+  };
+
+  const handleLockWallpaperUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressedDataUrl = await compressImageFile(file, 1440, 900, 0.78);
+      updateLockWallpaper({
+        mode: 'custom',
+        customImageUrl: compressedDataUrl,
+        customImageName: file.name.replace(/\.[^.]+$/, ''),
+      });
+      playSound('notify');
+      addNotification({
+        title: 'Lock Screen',
+        message: 'ロック画面のカスタム壁紙を更新しました',
+      });
+    } catch {
+      addNotification({
+        title: 'Lock Screen',
+        message: 'ロック画面用の壁紙画像の読み込みに失敗しました',
+      });
     }
   };
 
@@ -1130,6 +1258,654 @@ export function SettingsApp() {
     ? 'bg-[var(--os-surface-elevated)] border border-slate-300/75 shadow-xs rounded-2xl overflow-hidden'
     : 'bg-[var(--os-surface-elevated)] border border-white/[0.12] rounded-2xl overflow-hidden';
 
+  const renderGlassium6BetaStudio = () => {
+    const activeMat =
+      GLASISPECT_MATERIALS.find((m) => m.id === betaCfg.materialId) || GLASISPECT_MATERIALS[0];
+    const gemstoneMaterials = GLASISPECT_MATERIALS.filter((m) => m.category === 'gemstone');
+    const physicalMaterials = GLASISPECT_MATERIALS.filter((m) => m.category === 'material');
+    const isCloudFog = betaCfg.taskbarVariant === 'cloud-fog';
+    const isCustomDockOrTaskbar =
+      betaCfg.taskbarVariant === 'dock' ||
+      betaCfg.taskbarVariant === 'side-dock' ||
+      betaCfg.taskbarVariant === 'taskbar' ||
+      betaCfg.taskbarVariant === 'sidebar';
+    const isVerticalSide =
+      betaCfg.taskbarVariant === 'side-dock' || betaCfg.taskbarVariant === 'sidebar';
+
+    return (
+      <div className={`${cardSurfaceClass} p-5 space-y-5 border border-fuchsia-400/35`}>
+        {/* Header & Beta Mode Toggle */}
+        <div className="flex flex-wrap items-start justify-between gap-3 pb-3 border-b border-white/10">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-md bg-gradient-to-r from-fuchsia-500/30 to-cyan-500/30 border border-fuchsia-400/50 text-fuchsia-200 text-[10px] font-mono font-bold">
+                【BETA】GlassiumOS 6 future
+              </span>
+              <span className="px-2 py-0.5 rounded bg-white/10 text-[10px] font-mono opacity-80">
+                デフォルトOS表記: GlassiumOS 5 (u4 fix 1)
+              </span>
+            </div>
+            <h3 className="text-sm font-bold tracking-tight">
+              Glasispect UI 2: Material ＆ 次世代タスクバー / アイコンラボ
+            </h3>
+            <p className="text-[11px] opacity-65 leading-relaxed">
+              マウスが光源となり乱反射する「Glasispect UI 2: Material」（宝石6種＋鉄・革・水・氷・葉っぱ・木）、クリック＆ドラッグ時の素材別物理サウンド、3種類のアイコンスタイル（従来 / クリスタル / マテリアル）、5種類の次世代タスクバー＆Dockを試せます。
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <div className="text-xs font-bold">
+                {betaCfg.betaEnabled ? 'BETA 有効' : 'GlassiumOS 5 標準'}
+              </div>
+              <div className="text-[10px] opacity-55">
+                {betaCfg.betaEnabled ? 'Glasispect UI 2 稼働中' : 'クリックでBETA機能を有効化'}
+              </div>
+            </div>
+            <ToggleSwitch
+              checked={betaCfg.betaEnabled}
+              onChange={(val) => {
+                updateBetaCfg({
+                  betaEnabled: val,
+                  uiDesignStyle: val ? 'glasispect-material' : 'glass-classic',
+                });
+                materialAcousticSynth.playClick(betaCfg.materialId);
+                addNotification({
+                  title: '【BETA】GlassiumOS 6 future',
+                  message: val
+                    ? 'Glasispect UI 2: Material（マウス光源乱反射＆素材別サウンド）を有効化しました。'
+                    : 'GlassiumOS 5 標準モードに戻しました。',
+                });
+              }}
+            />
+          </div>
+        </div>
+
+        {/* 1. Icon Style Selector: Classic vs Crystal vs Material */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-xs font-bold">
+                1. アイコンスタイル選択 (従来 / クリスタルスタイル / マテリアルスタイル)
+              </h4>
+              <p className="text-[11px] opacity-60">
+                従来アイコンは一切作り変えずそのまま維持し、クリスタルカットまたは現在の素材（{activeMat.nameJa}）を纏ったアイコンへ切り替えられます
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            {(
+              [
+                {
+                  id: 'classic' as Glassium6IconStyle,
+                  title: '従来 (Classic)',
+                  sub: '作り変えない既存のGlassiumOS 5標準アイコン',
+                },
+                {
+                  id: 'crystal' as Glassium6IconStyle,
+                  title: 'クリスタルスタイル (Crystal)',
+                  sub: '多面体プリズムカット＆宝石屈折ハイライト',
+                },
+                {
+                  id: 'material' as Glassium6IconStyle,
+                  title: 'マテリアルスタイル (Material)',
+                  sub: `選択素材「${activeMat.nameJa}」の質感・光沢・色`,
+                },
+              ] as const
+            ).map((st) => {
+              const active = betaCfg.iconStyle === st.id;
+              return (
+                <button
+                  key={st.id}
+                  type="button"
+                  onClick={() => {
+                    updateBetaCfg({ iconStyle: st.id });
+                    materialAcousticSynth.playClick(betaCfg.materialId);
+                  }}
+                  className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between gap-2.5 ${
+                    active
+                      ? 'bg-[var(--os-accent)]/15 border-[var(--os-accent)] ring-1 ring-[var(--os-accent)]'
+                      : isLight
+                      ? 'bg-slate-200/60 hover:bg-slate-200 border-slate-300'
+                      : 'bg-white/5 hover:bg-white/10 border-white/10'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold">{st.title}</span>
+                    {active && <Icon name="CheckCircle2" size={15} className="text-[var(--os-accent)]" />}
+                  </div>
+                  {/* Live Icon Trio Preview */}
+                  <div className="flex items-center gap-2 py-1">
+                    <Icon
+                      name="browser"
+                      size={28}
+                      forceIconStyle={st.id}
+                      forceMaterialId={betaCfg.materialId}
+                    />
+                    <Icon
+                      name="synth"
+                      size={28}
+                      forceIconStyle={st.id}
+                      forceMaterialId={betaCfg.materialId}
+                    />
+                    <Icon
+                      name="settings"
+                      size={28}
+                      forceIconStyle={st.id}
+                      forceMaterialId={betaCfg.materialId}
+                    />
+                    <Icon
+                      name="game"
+                      size={28}
+                      forceIconStyle={st.id}
+                      forceMaterialId={betaCfg.materialId}
+                    />
+                  </div>
+                  <div className="text-[10px] opacity-65 leading-snug">{st.sub}</div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 2. Glasispect UI 2: Material — 12 Materials (6 Gemstones + 6 Physical/Natural) & Acoustic Synth */}
+        <div className="pt-3 border-t border-white/10 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h4 className="text-xs font-bold">
+                2. Glasispect UI 2: Material — 素材・宝石と乱反射＆物理サウンド (全12種)
+              </h4>
+              <p className="text-[11px] opacity-60">
+                マウスが光源となって素材ごとに異なる屈折率・粗さで乱反射し、クリックやドラッグ操作で素材特有の音が鳴ります
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => materialAcousticSynth.playClick(betaCfg.materialId)}
+                className="px-2.5 py-1 rounded-lg bg-fuchsia-500/20 hover:bg-fuchsia-500/30 border border-fuchsia-400/40 text-fuchsia-200 text-[11px] font-bold cursor-pointer"
+              >
+                🔊 クリック音試聴
+              </button>
+              <button
+                type="button"
+                onClick={() => materialAcousticSynth.playDrag(betaCfg.materialId, 1.4)}
+                className="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 text-cyan-200 text-[11px] font-bold cursor-pointer"
+              >
+                ✨ ドラッグ摩擦音試聴
+              </button>
+            </div>
+          </div>
+
+          {/* Gemstones (6) */}
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-bold text-fuchsia-300">
+              💎 宝石マテリアル (Gemstones — 色と光学屈折・高音クリスタル共鳴)
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {gemstoneMaterials.map((mat) => {
+                const selected = betaCfg.materialId === mat.id;
+                return (
+                  <button
+                    key={mat.id}
+                    type="button"
+                    onClick={() => {
+                      updateBetaCfg({
+                        betaEnabled: true,
+                        uiDesignStyle: 'glasispect-material',
+                        dockSurfaceStyle: 'glasispect-material',
+                        materialId: mat.id as GlasispectMaterialId,
+                      });
+                      materialAcousticSynth.playClick(mat.id);
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition cursor-pointer relative overflow-hidden ${
+                      selected
+                        ? 'border-white ring-2 ring-[var(--os-accent)] shadow-lg'
+                        : 'border-white/15 opacity-85 hover:opacity-100'
+                    }`}
+                    style={{
+                      background: `linear-gradient(135deg, rgba(${mat.primaryRgb}, 0.42), rgba(${mat.secondaryRgb}, 0.25))`,
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold">
+                        {mat.badgeEmoji} {mat.nameJa}
+                      </span>
+                      <span className="text-[9px] font-mono opacity-80">
+                        n={mat.refractionIndex.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="text-[10px] opacity-80 mt-1 line-clamp-1">{mat.descJa}</div>
+                    <div className="text-[9px] font-mono text-cyan-200/90 mt-0.5">
+                      音: {mat.soundProfileJa}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Physical / Natural Materials (6: Iron, Leather, Water, Ice, Leaf, Wood) */}
+          <div className="space-y-1.5 pt-1">
+            <div className="text-[11px] font-bold text-emerald-300">
+              🌿 自然・物理マテリアル (鉄・革・水・氷・葉っぱ・木 — 異方性反射＆物理音響)
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {physicalMaterials.map((mat) => {
+                const selected = betaCfg.materialId === mat.id;
+                return (
+                  <button
+                    key={mat.id}
+                    type="button"
+                    onClick={() => {
+                      updateBetaCfg({
+                        betaEnabled: true,
+                        uiDesignStyle: 'glasispect-material',
+                        dockSurfaceStyle: 'glasispect-material',
+                        materialId: mat.id as GlasispectMaterialId,
+                      });
+                      materialAcousticSynth.playClick(mat.id);
+                    }}
+                    className={`p-2.5 rounded-xl border text-left transition cursor-pointer relative overflow-hidden ${
+                      selected
+                        ? 'border-white ring-2 ring-[var(--os-accent)] shadow-lg'
+                        : 'border-white/15 opacity-85 hover:opacity-100'
+                    }`}
+                    style={{
+                      background: `linear-gradient(135deg, rgba(${mat.primaryRgb}, 0.42), rgba(${mat.secondaryRgb}, 0.25))`,
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold">
+                        {mat.badgeEmoji} {mat.nameJa}
+                      </span>
+                      <span className="text-[9px] font-mono opacity-80">
+                        粗さ {Math.round(mat.roughness * 100)}%
+                      </span>
+                    </div>
+                    <div className="text-[10px] opacity-80 mt-1 line-clamp-1">{mat.descJa}</div>
+                    <div className="text-[9px] font-mono text-emerald-200/90 mt-0.5">
+                      音: {mat.soundProfileJa}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Mouse Light Diffuse Intensity & Material Sound Toggle */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 items-center">
+            <CustomSlider
+              min={15}
+              max={100}
+              value={betaCfg.diffuseLightIntensity}
+              onChange={(val) => updateBetaCfg({ diffuseLightIntensity: val })}
+              label="マウス光源の乱反射強度 (Diffuse Light Reflection)"
+              valueText={`${betaCfg.diffuseLightIntensity}%`}
+            />
+            <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.04] border border-white/10">
+              <div>
+                <div className="text-xs font-bold">クリック＆ドラッグ時の素材サウンド</div>
+                <div className="text-[10px] opacity-60">
+                  マウスでドラッグ・クリックした際に「{activeMat.nameJa}」の音を鳴らす
+                </div>
+              </div>
+              <ToggleSwitch
+                checked={betaCfg.materialSoundEnabled}
+                onChange={(val) => updateBetaCfg({ materialSoundEnabled: val })}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Taskbar / Dock Variant Selector (GlassiumOS 5 Default + 5 Beta Variants) */}
+        <div className="pt-3 border-t border-white/10 space-y-3.5">
+          <div>
+            <h4 className="text-xs font-bold">
+              3. タスクバー / Dock の種類 (GlassiumOS 6 future BETA UI)
+            </h4>
+            <p className="text-[11px] opacity-60">
+              「Cloud / Fog」「Dock」「Side Dock」「タスクバー (Taskbar)」「サイドバー (Sidebar)」または従来の「GlassiumOS 5 標準」から選択できます
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {(
+              [
+                {
+                  id: 'glassium5-default' as Glassium6TaskbarVariant,
+                  label: 'GlassiumOS 5 標準',
+                  desc: 'デフォルトのGlassiumOS 5タスクバー',
+                },
+                {
+                  id: 'cloud-fog' as Glassium6TaskbarVariant,
+                  label: '☁️ Cloud / Fog',
+                  desc: 'マウスを下に移動すると雲が集まりタスクバー化',
+                },
+                {
+                  id: 'dock' as Glassium6TaskbarVariant,
+                  label: '🛸 Dock (下部ドック)',
+                  desc: '最大9アプリ・AI・News・検索UIを詳細設定可能',
+                },
+                {
+                  id: 'side-dock' as Glassium6TaskbarVariant,
+                  label: '📐 Side Dock (左右ドック)',
+                  desc: '画面の左または右に配置できるフローティングDock',
+                },
+                {
+                  id: 'taskbar' as Glassium6TaskbarVariant,
+                  label: '▬ タスクバー (Taskbar)',
+                  desc: 'Dockと同じ詳細カスタマイズが可能な全幅バー',
+                },
+                {
+                  id: 'sidebar' as Glassium6TaskbarVariant,
+                  label: '▮ サイドバー (Sidebar)',
+                  desc: 'タスクバーの縦（左右フルハイト）バージョン',
+                },
+              ] as const
+            ).map((tb) => {
+              const active = betaCfg.taskbarVariant === tb.id;
+              return (
+                <button
+                  key={tb.id}
+                  type="button"
+                  onClick={() => {
+                    updateBetaCfg({
+                      taskbarVariant: tb.id,
+                      betaEnabled: tb.id === 'glassium5-default' ? betaCfg.betaEnabled : true,
+                    });
+                    materialAcousticSynth.playClick(betaCfg.materialId);
+                  }}
+                  className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
+                    active
+                      ? 'bg-[var(--os-accent)] text-black font-bold border-transparent shadow-md'
+                      : isLight
+                      ? 'bg-slate-200/70 hover:bg-slate-300/70 text-slate-800 border-slate-300'
+                      : 'bg-white/5 hover:bg-white/10 text-white border-white/10'
+                  }`}
+                >
+                  <div className="text-xs font-bold">{tb.label}</div>
+                  <div className={`text-[10px] mt-1 leading-snug ${active ? 'opacity-85' : 'opacity-60'}`}>
+                    {tb.desc}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Cloud / Fog Exclusive Customization (Only Color, Opacity, Gather Speed — Detailed app customization disabled per spec) */}
+          {isCloudFog && (
+            <div className="p-4 rounded-2xl bg-cyan-500/10 border border-cyan-400/30 space-y-3.5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-bold text-cyan-200">
+                    ☁️ Cloud / Fog 専用カスタマイズ (色・薄さ・集まるスピード)
+                  </div>
+                  <div className="text-[11px] opacity-70">
+                    ※ Cloud / Fog モードではマウスを画面下部に移動すると雲が凝結してタスクバーになります（仕様により詳しいピン留め等のカスタマイズは不可で、色・薄さ・集まるスピードのみ変更可能です）。
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
+                <div>
+                  <label className="block text-[11px] font-bold mb-1.5">
+                    雲の色 (Cloud / Fog Color)
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={betaCfg.cloudColor}
+                      onChange={(e) => updateBetaCfg({ cloudColor: e.target.value })}
+                      className="w-8 h-8 rounded cursor-pointer border border-white/30 bg-transparent"
+                    />
+                    <div className="flex flex-wrap gap-1">
+                      {['#e0f2fe', '#c084fc', '#fbcfe8', '#a7f3d0', '#fde68a', '#93c5fd'].map(
+                        (hex) => (
+                          <button
+                            key={hex}
+                            type="button"
+                            onClick={() => updateBetaCfg({ cloudColor: hex })}
+                            style={{ backgroundColor: hex }}
+                            className="w-5 h-5 rounded-full border border-white/40 cursor-pointer hover:scale-110 transition"
+                            title={hex}
+                          />
+                        )
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <CustomSlider
+                  min={20}
+                  max={95}
+                  value={betaCfg.cloudOpacity}
+                  onChange={(val) => updateBetaCfg({ cloudOpacity: val })}
+                  label="雲の薄さ・濃度 (Opacity)"
+                  valueText={`${betaCfg.cloudOpacity}%`}
+                />
+
+                <CustomSlider
+                  min={0.4}
+                  max={2.5}
+                  step={0.1}
+                  value={betaCfg.cloudGatherSpeed}
+                  onChange={(val) => updateBetaCfg({ cloudGatherSpeed: val })}
+                  label="雲が集まるスピード (Speed)"
+                  valueText={`${betaCfg.cloudGatherSpeed.toFixed(1)}x`}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Detailed Customization for Dock / Side Dock / Taskbar / Sidebar */}
+          {isCustomDockOrTaskbar && (
+            <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/15 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 pb-2.5">
+                <div>
+                  <div className="text-xs font-bold text-fuchsia-200">
+                    🛠️ {betaCfg.taskbarVariant.toUpperCase()} 詳細カスタマイズ
+                  </div>
+                  <div className="text-[11px] opacity-65">
+                    サーフェスデザイン（従来 Glass UI / Glasispect UI 2: Material）、表示方法、左右位置、ピン留めアプリ（最大9個）、AI / News / 検索UI の表示・非表示を設定できます
+                  </div>
+                </div>
+              </div>
+
+              {/* Surface Design & Visibility Mode & Side Position */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                {/* Design: Glass UI (Classic) vs Glasispect UI 2: Material */}
+                <div className="p-3 rounded-xl bg-black/25 border border-white/10 space-y-2">
+                  <div className="text-[11px] font-bold opacity-80">デザイン質感</div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => updateBetaCfg({ dockSurfaceStyle: 'glass-classic' })}
+                      className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                        betaCfg.dockSurfaceStyle === 'glass-classic'
+                          ? 'bg-[var(--os-accent)] text-black'
+                          : 'bg-white/10 hover:bg-white/15'
+                      }`}
+                    >
+                      Glass UI (従来)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateBetaCfg({ dockSurfaceStyle: 'glasispect-material' })}
+                      className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                        betaCfg.dockSurfaceStyle === 'glasispect-material'
+                          ? 'bg-[var(--os-accent)] text-black'
+                          : 'bg-white/10 hover:bg-white/15'
+                      }`}
+                    >
+                      Glasispect UI 2
+                    </button>
+                  </div>
+                </div>
+
+                {/* Display Mode: Always vs Mouse Move Reveal */}
+                <div className="p-3 rounded-xl bg-black/25 border border-white/10 space-y-2">
+                  <div className="text-[11px] font-bold opacity-80">表示形式</div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => updateBetaCfg({ autoHideMode: 'always' })}
+                      className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                        betaCfg.autoHideMode === 'always'
+                          ? 'bg-[var(--os-accent)] text-black'
+                          : 'bg-white/10 hover:bg-white/15'
+                      }`}
+                    >
+                      常に表示
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => updateBetaCfg({ autoHideMode: 'mouse-bottom' })}
+                      className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                        betaCfg.autoHideMode === 'mouse-bottom'
+                          ? 'bg-[var(--os-accent)] text-black'
+                          : 'bg-white/10 hover:bg-white/15'
+                      }`}
+                    >
+                      端へ移動で表示
+                    </button>
+                  </div>
+                </div>
+
+                {/* Left / Right Side Position (for Side Dock & Sidebar) */}
+                <div className="p-3 rounded-xl bg-black/25 border border-white/10 space-y-2">
+                  <div className="text-[11px] font-bold opacity-80">
+                    配置場所 {isVerticalSide ? '(Side Dock / Sidebar)' : '(横バー時は中央/全幅)'}
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      disabled={!isVerticalSide}
+                      onClick={() => updateBetaCfg({ sidePosition: 'left' })}
+                      className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                        !isVerticalSide
+                          ? 'opacity-40 cursor-not-allowed bg-white/5'
+                          : betaCfg.sidePosition === 'left'
+                          ? 'bg-[var(--os-accent)] text-black'
+                          : 'bg-white/10 hover:bg-white/15'
+                      }`}
+                    >
+                      ◀ 画面の左 (Left)
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!isVerticalSide}
+                      onClick={() => updateBetaCfg({ sidePosition: 'right' })}
+                      className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition cursor-pointer ${
+                        !isVerticalSide
+                          ? 'opacity-40 cursor-not-allowed bg-white/5'
+                          : betaCfg.sidePosition === 'right'
+                          ? 'bg-[var(--os-accent)] text-black'
+                          : 'bg-white/10 hover:bg-white/15'
+                      }`}
+                    >
+                      画面の右 (Right) ▶
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Feature Buttons Show/Hide: AI Button, News Button, Search UI */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/20 border border-white/10">
+                  <div>
+                    <div className="text-xs font-bold">✨ AI ボタン表示</div>
+                    <div className="text-[10px] opacity-60">AI アシスタント起動ボタン</div>
+                  </div>
+                  <ToggleSwitch
+                    checked={betaCfg.showAIButton}
+                    onChange={(val) => updateBetaCfg({ showAIButton: val })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/20 border border-white/10">
+                  <div>
+                    <div className="text-xs font-bold">📰 News ボタン表示</div>
+                    <div className="text-[10px] opacity-60">最新ニュースフィードボタン</div>
+                  </div>
+                  <ToggleSwitch
+                    checked={betaCfg.showNewsButton}
+                    onChange={(val) => updateBetaCfg({ showNewsButton: val })}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/20 border border-white/10">
+                  <div>
+                    <div className="text-xs font-bold">🔍 検索 UI 表示</div>
+                    <div className="text-[10px] opacity-60">クイックアプリ検索ボックス</div>
+                  </div>
+                  <ToggleSwitch
+                    checked={betaCfg.showSearchUI}
+                    onChange={(val) => updateBetaCfg({ showSearchUI: val })}
+                  />
+                </div>
+              </div>
+
+              {/* Pinned Apps Selector (Up to 9 Apps) */}
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-bold">
+                      📌 ピン留めするアプリの選択 (最大 9 個)
+                    </span>
+                    <span className="ml-2 text-[11px] opacity-65">
+                      クリックしてピン留め / 解除を切り替え
+                    </span>
+                  </div>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold ${
+                      betaCfg.pinnedApps.length >= 9
+                        ? 'bg-amber-500/25 text-amber-300 border border-amber-400/40'
+                        : 'bg-cyan-500/20 text-cyan-300'
+                    }`}
+                  >
+                    選択中: {betaCfg.pinnedApps.length} / 9 個
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                  {PINNABLE_APPS_CATALOG.map((item) => {
+                    const isPinned = betaCfg.pinnedApps.includes(item.appId);
+                    const orderIdx = betaCfg.pinnedApps.indexOf(item.appId);
+                    return (
+                      <button
+                        key={item.appId}
+                        type="button"
+                        onClick={() => {
+                          toggleBetaPinnedApp(item.appId);
+                          materialAcousticSynth.playClick(betaCfg.materialId);
+                        }}
+                        className={`p-2 rounded-xl border text-left transition cursor-pointer flex items-center gap-2 relative ${
+                          isPinned
+                            ? 'bg-[var(--os-accent)]/20 border-[var(--os-accent)] font-bold'
+                            : 'bg-white/5 hover:bg-white/10 border-white/10 opacity-70 hover:opacity-100'
+                        }`}
+                      >
+                        <Icon name={item.appId} size={18} />
+                        <span className="text-[11px] truncate">{item.labelJa}</span>
+                        {isPinned && (
+                          <span className="ml-auto px-1.5 py-0.2 rounded bg-[var(--os-accent)] text-black text-[9px] font-mono font-bold">
+                            {orderIdx + 1}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div
       style={{ backgroundColor: 'var(--os-surface-solid)' }}
@@ -1197,19 +1973,19 @@ export function SettingsApp() {
           </nav>
         </div>
 
-        {/* System Version Tag & u4 Release Notes Button */}
+        {/* System Version Tag & u4(fix 1) Release Notes Button */}
         <div
           className={`px-2.5 pt-3 text-[11px] border-t flex items-center justify-between font-mono ${
             isLight ? 'border-slate-200/90' : 'border-white/[0.07]'
           }`}
         >
-          <span className="opacity-65 font-bold">GlassiumOS 5 u4</span>
+          <span className="opacity-65 font-bold">GlassiumOS 5 u4(fix 1)</span>
           <button
             type="button"
             onClick={() => window.dispatchEvent(new CustomEvent('open-glassium-u4-notes'))}
             className="px-2 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-300 text-[10px] font-bold transition cursor-pointer"
           >
-            u4 新機能
+            u4(fix 1)
           </button>
         </div>
       </div>
@@ -1232,7 +2008,7 @@ export function SettingsApp() {
                   <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <h1 className="text-2xl font-bold tracking-tight">
-                        {isJa ? 'システム (GlassiumOS 5 u4)' : 'System (GlassiumOS 5 u4)'}
+                        {isJa ? 'システム (GlassiumOS 5 u4(fix 1))' : 'System (GlassiumOS 5 u4(fix 1))'}
                       </h1>
                       <p className="text-xs opacity-50 mt-1">
                         {isJa
@@ -1246,9 +2022,59 @@ export function SettingsApp() {
                       className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-cyan-500/25 to-fuchsia-500/25 hover:from-cyan-500/40 hover:to-fuchsia-500/40 border border-cyan-400/40 text-xs font-bold text-cyan-200 flex items-center gap-2 transition cursor-pointer shadow-md"
                     >
                       <Icon name="Sparkles" size={15} className="text-cyan-300" />
-                      <span>GlassiumOS 5 u4 アップデート内容を見る</span>
+                      <span>GlassiumOS 5 u4(fix 1) アップデート一覧を見る</span>
                     </button>
                   </div>
+
+                  {/* u4(fix 1) Update List Card */}
+                  <div className={`${cardSurfaceClass} p-4 space-y-3`}>
+                    <div className="flex items-center justify-between gap-2 border-b pb-2.5 border-white/10">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-fuchsia-500/20 border border-fuchsia-400/40 text-fuchsia-300 text-[10px] font-mono font-bold">
+                          u4(fix 1)
+                        </span>
+                        <span className="text-xs font-bold">
+                          GlassiumOS 5 u4(fix 1) アップデート一覧
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => window.dispatchEvent(new CustomEvent('open-glassium-u4-notes'))}
+                        className="text-[11px] font-bold text-cyan-400 hover:underline cursor-pointer"
+                      >
+                        詳細モーダルを開く →
+                      </button>
+                    </div>
+                    <div className="space-y-2 text-xs">
+                      <div className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10">
+                        <div className="font-bold text-fuchsia-300">
+                          【Fix 1] テーマ・アクセントカラーの24bit自由選択＆OS全体・Liquid Glass色反映
+                        </div>
+                        <div className="text-[11px] opacity-65 mt-0.5 leading-relaxed">
+                          プリセット固定を廃止し、壁紙からの連続24bit RGB自動抽出＆自由カラーピッカーに対応。OS全体のウィンドウ・タイトルバーへのテーマ色反映と、Liquid Glass領域のガラス色（ティント）変更に対応。
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10">
+                        <div className="font-bold text-rose-300">
+                          【Fix 1] 音楽アプリのフル尺再生・歌詞同期ズレ修正・再生中ピル消去＆上部バー自動表示
+                        </div>
+                        <div className="text-[11px] opacity-65 mt-0.5 leading-relaxed">
+                          フル尺ストリーム解決強化とプレビュー時のPreviewバッジ表示、ミリ秒単位の歌詞同期、再生中でも消せる音楽ピル、マウス上端移動時の上部バー表示、デスクトップペット削除を反映。
+                        </div>
+                      </div>
+                      <div className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10">
+                        <div className="font-bold text-indigo-300">
+                          【Fix 1] Ultraviolet XORプロキシ復号修正・ゲームカタログ・映画/アニメ検索＆Wisp通信改善
+                        </div>
+                        <div className="text-[11px] opacity-65 mt-0.5 leading-relaxed">
+                          Ultraviolet URLの%60復号バグ（F1）、/api/proxy・/api/html-runner・/api/games/catalog（F2）、Naruto等を含む映画・アニメ検索（F3）、AI状態フラグ（D1）、Wispプリセット整理（D2）、Renderコールドスタート待機延長（D3）を修正。
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 【BETA】GlassiumOS 6 future: Glasispect UI 2: Material & Taskbar/Icon Studio */}
+                  {renderGlassium6BetaStudio()}
 
                   <div className={`${cardSurfaceClass} divide-y ${dividerClass}`}>
                     {SYSTEM_CARDS.map((card) => (
@@ -1613,6 +2439,343 @@ export function SettingsApp() {
                         </select>
                       </div>
                     </div>
+                  </div>
+
+                  {/* 0B. Bing Daily Nature Wallpaper Studio (Desktop Background & Lock Screen) */}
+                  <div className={`${cardSurfaceClass} p-4 space-y-3.5 border border-emerald-400/30`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[10px] font-mono font-bold">
+                            BING DAILY
+                          </span>
+                          <h3 className="text-[13px] font-bold tracking-tight">
+                            Bing 日替わり自然壁紙 (デスクトップ背景 & ロック画面対応)
+                          </h3>
+                        </div>
+                        <p className="text-[11px] opacity-65 mt-0.5">
+                          GitHub Pages や script.google.com でも直接表示できるマルチCDN構成。デスクトップ背景にもロック画面にもワンクリックで設定できます。
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            setSelectedCustomId(null);
+                            setWallpaper('bing');
+                            addNotification({
+                              title: 'Desktop Wallpaper',
+                              message: 'デスクトップ背景を「Bing 日替わり自然壁紙」に設定しました。',
+                            });
+                          }}
+                          className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                            wallpaper === 'bing' && !selectedCustomId
+                              ? 'bg-[var(--os-accent)] text-black shadow-md'
+                              : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/30'
+                          }`}
+                        >
+                          {wallpaper === 'bing' && !selectedCustomId
+                            ? '✓ デスクトップ適用中'
+                            : 'デスクトップ背景に適用'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            playSound('click');
+                            updateLockWallpaper({ mode: 'bing', bingIndex: desktopBingIdx });
+                            addNotification({
+                              title: 'Lock Screen',
+                              message: 'ロック画面の壁紙を「Bing 日替わり自然壁紙」に設定しました。',
+                            });
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                            lockWallCfg.mode === 'bing'
+                              ? 'bg-cyan-400 text-slate-950 shadow-md'
+                              : 'bg-white/10 hover:bg-white/15 text-white/85 border border-white/15'
+                          }`}
+                        >
+                          {lockWallCfg.mode === 'bing' ? '✓ ロック画面適用中' : 'ロック画面にも適用'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+                      {bingList.map((item, idx) => {
+                        const isDesktopActive =
+                          wallpaper === 'bing' && !selectedCustomId && desktopBingIdx === idx;
+                        const isLockActive =
+                          lockWallCfg.mode === 'bing' && lockWallCfg.bingIndex === idx;
+                        return (
+                          <div
+                            key={item.startdate || idx}
+                            className={`group relative rounded-xl overflow-hidden border transition h-28 flex flex-col justify-between p-2.5 ${
+                              isDesktopActive || isLockActive
+                                ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]'
+                                : 'border-white/15 opacity-90 hover:opacity-100'
+                            }`}
+                          >
+                            <img
+                              src={item.rawUrl || item.url}
+                              alt={item.title}
+                              referrerPolicy="no-referrer"
+                              onError={(e) => {
+                                const imgEl = e.currentTarget;
+                                if (item.backupUrl && imgEl.src !== item.backupUrl) {
+                                  imgEl.src = item.backupUrl;
+                                } else {
+                                  imgEl.src = makeFallbackNatureSvgDataUri(item.title);
+                                }
+                              }}
+                              className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-500"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/40" />
+
+                            <div className="relative z-10 flex items-center justify-between gap-1">
+                              <span className="px-1.5 py-0.5 rounded bg-black/65 text-[9px] font-mono text-emerald-300 font-bold">
+                                #{idx + 1}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                {isDesktopActive && (
+                                  <span className="px-1.5 py-0.5 rounded bg-[var(--os-accent)] text-black text-[9px] font-bold">
+                                    Desktop
+                                  </span>
+                                )}
+                                {isLockActive && (
+                                  <span className="px-1.5 py-0.5 rounded bg-cyan-400 text-slate-950 text-[9px] font-bold">
+                                    Lock
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="relative z-10 space-y-1.5">
+                              <div className="text-[11px] font-bold text-white truncate drop-shadow">
+                                {item.title}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    playSound('click');
+                                    setSelectedCustomId(null);
+                                    setWallpaper('bing');
+                                    setDesktopBingIndex(idx);
+                                    setDesktopBingIdxState(idx);
+                                  }}
+                                  className="flex-1 py-1 px-1.5 rounded bg-white/20 hover:bg-[var(--os-accent)] hover:text-black text-white text-[10px] font-bold transition cursor-pointer"
+                                >
+                                  デスクトップに設定
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    playSound('click');
+                                    updateLockWallpaper({ mode: 'bing', bingIndex: idx });
+                                  }}
+                                  className="py-1 px-2 rounded bg-black/60 hover:bg-cyan-400 hover:text-slate-950 text-cyan-200 text-[10px] font-bold transition cursor-pointer"
+                                  title="ロック画面に設定"
+                                >
+                                  ロック画面
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* 0C. Lock Screen Wallpaper Customization Studio */}
+                  <div className={`${cardSurfaceClass} p-4 space-y-3.5 border border-sky-400/30`}>
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2 py-0.5 rounded-md bg-sky-500/20 border border-sky-400/40 text-sky-300 text-[10px] font-mono font-bold">
+                            LOCK SCREEN
+                          </span>
+                          <h3 className="text-[13px] font-bold tracking-tight">
+                            ロック画面の壁紙設定 (Lock Screen Wallpaper)
+                          </h3>
+                        </div>
+                        <p className="text-[11px] opacity-65 mt-0.5">
+                          ロック画面の背景を「Bing 日替わり自然壁紙」「デスクトップ背景と同期」「システム壁紙プリセット」「3D 深度テーマ」「カスタム画像」から自由に変更できます
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => lockSystem()}
+                        className="px-3 py-1.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 border border-sky-400/30 text-sky-200 text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Icon name="Lock" size={13} />
+                        <span>ロック画面をプレビュー</span>
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                      {(
+                        [
+                          { id: 'bing' as LockWallpaperMode, label: '🏞️ Bing 日替わり', sub: '自然風景 (6枚)' },
+                          { id: 'sync-desktop' as LockWallpaperMode, label: '🖥️ デスクトップ同期', sub: '同じ壁紙を使用' },
+                          { id: 'preset' as LockWallpaperMode, label: '🎨 プリセット壁紙', sub: 'システム壁紙' },
+                          { id: 'depth' as LockWallpaperMode, label: '🏔️ 3D 深度山岳', sub: 'グラデーション' },
+                          { id: 'custom' as LockWallpaperMode, label: '🖼️ カスタム画像', sub: '好きな画像を設定' },
+                        ] as const
+                      ).map((m) => {
+                        const active = lockWallCfg.mode === m.id;
+                        return (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              playSound('click');
+                              updateLockWallpaper({ mode: m.id });
+                            }}
+                            className={`p-2.5 rounded-xl text-left border transition cursor-pointer flex flex-col justify-between ${
+                              active
+                                ? 'bg-[var(--os-accent)] text-black font-bold border-transparent shadow-md'
+                                : isLight
+                                ? 'bg-slate-200/70 hover:bg-slate-300/70 text-slate-800 border-slate-300'
+                                : 'bg-white/5 hover:bg-white/10 text-white border-white/10'
+                            }`}
+                          >
+                            <div className="text-xs font-bold">{m.label}</div>
+                            <div className={`text-[10px] mt-0.5 ${active ? 'opacity-85' : 'opacity-55'}`}>
+                              {m.sub}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {lockWallCfg.mode === 'preset' && (
+                      <div className="pt-2 border-t border-white/10">
+                        <label className="block text-[11px] font-bold mb-2 opacity-80">
+                          ロック画面に表示するシステム壁紙プリセットを選択:
+                        </label>
+                        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                          {WALLPAPER_KEYS.map((k) => {
+                            const wp = WALLPAPERS[k];
+                            const selected = lockWallCfg.presetWallpaper === k;
+                            return (
+                              <button
+                                key={k}
+                                type="button"
+                                onClick={() => {
+                                  playSound('click');
+                                  updateLockWallpaper({ mode: 'preset', presetWallpaper: k });
+                                }}
+                                style={{ background: wp?.preview || 'linear-gradient(135deg, #0f172a, #1e1b4b)' }}
+                                className={`p-2 rounded-lg text-left h-14 flex flex-col justify-end relative overflow-hidden border ${
+                                  selected
+                                    ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]'
+                                    : 'border-white/15 opacity-85 hover:opacity-100'
+                                }`}
+                              >
+                                <span
+                                  style={{ color: '#ffffff', textShadow: '0 1px 3px rgba(0,0,0,0.9)' }}
+                                  className="text-[10px] font-bold truncate"
+                                >
+                                  {wp?.label || k}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {lockWallCfg.mode === 'depth' && (
+                      <div className="pt-2 border-t border-white/10">
+                        <label className="block text-[11px] font-bold mb-2 opacity-80">
+                          ロック画面の 3D 深度マウンテン背景テーマを選択:
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                          {(
+                            [
+                              { id: 'alpine', label: '🏔️ Alpine Ridge (蒼氷)' },
+                              { id: 'aurora', label: '🌌 Aurora Crest (極光)' },
+                              { id: 'cyber-arch', label: '🔮 Cyber Arch (紫電)' },
+                              { id: 'golden-dusk', label: '🌇 Golden Dusk (黄金)' },
+                            ] as const
+                          ).map((sc) => (
+                            <button
+                              key={sc.id}
+                              type="button"
+                              onClick={() => {
+                                playSound('click');
+                                updateLockWallpaper({ mode: 'depth', depthScene: sc.id });
+                              }}
+                              className={`p-2.5 rounded-xl font-bold text-center border transition cursor-pointer ${
+                                lockWallCfg.depthScene === sc.id
+                                  ? 'bg-[var(--os-accent)] text-black border-transparent'
+                                  : 'bg-white/5 hover:bg-white/10 border-white/10'
+                              }`}
+                            >
+                              {sc.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {lockWallCfg.mode === 'custom' && (
+                      <div className="pt-2 border-t border-white/10 space-y-2.5">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-[11px] opacity-80">
+                            {lockWallCfg.customImageUrl
+                              ? `現在のロック画面画像: ${lockWallCfg.customImageName || 'カスタム画像'}`
+                              : 'ロック画面用の画像をアップロードするか、下のカスタム壁紙から選択してください'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => lockWallpaperInputRef.current?.click()}
+                            className="px-3 py-1.5 rounded-xl bg-[var(--os-accent)] text-black text-xs font-bold shadow hover:brightness-110 cursor-pointer"
+                          >
+                            ロック画面用の画像をアップロード
+                          </button>
+                          <input
+                            ref={lockWallpaperInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handleLockWallpaperUpload}
+                            className="hidden"
+                          />
+                        </div>
+                        {customWallpapers.length > 0 && (
+                          <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                            {customWallpapers.map((cw) => (
+                              <button
+                                key={cw.id}
+                                type="button"
+                                onClick={() => {
+                                  playSound('click');
+                                  updateLockWallpaper({
+                                    mode: 'custom',
+                                    customImageUrl: cw.dataUrl,
+                                    customImageName: cw.name,
+                                  });
+                                }}
+                                style={{
+                                  backgroundImage: `url(${cw.dataUrl})`,
+                                  backgroundSize: 'cover',
+                                  backgroundPosition: 'center',
+                                }}
+                                className={`h-16 rounded-lg p-2 flex items-end border ${
+                                  lockWallCfg.customImageUrl === cw.dataUrl
+                                    ? 'border-[var(--os-accent)] ring-2 ring-[var(--os-accent)]'
+                                    : 'border-white/15 opacity-85 hover:opacity-100'
+                                }`}
+                              >
+                                <span className="text-[10px] font-bold text-white bg-black/60 px-1.5 py-0.5 rounded truncate">
+                                  {cw.name}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* 1. Built-In Wallpapers with Guaranteed Inline CSS Previews */}
@@ -2337,6 +3500,57 @@ export function SettingsApp() {
                       </div>
                     </div>
 
+                    <div className={`pt-4 border-t space-y-3 ${isLight ? 'border-slate-300' : 'border-white/10'}`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <label className="block text-xs font-semibold">
+                            {isJa ? 'ロック画面の壁紙モード (Lock Screen Wallpaper)' : 'Lock Screen Wallpaper Mode'}
+                          </label>
+                          <p className="text-[11px] opacity-55">
+                            {isJa
+                              ? 'ロック画面の背景を Bing 日替わり自然壁紙・デスクトップ同期・プリセット・カスタム画像から選択します'
+                              : 'Choose Bing Daily Nature, Desktop Sync, Preset, or Custom Image for Lock Screen'}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSystemSubView('display')}
+                          className="text-[11px] font-bold text-cyan-400 hover:underline cursor-pointer"
+                        >
+                          詳細なロック画面壁紙設定を開く →
+                        </button>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                        {(
+                          [
+                            { id: 'bing' as LockWallpaperMode, label: '🏞️ Bing自然' },
+                            { id: 'sync-desktop' as LockWallpaperMode, label: '🖥️ デスクトップ同期' },
+                            { id: 'preset' as LockWallpaperMode, label: '🎨 プリセット' },
+                            { id: 'depth' as LockWallpaperMode, label: '🏔️ 3D深度山岳' },
+                            { id: 'custom' as LockWallpaperMode, label: '🖼️ カスタム画像' },
+                          ] as const
+                        ).map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => {
+                              playSound('click');
+                              updateLockWallpaper({ mode: m.id });
+                            }}
+                            className={`p-2.5 rounded-xl text-center font-bold transition cursor-pointer ${
+                              lockWallCfg.mode === m.id
+                                ? 'bg-[var(--os-accent)] text-black shadow-md'
+                                : isLight
+                                ? 'bg-slate-200/70 hover:bg-slate-300/70'
+                                : 'bg-white/5 hover:bg-white/10'
+                            }`}
+                          >
+                            {m.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     <div className={`pt-4 border-t ${isLight ? 'border-slate-300' : 'border-white/10'}`}>
                       <label className="block text-xs font-semibold mb-2">
                         {isJa ? 'スリープ背景テーマ' : 'Sleep Background'}
@@ -2466,6 +3680,11 @@ export function SettingsApp() {
                         </p>
                       </div>
                       <ToggleSwitch checked={autoHideTaskbar} onChange={setAutoHideTaskbar} />
+                    </div>
+
+                    {/* 【BETA】GlassiumOS 6 future: Taskbar, Dock, Cloud/Fog & Glasispect UI 2: Material */}
+                    <div className="pt-4 border-t border-white/10">
+                      {renderGlassium6BetaStudio()}
                     </div>
                   </div>
                 </div>
@@ -2791,7 +4010,9 @@ export function SettingsApp() {
                                 />
                               </div>
                               <div className="text-[10px] opacity-65">
-                                {customThemeHex
+                                {!isDynamicSurfaceMode
+                                  ? '現在「通常ダーク/ライト（固定色モード）」のため、壁紙を変えてもOS背景色・ガラス色は動的に変化しません'
+                                  : customThemeHex
                                   ? `自由指定カラー (${customThemeHex}) を全アプリ＆Liquid Glassに反映中`
                                   : `壁紙からプリセットに丸めず連続抽出 (RGB: ${activeThemeRgb.join(', ')}) を全アプリ＆ガラスに反映中`}
                               </div>
@@ -2803,29 +4024,29 @@ export function SettingsApp() {
                               type="button"
                               onClick={() => {
                                 playSound('click');
-                                setTheme('dark');
+                                setThemeMode('dynamic-dark');
                               }}
                               className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                                theme === 'dark'
+                                isDynamicSurfaceMode && theme === 'dark'
                                   ? 'bg-[var(--os-accent)] text-black shadow-xs'
                                   : 'bg-white/10 hover:bg-white/20 opacity-75'
                               }`}
                             >
-                              黒＋テーマ色 (ダーク)
+                              黒＋テーマ色 (動的ダーク)
                             </button>
                             <button
                               type="button"
                               onClick={() => {
                                 playSound('click');
-                                setTheme('light');
+                                setThemeMode('dynamic-light');
                               }}
                               className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                                theme === 'light'
+                                isDynamicSurfaceMode && theme === 'light'
                                   ? 'bg-[var(--os-accent)] text-black shadow-xs'
                                   : 'bg-slate-300/60 hover:bg-slate-300 text-slate-800 opacity-75'
                               }`}
                             >
-                              白＋テーマ色 (ライト)
+                              白＋テーマ色 (動的ライト)
                             </button>
                           </div>
                         </div>
@@ -2846,6 +4067,9 @@ export function SettingsApp() {
                                   const hex = e.target.value;
                                   setCustomThemeHex(hex);
                                   setAccentColor(hex);
+                                  if (!isDynamicSurfaceMode) {
+                                    setThemeMode(theme === 'light' ? 'dynamic-light' : 'dynamic-dark');
+                                  }
                                 }}
                                 className="w-5 h-5 rounded cursor-pointer border-0 bg-transparent p-0"
                               />
@@ -2865,6 +4089,9 @@ export function SettingsApp() {
                                 if (/^#[0-9a-fA-F]{6}$/.test(v)) {
                                   setCustomThemeHex(v);
                                   setAccentColor(v);
+                                  if (!isDynamicSurfaceMode) {
+                                    setThemeMode(theme === 'light' ? 'dynamic-light' : 'dynamic-dark');
+                                  }
                                 }
                               }}
                               placeholder="#38bdf8"
@@ -3097,6 +4324,9 @@ export function SettingsApp() {
                       </div>
                     </button>
                   </div>
+
+                  {/* 【BETA】GlassiumOS 6 future: Glasispect UI 2: Material & Icon Styles */}
+                  {renderGlassium6BetaStudio()}
                 </>
               ) : personalSubView === 'uistyle' ? (
                 /* ---------------- UI STYLE WITH DISTINCT DIAGRAMS ---------------- */
@@ -3134,6 +4364,9 @@ export function SettingsApp() {
                 /* ---------------- SURFACE MATERIAL ENGINE ---------------- */
                 <div className="space-y-6">
                   {renderBreadcrumbHeader('サーフェスマテリアル質感', 'Surface Material Engine', () => setPersonalSubView('main'))}
+
+                  {/* 【BETA】GlassiumOS 6 future: Glasispect UI 2: Material */}
+                  {renderGlassium6BetaStudio()}
 
                   <div className={`${cardSurfaceClass} divide-y ${dividerClass}`}>
                     {DESIGN_ENGINES.map((de) => {

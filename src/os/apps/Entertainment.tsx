@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { backendFetch, resolveBackendUrl } from '../backendConfig';
 
 export type EntertainmentTab = 'movies' | 'anime' | 'youtube' | 'shorts';
-export type StreamingProvider = 'vidlink' | 'mapple-fun' | 'streamex' | 'flixhd' | 'mapletv' | 'youtube';
+export type StreamingProvider = 'toustream' | 'mapple-fun' | 'vidlink' | 'streamex' | 'flixhd' | 'mapletv' | 'youtube';
 
 interface MediaItem {
   id: string;
@@ -46,9 +46,15 @@ const PROVIDER_METADATA: Record<
   StreamingProvider,
   { name: string; badge: string; color: string; desc: string }
 > = {
+  toustream: {
+    name: 'toustream.xyz (Proxy)',
+    badge: '最推奨 (toustream.xyz Proxy)',
+    color: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+    desc: 'toustream.xyz ソース（12種マルチミラー内蔵）をサーバープロキシ経由でストリーム再生',
+  },
   'mapple-fun': {
     name: 'mapple.fun (Proxy Main)',
-    badge: '最推奨 (mapple.fun Proxy)',
+    badge: '推奨 (mapple.fun Proxy)',
     color: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
     desc: 'mapple.fun ソースをサーバープロキシ経由でストリーム再生',
   },
@@ -619,9 +625,11 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
     return (savedState?.activeTab as EntertainmentTab) || 'movies';
   });
 
-  const [provider, setProvider] = useState<StreamingProvider>(
-    (savedState?.provider as StreamingProvider) || 'mapple-fun'
-  );
+  const [provider, setProvider] = useState<StreamingProvider>(() => {
+    const saved = savedState?.provider as StreamingProvider | undefined;
+    if (saved && saved in PROVIDER_METADATA) return saved;
+    return 'toustream';
+  });
   const [searchQuery, setSearchQuery] = useState<string>(savedState?.searchQuery || '');
   const [selectedGenre, setSelectedGenre] = useState<string>(savedState?.selectedGenre || 'All');
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(
@@ -953,7 +961,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
               Glassium Entertainment
             </h1>
             <p className="text-[10px] text-white/50 -mt-0.5">
-              Prime Shows · StreameX · FlixHD · Maple TV · YouTube & Shorts
+              toustream.xyz · mapple.fun · StreameX · FlixHD · Maple TV · YouTube & Shorts
             </p>
           </div>
         </div>
@@ -1020,6 +1028,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
             onChange={(e) => setProvider(e.target.value as StreamingProvider)}
             className="bg-black/60 border border-white/15 text-white text-xs font-semibold rounded-lg px-2.5 py-1.5 outline-none hover:border-white/30 transition cursor-pointer"
           >
+            <option value="toustream">toustream.xyz (Proxy 12ミラー内蔵)</option>
             <option value="mapple-fun">mapple.fun (Proxy メインソース)</option>
             <option value="vidlink">VidCore 1080p (Proxy ミラー1)</option>
             <option value="streamex">AutoEmbed HD (Proxy ミラー2)</option>
@@ -1073,6 +1082,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
                       <div className="flex items-center gap-1 bg-black/80 backdrop-blur-md p-1 rounded-full border border-white/20 pointer-events-auto overflow-x-auto max-w-full">
                         {(
                           [
+                            ['toustream', 'toustream.xyz (Proxy)'],
                             ['mapple-fun', 'mapple.fun (Proxy)'],
                             ['vidlink', 'VidCore 1080p (Proxy)'],
                             ['flixhd', '2Embed (Proxy)'],
@@ -1223,7 +1233,7 @@ export function EntertainmentApp({ initialTab, payload }: { initialTab?: string;
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="映画・ドラマ・アニメ名 (TMDB/mapple.fun リアルタイム検索)..."
+                  placeholder="映画・ドラマ・アニメ名 (TMDB / toustream.xyz / mapple.fun リアルタイム検索)..."
                   className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-rose-500/60 focus:bg-white/10 transition"
                 />
                 {isSearchingOnline && (

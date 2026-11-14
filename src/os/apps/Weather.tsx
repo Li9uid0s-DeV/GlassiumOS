@@ -126,20 +126,36 @@ export function WeatherApp() {
   const [radarPlaying, setRadarPlaying] = useState<boolean>(false);
   const [radarOpacity, setRadarOpacity] = useState<number>(0.75);
   const [showWindOverlay, setShowWindOverlay] = useState<boolean>(true);
+  const [mapPanOffset, setMapPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [mapDragging, setMapDragging] = useState<boolean>(false);
+  const mapDragStartRef = React.useRef<{ startX: number; startY: number; baseX: number; baseY: number }>({
+    startX: 0,
+    startY: 0,
+    baseX: 0,
+    baseY: 0,
+  });
 
   // 3D Weather Sky background state
   const [show3dSky, setShow3dSky] = useState<boolean>(true);
   const [wiperActive, setWiperActive] = useState<boolean>(true);
+  const [wiperSweepCount, setWiperSweepCount] = useState<number>(0);
+  const [skyConditionOverride, setSkyConditionOverride] = useState<'auto' | WeatherConditionKey>('auto');
 
   const conditionKey: WeatherConditionKey = useMemo(() => {
+    if (skyConditionOverride !== 'auto') return skyConditionOverride;
     const cond = (weather?.condition || '').toLowerCase();
     if (cond.includes('雷') || cond.includes('thunder') || cond.includes('storm')) return 'Thunderstorm';
     if (cond.includes('雪') || cond.includes('snow') || cond.includes('氷') || cond.includes('sleet')) return 'Snow';
     if (cond.includes('雨') || cond.includes('rain') || cond.includes('drizzle') || cond.includes('shower')) return 'Rainy';
-    if (cond.includes('曇') || cond.includes('cloud') || cond.includes('overcast')) return 'Cloudy';
+    if (cond.includes('曇') || cond.includes('cloud') || cond.includes('overcast') || cond.includes('霧')) return 'Cloudy';
     if (cond.includes('aurora') || cond.includes('オーロラ')) return 'Aurora';
     return 'Sunny';
-  }, [weather?.condition]);
+  }, [weather?.condition, skyConditionOverride]);
+
+  // Reset map pan when location or zoom changes
+  useEffect(() => {
+    setMapPanOffset({ x: 0, y: 0 });
+  }, [activeLoc.id, mapZoom]);
 
   useEffect(() => {
     try {
@@ -341,10 +357,12 @@ export function WeatherApp() {
     return () => clearInterval(id);
   }, [radarPlaying, weather?.radar?.frames]);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = searchQuery.trim();
-    if (!q) return;
+  const executeLocationSearch = useCallback(async (queryText: string) => {
+    const q = queryText.trim();
+    if (!q) {
+      setSearchResults([]);
+      return;
+    }
     setSearching(true);
     try {
       let found: SavedWeatherLocation[] | null = null;
@@ -371,10 +389,9 @@ export function WeatherApp() {
           const geoData = await geoRes.json();
           found = (geoData.results || []).map(
             (r: { id: number; name: string; admin1?: string; country?: string; latitude: number; longitude: number }) => ({
-              id: String(r.id || `${r.latitude},${r.longitude}`),
+              id: `${r.latitude.toFixed(3)},${r.longitude.toFixed(3)}`,
               name: r.name,
-              admin1: r.admin1 || '',
-              country: r.country || '',
+              region: [r.admin1, r.country].filter(Boolean).join(', '),
               lat: r.latitude,
               lon: r.longitude,
             })
@@ -388,6 +405,24 @@ export function WeatherApp() {
     } finally {
       setSearching(false);
     }
+  }, []);
+
+  // Debounced live search when typing city names
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      void executeLocationSearch(q);
+    }, 340);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery, executeLocationSearch]);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await executeLocationSearch(searchQuery);
   };
 
   const isLocationSaved = useMemo(
@@ -419,7 +454,7 @@ export function WeatherApp() {
 
   const fmtTemp = (c: number) => (unit === 'C' ? Math.round(c) : Math.round((c * 9) / 5 + 32));
 
-  // Compute 3x3 slippy map tiles around activeLoc (lat, lon)
+  // Compute 5x5 slippy map tiles (1280x1280) around activeLoc (lat, lon) so wide/maximized windows are completely filled
   const tileGrid = useMemo(() => {
     const exactX = lon2tile(activeLoc.lon, mapZoom);
     const exactY = lat2tile(activeLoc.lat, mapZoom);
@@ -430,8 +465,8 @@ export function WeatherApp() {
     const maxTile = Math.pow(2, mapZoom);
 
     const tiles: Array<{ dx: number; dy: number; x: number; y: number; z: number }> = [];
-    for (let dy = -1; dy <= 1; dy++) {
-      for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -2; dy <= 2; dy++) {
+      for (let dx = -2; dx <= 2; dx++) {
         const tx = ((centerTileX + dx) % maxTile + maxTile) % maxTile;
         const ty = Math.max(0, Math.min(maxTile - 1, centerTileY + dy));
         tiles.push({ dx, dy, x: tx, y: ty, z: mapZoom });
@@ -454,16 +489,24 @@ export function WeatherApp() {
   const nextMin = Math.floor(countdownSec / 60);
   const nextSec = String(countdownSec % 60).padStart(2, '0');
 
+  const cardGlassClass = isLight
+    ? show3dSky
+      ? 'weather-sky-preserve bg-white/85 backdrop-blur-md border-slate-200/90 text-slate-900 shadow-sm'
+      : 'bg-white border-slate-200 text-slate-900 shadow-sm'
+    : show3dSky
+    ? 'weather-sky-preserve bg-slate-950/60 backdrop-blur-md border-white/15 text-white shadow-lg'
+    : 'bg-white/[0.04] border-white/10 text-white';
+
   return (
     <div
-      className={`h-full flex flex-col overflow-hidden select-none ${
+      className={`h-full flex flex-col overflow-hidden select-none relative ${
         isLight ? 'bg-slate-50 text-slate-900' : 'bg-slate-950/90 text-white'
       }`}
     >
       {/* Top Bar: Location Search, Saved Locations, View Tabs, 5-Min Sync Status */}
       <div
-        className={`px-4 py-3 border-b flex flex-col gap-2.5 shrink-0 ${
-          isLight ? 'bg-white/80 border-slate-200' : 'bg-slate-900/70 border-white/10'
+        className={`relative z-30 px-4 py-3 border-b flex flex-col gap-2.5 shrink-0 ${
+          isLight ? 'bg-white/90 border-slate-200' : 'bg-slate-900/85 border-white/10'
         } backdrop-blur-xl`}
       >
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -511,7 +554,7 @@ export function WeatherApp() {
             {searchResults.length > 0 && (
               <div
                 className={`absolute left-0 right-0 top-full mt-1.5 z-50 rounded-2xl border shadow-2xl overflow-hidden max-h-60 overflow-y-auto ${
-                  isLight ? 'bg-white border-slate-200' : 'bg-slate-900 border-white/15'
+                  isLight ? 'bg-white border-slate-200 text-slate-900' : 'bg-slate-900 border-white/15 text-white'
                 }`}
               >
                 {searchResults.map((loc) => {
@@ -564,7 +607,7 @@ export function WeatherApp() {
           </form>
 
           {/* View Switcher & Server Update Indicator */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <div
               className={`flex p-0.5 rounded-xl border ${
                 isLight ? 'bg-slate-100 border-slate-200' : 'bg-white/5 border-white/10'
@@ -618,20 +661,44 @@ export function WeatherApp() {
             </button>
 
             {show3dSky && (
-              <button
-                type="button"
-                onClick={() => setWiperActive((v) => !v)}
-                className={`px-2 py-1 rounded-xl border text-[11px] font-medium flex items-center gap-1 cursor-pointer transition ${
-                  wiperActive
-                    ? 'bg-sky-500/15 text-sky-300 border-sky-400/30'
-                    : isLight
-                    ? 'bg-slate-100 border-slate-200 opacity-50'
-                    : 'bg-white/5 border-white/10 opacity-50'
-                }`}
-                title="ワイパー効果のON/OFF"
-              >
-                <span>ワイパー {wiperActive ? '✓' : '—'}</span>
-              </button>
+              <>
+                <select
+                  value={skyConditionOverride}
+                  onChange={(e) => setSkyConditionOverride(e.target.value as 'auto' | WeatherConditionKey)}
+                  className={`px-2 py-1 rounded-xl border text-[11px] font-bold outline-none cursor-pointer ${
+                    isLight
+                      ? 'bg-slate-100 border-slate-200 text-slate-800'
+                      : 'bg-slate-900 border-white/15 text-white'
+                  }`}
+                  title="3D天球シミュレーション天候切り替え"
+                >
+                  <option value="auto">🔄 現地の天候に連動 ({conditionKey})</option>
+                  <option value="Sunny">☀️ 快晴 (Sunny)</option>
+                  <option value="Cloudy">☁️ 曇天 (Cloudy)</option>
+                  <option value="Rainy">🌧️ 雨 (Rainy)</option>
+                  <option value="Thunderstorm">⛈️ 雷雨 (Thunderstorm)</option>
+                  <option value="Snow">❄️ 雪 (Snow)</option>
+                  <option value="Aurora">🌌 オーロラ (Aurora)</option>
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setWiperActive(true);
+                    setWiperSweepCount((c) => c + 1);
+                  }}
+                  className={`px-2 py-1 rounded-xl border text-[11px] font-medium flex items-center gap-1 cursor-pointer transition ${
+                    wiperActive
+                      ? 'bg-sky-500/15 text-sky-400 border-sky-400/30'
+                      : isLight
+                      ? 'bg-slate-100 border-slate-200 opacity-60'
+                      : 'bg-white/5 border-white/10 opacity-60'
+                  }`}
+                  title="クリックでフロントガラス・ワイパーを動作"
+                >
+                  <span>🧹 ワイパー動作</span>
+                </button>
+              </>
             )}
 
             <button
@@ -719,357 +786,393 @@ export function WeatherApp() {
       <div className="relative flex-1 overflow-hidden">
         {/* 3D Dynamic Sky Background Layer */}
         {show3dSky && (
-          <div className="absolute inset-0 z-0 pointer-events-auto overflow-hidden opacity-90">
+          <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
             <VintageAndroidWeatherSky
               condition={conditionKey}
               enableWiper={wiperActive}
+              wiperSweepCount={wiperSweepCount}
               className="w-full h-full"
             />
           </div>
         )}
 
         <div className="relative z-10 h-full overflow-y-auto p-4 space-y-4">
-        {errorMsg && (
-          <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs">
-            {errorMsg}
-          </div>
-        )}
-
-        {activeTab === 'forecast' ? (
-          <>
-            {/* Current Weather Summary Card */}
-            <div
-              className={`p-5 rounded-2xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${
-                isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.04] border-white/10'
-              }`}
-            >
-              <div className="flex items-center gap-4">
-                <div className="text-5xl select-none">{weather?.icon || '⛅'}</div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-xl font-bold">{activeLoc.name}</h2>
-                    {activeLoc.region && (
-                      <span className="text-xs opacity-60">{activeLoc.region}</span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={toggleSaveActiveLocation}
-                      className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border cursor-pointer ${
-                        isLocationSaved
-                          ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-                          : 'border-white/20 opacity-75 hover:opacity-100'
-                      }`}
-                    >
-                      {isLocationSaved ? '★ 登録地点' : '☆ 地点登録'}
-                    </button>
-                  </div>
-                  <div className="text-sm opacity-80 mt-0.5">
-                    {weather?.condition || '取得中...'} ・ 最高 {fmtTemp(weather?.high ?? 22)}°{unit} / 最低{' '}
-                    {fmtTemp(weather?.low ?? 14)}°{unit}
-                  </div>
-                  <div className="text-[11px] opacity-55 mt-1 font-mono">
-                    緯度 {activeLoc.lat.toFixed(2)}° / 経度 {activeLoc.lon.toFixed(2)}° ・ 5分自動更新サーバー接続中
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-black tracking-tight">
-                  {fmtTemp(weather?.temp ?? 20)}°{unit}
-                </span>
-                <span className="text-xs opacity-65">
-                  体感 {fmtTemp(weather?.feelsLike ?? 19)}°{unit}
-                </span>
-              </div>
+          {errorMsg && (
+            <div className="p-3 rounded-xl bg-rose-500/20 backdrop-blur-md border border-rose-500/40 text-rose-200 text-xs">
+              {errorMsg}
             </div>
+          )}
 
-            {/* Key Weather Metrics Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-              {[
-                { label: '湿度', value: `${weather?.humidity ?? 55}%`, sub: '相対湿度' },
-                { label: '風速', value: `${weather?.wind ?? 8} km/h`, sub: `風向 ${weather?.windDirection ?? 180}°` },
-                { label: '気圧', value: `${weather?.pressure ?? 1013} hPa`, sub: '海面更正気圧' },
-                { label: '降水量', value: `${weather?.precipitation ?? 0} mm`, sub: '直近1時間' },
-                { label: 'UV指数', value: `${weather?.uvIndex ?? 4}`, sub: (weather?.uvIndex ?? 4) >= 6 ? '強い' : '中程度' },
-                { label: '日の出 / 日の入り', value: `${weather?.sunrise ?? '05:45'}`, sub: `日没 ${weather?.sunset ?? '18:15'}` },
-              ].map((m) => (
-                <div
-                  key={m.label}
-                  className={`p-3 rounded-xl border ${
-                    isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/10'
-                  }`}
-                >
-                  <div className="text-[11px] opacity-60">{m.label}</div>
-                  <div className="text-base font-bold mt-1">{m.value}</div>
-                  <div className="text-[10px] opacity-50 mt-0.5">{m.sub}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Hourly Forecast (24 Hours) */}
-            <div
-              className={`p-4 rounded-2xl border ${
-                isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/10'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-xs font-bold">時間ごとの天気予報 (24時間)</h3>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('radar')}
-                  style={{ color: resolvedAccentHex }}
-                  className="text-xs font-bold hover:underline cursor-pointer"
-                >
-                  雨雲レーダーを見る →
-                </button>
-              </div>
-              <div className="flex gap-2.5 overflow-x-auto pb-2">
-                {(Array.isArray(weather?.hourly) && weather.hourly.length > 0
-                  ? weather.hourly
-                  : Array.from({ length: 12 }, (_, i) => ({
-                      time: `${(new Date().getHours() + i) % 24}:00`,
-                      temp: 20 - Math.sin(i / 3) * 3,
-                      precipProb: 10,
-                      precipMm: 0,
-                      windSpeed: 6,
-                      icon: '⛅',
-                      condition: '晴れ',
-                    }))
-                ).map((h, i) => (
-                  <div
-                    key={`${h.time}-${i}`}
-                    className={`min-w-[74px] p-2.5 rounded-xl border flex flex-col items-center gap-1 shrink-0 ${
-                      isLight ? 'bg-slate-50 border-slate-200' : 'bg-black/25 border-white/10'
-                    }`}
-                  >
-                    <span className="text-[11px] opacity-65 font-mono">{i === 0 ? '現在' : h.time}</span>
-                    <span className="text-xl my-0.5">{h.icon}</span>
-                    <span className="text-xs font-bold">
-                      {fmtTemp(h.temp)}°{unit}
-                    </span>
-                    <span className="text-[10px] text-sky-400 font-mono">💧{h.precipProb}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* 7-Day Forecast */}
-            <div
-              className={`p-4 rounded-2xl border ${
-                isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/10'
-              }`}
-            >
-              <h3 className="text-xs font-bold mb-3">週間天気予報 (7日間)</h3>
-              <div className="divide-y divide-white/10">
-                {(Array.isArray(weather?.daily) ? weather.daily : []).map((d) => (
-                  <div key={d.date} className="py-2.5 flex items-center justify-between text-xs gap-3">
-                    <div className="w-24 font-bold">
-                      {d.day}{' '}
-                      <span className="text-[10px] opacity-50 font-mono">{d.date.slice(5)}</span>
-                    </div>
-                    <div className="flex items-center gap-2 w-32">
-                      <span className="text-lg">{d.icon}</span>
-                      <span className="opacity-85 truncate">{d.condition}</span>
-                    </div>
-                    <div className="w-20 text-sky-400 font-mono text-[11px]">
-                      降水 {d.precipProb}%
-                    </div>
-                    <div className="flex items-center gap-2 font-mono">
-                      <span className="opacity-60">{fmtTemp(d.low)}°</span>
-                      <div className="w-20 h-1.5 rounded-full bg-white/10 overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${Math.min(100, Math.max(25, (d.high - d.low) * 6))}%`,
-                            backgroundColor: resolvedAccentHex,
-                          }}
-                        />
-                      </div>
-                      <span className="font-bold">{fmtTemp(d.high)}°</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        ) : (
-          /* Rain Cloud Radar & Weather Map View */
-          <div className="space-y-3">
-            <div
-              className={`p-4 rounded-2xl border space-y-3 ${
-                isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/10'
-              }`}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-bold">
-                    {activeLoc.name} 周辺の雨雲レーダー・気象マップ
-                  </h3>
-                  <p className="text-[11px] opacity-60">
-                    OpenStreetMap 地図タイル ＋ RainViewer 降水レーダーオーバーレイ（5分周期自動更新）
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={showWindOverlay}
-                      onChange={(e) => setShowWindOverlay(e.target.checked)}
-                    />
-                    <span>風向・気象情報表示</span>
-                  </label>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setMapZoom((z) => Math.max(4, z - 1))}
-                      className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold cursor-pointer"
-                    >
-                      － 縮小
-                    </button>
-                    <span className="text-xs font-mono px-1.5">Zoom {mapZoom}</span>
-                    <button
-                      type="button"
-                      onClick={() => setMapZoom((z) => Math.min(10, z + 1))}
-                      className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-bold cursor-pointer"
-                    >
-                      ＋ 拡大
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Map Viewport (3x3 256px Tiles = 768x768 centered on location) */}
-              <div className="relative w-full h-[380px] rounded-2xl overflow-hidden border border-white/15 bg-slate-900">
-                <div
-                  className="absolute"
-                  style={{
-                    width: 768,
-                    height: 768,
-                    left: `calc(50% - ${256 + tileGrid.offsetX}px)`,
-                    top: `calc(50% - ${256 + tileGrid.offsetY}px)`,
-                  }}
-                >
-                  {tileGrid.tiles.map((t) => (
-                    <React.Fragment key={`${t.z}-${t.x}-${t.y}`}>
-                      {/* Base Map Tile */}
-                      <img
-                        src={`https://tile.openstreetmap.org/${t.z}/${t.x}/${t.y}.png`}
-                        alt=""
-                        className="absolute w-[256px] h-[256px] select-none pointer-events-none"
-                        style={{
-                          left: (t.dx + 1) * 256,
-                          top: (t.dy + 1) * 256,
-                          filter: isLight ? 'none' : 'invert(90%) hue-rotate(180deg) brightness(88%) contrast(92%)',
-                        }}
-                      />
-                      {/* RainViewer Precipitation Radar Tile Overlay */}
-                      {activeRadarFrame?.path && (
-                        <img
-                          src={`${radarHost}${activeRadarFrame.path}/256/${t.z}/${t.x}/${t.y}/2/1_1.png`}
-                          alt=""
-                          className="absolute w-[256px] h-[256px] select-none pointer-events-none transition-opacity duration-300"
-                          style={{
-                            left: (t.dx + 1) * 256,
-                            top: (t.dy + 1) * 256,
-                            opacity: radarOpacity,
-                          }}
-                        />
+          {activeTab === 'forecast' ? (
+            <>
+              {/* Current Weather Summary Card */}
+              <div
+                className={`p-5 rounded-2xl border flex flex-col md:flex-row items-start md:items-center justify-between gap-4 ${cardGlassClass}`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className="text-5xl select-none">{weather?.icon || '⛅'}</div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold">{activeLoc.name}</h2>
+                      {activeLoc.region && (
+                        <span className="text-xs opacity-60">{activeLoc.region}</span>
                       )}
-                    </React.Fragment>
-                  ))}
-                </div>
-
-                {/* Center Location Marker */}
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center pointer-events-none">
-                  <div
-                    style={{ backgroundColor: resolvedAccentHex }}
-                    className="px-2.5 py-1 rounded-full text-[11px] font-bold text-slate-950 shadow-lg mb-1 whitespace-nowrap"
-                  >
-                    {activeLoc.name} {fmtTemp(weather?.temp ?? 20)}°{unit} ({weather?.condition || '晴れ'})
-                  </div>
-                  <div
-                    style={{ backgroundColor: resolvedAccentHex }}
-                    className="w-3.5 h-3.5 rounded-full border-2 border-white shadow-md"
-                  />
-                </div>
-
-                {/* Weather Telemetry HUD on Map */}
-                {showWindOverlay && (
-                  <div className="absolute top-3 left-3 z-20 p-3 rounded-xl bg-slate-950/80 backdrop-blur-md border border-white/15 text-white text-xs space-y-1">
-                    <div className="font-bold flex items-center gap-1.5">
-                      <span>🌧️ 降水量: {weather?.precipitation ?? 0} mm/h</span>
+                      <button
+                        type="button"
+                        onClick={toggleSaveActiveLocation}
+                        className={`px-2 py-0.5 rounded-lg text-[11px] font-semibold border cursor-pointer ${
+                          isLocationSaved
+                            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+                            : 'border-current/25 opacity-75 hover:opacity-100'
+                        }`}
+                      >
+                        {isLocationSaved ? '★ 登録地点' : '☆ 地点登録'}
+                      </button>
                     </div>
-                    <div className="opacity-80">
-                      💨 風速: {weather?.wind ?? 8} km/h (風向 {weather?.windDirection ?? 180}°)
+                    <div className="text-sm opacity-85 mt-0.5">
+                      {weather?.condition || '取得中...'} ・ 最高 {fmtTemp(weather?.high ?? 22)}°{unit} / 最低{' '}
+                      {fmtTemp(weather?.low ?? 14)}°{unit}
                     </div>
-                    <div className="opacity-80">
-                      💧 湿度: {weather?.humidity ?? 55}% / 気圧: {weather?.pressure ?? 1013} hPa
+                    <div className="text-[11px] opacity-65 mt-1 font-mono">
+                      緯度 {activeLoc.lat.toFixed(2)}° / 経度 {activeLoc.lon.toFixed(2)}° ・ 5分自動更新サーバー接続中
                     </div>
                   </div>
-                )}
-
-                {/* Rain Intensity Legend */}
-                <div className="absolute bottom-3 right-3 z-20 px-3 py-2 rounded-xl bg-slate-950/80 backdrop-blur-md border border-white/15 text-white text-[10px] flex items-center gap-2">
-                  <span>雨雲強度:</span>
-                  <span className="px-1.5 py-0.5 rounded bg-sky-400/40">弱</span>
-                  <span className="px-1.5 py-0.5 rounded bg-blue-500/60">中</span>
-                  <span className="px-1.5 py-0.5 rounded bg-amber-500/70">強</span>
-                  <span className="px-1.5 py-0.5 rounded bg-rose-600/80">激しい雨</span>
                 </div>
-              </div>
 
-              {/* Radar Timeline Controls */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setRadarPlaying(!radarPlaying)}
-                    style={{ backgroundColor: resolvedAccentHex }}
-                    className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-950 cursor-pointer"
-                  >
-                    {radarPlaying ? '⏸ 一時停止' : '▶ 雨雲の動きを再生'}
-                  </button>
-                  <span className="text-xs font-mono opacity-80">
-                    {activeRadarFrame?.time
-                      ? new Date(activeRadarFrame.time * 1000).toLocaleTimeString('ja-JP', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })
-                      : '現在時刻'}
+                <div className="flex items-baseline gap-2">
+                  <span className="text-5xl font-black tracking-tight">
+                    {fmtTemp(weather?.temp ?? 20)}°{unit}
+                  </span>
+                  <span className="text-xs opacity-70">
+                    体感 {fmtTemp(weather?.feelsLike ?? 19)}°{unit}
                   </span>
                 </div>
+              </div>
 
-                {radarFrames.length > 1 && (
-                  <input
-                    type="range"
-                    min={0}
-                    max={radarFrames.length - 1}
-                    value={radarFrameIdx}
-                    onChange={(e) => {
-                      setRadarPlaying(false);
-                      setRadarFrameIdx(Number(e.target.value));
+              {/* Key Weather Metrics Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                {[
+                  { label: '湿度', value: `${weather?.humidity ?? 55}%`, sub: '相対湿度' },
+                  { label: '風速', value: `${weather?.wind ?? 8} km/h`, sub: `風向 ${weather?.windDirection ?? 180}°` },
+                  { label: '気圧', value: `${weather?.pressure ?? 1013} hPa`, sub: '海面更正気圧' },
+                  { label: '降水量', value: `${weather?.precipitation ?? 0} mm`, sub: '直近1時間' },
+                  { label: 'UV指数', value: `${weather?.uvIndex ?? 4}`, sub: (weather?.uvIndex ?? 4) >= 6 ? '強い' : '中程度' },
+                  { label: '日の出 / 日の入り', value: `${weather?.sunrise ?? '05:45'}`, sub: `日没 ${weather?.sunset ?? '18:15'}` },
+                ].map((m) => (
+                  <div
+                    key={m.label}
+                    className={`p-3 rounded-xl border ${cardGlassClass}`}
+                  >
+                    <div className="text-[11px] opacity-65">{m.label}</div>
+                    <div className="text-base font-bold mt-1">{m.value}</div>
+                    <div className="text-[10px] opacity-55 mt-0.5">{m.sub}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Hourly Forecast (24 Hours) */}
+              <div className={`p-4 rounded-2xl border ${cardGlassClass}`}>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-xs font-bold">時間ごとの天気予報 (24時間)</h3>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('radar')}
+                    style={{ color: resolvedAccentHex }}
+                    className="text-xs font-bold hover:underline cursor-pointer"
+                  >
+                    雨雲レーダーを見る →
+                  </button>
+                </div>
+                <div className="flex gap-2.5 overflow-x-auto pb-2">
+                  {(Array.isArray(weather?.hourly) && weather.hourly.length > 0
+                    ? weather.hourly
+                    : Array.from({ length: 12 }, (_, i) => ({
+                        time: `${(new Date().getHours() + i) % 24}:00`,
+                        temp: 20 - Math.sin(i / 3) * 3,
+                        precipProb: 10,
+                        precipMm: 0,
+                        windSpeed: 6,
+                        icon: '⛅',
+                        condition: '晴れ',
+                      }))
+                  ).map((h, i) => (
+                    <div
+                      key={`${h.time}-${i}`}
+                      className={`min-w-[74px] p-2.5 rounded-xl border flex flex-col items-center gap-1 shrink-0 ${
+                        isLight ? 'bg-slate-100/80 border-slate-200' : 'bg-black/35 border-white/10'
+                      }`}
+                    >
+                      <span className="text-[11px] opacity-70 font-mono">{i === 0 ? '現在' : h.time}</span>
+                      <span className="text-xl my-0.5">{h.icon}</span>
+                      <span className="text-xs font-bold">
+                        {fmtTemp(h.temp)}°{unit}
+                      </span>
+                      <span className="text-[10px] text-sky-400 font-mono">💧{h.precipProb}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 7-Day Forecast */}
+              <div className={`p-4 rounded-2xl border ${cardGlassClass}`}>
+                <h3 className="text-xs font-bold mb-3">週間天気予報 (7日間)</h3>
+                <div className={`divide-y ${isLight ? 'divide-slate-200' : 'divide-white/10'}`}>
+                  {(Array.isArray(weather?.daily) ? weather.daily : []).map((d) => (
+                    <div key={d.date} className="py-2.5 flex items-center justify-between text-xs gap-3">
+                      <div className="w-24 font-bold">
+                        {d.day}{' '}
+                        <span className="text-[10px] opacity-55 font-mono">{d.date.slice(5)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 w-32">
+                        <span className="text-lg">{d.icon}</span>
+                        <span className="opacity-90 truncate">{d.condition}</span>
+                      </div>
+                      <div className="w-20 text-sky-400 font-mono text-[11px]">
+                        降水 {d.precipProb}%
+                      </div>
+                      <div className="flex items-center gap-2 font-mono">
+                        <span className="opacity-65">{fmtTemp(d.low)}°</span>
+                        <div className={`w-20 h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-slate-200' : 'bg-white/15'}`}>
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${Math.min(100, Math.max(25, (d.high - d.low) * 6))}%`,
+                              backgroundColor: resolvedAccentHex,
+                            }}
+                          />
+                        </div>
+                        <span className="font-bold">{fmtTemp(d.high)}°</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
+          ) : (
+            /* Rain Cloud Radar & Weather Map View */
+            <div className="space-y-3">
+              <div className={`p-4 rounded-2xl border space-y-3 ${cardGlassClass}`}>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-bold">
+                      {activeLoc.name} 周辺の雨雲レーダー・気象マップ
+                    </h3>
+                    <p className="text-[11px] opacity-65">
+                      OpenStreetMap 地図タイル ＋ RainViewer 降水レーダーオーバーレイ（ドラッグで移動・5分周期自動更新）
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showWindOverlay}
+                        onChange={(e) => setShowWindOverlay(e.target.checked)}
+                      />
+                      <span>風向・気象情報表示</span>
+                    </label>
+                    {(mapPanOffset.x !== 0 || mapPanOffset.y !== 0) && (
+                      <button
+                        type="button"
+                        onClick={() => setMapPanOffset({ x: 0, y: 0 })}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer ${
+                          isLight ? 'bg-slate-200 hover:bg-slate-300 text-slate-800' : 'bg-white/10 hover:bg-white/20 text-white'
+                        }`}
+                      >
+                        📍 中心へ戻す
+                      </button>
+                    )}
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setMapZoom((z) => Math.max(4, z - 1))}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer ${
+                          isLight ? 'bg-slate-200 hover:bg-slate-300 text-slate-800' : 'bg-white/10 hover:bg-white/20 text-white'
+                        }`}
+                      >
+                        － 縮小
+                      </button>
+                      <span className="text-xs font-mono px-1.5">Zoom {mapZoom}</span>
+                      <button
+                        type="button"
+                        onClick={() => setMapZoom((z) => Math.min(9, z + 1))}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold cursor-pointer ${
+                          isLight ? 'bg-slate-200 hover:bg-slate-300 text-slate-800' : 'bg-white/10 hover:bg-white/20 text-white'
+                        }`}
+                      >
+                        ＋ 拡大
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Map Viewport (5x5 256px Tiles = 1280x1280 centered on location, supports pointer drag-to-pan) */}
+                <div
+                  onPointerDown={(e) => {
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                    setMapDragging(true);
+                    mapDragStartRef.current = {
+                      startX: e.clientX,
+                      startY: e.clientY,
+                      baseX: mapPanOffset.x,
+                      baseY: mapPanOffset.y,
+                    };
+                  }}
+                  onPointerMove={(e) => {
+                    if (!mapDragging) return;
+                    const dx = Math.max(-256, Math.min(256, mapDragStartRef.current.baseX + (e.clientX - mapDragStartRef.current.startX)));
+                    const dy = Math.max(-256, Math.min(256, mapDragStartRef.current.baseY + (e.clientY - mapDragStartRef.current.startY)));
+                    setMapPanOffset({ x: dx, y: dy });
+                  }}
+                  onPointerUp={() => setMapDragging(false)}
+                  onPointerCancel={() => setMapDragging(false)}
+                  className={`weather-sky-preserve relative w-full h-[380px] rounded-2xl overflow-hidden border border-white/15 bg-slate-900 ${
+                    mapDragging ? 'cursor-grabbing' : 'cursor-grab'
+                  }`}
+                >
+                  <div
+                    className="absolute"
+                    style={{
+                      width: 1280,
+                      height: 1280,
+                      left: `calc(50% - ${512 + tileGrid.offsetX - mapPanOffset.x}px)`,
+                      top: `calc(50% - ${512 + tileGrid.offsetY - mapPanOffset.y}px)`,
                     }}
-                    className="flex-1 min-w-[140px] cursor-pointer"
-                  />
-                )}
+                  >
+                    {tileGrid.tiles.map((t) => (
+                      <React.Fragment key={`${t.z}-${t.x}-${t.y}`}>
+                        {/* Base Map Tile */}
+                        <img
+                          src={`https://tile.openstreetmap.org/${t.z}/${t.x}/${t.y}.png`}
+                          alt=""
+                          draggable={false}
+                          onError={(e) => {
+                            e.currentTarget.style.visibility = 'hidden';
+                          }}
+                          className="absolute w-[256px] h-[256px] select-none pointer-events-none"
+                          style={{
+                            left: (t.dx + 2) * 256,
+                            top: (t.dy + 2) * 256,
+                            filter: isLight ? 'none' : 'invert(90%) hue-rotate(180deg) brightness(88%) contrast(92%)',
+                          }}
+                        />
+                        {/* RainViewer Precipitation Radar Tile Overlay */}
+                        {activeRadarFrame?.path && (
+                          <img
+                            src={`${radarHost}${activeRadarFrame.path}/256/${t.z}/${t.x}/${t.y}/2/1_1.png`}
+                            alt=""
+                            draggable={false}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                            className="absolute w-[256px] h-[256px] select-none pointer-events-none transition-opacity duration-300"
+                            style={{
+                              left: (t.dx + 2) * 256,
+                              top: (t.dy + 2) * 256,
+                              opacity: radarOpacity,
+                            }}
+                          />
+                        )}
+                      </React.Fragment>
+                    ))}
+                  </div>
 
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="opacity-65">レーダー透過度</span>
-                  <input
-                    type="range"
-                    min={0.2}
-                    max={1}
-                    step={0.05}
-                    value={radarOpacity}
-                    onChange={(e) => setRadarOpacity(Number(e.target.value))}
-                    className="w-24 cursor-pointer"
-                  />
+                  {/* Center Location Marker */}
+                  <div
+                    style={{
+                      left: `calc(50% + ${mapPanOffset.x}px)`,
+                      top: `calc(50% + ${mapPanOffset.y}px)`,
+                    }}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center pointer-events-none"
+                  >
+                    <div
+                      style={{ backgroundColor: resolvedAccentHex }}
+                      className="px-2.5 py-1 rounded-full text-[11px] font-bold text-slate-950 shadow-lg mb-1 whitespace-nowrap"
+                    >
+                      {activeLoc.name} {fmtTemp(weather?.temp ?? 20)}°{unit} ({weather?.condition || '晴れ'})
+                    </div>
+                    <div
+                      style={{ backgroundColor: resolvedAccentHex }}
+                      className="w-3.5 h-3.5 rounded-full border-2 border-white shadow-md"
+                    />
+                  </div>
+
+                  {/* Weather Telemetry HUD on Map */}
+                  {showWindOverlay && (
+                    <div className="weather-map-hud absolute top-3 left-3 z-20 p-3 rounded-xl bg-slate-950/85 backdrop-blur-md border border-white/15 text-white text-xs space-y-1 pointer-events-none">
+                      <div className="font-bold flex items-center gap-1.5">
+                        <span>🌧️ 降水量: {weather?.precipitation ?? 0} mm/h</span>
+                      </div>
+                      <div className="opacity-85">
+                        💨 風速: {weather?.wind ?? 8} km/h (風向 {weather?.windDirection ?? 180}°)
+                      </div>
+                      <div className="opacity-85">
+                        💧 湿度: {weather?.humidity ?? 55}% / 気圧: {weather?.pressure ?? 1013} hPa
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rain Intensity Legend */}
+                  <div className="weather-map-hud absolute bottom-3 right-3 z-20 px-3 py-2 rounded-xl bg-slate-950/85 backdrop-blur-md border border-white/15 text-white text-[10px] flex items-center gap-2 pointer-events-none">
+                    <span>雨雲強度:</span>
+                    <span className="px-1.5 py-0.5 rounded bg-sky-400/50">弱</span>
+                    <span className="px-1.5 py-0.5 rounded bg-blue-500/70">中</span>
+                    <span className="px-1.5 py-0.5 rounded bg-amber-500/80">強</span>
+                    <span className="px-1.5 py-0.5 rounded bg-rose-600/90">激しい雨</span>
+                  </div>
+                </div>
+
+                {/* Radar Timeline Controls */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRadarPlaying(!radarPlaying)}
+                      style={{ backgroundColor: resolvedAccentHex }}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold text-slate-950 cursor-pointer"
+                    >
+                      {radarPlaying ? '⏸ 一時停止' : '▶ 雨雲の動きを再生'}
+                    </button>
+                    <span className="text-xs font-mono opacity-80">
+                      {activeRadarFrame?.time
+                        ? new Date(activeRadarFrame.time * 1000).toLocaleTimeString('ja-JP', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })
+                        : '現在時刻'}
+                    </span>
+                  </div>
+
+                  {radarFrames.length > 1 && (
+                    <input
+                      type="range"
+                      min={0}
+                      max={radarFrames.length - 1}
+                      value={radarFrameIdx}
+                      onChange={(e) => {
+                        setRadarPlaying(false);
+                        setRadarFrameIdx(Number(e.target.value));
+                      }}
+                      className="flex-1 min-w-[140px] cursor-pointer"
+                    />
+                  )}
+
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="opacity-65">レーダー透過度</span>
+                    <input
+                      type="range"
+                      min={0.2}
+                      max={1}
+                      step={0.05}
+                      value={radarOpacity}
+                      onChange={(e) => setRadarOpacity(Number(e.target.value))}
+                      className="w-24 cursor-pointer"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
         </div>
       </div>
     </div>

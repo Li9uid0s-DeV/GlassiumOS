@@ -40,6 +40,7 @@ import {
 import { VirtualFolder, getInitialFileSystem, VirtualNode } from './fileSystem';
 import { WALLPAPERS } from './wallpapers';
 import { soundService } from './soundService';
+import { getCachedBingWallpapers, getDesktopBingIndex } from './bingWallpaperService';
 
 export interface DeskStickyNote {
   id: string;
@@ -50,6 +51,7 @@ export interface DeskStickyNote {
 }
 
 export type Wallpaper =
+  | 'bing'
   | 'dynamic-world'
   | 'live2d'
   | 'golden-sparkle'
@@ -936,14 +938,16 @@ export function OSProvider({ children }: { children: ReactNode }) {
     }
   }, [themeMode]);
 
-  // Listen to dynamic world state updates so Dynamic Accent Color reacts immediately
+  // Listen to dynamic world & Bing wallpaper updates so Dynamic Accent Color reacts immediately
   useEffect(() => {
     const onWorldUpdate = () => setDynamicWorldTick((t) => t + 1);
     window.addEventListener('glassium-dynamic-world-change', onWorldUpdate);
     window.addEventListener('glasis-dynamic-env-changed', onWorldUpdate);
+    window.addEventListener('glassium-desktop-bing-changed', onWorldUpdate);
     return () => {
       window.removeEventListener('glassium-dynamic-world-change', onWorldUpdate);
       window.removeEventListener('glasis-dynamic-env-changed', onWorldUpdate);
+      window.removeEventListener('glassium-desktop-bing-changed', onWorldUpdate);
     };
   }, []);
 
@@ -1144,6 +1148,13 @@ export function OSProvider({ children }: { children: ReactNode }) {
       'solar-flare': [238, 92, 56],
     };
 
+    if (wallpaper === 'bing') {
+      const bingList = getCachedBingWallpapers();
+      const bIdx = getDesktopBingIndex();
+      const activeBing = bingList[bIdx % bingList.length] || bingList[0];
+      return activeBing?.dominantRgb || [28, 92, 168];
+    }
+
     if (wallpaper === 'dynamic-world') {
       const now = new Date();
       const m = now.getMonth() + 1;
@@ -1273,6 +1284,9 @@ export function OSProvider({ children }: { children: ReactNode }) {
       return null;
     };
 
+    const isDynamicThemeMode =
+      themeMode === 'dynamic' || themeMode === 'dynamic-dark' || themeMode === 'dynamic-light';
+
     if (accentColor !== 'dynamic') {
       // Check if user selected an arbitrary custom hex color (e.g. '#ff4081')
       if (accentColor.startsWith('#')) {
@@ -1289,6 +1303,14 @@ export function OSProvider({ children }: { children: ReactNode }) {
       if (preset) {
         return { resolvedAccentHex: preset.hex, resolvedAccentRgb: preset.rgb };
       }
+    }
+
+    // In standard Dark / Light / System modes (non-dynamic), keep the accent color static if set to 'dynamic'
+    if (!isDynamicThemeMode && !customThemeHex) {
+      return {
+        resolvedAccentHex: '#06b6d4',
+        resolvedAccentRgb: '6, 182, 212',
+      };
     }
 
     // Dynamic mode: use customThemeHex if explicitly set, otherwise continuous wallpaperBaseRgb
@@ -1313,7 +1335,7 @@ export function OSProvider({ children }: { children: ReactNode }) {
       resolvedAccentHex: `#${toHex(r)}${toHex(g)}${toHex(b)}`,
       resolvedAccentRgb: `${r}, ${g}, ${b}`,
     };
-  }, [accentColor, customThemeHex, wallpaperBaseRgb, theme]);
+  }, [accentColor, customThemeHex, wallpaperBaseRgb, theme, themeMode]);
 
   // Active OS-wide theme RGB (combines customThemeHex, chosen accent color, or continuous wallpaper RGB)
   const activeThemeRgb = useMemo<[number, number, number]>(() => {
@@ -1344,8 +1366,11 @@ export function OSProvider({ children }: { children: ReactNode }) {
   // Sync CSS variables & data attributes with custom slider, theme, wallpaper tone, OS-wide theme surface, and Liquid Glass tint
   useEffect(() => {
     const root = document.documentElement;
+    const isDynamicSurface =
+      themeMode === 'dynamic' || themeMode === 'dynamic-dark' || themeMode === 'dynamic-light';
+
     root.setAttribute('data-theme', theme);
-    root.setAttribute('data-theme-mode', themeMode);
+    root.setAttribute('data-theme-mode', isDynamicSurface ? 'dynamic' : theme);
     root.setAttribute('data-accent', accentColor);
     root.setAttribute('data-ui-style', uiStyle);
     root.setAttribute('data-shell-mode', shellMode);
@@ -1367,12 +1392,60 @@ export function OSProvider({ children }: { children: ReactNode }) {
     root.style.setProperty('--glass-specular', `${glassSpecular / 100}`);
     root.style.setProperty('--glass-wobble', `${glassWobble / 100}`);
 
-    const isDynamicSurface =
-      themeMode === 'dynamic' || themeMode === 'dynamic-dark' || themeMode === 'dynamic-light';
-    // Blend strength: stronger in dynamic surface mode or when customThemeHex is set, cohesive tint across OS otherwise
-    const blendFactor = isDynamicSurface || customThemeHex ? (theme === 'dark' ? 0.30 : 0.16) : theme === 'dark' ? 0.16 : 0.09;
-    const elevFactor = isDynamicSurface || customThemeHex ? (theme === 'dark' ? 0.38 : 0.12) : theme === 'dark' ? 0.22 : 0.06;
-    const titleFactor = isDynamicSurface || customThemeHex ? (theme === 'dark' ? 0.26 : 0.19) : theme === 'dark' ? 0.15 : 0.10;
+    if (!isDynamicSurface) {
+      // Standard static Dark Mode & Light Mode: colors NEVER change dynamically with wallpaper
+      if (theme === 'dark') {
+        root.style.setProperty('--os-dynamic-surface', 'rgba(11, 15, 25, 0.86)');
+        root.style.setProperty('--os-dynamic-surface-solid', '#0b0f19');
+        root.style.setProperty('--os-dynamic-surface-elevated', 'rgba(19, 26, 42, 0.82)');
+        root.style.setProperty('--os-dynamic-surface-panel', 'rgba(255, 255, 255, 0.05)');
+        root.style.setProperty('--os-dynamic-surface-hover', 'rgba(255, 255, 255, 0.10)');
+        root.style.setProperty('--os-dynamic-titlebar', 'rgba(8, 12, 22, 0.78)');
+
+        root.style.setProperty(
+          '--os-glass-window-bg',
+          'linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, rgba(15, 23, 42, 0.65) 48%, rgba(255, 255, 255, 0.06) 100%)'
+        );
+        root.style.setProperty(
+          '--os-glass-taskbar-bg',
+          'linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, rgba(15, 23, 42, 0.62) 50%, rgba(255, 255, 255, 0.10) 100%)'
+        );
+        root.style.setProperty(
+          '--os-glass-bg',
+          'linear-gradient(135deg, rgba(255, 255, 255, 0.14) 0%, rgba(15, 23, 42, 0.45) 55%, rgba(255, 255, 255, 0.08) 100%)'
+        );
+        root.style.setProperty('--os-glass-border', 'rgba(255, 255, 255, 0.22)');
+        root.style.setProperty('--os-glass-specular', 'rgba(255, 255, 255, 0.22)');
+      } else {
+        root.style.setProperty('--os-dynamic-surface', 'rgba(255, 255, 255, 0.90)');
+        root.style.setProperty('--os-dynamic-surface-solid', '#f8fafc');
+        root.style.setProperty('--os-dynamic-surface-elevated', 'rgba(241, 245, 249, 0.92)');
+        root.style.setProperty('--os-dynamic-surface-panel', 'rgba(15, 23, 42, 0.05)');
+        root.style.setProperty('--os-dynamic-surface-hover', 'rgba(15, 23, 42, 0.09)');
+        root.style.setProperty('--os-dynamic-titlebar', 'rgba(248, 250, 252, 0.86)');
+
+        root.style.setProperty(
+          '--os-glass-window-bg',
+          'linear-gradient(135deg, rgba(255, 255, 255, 0.84) 0%, rgba(241, 245, 249, 0.72) 48%, rgba(255, 255, 255, 0.78) 100%)'
+        );
+        root.style.setProperty(
+          '--os-glass-taskbar-bg',
+          'linear-gradient(135deg, rgba(255, 255, 255, 0.86) 0%, rgba(241, 245, 249, 0.76) 52%, rgba(255, 255, 255, 0.80) 100%)'
+        );
+        root.style.setProperty(
+          '--os-glass-bg',
+          'linear-gradient(135deg, rgba(255, 255, 255, 0.80) 0%, rgba(241, 245, 249, 0.68) 55%, rgba(255, 255, 255, 0.74) 100%)'
+        );
+        root.style.setProperty('--os-glass-border', 'rgba(15, 23, 42, 0.14)');
+        root.style.setProperty('--os-glass-specular', 'rgba(255, 255, 255, 0.88)');
+      }
+      return;
+    }
+
+    // Dynamic Mode ('dynamic' | 'dynamic-dark' | 'dynamic-light'): blend activeThemeRgb into OS surfaces and Liquid Glass
+    const blendFactor = theme === 'dark' ? 0.30 : 0.16;
+    const elevFactor = theme === 'dark' ? 0.38 : 0.12;
+    const titleFactor = theme === 'dark' ? 0.26 : 0.19;
 
     if (theme === 'dark') {
       const sr = Math.round(6 * (1 - blendFactor) + tr * blendFactor);

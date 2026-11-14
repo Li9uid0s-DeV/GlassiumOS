@@ -12,6 +12,7 @@ interface VintageAndroidWeatherSkyProps {
   condition: WeatherConditionKey;
   className?: string;
   enableWiper?: boolean;
+  wiperSweepCount?: number;
 }
 
 // Reusable module-scope math objects (Zero GC in render loop)
@@ -151,6 +152,7 @@ export const VintageAndroidWeatherSky: React.FC<VintageAndroidWeatherSkyProps> =
   condition,
   className = '',
   enableWiper = true,
+  wiperSweepCount = 0,
 }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const conditionRef = useRef<WeatherConditionKey>(condition);
@@ -159,11 +161,25 @@ export const VintageAndroidWeatherSky: React.FC<VintageAndroidWeatherSkyProps> =
   const [wiperActive, setWiperActive] = useState(false);
   const wasmActive = isRustWasmActive();
 
-  const triggerWiper = () => {
-    if (wiperActive) return;
+  useEffect(() => {
+    if (!enableWiper) {
+      setWiperActive(false);
+      return;
+    }
     setWiperActive(true);
-    setTimeout(() => setWiperActive(false), 1400);
-  };
+    const hideTimer = window.setTimeout(() => setWiperActive(false), 1200);
+    if (condition !== 'Rainy' && condition !== 'Thunderstorm') {
+      return () => window.clearTimeout(hideTimer);
+    }
+    const interval = window.setInterval(() => {
+      setWiperActive(true);
+      window.setTimeout(() => setWiperActive(false), 1200);
+    }, 5200);
+    return () => {
+      window.clearTimeout(hideTimer);
+      window.clearInterval(interval);
+    };
+  }, [enableWiper, wiperSweepCount, condition]);
 
   useEffect(() => {
     const container = mountRef.current;
@@ -773,38 +789,28 @@ export const VintageAndroidWeatherSky: React.FC<VintageAndroidWeatherSkyProps> =
 
   return (
     <div
-      className={`fixed inset-0 overflow-hidden pointer-events-none select-none z-0 ${className}`}
+      className={`absolute inset-0 overflow-hidden pointer-events-none select-none z-0 ${className}`}
     >
       {/* Dedicated Three.js WebGL Mount Container */}
       <div ref={mountRef} className="absolute inset-0 w-full h-full" />
 
       {/* Rust + Three.js Engine Telemetry Badge */}
-      <div className="absolute bottom-3 right-3 z-10 px-2.5 py-1 rounded-lg bg-slate-950/75 border border-white/15 text-[10px] font-mono text-cyan-300 flex items-center gap-1.5">
+      <div className="weather-map-hud absolute bottom-3 right-3 z-10 px-2.5 py-1 rounded-lg bg-slate-950/75 border border-white/15 text-[10px] font-mono text-cyan-300 flex items-center gap-1.5">
         <span>🦀 Rust/Wasm {wasmActive ? 'Active' : 'Ready'}</span>
         <span className="text-white/30">·</span>
         <span>Three.js 3D Sky ({condition})</span>
       </div>
 
-      {/* Windshield Wiper Sweep Effect for Rainy / Thunderstorm */}
-      {enableWiper && (condition === 'Rainy' || condition === 'Thunderstorm') && (
-        <div className="absolute inset-0 pointer-events-auto">
+      {/* Windshield Wiper Sweep Effect */}
+      {enableWiper && (
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div
-            className={`absolute bottom-0 left-1/2 -translate-x-1/2 origin-bottom w-3 h-[130%] bg-zinc-800 border-x border-zinc-600 shadow-[0_0_20px_rgba(0,0,0,0.8)] transition-transform duration-700 ease-in-out ${
-              wiperActive ? 'rotate-[75deg] scale-x-110' : '-rotate-[75deg] opacity-0'
+            className={`absolute bottom-0 left-1/2 -translate-x-1/2 origin-bottom w-3 h-[130%] bg-zinc-800 border-x border-zinc-600 shadow-[0_0_24px_rgba(56,189,248,0.45)] transition-all duration-700 ease-in-out ${
+              wiperActive ? 'rotate-[72deg] opacity-95' : '-rotate-[72deg] opacity-0'
             }`}
           >
-            <div className="absolute top-0 bottom-0 -right-1 w-1.5 bg-black/90 rounded-r" />
+            <div className="absolute top-0 bottom-0 -right-1 w-1.5 bg-cyan-400/60 rounded-r" />
           </div>
-
-          <button
-            type="button"
-            onClick={triggerWiper}
-            className="absolute top-16 right-4 pointer-events-auto px-3 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-cyan-400/40 text-xs text-cyan-200 hover:text-white flex items-center gap-1.5 shadow-lg transition active:scale-95 cursor-pointer"
-            title="フロントガラス・ワイパーを動かす"
-          >
-            <span>🧹</span>
-            <span>3D 雨滴ワイパー</span>
-          </button>
         </div>
       )}
     </div>
