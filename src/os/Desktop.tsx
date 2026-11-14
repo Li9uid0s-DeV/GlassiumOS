@@ -1966,10 +1966,9 @@ export function Desktop() {
       {/* ========================================================
           ACTIVE FLOATING WINDOWS (Filtered by Current Virtual Desktop)
          ======================================================== */}
-      <AnimatePresence>
-        {mountedWindows.map((win) => (
+      {mountedWindows.map((win) => (
+        <WindowErrorBoundary key={win.id} appTitle={win.title}>
           <WindowFrame
-            key={win.id}
             win={win}
             isHidden={Boolean(win.closed || win.minimized || ((win.desktopId || 'desk-1') !== activeDesktopId))}
           >
@@ -1985,8 +1984,8 @@ export function Desktop() {
               </Suspense>
             </WindowErrorBoundary>
           </WindowFrame>
-        ))}
-      </AnimatePresence>
+        </WindowErrorBoundary>
+      ))}
 
       {/* ========================================================
           WINDOWS 11 TASK VIEW / VIRTUAL DESKTOPS OVERLAY ("デスク機能")

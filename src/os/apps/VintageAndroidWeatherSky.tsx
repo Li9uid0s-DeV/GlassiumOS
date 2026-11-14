@@ -167,16 +167,19 @@ export const VintageAndroidWeatherSky: React.FC<VintageAndroidWeatherSkyProps> =
       return;
     }
     setWiperActive(true);
+    let innerTimer = 0;
     const hideTimer = window.setTimeout(() => setWiperActive(false), 1200);
     if (condition !== 'Rainy' && condition !== 'Thunderstorm') {
       return () => window.clearTimeout(hideTimer);
     }
     const interval = window.setInterval(() => {
       setWiperActive(true);
-      window.setTimeout(() => setWiperActive(false), 1200);
+      window.clearTimeout(innerTimer);
+      innerTimer = window.setTimeout(() => setWiperActive(false), 1200);
     }, 5200);
     return () => {
       window.clearTimeout(hideTimer);
+      window.clearTimeout(innerTimer);
       window.clearInterval(interval);
     };
   }, [enableWiper, wiperSweepCount, condition]);
@@ -229,7 +232,9 @@ export const VintageAndroidWeatherSky: React.FC<VintageAndroidWeatherSkyProps> =
       renderer.shadowMap.enabled = !isSoftwareGl;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-      container.innerHTML = '';
+      while (container.firstChild) {
+        container.removeChild(container.firstChild);
+      }
       container.appendChild(renderer.domElement);
 
       // Studio Environment Map (RoomEnvironment + PMREMGenerator)
@@ -583,30 +588,56 @@ export const VintageAndroidWeatherSky: React.FC<VintageAndroidWeatherSkyProps> =
     // -----------------------------------------------------------------------
     const clock = new THREE.Clock();
     let frameId = 0;
+    let isDisposed = false;
     let lightningTimer = 1.8;
     let lightningIntensity = 0;
 
     function afterDraw(cb: () => void) {
-      const gl = renderer.getContext() as WebGL2RenderingContext;
-      if (gl && typeof gl.fenceSync === 'function') {
-        const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
-        gl.flush();
-        const poll = () => {
-          const state = sync && gl.getSyncParameter(sync, gl.SYNC_STATUS);
-          if (state === gl.UNSIGNALED) {
-            frameId = window.setTimeout(poll, 5);
-          } else {
-            if (sync) gl.deleteSync(sync);
-            frameId = window.setTimeout(cb, 80);
-          }
-        };
-        frameId = window.setTimeout(poll, 5);
-      } else {
-        frameId = window.setTimeout(cb, 80);
+      if (isDisposed) return;
+      try {
+        const gl = renderer.getContext() as WebGL2RenderingContext;
+        if (gl && typeof gl.fenceSync === 'function') {
+          const sync = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0);
+          gl.flush();
+          const poll = () => {
+            if (isDisposed) {
+              try {
+                if (sync) gl.deleteSync(sync);
+              } catch {
+                // ignore
+              }
+              return;
+            }
+            let state: GLenum | number = gl.SIGNALED;
+            try {
+              state = sync ? (gl.getSyncParameter(sync, gl.SYNC_STATUS) as number) : gl.SIGNALED;
+            } catch {
+              state = gl.SIGNALED;
+            }
+            if (state === gl.UNSIGNALED) {
+              frameId = window.setTimeout(poll, 5);
+            } else {
+              try {
+                if (sync) gl.deleteSync(sync);
+              } catch {
+                // ignore
+              }
+              frameId = window.setTimeout(cb, 80);
+            }
+          };
+          frameId = window.setTimeout(poll, 5);
+        } else {
+          frameId = window.setTimeout(cb, 80);
+        }
+      } catch {
+        if (!isDisposed) {
+          frameId = window.setTimeout(cb, 80);
+        }
       }
     }
 
     function tick() {
+      if (isDisposed) return;
       const dt = Math.min(0.1, clock.getDelta());
       const elapsed = clock.getElapsedTime();
       const activeCond = conditionRef.current;
@@ -755,7 +786,12 @@ export const VintageAndroidWeatherSky: React.FC<VintageAndroidWeatherSkyProps> =
         precipInstanced.instanceMatrix.needsUpdate = true;
       }
 
-      renderer.render(scene, camera);
+      try {
+        renderer.render(scene, camera);
+      } catch {
+        return;
+      }
+      if (isDisposed) return;
       if (isSoftwareGl) {
         afterDraw(tick);
       } else {
@@ -766,24 +802,36 @@ export const VintageAndroidWeatherSky: React.FC<VintageAndroidWeatherSkyProps> =
     tick();
 
     return () => {
+      isDisposed = true;
       cancelAnimationFrame(frameId);
       clearTimeout(frameId);
       window.removeEventListener('pointermove', onPointerMove);
-      resizeObs.disconnect();
-      skyGeo.dispose();
-      skyMat.dispose();
-      terrainGeo.dispose();
-      terrainMat.dispose();
-      waterGeo.dispose();
-      waterMat.dispose();
-      puffGeo.dispose();
-      cloudMaterial.dispose();
-      precipGeo.dispose();
-      precipMat.dispose();
-      boltGeo.dispose();
-      boltMat.dispose();
-      envTarget.dispose();
-      renderer.dispose();
+      try {
+        resizeObs.disconnect();
+      } catch {
+        // ignore
+      }
+      try {
+        skyGeo.dispose();
+        skyMat.dispose();
+        terrainGeo.dispose();
+        terrainMat.dispose();
+        waterGeo.dispose();
+        waterMat.dispose();
+        puffGeo.dispose();
+        cloudMaterial.dispose();
+        precipGeo.dispose();
+        precipMat.dispose();
+        boltGeo.dispose();
+        boltMat.dispose();
+        scene.environment?.dispose();
+        renderer.dispose();
+        if (renderer.domElement && renderer.domElement.parentNode === container) {
+          container.removeChild(renderer.domElement);
+        }
+      } catch {
+        // ignore WebGL context teardown exceptions
+      }
     };
   }, []);
 

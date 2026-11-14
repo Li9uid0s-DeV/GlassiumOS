@@ -45,10 +45,11 @@ import {
 } from '../bingWallpaperService';
 import {
   GLASISPECT_MATERIALS,
+  GLASISPECT_MATERIAL_LIST,
   GlasispectMaterialId,
   Glassium6BetaConfig,
-  Glassium6TaskbarVariant,
-  Glassium6IconStyle,
+  TaskbarVariant as Glassium6TaskbarVariant,
+  GlasispectIconStyle as Glassium6IconStyle,
   loadGlassium6BetaConfig,
   saveGlassium6BetaConfig,
   materialAcousticSynth,
@@ -1260,9 +1261,9 @@ export function SettingsApp() {
 
   const renderGlassium6BetaStudio = () => {
     const activeMat =
-      GLASISPECT_MATERIALS.find((m) => m.id === betaCfg.materialId) || GLASISPECT_MATERIALS[0];
-    const gemstoneMaterials = GLASISPECT_MATERIALS.filter((m) => m.category === 'gemstone');
-    const physicalMaterials = GLASISPECT_MATERIALS.filter((m) => m.category === 'material');
+      GLASISPECT_MATERIALS[betaCfg.activeMaterial] || GLASISPECT_MATERIAL_LIST[0];
+    const gemstoneMaterials = GLASISPECT_MATERIAL_LIST.filter((m) => m.category === 'gemstone');
+    const physicalMaterials = GLASISPECT_MATERIAL_LIST.filter((m) => m.category === 'natural');
     const isCloudFog = betaCfg.taskbarVariant === 'cloud-fog';
     const isCustomDockOrTaskbar =
       betaCfg.taskbarVariant === 'dock' ||
@@ -1307,9 +1308,9 @@ export function SettingsApp() {
               onChange={(val) => {
                 updateBetaCfg({
                   betaEnabled: val,
-                  uiDesignStyle: val ? 'glasispect-material' : 'glass-classic',
+                  uiDesignStyle: val ? 'glasispect-material' : 'glass-ui',
                 });
-                materialAcousticSynth.playClick(betaCfg.materialId);
+                materialAcousticSynth.playClick(betaCfg.activeMaterial);
                 addNotification({
                   title: '【BETA】GlassiumOS 6 future',
                   message: val
@@ -1361,7 +1362,7 @@ export function SettingsApp() {
                   type="button"
                   onClick={() => {
                     updateBetaCfg({ iconStyle: st.id });
-                    materialAcousticSynth.playClick(betaCfg.materialId);
+                    materialAcousticSynth.playClick(betaCfg.activeMaterial);
                   }}
                   className={`p-3 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between gap-2.5 ${
                     active
@@ -1381,25 +1382,25 @@ export function SettingsApp() {
                       name="browser"
                       size={28}
                       forceIconStyle={st.id}
-                      forceMaterialId={betaCfg.materialId}
+                      forceMaterialId={betaCfg.activeMaterial}
                     />
                     <Icon
                       name="synth"
                       size={28}
                       forceIconStyle={st.id}
-                      forceMaterialId={betaCfg.materialId}
+                      forceMaterialId={betaCfg.activeMaterial}
                     />
                     <Icon
                       name="settings"
                       size={28}
                       forceIconStyle={st.id}
-                      forceMaterialId={betaCfg.materialId}
+                      forceMaterialId={betaCfg.activeMaterial}
                     />
                     <Icon
                       name="game"
                       size={28}
                       forceIconStyle={st.id}
-                      forceMaterialId={betaCfg.materialId}
+                      forceMaterialId={betaCfg.activeMaterial}
                     />
                   </div>
                   <div className="text-[10px] opacity-65 leading-snug">{st.sub}</div>
@@ -1423,14 +1424,14 @@ export function SettingsApp() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => materialAcousticSynth.playClick(betaCfg.materialId)}
+                onClick={() => materialAcousticSynth.playClick(betaCfg.activeMaterial)}
                 className="px-2.5 py-1 rounded-lg bg-fuchsia-500/20 hover:bg-fuchsia-500/30 border border-fuchsia-400/40 text-fuchsia-200 text-[11px] font-bold cursor-pointer"
               >
                 🔊 クリック音試聴
               </button>
               <button
                 type="button"
-                onClick={() => materialAcousticSynth.playDrag(betaCfg.materialId, 1.4)}
+                onClick={() => materialAcousticSynth.playDrag(betaCfg.activeMaterial, 1.4)}
                 className="px-2.5 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 text-cyan-200 text-[11px] font-bold cursor-pointer"
               >
                 ✨ ドラッグ摩擦音試聴
@@ -1445,7 +1446,7 @@ export function SettingsApp() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {gemstoneMaterials.map((mat) => {
-                const selected = betaCfg.materialId === mat.id;
+                const selected = betaCfg.activeMaterial === mat.id;
                 return (
                   <button
                     key={mat.id}
@@ -1455,7 +1456,7 @@ export function SettingsApp() {
                         betaEnabled: true,
                         uiDesignStyle: 'glasispect-material',
                         dockSurfaceStyle: 'glasispect-material',
-                        materialId: mat.id as GlasispectMaterialId,
+                        activeMaterial: mat.id as GlasispectMaterialId,
                       });
                       materialAcousticSynth.playClick(mat.id);
                     }}
@@ -1465,7 +1466,7 @@ export function SettingsApp() {
                         : 'border-white/15 opacity-85 hover:opacity-100'
                     }`}
                     style={{
-                      background: `linear-gradient(135deg, rgba(${mat.primaryRgb}, 0.42), rgba(${mat.secondaryRgb}, 0.25))`,
+                      background: `linear-gradient(135deg, rgba(${mat.rgb.join(', ')}, 0.42), rgba(${mat.secondaryRgb.join(', ')}, 0.25))`,
                     }}
                   >
                     <div className="flex items-center justify-between">
@@ -1476,9 +1477,9 @@ export function SettingsApp() {
                         n={mat.refractionIndex.toFixed(2)}
                       </span>
                     </div>
-                    <div className="text-[10px] opacity-80 mt-1 line-clamp-1">{mat.descJa}</div>
+                    <div className="text-[10px] opacity-80 mt-1 line-clamp-1">{mat.subtitleJa}</div>
                     <div className="text-[9px] font-mono text-cyan-200/90 mt-0.5">
-                      音: {mat.soundProfileJa}
+                      音: {mat.soundDescriptionJa}
                     </div>
                   </button>
                 );
@@ -1493,7 +1494,7 @@ export function SettingsApp() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {physicalMaterials.map((mat) => {
-                const selected = betaCfg.materialId === mat.id;
+                const selected = betaCfg.activeMaterial === mat.id;
                 return (
                   <button
                     key={mat.id}
@@ -1503,7 +1504,7 @@ export function SettingsApp() {
                         betaEnabled: true,
                         uiDesignStyle: 'glasispect-material',
                         dockSurfaceStyle: 'glasispect-material',
-                        materialId: mat.id as GlasispectMaterialId,
+                        activeMaterial: mat.id as GlasispectMaterialId,
                       });
                       materialAcousticSynth.playClick(mat.id);
                     }}
@@ -1513,7 +1514,7 @@ export function SettingsApp() {
                         : 'border-white/15 opacity-85 hover:opacity-100'
                     }`}
                     style={{
-                      background: `linear-gradient(135deg, rgba(${mat.primaryRgb}, 0.42), rgba(${mat.secondaryRgb}, 0.25))`,
+                      background: `linear-gradient(135deg, rgba(${mat.rgb.join(', ')}, 0.42), rgba(${mat.secondaryRgb.join(', ')}, 0.25))`,
                     }}
                   >
                     <div className="flex items-center justify-between">
@@ -1524,9 +1525,9 @@ export function SettingsApp() {
                         粗さ {Math.round(mat.roughness * 100)}%
                       </span>
                     </div>
-                    <div className="text-[10px] opacity-80 mt-1 line-clamp-1">{mat.descJa}</div>
+                    <div className="text-[10px] opacity-80 mt-1 line-clamp-1">{mat.subtitleJa}</div>
                     <div className="text-[9px] font-mono text-emerald-200/90 mt-0.5">
-                      音: {mat.soundProfileJa}
+                      音: {mat.soundDescriptionJa}
                     </div>
                   </button>
                 );
@@ -1615,7 +1616,7 @@ export function SettingsApp() {
                       taskbarVariant: tb.id,
                       betaEnabled: tb.id === 'glassium5-default' ? betaCfg.betaEnabled : true,
                     });
-                    materialAcousticSynth.playClick(betaCfg.materialId);
+                    materialAcousticSynth.playClick(betaCfg.activeMaterial);
                   }}
                   className={`p-2.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
                     active
@@ -1721,9 +1722,9 @@ export function SettingsApp() {
                   <div className="grid grid-cols-2 gap-1.5">
                     <button
                       type="button"
-                      onClick={() => updateBetaCfg({ dockSurfaceStyle: 'glass-classic' })}
+                      onClick={() => updateBetaCfg({ dockSurfaceStyle: 'glass-ui' })}
                       className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition cursor-pointer ${
-                        betaCfg.dockSurfaceStyle === 'glass-classic'
+                        betaCfg.dockSurfaceStyle === 'glass-ui'
                           ? 'bg-[var(--os-accent)] text-black'
                           : 'bg-white/10 hover:bg-white/15'
                       }`}
@@ -1879,7 +1880,7 @@ export function SettingsApp() {
                         type="button"
                         onClick={() => {
                           toggleBetaPinnedApp(item.appId);
-                          materialAcousticSynth.playClick(betaCfg.materialId);
+                          materialAcousticSynth.playClick(betaCfg.activeMaterial);
                         }}
                         className={`p-2 rounded-xl border text-left transition cursor-pointer flex items-center gap-2 relative ${
                           isPinned

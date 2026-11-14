@@ -321,8 +321,10 @@ export function Taskbar(_props?: TaskbarProps) {
          ============================================================== */}
       {useBetaTaskbar && (
         <Glassium6TaskbarRenderer
+          cfg={betaCfg}
           onStartClick={handleStartClick}
-          onTrayToggle={() => setTrayOpen((v) => !v)}
+          startOpen={startOpen}
+          onToggleTray={() => setTrayOpen((v) => !v)}
           trayOpen={trayOpen}
           timeStr={timeStr}
           dateStr={dateStr}
